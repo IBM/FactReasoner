@@ -19,26 +19,16 @@ import os
 import json
 import sqlite3
 import requests
-import logging
-
 from ast import literal_eval
 from dotenv import load_dotenv
 from thefuzz import fuzz
+import logging
 
 logger = logging.getLogger(__name__)
 
 class SearchAPI():
     def __init__(self, cache_dir: str = None, similarity_threshold: float = 90):
-        """ 
-        Initialize the SearchAPI with a cache directory and similarity threshold.
-        
-        Args:
-            cache_dir : str
-                Path to the SQLite database file for caching search results. If
-                it is None, then the retrieved search results are not cached.
-            similarity_threshold : float
-                Minimum similarity score (0-100) for cached results to be considered relevant.
-        """
+
         if not os.environ.get("_DOTENV_LOADED"):
             load_dotenv(override=True) 
             os.environ["_DOTENV_LOADED"] = "1"
@@ -48,22 +38,16 @@ class SearchAPI():
         self.headers = {'X-API-KEY': self.serper_key,
                         'Content-Type': 'application/json'}
 
-        # Set up database if cache_dir is not None
-        if cache_dir is not None:
-            self.do_caching = True
-            self.cache_dir = cache_dir
-            self.similarity_threshold = similarity_threshold
-            self._init_db()
-        else:
-            self.do_caching = False
+        # Set up database
+        if cache_dir is None:
+            cache_dir = "./db/google_cache.db"
+
+        self.cache_dir = cache_dir
+        self.similarity_threshold = similarity_threshold
+        self._init_db()
 
     def _init_db(self):
-        """
-        Initialize the SQLite database with FTS5 for full-text search, using 
-        WAL mode for better concurrency.
-        """
-        assert (self.do_caching is True), f"Caching requires an existing cache dir."
-
+        """Initialize the SQLite database with FTS5 for full-text search, using WAL mode for better concurrency."""
         with sqlite3.connect(self.cache_dir) as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA journal_mode=WAL;")  # Enable Write-Ahead Logging
@@ -75,18 +59,6 @@ class SearchAPI():
             conn.commit()
 
     def get_snippets(self, claim_lst):
-        """
-        Retrieve search snippets for a list of claims.
-        
-        Args:
-            claim_lst : list
-                A list of claims (strings) for which to retrieve search snippets.
-        Returns:
-            dict
-                A dictionary where keys are claims and values are lists of search results,
-                each containing a title, snippet, and link.
-        """
-        
         text_claim_snippets_dict = {}
         for query in claim_lst:
             search_result = self.get_search_res(query)
@@ -103,47 +75,24 @@ class SearchAPI():
         return text_claim_snippets_dict
 
     def get_search_res(self, query):
-        """
-        Retrieve search results for a given query, using cache if available.
-        Args:
-            query : str
-                The search query string.
-        Returns:
-            dict
-                The search results in JSON format, either from cache or from the API.
-        """
-        
-        if self.do_caching:
-            cache_key = query.strip()
-            cached_response = self._get_from_cache(cache_key)
-            if cached_response:
-                logger.info(f"CACHE HIT! key={cache_key}, q={cached_response['searchParameters']['q']}")
-                return cached_response
+        cache_key = query.strip()
+        cached_response = self._get_from_cache(cache_key)
+        if cached_response:
+            logger.info(f"CACHE HIT! key={cache_key}, q={cached_response['searchParameters']['q']}")
+            return cached_response
 
         # Make API request
         payload = json.dumps({"q": query})
         response = requests.request("POST", self.url, params={"num": 15}, headers=self.headers, data=payload)
         response_json = literal_eval(response.text)
         try:
-            if self.do_caching:
-                self._save_to_cache(cache_key, response_json)
+            self._save_to_cache(cache_key, response_json)
         except sqlite3.Error as e:
             logger.error(f"Error saving to cache: {e}. Continuing...")
         return response_json
 
     def _get_from_cache(self, query):
-        """
-        Retrieve the top 3 most relevant cached search results and use 
-        fuzz.token_sort_ratio to pick the best one.
-        
-        Args:
-            query : str
-                The search query string to look up in the cache.
-        Returns:
-            dict or None
-                The best matching cached search result as a dictionary, or None if no match is found.
-        """
-
+        """Retrieve the top 3 most relevant cached search results and use fuzz.token_sort_ratio to pick the best one."""
         # Escape double quotes for FTS5
         query = query.replace('"', '""')
 
@@ -166,20 +115,7 @@ class SearchAPI():
         return json.loads(best_match[1]) if best_score > self.similarity_threshold else None
 
     def _save_to_cache(self, query, response_json):
-        """
-        Save a search result to the SQLite FTS5 cache with transactions.
-        
-        Args:
-            query : str
-                The search query string to cache.
-            response_json : dict
-                The search result in JSON format to cache.
-        Returns:
-            None
-        Raises:
-            sqlite3.Error: If there is an error during the database operation.
-        """
-        
+        """Save a search result to the SQLite FTS5 cache with transactions."""
         # Do not cache empty search results
         organic_res = response_json.get("organic", [])
         if len(organic_res) == 0:
@@ -201,7 +137,7 @@ class SearchAPI():
 
 if __name__ == '__main__':
     
-    cache_dir = None # "my_database.db"
+    cache_dir = "my_database.db"
 
     text = "Neil B. Todd was an American geneticist"
     # text = "Lanny Flaherty is an American."

@@ -13,38 +13,131 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Split the input text into atomic facts/claims (LLM based).
+# Split the input text into atomic facts/claims (based on FactBench/VERIFY).
 
 from typing import Any, List
 from tqdm import tqdm
 
-# if not __package__:
-#     # Make CLI runnable from source tree with
-#     #    python src/package
-#     package_source_path = os.path.dirname(os.path.dirname(__file__))
-#     sys.path.insert(0, package_source_path)
-
-# Local imports
-from src.fact_reasoner.prompts import ATOM_EXTRACTION_PROMPT_V1, ATOM_EXTRACTION_PROMPT_V2
+from src.fact_reasoner.utils import RITS_MODELS, DEFAULT_PROMPT_BEGIN, DEFAULT_PROMPT_END
 from src.fact_reasoner.llm_handler import LLMHandler
+
+# v1
+ATOM_EXTRACTION_PROMPT1 = """{_PROMPT_BEGIN_PLACEHOLDER}
+Instructions:
+1. You are given a paragraph. Your task is to break the sentence down into a list of atomic statements without adding any new information.
+2. An atomic statement is a sentence containing a singular piece of information directly extracted from the provided paragraph.
+3. Atomic statements may contradict one another.
+4. The paragraph may contain information that is factually incorrect. Even in such cases, you are not to alter any information contained in the paragraph and must produce atomic statements that are completely faithful to the information in the paragraph.
+5. Each atomic statement in the outputted list should check a different piece of information found explicitly in the paragraph.
+6. Each atomic statement is standalone in that any actual nouns or proper nouns should be used in place of pronouns or anaphors.
+7. Each atomic statement must not include any information beyond what is explicitly stated in the provided paragraph.
+8. Where possible, avoid paraphrasing and instead try to only use language used in the paragraph without introducing new words. 
+9. Use the previous examples to learn how to do this.
+10. You should only output the atomic statement as a list, with each item starting with "- ". Do not include other formatting.
+11. Your task is to do this for the last paragraph that is given. 
+
+Example 1:
+Please breakdown the following paragraph into independent statements: Glenn Allen Anzalone (born June 23, 1955), better known by his stage name Glenn Danzig, is an American singer, songwriter, musician, and record producer. He is the founder of the rock bands Misfits, Samhain, and Danzig. He owns the Evilive record label as well as Verotik, an adult-oriented comic book publishing company.
+- Glenn Allen Anzalone was born on June 23, 1955.
+- Glenn Allen Anzalone is better known by his stage name Glenn Danzig.
+- Glenn Danzig is an American singer, songwriter, musician, and record producer.
+- Glenn Danzig is the founder of several rock bands, including Misfits, Samhain, and Danzig.
+- Glenn Danzig owns the Evilive record label.
+- Glenn Danzig owns Verotik, which is an adult-oriented comic book publishing company.
+
+Example 2:
+Please breakdown the following paragraph into independent statements: Luiz Inácio Lula da Silva (born 27 October 1945), also known as Lula da Silva or simply Lula, is a Brazilian politician who is the 39th and current president of Brazil since 2023. A member of the Workers' Party, Lula was also the 35th president from 2003 to 2010. He also holds the presidency of the G20 since 2023. Lula quit school after second grade to work, and did not learn to read until he was ten years old. As a teenager, he worked as a metalworker and became a trade unionist.
+- Luiz Inácio Lula da Silva was born on October 27, 1945.
+- Luiz Inácio Lula da Silva is also known as Lula da Silva or simply Lula.
+- Lula is a Brazilian politician.
+- Lula is the 39th and current president of Brazil since 2023.
+- Lula is a member of the Workers' Party.
+- Lula served as the 35th president of Brazil from 2003 to 2010.
+- Lula holds the presidency of the G20 since 2023.
+- Lula quit school after the second grade to work.
+- Lula did not learn to read until he was ten years old.
+- As a teenager, Lula worked as a metalworker.
+- Lula became a trade unionist.
+
+Your task:
+Please breakdown the following paragraph into independent statements: {_RESPONSE_PLACEHOLDER}{_PROMPT_END_PLACEHOLDER}
+"""
+
+# v2
+ATOM_EXTRACTION_PROMPT2 = """{_PROMPT_BEGIN_PLACEHOLDER}
+
+Instructions: 
+- Exhaustively break down the following text into independent content units. Each content unit can take one of the following forms:
+  a. Fact: An objective piece of information that can be proven or verified.
+  b. Claim: A statement or assertion that expresses a position or viewpoint on a particular topic.
+  c. Instruction: A directive or guidance on how to perform a specific task.
+  d. Data Format: Any content presented in a specific format, including code, mathematical notations, equations, variables, technical symbols, tables, or structured data formats.
+  e. Meta Statement: Disclaimers, acknowledgments, or any other statements about the nature of the response or the responder.
+  f. Question: A query or inquiry about a particular topic.
+  g. Other: Any other relevant content that doesn't fit into the above categories.
+- Label each content unit with its corresponding unit type using the format: [content unit]: [content unit type]
+- You should only output the independent content units as a list, with each item starting with "- ". Do not include any explanations, other formatting or preamble text.
+- Refer to the following examples to understand the task and output formats. 
+
+Example 1:
+TEXT: Zhejiang Huafang Pharmaceutical Co., Ltd. is a leading chemical company based in China that specializes in the research, manufacturing, and sales of various pharmaceutical products, including excipients and intermediates. The company was founded in 2018 and is located in Hangzhou, a city with a rich history in eastern China. Zhejiang Huafang Pharmaceutical Co., Ltd. is committed to providing high-quality products to its customers in the healthcare industry. The company's manufacturing facilities are equipped with state-of-the-art technology and infrastructure that ensure the production of high-quality products. Overall, Zhejiang Huafang Pharmaceutical Co., Ltd. is a reputable pharmaceutical company with a long history of success in the healthcare industry. The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical research and development.
+
+UNITS:
+- Zhejiang Huafang Pharmaceutical Co., Ltd. is a leading chemical company: Fact
+- Zhejiang Huafang Pharmaceutical Co., Ltd. is based in China: Fact
+- Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the research of various pharmaceutical products: Fact
+- Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the manufacturing of various pharmaceutical products: Fact
+- Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the sales of various pharmaceutical products: Fact
+- excipients are the pharmaceutical products of the Zhejiang Huafang Pharmaceutical Co., Ltd.: Fact
+- intermediates are the pharmaceutical products of the Zhejiang Huafang Pharmaceutical Co., Ltd.: Fact
+- The company was founded in 2018: Fact
+- The company is located in Hangzhou: Fact
+- Hangzhou is a city: Fact
+- Hangzhou has a rich history in eastern China: Fact
+- Zhejiang Huafang Pharmaceutical Co., Ltd. is committed to providing high-quality products to its customers in the healthcare industry: Claim
+- The company's manufacturing facilities are equipped with state-of-the-art technology: Fact
+- The company's manufacturing facilities are equipped with state-of-the-art infrastructure: Fact
+- The company's manufacturing facilities are equipped with state-of-the-art technology and infrastructure that ensure the production of high-quality products: Claim
+- Zhejiang Huafang Pharmaceutical Co., Ltd. is a reputable pharmaceutical company: Claim
+- Zhejiang Huafang Pharmaceutical Co., Ltd. has a long history of success in the healthcare industry: Claim
+- The company is committed to quality: Claim
+- The company is committed to innovation: Claim
+- The company is committed to customer service: Claim
+- The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical research: Claim
+- The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical development: Claim
+
+Example 2:
+TEXT: I'm here to help you make an informed decision. Both the RTX 3060 Ti and RTX 3060 are powerful GPUs, and the difference between them lies in their performance. The RTX 3060 Ti has more CUDA cores (4864 vs 3584) but a lower boost clock speed (1665 MHz vs 1777 MHz) compared to the RTX 3060. In terms of memory bandwidth, the RTX 3060 Ti has a slight edge over the RTX 3060 with a bandwidth of 448 GB/s compared to 360 GB/s. However, the difference is relatively small. It's important to consider other factors such as the power consumption, cooling system, and compatibility with your system when making a decision."
+
+UNITS: 
+- I'm here to help you make an informed decision: Meta Statement
+- The RTX 3060 Ti is a powerful GPU: Claim
+- The RTX 3060 is a powerful GPU: Claim
+- The difference between them lies in their performance: Claim
+- The RTX 3060 Ti has more CUDA cores compared to the RTX 3060: Fact
+- The RTX 3060 Ti has 4864 CUDA cores: Fact
+- The RTX 3060 has 3584 CUDA cores: Fact
+- The RTX 3060 Ti has a lower boost clock speed compared to the RTX 3060: Fact
+- The RTX 3060 Ti has a boost clock speed of 1665 MHz: Fact
+- The RTX 3060 has a boost clock speed of 1777 MHz: Fact
+- The RTX 3060 Ti has a slight edge over the RTX 3060 in terms of memory bandwidth: Fact
+- The RTX 3060 Ti has a memory bandwidth of 448 GB/s: Fact
+- The RTX 3060 has a memory bandwidth of 360 GB/s: Fact
+- The difference is relatively small: Claim
+- It's important to consider other factors such as power consumption when making a decision: Instruction
+- It's important to consider other factors such as cooling system when making a decision: Instruction
+- It's important to consider other factors such as compatibility with your system when making a decision: Instruction
+
+Your Task:
+TEXT: {_RESPONSE_PLACEHOLDER}
+
+UNITS:{_PROMPT_END_PLACEHOLDER}
+"""
 
 _ATOM = 'atom'
 _LABEL = 'label'
 
 def text_to_units(text: str, separator: str = '- ') -> List[str]:
-    """
-    Parse the input text into atomic units and their labels.
-
-    Args:
-        text: str
-            The input text containing atomic units.
-        separator: str
-            The separator used to identify the start of each atomic unit.
-
-    Returns:
-        List[str]: A list of atomic units.
-    """
-
     parsed_units = []
     parsed_labels = []
     current_unit = []
@@ -88,20 +181,11 @@ def text_to_units(text: str, separator: str = '- ') -> List[str]:
     
     return parsed_units, parsed_labels
 
-def convert_atomic_units_to_dicts_(labels: List[str], units: List[str]) -> List[dict[str, Any]]:
-    """
-    Convert atomic units and their labels into a list of dictionaries.
-    
-    Args:
-        labels: List[str]
-            A list of labels for the atomic units.
-        units: List[str]
-            A list of atomic units (facts or claims).
+def convert_atomic_units_to_dicts_(
+    labels: List[str], 
+    units: List[str]
+) -> List[dict[str, Any]]:
 
-    Returns:
-        List[dict[str, Any]]: A list of dictionaries where each dictionary contains
-        a label and its corresponding atomic unit.
-    """
     return [
         {_LABEL: label, _ATOM: atom}
         for label, atom in zip(labels, units)
@@ -109,84 +193,59 @@ def convert_atomic_units_to_dicts_(labels: List[str], units: List[str]) -> List[
  
 class AtomExtractor(object):
     """
-    Main class for atomic unit decomposition (i.e., atom extraction). 
-    An atomic unit is either a fact or a claim.
+    Main class for atomic unit decomposition. An atomic unit is either a fact
+    or a claim.
     """
 
     def __init__(
         self, 
-        model_id: str = "llama-3.1-70b-instruct",
+        model: str = "llama-3.1-70b-instruct",
         prompt_version: str = "v1",
-        backend: str = "rits"
+        RITS: bool = True
     ):
         """
         Initialize the AtomExtractor.
 
         Args:
-            model_id: str
-                The model id used for extraction.
+            model: str
+                The model id (RITS) used for extraction.
             prompt_version: str
                 The prompt version used for the model (v1 - original, v2 - newer)
-            backend: str
-                The model's backend (rits, hf or wx).
         """ 
-        
-        # Initialize the extractor
-        self.model_id = model_id
-        self.backend = backend
+            
+        self.model = model
         self.prompt_version = prompt_version
-        self.llm_handler = LLMHandler(self.model_id, backend=backend)
 
-        # Set the prompt begin and end templates
-        self.prompt_begin = self.llm_handler.get_prompt_begin()
-        self.prompt_end = self.llm_handler.get_prompt_end()
+        self.rits_model_info = RITS_MODELS[model] #only used to ger prompt begin/end
+        self.prompt_begin = self.rits_model_info.get("prompt_begin", DEFAULT_PROMPT_BEGIN)
+        self.prompt_end = self.rits_model_info.get("prompt_end", DEFAULT_PROMPT_END)
         
-        print(f"[AtomExtractor] Using LLM on {self.backend}: {self.model_id}")
+        self.llm_handler = LLMHandler(self.model, RITS=RITS)
+
+     
+        print(f"[AtomExtractor] Using LLM on {RITS*'RITS'}{(not RITS)*'vLLM'}: {self.model}")
         print(f"[AtomExtractor] Using prompt version: {self.prompt_version}")
 
     def make_prompt(self, response: str) -> str:
-        """
-        Create the prompt for atom extraction based on the response.
-        
-        Args:
-            response: str
-                The response from which to extract atomic units.
-        
-        Returns:
-            str: The formatted prompt for the LLM.
-        """
-
         if self.prompt_version == "v1":
-            prompt = ATOM_EXTRACTION_PROMPT_V1.format(
+            prompt = ATOM_EXTRACTION_PROMPT1.format(
                 _RESPONSE_PLACEHOLDER=response,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
                 _PROMPT_END_PLACEHOLDER=self.prompt_end
             )
         elif self.prompt_version == "v2":
-            prompt = ATOM_EXTRACTION_PROMPT_V2.format(
+            prompt = ATOM_EXTRACTION_PROMPT2.format(
                 _RESPONSE_PLACEHOLDER=response,
                 _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
                 _PROMPT_END_PLACEHOLDER=self.prompt_end
             )
         else:
-            raise ValueError(f"Unknown prompt version: {self.prompt_version}. "
-                    f"Supported versions are: 'v1', 'v2'.")
+            raise ValueError(f"AtomExtractor: Uknown prompt version {self.prompt_version}.")
         
         return prompt
 
     def get_atoms_from_response(self, response: str):
-        """
-        Extract atomic units from a single response.
-        Args:
-            response: str
-                The response from which to extract atomic units.
-
-        Returns:
-            List[str]: A list of atomic units (facts or claims).
-            List[str]: A list of labels corresponding to the atomic units.
-        """
-
-        print(f"[AtomExtractor] Prompts created: 1")
+        print(f"[AtomExtractor] Prompt created: 1")
         prompt = self.make_prompt(response)
         response = self.llm_handler.completion(prompt)
         output = response.choices[0].message.content
@@ -195,17 +254,6 @@ class AtomExtractor(object):
         return units, labels
 
     def get_atoms_from_responses(self, responses: List[str]):
-        """
-        Extract atomic units from multiple responses.
-        Args:
-            responses: List[str]
-                A list of responses from which to extract atomic units.
-        
-        Returns:
-            List[List[str]]: A list of lists, where each inner list contains atomic units (facts or claims).
-            List[List[str]]: A list of lists, where each inner list contains labels corresponding to the atomic units.
-        """
-
         results = []
         prompts = [self.make_prompt(response) for response in responses]
         print(f"[AtomExtractor] Prompts created: {len(prompts)}")
@@ -226,19 +274,9 @@ class AtomExtractor(object):
             units, labels = text_to_units(result)
             all_units.append(units)
             all_labels.append(labels)
-        
         return all_units, all_labels
 
-    def run(self, response: str) -> dict[str, Any]:
-        """ Extract atomic units from a single response.
-        Args:
-            response: str
-                The response from which to extract atomic units.
-        Returns:
-            dict: A dictionary containing the number of atomic units, the units themselves,
-            all atomic units as dictionaries, and all facts as dictionaries.
-        """
-
+    def run(self, response: str):
         units, labels = self.get_atoms_from_response(response)
         # print(f"units: {units}, labels: {labels}")
         units_as_dict = convert_atomic_units_to_dicts_(labels, units)
@@ -251,16 +289,7 @@ class AtomExtractor(object):
             'all_facts': facts_as_dict
         }
     
-    def runall(self, responses: List[str]) -> List[dict[str, Any]]:
-        """ Extract atomic units from multiple responses.
-        Args:
-            responses: List[str]
-                A list of responses from which to extract atomic units.
-
-        Returns:
-            List[dict]: A list of dictionaries, where each dictionary contains the number of atomic units,
-            the units themselves, all atomic units as dictionaries, and all facts as dictionaries."""
-
+    def runall(self, responses: List[str]):
         results = []
         units, labels = self.get_atoms_from_responses(responses)
         # print(f"units: {units}, labels: {labels}")
@@ -278,11 +307,10 @@ class AtomExtractor(object):
 
 if __name__ == "__main__":
 
-    model_id = "llama-3.3-70b-instruct"
+    model = "llama-3.3-70b-instruct"
     prompt_version = "v2"
-    backend = "rits"
 
-    extractor = AtomExtractor(model_id=model_id, prompt_version=prompt_version, backend=backend)
+    extractor = AtomExtractor(model=model, prompt_version=prompt_version)
 
     response = "The Apollo 14 mission to the Moon took place on January 31, 1971. \
         This mission was significant as it marked the third time humans set \

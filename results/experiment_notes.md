@@ -1,0 +1,25 @@
+- v1 — original pipeline
+  - WikiContradict results: Llama 3.3 70B: 0.70, Qwen 2.5 72B: 0.70
+- v2 — efficiency adjustments
+  - WikiContradict results: Llama 3.3 70B: 0.69, Qwen 2.5 72B: 0.71
+- v3 — incorporate answer1 and answer2 in WikiContradict evaluation
+  - WikiContradict results: Llama 3.3 70B: 0.72, Qwen 2.5 72B: 0.70
+- v4 — consider directionality of edges when calculating comprehensiveness
+  - WikiContradict results: Llama 3.3 70B: 0.71, Qwen 2.5 72B: 0.71
+- v5 — consider equivalence clusters when calculating comprehensiveness
+  - WikiContradict results: Llama 3.3 70B: 0.71, Qwen 2.5 72B: 0.71
+- v6 — parallelise answer generation and comparison, use reasoning in answer comparison, adjust tool calling logic (directly use results from tool calls)
+  - WikiContradict results: Llama 3.3 70B: 0.67, Qwen 2.5 72B: 0.65
+- v7 — fix issue in processing "second more specific" comparison results
+  - WikiContradict results: Llama 3.3 70B: 0.69, Qwen 2.5 72B: 0.67
+- v8 — partially revert v6, answer all questions in the same context
+  - WikiContradict results: Llama 3.3 70B: 0.69, Qwen 2.5 72B: 0.67
+- v9 — continue reverting changes in v6 due to the reduction in performance
+  - WikiContradict results: Llama 3.3 70B: 0.72, Qwen 2.5 72B: 0.72
+- v10 — restore parallel answer comparison and tool call changes, with additional tweaks aiming to address performance issues
+  - WikiContradict results: Llama 3.3 70B: 0.72, Qwen 2.5 72B: 0.71
+- v11 — refactored version with an NLI option
+  - Q&A WikiContradict results: Llama 3.3 70B: 0.73, Qwen 2.5 72B: 0.71
+  - NLI WikiContradict results: Llama 3.3 70B: 0.55, Qwen 2.5 72B: 0.63
+- v12 — small code updates for additional models (gpt-oss-20b) as well as running with experiment orchestrator
+  - See results in `analysis.ipynb`.

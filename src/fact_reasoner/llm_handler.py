@@ -1,30 +1,25 @@
-# coding=utf-8
-# Copyright 2023-present the International Business Machines.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
+from copy import deepcopy
 import os
 import litellm
+from litellm.exceptions import (
+    Timeout,
+    RateLimitError,
+    APIConnectionError,
+    APIError,
+    ServiceUnavailableError,
+    InternalServerError,
+)
+from litellm.types.utils import Choices, ModelResponse
 import torch
-
-from vllm import LLM, SamplingParams
 from dotenv import load_dotenv
-
-# Local imports
-from src.fact_reasoner.utils import DEFAULT_PROMPT_BEGIN, DEFAULT_PROMPT_END, get_models_config
+from src.fact_reasoner.utils import RITS_MODELS, DEFAULT_PROMPT_BEGIN, DEFAULT_PROMPT_END, HF_MODELS
+from tenacity import Retrying, stop_after_attempt, wait_random_exponential
+from typing import cast
 
 GPU = torch.cuda.is_available()
 DEVICE = GPU*"cuda" + (not GPU)*"cpu"
+
+GPT_RETRY_PROMPT = """IMPORTANT: This is a retry because the previous attempt got stuck in a reasoning loop and exceeded the maximum token limit. To avoid this, please keep your reasoning very short and aim to provide an answer as early as possible, even if you are uncertain. It is paramount that you return a response in the correct format quickly, regardless of whether it might be imperfect.\n\n"""
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -33,127 +28,95 @@ class dotdict(dict):
     __delattr__ = dict.__delitem__
 
 class LLMHandler:
-    """
-    A handler for LLMs that can switch between different backends like rits,
-    huggingface, or watsonx. It is possible to extend the handler to support
-    additional backends like openai or anthropic.
-    """
-
-    def __init__(self, model_id: str, backend: str = "rits", dtype="auto", **default_kwargs):
+    def __init__(self, 
+                 model: str,  
+                 RITS: bool = True, 
+                 dtype="auto",
+                 **default_kwargs
+    ):
         """
         Initializes the LLM handler.
 
-        Args:
-            model_id: str
-                The model name or path to load.
-            backend: str
-                The model's backend such as [rits, hf, wx].
-            dtype: str
-                The data type for the model (e.g., "auto", "half", "bfloat16").
-            default_kwargs: dict
-                Default parameters to pass to completion calls (e.g., temperature, max_tokens).
+        :param model_id: Model name or path.
+        :param RITS: If True, use RITS model; if False, load using vLLM.
+        :param default_kwargs: Default parameters (e.g., temperature, max_tokens) to pass to completion calls.
         """
-
-        self.backend = backend  # The model's backend: one of [rits, hf, wx]
+        self.RITS = RITS
         self.default_kwargs = default_kwargs  # Store common parameters for completions
-        assert backend in ["rits", "hf", "wx"], \
-            f"Model backend {backend} is not supported yet. Use `rits`, `hf` or `wx` only."
-        
-        self.models_config = get_models_config()
-        if self.backend == "hf":
-            self.HF_model_info = self.models_config["HF_MODELS"][model_id]
-            self.model_id = self.HF_model_info.get("model_id", None)
+
+        if not self.RITS:
+            from vllm import LLM
+            self.HF_model_info = HF_MODELS[model]
+            self.model_id = self.HF_model_info["model_id"]
             assert self.model_id is not None
             print(f"Loading local model with vLLM: {self.model_id}...")
             self.llm = LLM(model=self.model_id, device=DEVICE, dtype=dtype)  # Load model using vLLM
-        elif self.backend == "rits":
+        else:
 
             if not os.environ.get("_DOTENV_LOADED"):
                 load_dotenv(override=True) 
                 os.environ["_DOTENV_LOADED"] = "1"
             
             self.RITS_API_KEY = os.getenv("RITS_API_KEY")
-            self.model_id = model_id
-            self.rits_model_info = self.models_config["RITS_MODELS"][model_id]
+
+            self.rits_model_info = RITS_MODELS[model]
 
             self.prompt_template = self.rits_model_info.get("prompt_template", None)
             self.max_new_tokens = self.rits_model_info.get("max_new_tokens", None)
             self.api_base = self.rits_model_info.get("api_base", None)
-            self.model_id = self.rits_model_info.get("model_id", None)
+            self.model_id = self.rits_model_info["model_id"]
             self.prompt_begin = self.rits_model_info.get("prompt_begin", DEFAULT_PROMPT_BEGIN)
             self.prompt_end = self.rits_model_info.get("prompt_end", DEFAULT_PROMPT_END)
             assert self.prompt_template is not None \
                 and self.max_new_tokens is not None \
                 and self.api_base is not None \
                 and self.model_id is not None
-            
-            print(f"[LLMHandler] Using API key: {self.RITS_API_KEY}")
-            print(f"[LLMHandler] Using model id: {self.model_id}")
-            print(f"[LLMHandler] Using model info: {self.rits_model_info}")
-            print(f"[LLMHandler] Initialization completed.")
 
-        elif self.backend == "wx":
-            raise ValueError(f"WatsonX backend is not supported yet.")
-        else:
-            raise ValueError(f"Uknown backend value: {self.backend}")
 
-    def get_prompt_begin(self):
-        """
-        Returns the prompt begin template for the model.
-        """
-
-        if self.backend == "rits":
-            return self.prompt_begin
-        else:
-            return ""  # vLLM does not use a prompt begin template
-    
-    def get_prompt_end(self):
-        """
-        Returns the prompt end template for the model.
-        """
-
-        if self.backend == "rits":
-            return self.prompt_end
-        else:
-            return "" # vLLM does not use a prompt end template
-
-    def completion(self, prompt, **kwargs):
+    def completion(self, prompt: str | None = None, messages: list[dict[str, str]] = [], **kwargs):
         """
         Generate a response using the RITS API (if RITS=True) or the local model.
 
-        Args:
-            prompt: str
-                The prompt or a list of prompts to generate responses for.
-            kwargs: dict
-                Additional parameters for completion (e.g., temperature, max_tokens).
+        :param prompt: The prompt.
+        :param messages: A list of messages in a chat format.
+        :param kwargs: Additional parameters for completion (overrides defaults).
         """
-        return self._call_model(prompt, **kwargs)
+        prompts = prompt if prompt is not None else []
+        return self._call_model(prompts, messages=messages, **kwargs)
 
     def batch_completion(self, prompts, **kwargs):
         """
         Generate responses in batch using the RITS API (if RITS=True) or the local model.
 
-        Args:
-            prompts: list of str
-                A list of prompts to generate responses for.
-            kwargs: dict
-                Additional parameters for batch completion (e.g., temperature, max_tokens).
+        :param prompts: List of prompts.
+        :param kwargs: Additional parameters for batch completion.
         """
-        return self._call_model(prompts, **kwargs)
+        responses = self._call_model(prompts, **kwargs)
+        assert responses is not None, "Unexpected None responses from model."
+        return responses
 
-    def _call_model(self, prompts, num_retries=5, **kwargs):
+
+    def _call_model(
+        self,
+        prompts: str | list[str] = [],
+        messages: list[dict[str, str]] = [],
+        num_internal_retries=5,
+        retry_after=3,
+        num_outer_retries=4,
+        expect_content=False,
+        **kwargs,
+    ):
         """
         Handles both single and batch generation.
 
-        Args:
-            prompts: str or list of str
-                The prompt or a list of prompts to generate responses for.
-            num_retries: int
-                Number of retries for the API call in case of failure.
-            kwargs: dict
-                Additional parameters for completion (e.g., temperature, max_tokens).               
+        :param prompts: A single string or a list of strings.
+        :param messages: A list of messages in a chat format.
+        :param kwargs: Additional parameters.
+        :param num_internal_retries: The number of litellm completion retries.
+        :param retry_after: Retry after value for litellm.
+        :param num_outer_retries: The number of outer retries using Tenacity.
+        :param expect_content: Whether to expect non-null content on the response.
         """
-
         params = {
             "temperature": 0,
             "seed": 42,
@@ -163,33 +126,180 @@ class LLMHandler:
             **kwargs
         }  # Merge defaults with provided params
 
-        if self.backend == "rits":
+        if self.RITS:
             # Ensure we always send a list to batch_completion
-            if isinstance(prompts, str):
-                return litellm.completion(
-                    model=self.model_id,
-                    api_base=self.api_base,
-                    messages=[{"role": "user", "content": prompts}],  # Wrap prompt for compatibility
-                    api_key=self.RITS_API_KEY,
-                    num_retries=num_retries,
-                    extra_headers={
-                        "RITS_API_KEY": self.RITS_API_KEY
-                    },
-                    **params
-                )
-            return litellm.batch_completion(
-                model=self.model_id,
-                api_base=self.api_base,
-                messages=[[{"role": "user", "content": p}] for p in prompts],  # Wrap each prompt
-                api_key=self.RITS_API_KEY,
-                num_retries=num_retries,
-                extra_headers={
-                    "RITS_API_KEY": self.RITS_API_KEY
-                },
-                **params
-            )
+            if messages or isinstance(prompts, str):
+                if not messages:
+                    prompts = cast(str, prompts)
+                    messages = [{"role": "user", "content": prompts}]  # Wrap prompt for compatibility
+                got_empty_content = False
+                for attempt in Retrying(
+                    stop=stop_after_attempt(num_outer_retries),
+                    wait=wait_random_exponential(multiplier=30, max=180),
+                ):
+                    with attempt:
+                        current_messages = deepcopy(messages)
+                        attempt_number = attempt.retry_state.attempt_number
+                        if (
+                            "gpt-oss" in self.model_id
+                            and got_empty_content
+                            and attempt_number > 1
+                            and attempt_number > (num_outer_retries - 2)
+                        ):
+                            # gpt-oss occasionaly starts cycling in its reasoning process
+                            # without ever generating an answer. We try to nudge it to
+                            # shorten its reasoning here.
+                            last_message = current_messages[-1]
+                            if last_message["role"] != "user":
+                                print(
+                                    "WARNING: Unable to adjust prompt for gpt-oss retry."
+                                )
+                            else:
+                                last_message["content"] = (
+                                    GPT_RETRY_PROMPT + last_message["content"]
+                                )
+                                print("INFO: Modified model prompt:")
+                                print(last_message["content"])
+                        got_empty_content = False
+                        response = litellm.completion(
+                            model=self.model_id,
+                            api_base=self.api_base,
+                            messages=current_messages,
+                            api_key=self.RITS_API_KEY,
+                            num_retries=num_internal_retries,
+                            retry_after=retry_after,
+                            extra_headers={"RITS_API_KEY": self.RITS_API_KEY},
+                            **params,
+                        )
+                        if any(
+                            isinstance(response, c)
+                            for c in [
+                                Timeout,
+                                RateLimitError,
+                                APIConnectionError,
+                                APIError,
+                                ServiceUnavailableError,
+                                InternalServerError,
+                            ]
+                        ):
+                            error_name = type(response).__name__
+                            print(
+                                f"WARNING: Retrying completion due to {error_name}!"
+                            )
+                            raise ValueError(
+                                f"Retrying due to {error_name}"
+                            )
+                        if expect_content and (
+                            not isinstance(response, ModelResponse)
+                            or not isinstance(response.choices[0], Choices)
+                            or not isinstance(response.choices[0].message.content, str)
+                        ):
+                            got_empty_content = True
+                            if isinstance(response, ModelResponse) and isinstance(
+                                response.choices[0], Choices
+                            ):
+                                # Remove logprobs from the response, as they result
+                                # in overly verbose output
+                                response.choices[0].logprobs = None
+                            print(
+                                f"WARNING: Retrying due to unexpected response without content: {response}"
+                            )
+                            raise ValueError(
+                                f"Retrying due to unexpected response without content: {response}"
+                            )
+                        return response
 
-        elif self.backend == "hf":
+            got_empty_content = False
+            for attempt in Retrying(
+                stop=stop_after_attempt(num_internal_retries),
+                wait=wait_random_exponential(multiplier=30, max=180),
+            ):
+                with attempt:
+                    current_prompts = deepcopy(prompts)
+                    attempt_number = attempt.retry_state.attempt_number
+                    if (
+                        "gpt-oss" in self.model_id
+                        and got_empty_content
+                        and attempt_number > 1
+                        and attempt_number > (num_outer_retries - 2)
+                    ):
+                        # gpt-oss occasionaly starts cycling in its reasoning process
+                        # without ever generating an answer. We try to nudge it to
+                        # shorten its reasoning here.
+                        current_prompts = [GPT_RETRY_PROMPT + p for p in current_prompts]
+                        print("INFO: Modified model prompts, e.g.:")
+                        print(current_prompts[0])
+                    got_empty_content = False
+                    responses = litellm.batch_completion(
+                        model=self.model_id,
+                        api_base=self.api_base,
+                        messages=[
+                            [{"role": "user", "content": p}] for p in current_prompts
+                        ],  # Wrap each prompt
+                        api_key=self.RITS_API_KEY,
+                        num_retries=num_internal_retries,
+                        retry_after=retry_after,
+                        extra_headers={"RITS_API_KEY": self.RITS_API_KEY},
+                        **params,
+                    )
+                    error_response = next(
+                        (
+                            r
+                            for r in responses
+                            if any(
+                                isinstance(r, c)
+                                for c in [
+                                    Timeout,
+                                    RateLimitError,
+                                    APIConnectionError,
+                                    APIError,
+                                    ServiceUnavailableError,
+                                    InternalServerError,
+                                ]
+                            )
+                        ),
+                        None,
+                    )
+                    if error_response is not None:
+                        error_name = type(error_response).__name__
+                        print(
+                            f"WARNING: Retrying batch completion due to {error_name}!"
+                        )
+                        raise ValueError(f"Retrying due to {error_name}.")
+                    empty_response = next(
+                        (
+                            r
+                            for r in responses
+                            if expect_content
+                            and (
+                                not isinstance(r, ModelResponse)
+                                or not isinstance(r.choices[0], Choices)
+                                or not isinstance(r.choices[0].message.content, str)
+                            )
+                        ),
+                        None,
+                    )
+                    if empty_response is not None:
+                        got_empty_content = True
+                        if isinstance(empty_response, ModelResponse) and isinstance(
+                            empty_response.choices[0], Choices
+                        ):
+                            # Remove logprobs from the response, as they result
+                            # in overly verbose output
+                            empty_response.choices[0].logprobs = None
+                        print(
+                            f"WARNING: Retrying batch completion due to unexpected response without content {empty_response}"
+                        )
+                        raise ValueError(
+                            f"Retrying due to unexpected response without content: {empty_response}"
+                        )
+                    return responses
+        else:
+            from vllm import SamplingParams
+
+            if messages:
+                raise NotImplementedError("Chat-style inputs are not yet supported for vLLM.")
+
             # Ensure prompts is always a list for vLLM
             if isinstance(prompts, str):
                 prompts = [prompts]
@@ -211,9 +321,7 @@ class LLMHandler:
             #return [output.outputs[0].text for output in outputs] #TODO: make output consistent with that of RITS
 
     def transform_vllm_response(self, response_obj):
-        """
-        Transform the vLLM response to match the expected litellm format.
-        """
+    
         output_obj = response_obj.outputs[0]  
 
         # Extract the generated text
@@ -241,10 +349,7 @@ class LLMHandler:
         return transformed_response
 
     def recursive_print(self, obj, indent=0):
-        """
-        Recursively print objects, lists, and dicts for deep inspection.
-        """
-        
+        """Recursively print objects, lists, and dicts for deep inspection."""
         prefix = "  " * indent  # Indentation for readability
 
         if isinstance(obj, list):
@@ -270,15 +375,14 @@ class LLMHandler:
 if __name__ == "__main__":
 
     """
-    Test to compare remote (rits) and local (hf) outputs.
+    Test to compare RITS (litellm) and local (vLLM) outputs.
     """
     test_prompt = "What is the capital of France?"
 
     # RITS (litellm) API
-    print(f"Test LLMHandler on remote backend (rits)...")
     remote_handler = LLMHandler(
-        model_id="llama-3.3-70b-instruct",
-        backend="rits",
+        model="llama-3.1-70b-instruct",
+        RITS=True,
     )
     
     remote_response = remote_handler.completion(
@@ -293,16 +397,15 @@ if __name__ == "__main__":
     """
     local_handler = LLMHandler(
         model="mixtral-8x7b-instruct",
-        backend="hf",
+        RITS=False,
         dtype="half",
         logprobs=1
     )
     """
 
-    print(f"Test LLMHandler on local backend (hf)...")
     local_handler = LLMHandler(
-        model_id="facebook/opt-350m",
-        backend="hf",
+        model="facebook/opt-350m",
+        RITS=False,
         logprobs=1
     )
 
