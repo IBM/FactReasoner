@@ -72,7 +72,7 @@ Background text #2:
 The Airbus A380 is a very large wide-body airliner, developed and produced by Airbus until 2021. It is the world's largest passenger airliner and the only full-length double-deck jet airliner. The full-length double-deck aircraft has a typical seating for 525 passengers, with a maximum certified capacity for 853 passengers. The quadjet is powered by Engine Alliance GP7200 or Rolls-Royce Trent 900 turbofans providing a range of 6,000 nmi (11,100 km; 6,900 mi). As of December 2021, the global A380 fleet had completed more than 800,000 flights with no fatalities and no hull losses.
 
 Background text #3:
-Airbus started the work on Airbus A380 development in the late 1990s, with the intention of producing an unprecedentedly large passenger airliner. The Airbus A380 made its maiiden flight on April 27, 2005 and was introduced into regular service in 2007. The aircraft provides a massive range of approximately 8,000 nautical miles (14,800 km). While it has become an icon of the skies, it was a commercial failure due to large development costs and limited sales.
+Airbus started the work on Airbus A380 development in the late 1990s, with the intention of producing an unprecedentedly large passenger airliner. The Airbus A380 made its maiden flight on April 27, 2005 and was introduced into regular service in 2007. The aircraft provides a massive range of approximately 8,000 nautical miles (14,800 km). While it has become an icon of the skies, it was a commercial failure due to large development costs and limited sales.
 
 Evaluated answer:
 Airbus A380 has defined the ultra-long-range travel. Its versatility and adaptability to various conditions has contributed to its impressive range of 11100 km.

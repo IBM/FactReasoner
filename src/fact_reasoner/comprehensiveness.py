@@ -282,12 +282,18 @@ class EndToEndFactGraphMiner(FactGraphMiner):
         for coverage_result in covered_contexts + uncovered_contexts:
             atom = None
             if coverage_result["is_covered"]:
+                # The contexts in this cluster are covered, so they should be
+                # linked with the associated atom.
                 aid = f"a{aid_counter}"
                 aid_counter += 1
                 atom = Atom(aid, text=coverage_result["statement"])
                 atoms_dict[aid] = atom
 
+            cluster_contexts: list[Context] = []
             for source_id in coverage_result["context_ids"]:
+                # We create a separate context for each source ID, even though
+                # they share the same text. This makes the resulting fact graph
+                # closer to the graphs extracted by the other miners.
                 cid = f"c{cid_counter}_{source_id}"
                 cid_counter += 1
                 context = Context(
@@ -297,6 +303,7 @@ class EndToEndFactGraphMiner(FactGraphMiner):
                     metadata={"source_id": source_id},
                 )
                 context_dict[cid] = context
+                cluster_contexts.append(context)
 
                 if coverage_result["is_covered"]:
                     assert atom is not None, "Got unexpected None atom"
@@ -307,6 +314,21 @@ class EndToEndFactGraphMiner(FactGraphMiner):
                             type="equivalence",
                             probability=1.0,
                             link="context_atom",
+                        )
+                    )
+
+            # All contexts in a cluster are equivalent
+            for i, c1 in enumerate(cluster_contexts):
+                for j, c2 in enumerate(cluster_contexts):
+                    if i >= j:
+                        continue
+                    relations.append(
+                        Relation(
+                            source=c1,
+                            target=c2,
+                            type="equivalence",
+                            probability=1.0,
+                            link="context_context",
                         )
                     )
 
@@ -1803,12 +1825,14 @@ if __name__ == "__main__":
         )
     elif "e2e" in args.variant:
         if args.variant == "e2e-base":
-            coverage_evaluator = CoverageEvaluator(model=args.model_name, version="base")
+            coverage_evaluator = CoverageEvaluator(
+                model=args.model_name, version="base"
+            )
         else:
-            coverage_evaluator = CoverageEvaluator(model=args.model_name, version="few-shot")
-        fact_graph_miner = EndToEndFactGraphMiner(
-            coverage_evaluator=coverage_evaluator
-        )
+            coverage_evaluator = CoverageEvaluator(
+                model=args.model_name, version="few-shot"
+            )
+        fact_graph_miner = EndToEndFactGraphMiner(coverage_evaluator=coverage_evaluator)
     else:
         raise ValueError(f"Unexpected variant {args.variant}!")
 
