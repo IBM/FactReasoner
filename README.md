@@ -34,7 +34,16 @@ conda activate comprehensiveness
 pip install -e .
 ```
 
-Some functionality of this package relies on an external probabilistic reasoning engine. We use the open-source C++ `merlin` probabilistic inference library available [here](https://github.com/radum2275/merlin). The C++ library needs to be compiled locally and the path to the binary must be provided in the `MERLIN_PATH` environment variable.
+Some functionality of this package relies on an external probabilistic reasoning engine. We use the open-source C++ `merlin` probabilistic inference library available [here](https://github.com/radum2275/merlin). The C++ library needs to be compiled locally and the path to the binary must be provided in the `MERLIN_PATH` environment variable. You may also need to install [boost](https://www.boost.org/) libraries as a dependency:
+
+```
+wget https://archives.boost.io/release/1.75.0/source/boost_1_75_0.tar.bz2
+tar --bzip2 -xf ./boost_1_75_0.tar.bz2
+cd boost_1_75_0
+./bootstrap.sh
+./b2
+export LD_LIBRARY_PATH=<path to boost installation directory>:$LD_LIBRARY_PATH
+```
 
 There are also additional environment variables that need to be configured before running the code. For convenience, we recommend creating a `.env` file with the following variables:
 
