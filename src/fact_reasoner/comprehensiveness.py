@@ -1561,7 +1561,7 @@ def load_conflict_bank() -> tuple[list[dict], DatasetConfig]:
                         satisfies_lax_criteria += 1
                     if source_coverage > MODERATE_HIGH_THRESHOLD:
                         satisfies_moderate_criteria += 1
-                    if math.isclose(source_coverage, 1.0):
+                    if math.isclose(source_coverage, 1.0, rel_tol=1e-6):
                         satisfies_strict_criteria += 1
                 elif "default" in source:
                     if default_claim_coverage < MODERATE_LOW_THRESHOLD:
@@ -1580,7 +1580,7 @@ def load_conflict_bank() -> tuple[list[dict], DatasetConfig]:
                         satisfies_lax_criteria += 1
                     if source_coverage < MODERATE_LOW_THRESHOLD:
                         satisfies_moderate_criteria += 1
-                    if math.isclose(source_coverage, 0.0):
+                    if math.isclose(source_coverage, 0.0, rel_tol=1e-6):
                         satisfies_strict_criteria += 1
                 elif "default" in source:
                     if default_claim_coverage > MODERATE_HIGH_THRESHOLD:

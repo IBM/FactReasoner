@@ -25,7 +25,6 @@ from tqdm import tqdm
 from difflib import SequenceMatcher
 from litellm.types.utils import ModelResponse
 from operator import itemgetter
-from src.fact_reasoner.align_scorer import AlignScorer
 from src.fact_reasoner.llm_handler import LLMHandler
 
 from src.fact_reasoner.utils import (
@@ -290,18 +289,7 @@ class NLIExtractor:
             print(f"[NLIExtractor] Prompt version: {self.prompt_version}")
             self.bert_model = None
         else:
-            self.rits_model_info = None
-            self.prompt_template = None
-            self.api_base = None
-            self.prompt_begin = None
-            self.prompt_end = None
-            print(f"[NLIExtractor] Using BERT model: {self.model}")
-            self.bert_model = AlignScorer(
-                model="roberta-large", 
-                ckpt_path="/home/radu/ckpts/AlignScore-large.ckpt",
-                evaluation_mode="nli_sp",
-                granularity="paragraph"
-            ) 
+            raise ValueError("BERT models are not supported anymore.")
 
     def make_prompt(self, premise: str, hypothesis: str) -> str:
         if self.prompt_version == "v1":
