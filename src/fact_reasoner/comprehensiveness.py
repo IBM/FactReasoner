@@ -1549,6 +1549,18 @@ def load_conflict_bank() -> tuple[list[dict], DatasetConfig]:
         satisfies_lax_criteria = 0
         satisfies_moderate_criteria = 0
         satisfies_strict_criteria = 0
+
+        # Check if absolute comprehensiveness is moderate, as the response always covers
+        # only a subset of the contexts.
+        comprehensiveness_score = result["comprehensiveness_score"]
+        if comprehensiveness_score > 1e-6 and comprehensiveness_score < 1 - 1e-6:
+            satisfies_strict_criteria += 1
+        if (
+            comprehensiveness_score > MODERATE_LOW_THRESHOLD
+            and comprehensiveness_score < MODERATE_HIGH_THRESHOLD
+        ):
+            satisfies_moderate_criteria += 1
+
         if "conflict" in answer_field:
             # Expect conflict contexts to be covered and default context
             # to be uncovered.
@@ -1595,11 +1607,12 @@ def load_conflict_bank() -> tuple[list[dict], DatasetConfig]:
         lax_score = satisfies_lax_criteria / (
             len(total_contexts_by_source.keys()) - 1 + 1e-9
         )
+        # The extra check is for moderate absolute comprehensiveness.
         moderate_score = satisfies_moderate_criteria / (
-            len(total_contexts_by_source.keys()) + 1e-9
+            len(total_contexts_by_source.keys()) + 1 + 1e-9
         )
         strict_score = satisfies_strict_criteria / (
-            len(total_contexts_by_source.keys()) + 1e-9
+            len(total_contexts_by_source.keys()) + 1 + 1e-9
         )
 
         result["comprehensiveness_eval_main_score"] = statistics.mean(
@@ -1811,7 +1824,7 @@ if __name__ == "__main__":
             confidence_threshold=args.confidence_threshold,
             qag_processor=qag_processor,
         )
-    elif args.variant == "qa":
+    elif args.variant == "nli":
         atom_extractor = AtomExtractor(model=args.model_name, prompt_version="v2")
         atom_reviser = BatchAtomReviser(model=args.model_name)
         relevance_estimator = RelevanceEstimator(model=args.model_name)
