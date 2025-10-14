@@ -1,3 +1,4 @@
+# The entry-point script
 # coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
@@ -16,10 +17,11 @@
 # Factuality graph
 
 import json
-from pathlib import Path
 from typing import List
-from tqdm import tqdm
+
 import networkx as nx
+from tqdm import tqdm
+
 
 class Node:
     def __init__(
@@ -75,7 +77,7 @@ class Edge:
                 The type of link: context_atom, context_context, atom_atom
         """
 
-        assert (type in ["entailment", "contradiction", "equivalence"]), \
+        assert (type in ["entailment", "contradiction", "neutral", "equivalence"]), \
             f"Unknown relation type: {type}."
         assert (link in ["context_atom", "context_context", "atom_atom"]), \
             f"Unknown link type: {link}"
@@ -239,6 +241,39 @@ class FactGraph:
 
         return G
 
+    def as_json_graph(self) -> dict:
+        """
+        Generate a full JSON-serializable representation of the FactGraph
+        that can be round-tripped into `from_json`.
+
+        Returns:
+            dict with 'nodes' and 'edges'.
+        """
+        graph = {
+            "nodes": [],
+            "edges": []
+        }
+
+        for node in self.nodes.values():
+            node_data = {
+                "id": node.id,
+                "type": node.type,
+                "probability": node.probability,
+            }
+            graph["nodes"].append(node_data)
+
+        for edge in self.edges:
+            edge_data = {
+                "from": edge.source,
+                "to": edge.target,
+                "relation": edge.type,
+                "probability": edge.probability,
+                "link": edge.link,
+            }
+            graph["edges"].append(edge_data)
+
+        return graph
+
 
     def dump(self):
         print("Nodes:")
@@ -252,9 +287,10 @@ class FactGraph:
 
 if __name__ == "__main__":
 
-    d = Path(__file__).resolve().parent.parent.parent
-    filename = Path.joinpath(d, "examples", "simple.json")
-    fg = FactGraph()
-    fg.from_json(json_file=filename)
-    fg.dump()
+    file = "/home/radu/git/fm-factual/examples/graph.json"
+    g = FactGraph()
+    g.from_json(json_file=file)
+    g.dump()
+    print(f"Done.")
+    g.dump()
     print(f"Done.")

@@ -15,12 +15,14 @@
 
 import io
 import re
+from typing import Any, Callable, Dict, List, Optional
+
 import chromadb
 import html2text
 import requests
 import torch
 
-from typing import Callable, List, Optional
+# from langchain.text_splitter import SentenceTransformersTokenTextSplitter
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from chromadb.utils import embedding_functions
@@ -31,11 +33,12 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from pypdf import PdfReader
 
-# Local
-from src.fact_reasoner.query_builder import QueryBuilder
-from src.fact_reasoner.search_api import SearchAPI
+from fm_factual.query_builder import QueryBuilder
+from fm_factual.search_api import SearchAPI
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_COLLECTION_NAME = "lit_agent_demo"
+DEFAULT_DB_PATH = "/Users/jbarry/work_projects/nasa_contrib/accelerated-discovery/chroma_db"
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 NEWLINES_RE = re.compile(r"\n{2,}")  # two or more "\n" characters
 
 CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
@@ -44,6 +47,8 @@ CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
     chunk_size=1000,
     chunk_overlap=0
 )
+
+# TOKEN_SPLITTER = SentenceTransformersTokenTextSplitter(chunk_overlap=0, tokens_per_chunk=256)
 
 def remove_citation(paragraph: str) -> str:
     """Remove all citations (numbers in side square brackets) in paragraph"""
@@ -184,7 +189,53 @@ class ChromaReader:
             The closest result to the given question.
         """
         return self.collection.query(query_texts=query_texts, n_results=n_results)
-  
+
+
+def is_content_valid(link: str, page_text: str) -> bool:
+    """
+    Checks if the scraped page text is likely to be valid content
+    and not a restriction notice, boilerplate, or garbled/binary data.
+    """
+    # Initial check for empty or invalid input
+    if not page_text or not isinstance(page_text, str):
+        return False
+
+    # --- Check 1: Look for specific "red flag" phrases ---
+    restriction_phrases = [
+        "please contact our support team",
+        "cookies are used by this site",
+        "copyright ©",
+        "all rights are reserved",
+        "ai training, and similar technologies",
+        "enable javascript",
+        "must have javascript enabled",
+        "to continue, please verify you are a human",
+        "access denied",
+        "403 forbidden",
+        "errors.edgesuite",
+        "you do not have access to"
+    ]
+    
+    text_lower = page_text.lower()
+    for phrase in restriction_phrases:
+        if phrase in text_lower:
+            print(f"Redundant content detected due to restriction phrase: '{phrase}'")
+            return False
+
+    if len(page_text) > 50:
+        # TODO: add more filters
+        replacement_char_count = page_text.count("�")
+        try:
+            ratio = replacement_char_count / len(page_text)
+        except ZeroDivisionError:
+            ratio = 0
+        if ratio > 0.10:
+            print(f"Redundant content detected due to high ratio of replacement characters: {ratio:.2%}")
+            return False
+
+    # we consider the content as valid
+    return True
+
 
 class ContextRetriever:
     """
@@ -195,26 +246,33 @@ class ContextRetriever:
     
     def __init__(
             self,
+            db_address: str = "9.59.197.15",
+            db_port: int = "5000",
+            db_remote: bool = False,
             service_type: str = "chromadb",
-            collection_name: str = "wikipedia_en",
-            persist_directory: str = "/tmp/wiki_db",
             top_k: int = 1,
             cache_dir: Optional[str] = None,
+            db_path: Optional[str] = None,
+            collection_name: Optional[str] = None,
+            embedding_model: Optional[str] = None,
             debug: bool = False,
             fetch_text: bool = False,
             use_in_memory_vectorstore: bool = False,
+            in_memory_vectorstore: bool = None,
             query_builder: QueryBuilder = None
     ):
         """
         Initialize the context retriever component.
 
         Args:
+            db_address: str
+                The IP address of the host running the API to the vector store.
+            db_port: int
+                The port of the host running the API for querying the vector store.
+            db_remote: bool
+                Flag indicating a remote (http) service.
             service_type: str
                 The type of the context retriever (chromadb, langchain, google)
-            collection_name: str
-                Name of the collection of documents stored in the vectorstore
-            persist_directory: str
-                The dir name where the vectorstore is persisted
             top_k: int
                 The top k most relevant contexts.
             cache_dir: str
@@ -233,6 +291,9 @@ class ContextRetriever:
         """
         
         self.top_k = top_k
+        self.db_address = db_address
+        self.db_port = db_port
+        self.db_remote = db_remote
         self.service_type = service_type
         self.chromadb_retriever = None
         self.langchain_retriever = None
@@ -241,20 +302,21 @@ class ContextRetriever:
         self.debug = debug
         self.cache_dir = cache_dir
         self.fetch_text = fetch_text
+        self.in_memory_vectorstore = in_memory_vectorstore
         self.use_in_memory_vectorstore = use_in_memory_vectorstore
         self.query_builder = query_builder
-        self.collection_name = collection_name
-        self.persist_directory = persist_directory
+
 
         assert self.service_type in ["chromadb", "langchain", "google"]
 
         if self.service_type == "chromadb":
-            self.chromadb_retriever = ChromaReader(
-                collection_name=self.collection_name, 
-                persist_directory=self.persist_directory, 
-                embedding_model=EMBEDDING_MODEL, 
-                collection_metadata={"hnsw:space": "cosine"}
-            )
+            if not self.db_remote: # Create a local ChromaDB client
+                self.chromadb_retriever = ChromaReader(
+                    collection_name=collection_name or DEFAULT_COLLECTION_NAME, 
+                    persist_directory=db_path or DEFAULT_DB_PATH, 
+                    embedding_model=embedding_model or DEFAULT_EMBEDDING_MODEL, 
+                    collection_metadata={"hnsw:space": "cosine"}
+                )
         elif self.service_type == "langchain":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
@@ -263,7 +325,7 @@ class ContextRetriever:
             self.google_retriever = SearchAPI(cache_dir=self.cache_dir)
             if self.use_in_memory_vectorstore:
                 self.in_memory_vectorstore = InMemoryVectorStore(
-                    HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+                    HuggingFaceEmbeddings(model_name=embedding_model or DEFAULT_EMBEDDING_MODEL)
                 )
 
     def set_query_builder(self, query_builder: QueryBuilder = None):
@@ -272,6 +334,7 @@ class ContextRetriever:
     def query(
             self, 
             text: str,
+            credentials: Dict[str, Any]
     ) -> List[str]:
         """
         Retrieve a number of contexts relevant to the input text.
@@ -288,23 +351,50 @@ class ContextRetriever:
 
         results = []
         if self.service_type == "chromadb":
-            if self.debug:
-                print(f"Retrieving {self.top_k} relevant documents for query: {text}")
-                print(f"Using chromadb")
+            if self.db_remote:
+                if self.debug:
+                    print(f"Retrieving {self.top_k} relevant documents for query: {text}")
+                    print(f"Using chromadb")
 
-            # Retrieve the relevant chunks from the vector store
-            relevant_chunks = self.chromadb_retriever.query(
-                query_texts=[text],
-                n_results=self.top_k,
-            )
+                # Send a POST request with JSON data using the session object
+                headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+                url = "http://" + self.host_address + ":" + str(self.host_port) + "/query"
+                data = dict(
+                    query_text=text, 
+                    n_results=self.top_k,
+                )
 
-            # Get the chunks (documents)
-            docs = relevant_chunks["documents"][0]
-            passages = [dict(title=get_title(doc), text=make_uniform(doc), snippet="", link="") for doc in docs]
+                # Get the response
+                with requests.Session() as s:
+                    response = s.post(url, json=data, headers=headers)
+                    results = []
+                    if response.status_code == 200: # success
+                        passages = response.json()
+                        results = [passages[str(i)] for i in range(len(passages))]
+            else: # local
+                if self.debug:
+                    print(f"Retrieving {self.top_k} relevant documents for query: {text}")
+                    print(f"Using chromadb")
 
-            n = min(self.top_k, len(passages))
-            for i in range(n):
-                results.append(passages[i]) # a passage is a dict with title and text as keys
+                relevant_chunks = self.chromadb_retriever.query(
+                    query_texts=[text],
+                    n_results=self.top_k,
+                )
+
+                docs = relevant_chunks.get("documents", [[]])[0]
+                metadatas = relevant_chunks.get("metadatas", [[]])[0]
+                
+                passages = []
+                for doc_content, metadata in zip(docs, metadatas):
+                    passage = {
+                        "title": metadata.get("title", "No Title Provided"),
+                        "text": make_uniform(doc_content),
+                        "snippet": "",
+                        "link": metadata.get("source", "")
+                    }
+                    passages.append(passage)
+
+                results.extend(passages)
         elif self.service_type == "langchain":
             if self.debug:
                 print(f"Retrieving {self.top_k} relevant documents for query: {text}")
@@ -325,6 +415,7 @@ class ContextRetriever:
             n = min(self.top_k, len(passages))
             for i in range(n):
                 results.append(passages[i]) # a passage is a dict with title and text as keys
+
         elif self.service_type == "google":
             print(f"Retrieving {self.top_k} search results for: {text}")
             if not text:
@@ -332,7 +423,7 @@ class ContextRetriever:
 
             # Generate the query text if there is a query builder
             if self.query_builder is not None:
-                result = self.query_builder.run(text)
+                result = self.query_builder.run(text, knowledge="", credentials=credentials)
                 query_text = result.get("query", text)
             else:
                 query_text = text
@@ -356,10 +447,10 @@ class ContextRetriever:
             n = len(search_results[query_text])
 
             i = 0
-            cont_content = 0
+            count_content = 0
             index_available = []
 
-            while ((i < n) and (cont_content < self.top_k)):
+            while ((i < n) and (count_content < self.top_k)):
                 # we retrieve content from the link
                 if self.fetch_text:
                     # loop to check that the content retrieved is not empty: if it is empty, check the next link
@@ -371,31 +462,37 @@ class ContextRetriever:
 
                         # if using in memory vector store, do not set a max size initially on the page text
                         # it will be determined by the splitter chunk size and number of chunks.
-                        page_text = fetch_text_from_link(link, max_size=None if self.use_in_memory_vectorstore else 4000)
-                        doc_content = make_uniform(page_text) if len(page_text) > 0 else ""
+                        raw_page_text = fetch_text_from_link(link, max_size=None if self.use_in_memory_vectorstore else 4000)
+                        if is_content_valid(link, raw_page_text):
+                            page_text = raw_page_text
+                        else:
+                            page_text = False  # The content is redundant, set page_text to False
                         
-                        if self.use_in_memory_vectorstore:
-                            # make documents for vectorstore
-                            split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
-                            documents = [Document(id=f"{doc_id}", page_content=text, metadata={"source": link})
-                                for doc_id, text in enumerate(split_doc_content)
-                            ]
-                            self.in_memory_vectorstore.add_documents(documents=documents)
-                            retriever = self.in_memory_vectorstore.as_retriever(search_kwargs={"k": 3})
-                            retrieved_docs = retriever.invoke(query_text)
-                            doc_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
-         
-                        # no content from the link
-                        # or the content may be AI-generated or talking about a dataset used to test LLMs                      
-                        # we store the index in case we run out of links and we have to come back to the previous ones
-                        if (doc_content == "") or ("chatgpt" in doc_content.lower()) or ("factscore" in doc_content.lower()) or ("dataset viewer" in doc_content.lower()):
+                        if page_text:
+                            doc_content = make_uniform(page_text) if len(page_text) > 0 else ""
+                        else:
+                            doc_content = ""
+
+                        if not doc_content or ("chatgpt" in doc_content.lower()) or ("factscore" in doc_content.lower()) or ("dataset viewer" in doc_content.lower()):
                             doc_content = ""
                             index_available.append(i)
                             i += 1
 
-                        # found content from the link
                         else: 
-                            cont_content += 1
+                            if self.use_in_memory_vectorstore:
+                                original_doc_content = doc_content
+                                # make documents for vectorstore
+                                split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
+                                documents = [Document(id=f"{doc_id}", page_content=text, metadata={"source": link})
+                                    for doc_id, text in enumerate(split_doc_content)
+                                ]
+                                self.in_memory_vectorstore.add_documents(documents=documents)
+                                retriever = self.in_memory_vectorstore.as_retriever(search_kwargs={"k": 3})
+                                retrieved_docs = retriever.invoke(query_text)
+                                doc_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
+
+                            # progress
+                            count_content += 1
                             i += 1
                             break
 
@@ -407,12 +504,12 @@ class ContextRetriever:
                     link = res['link']
                     doc_content = ""
                     i += 1
-                    cont_content += 1
+                    count_content += 1
 
                 passages.append(dict(title=title, text=doc_content, snippet=snippet, link=link))
 
             # in case we run out of links and we have to come back to the previous ones, whose content is empty
-            if (cont_content < self.top_k):
+            if (count_content < self.top_k):
                 for i in index_available:
                     res = search_results[query_text][i]
                     title = res['title']
@@ -422,8 +519,8 @@ class ContextRetriever:
 
                     passages.append(dict(title=title, text=doc_content, snippet=snippet, link=link))
 
-                    cont_content += 1
-                    if cont_content == self.top_k:
+                    count_content += 1
+                    if count_content == self.top_k:
                         break
 
             for passage in passages:
@@ -482,15 +579,18 @@ def test_langchain():
 
 if __name__ == '__main__':
 
-    query = "Lanny Flaherty has appeared in Law & Order."
-    cache_dir = None # "my_database.db"
-    query_builder = None # QueryBuilder(model_id="llama-3.3-70b-instruct", backend="rits")
+    # query = "Lanny Flaherty has appeared in Law & Order."
+    query = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
+    cache_dir = "my_database.db"
+    # query_builder = QueryBuilder(model="llama-3.3-70b-instruct")
 
     retriever = ContextRetriever(
         top_k=5,
         service_type="google",
         cache_dir=cache_dir,
-        query_builder=query_builder
+        fetch_text=True,
+        use_in_memory_vectorstore=True
+        # query_builder=query_builder
     )
     
     contexts = retriever.query(text=query)

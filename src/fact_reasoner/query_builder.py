@@ -15,13 +15,77 @@
 
 # Query builder for atoms to retrieve results from Google and/or Wikipedia
 
-from tqdm import tqdm
-from typing import Dict, List
+import time
+from typing import Any, Dict, List
 
-# Local imports
-from src.fact_reasoner.utils import extract_last_square_brackets
-from src.fact_reasoner.llm_handler import LLMHandler
-from src.fact_reasoner.prompts import QUERY_BUILDER_PROMPT_V1, QUERY_BUILDER_PROMPT_V2
+from fm_factual.llm_handler import LLMHandler
+from fm_factual.utils import extract_last_square_brackets
+from tqdm import tqdm
+
+from litellm.exceptions import RateLimitError
+
+# Single turn version
+QUERY_BUILDER_PROMPT_V1 = """{_PROMPT_BEGIN_PLACEHOLDER}
+Instructions:
+Your task is to generate a Google Search query about a given STATEMENT. \
+Optionally, you are also given a list of previous queries and results called KNOWLEDGE. \
+Your goal is to generate a high quality query that is most likely to retrieve the relevant information about the STATEMENT.
+
+QUERY CONSTRUCTION CRITERIA: a well-crafted query should:
+  - Retrieve information to verify the STATEMENT's factual accuracy.
+  - Seek new information not present in the current KNOWLEDGE.
+  - Balance specificity for targeted results with breadth to avoid missing critical information.
+
+Process:
+1. Construct a Useful Google Search Query: 
+  - Craft a query based on the QUERY CONSTRUCTION CRITERIA.
+  - Prioritize natural language queries that a typical user might enter.
+  - Use special operators (quotation marks, "site:", Boolean operators, intitle:, etc.) selectively and only when they significantly enhance the query's effectiveness.
+
+2. Provide Query Rationale (2-3 sentences): 
+  Explain how this query builds upon previous efforts and/or why it's likely to uncover new, relevant information about the STATEMENT's accuracy.
+
+3. Format Final Query: 
+  Finally, present your query enclosed in square brackets, like [QUERY].
+
+KNOWLEDGE:
+{_KNOWLEDGE_PLACEHOLDER}
+
+STATEMENT:
+{_STATEMENT_PLACEHOLDER}
+"""
+
+# Multi-turn version (experimental)
+QUERY_BUILDER_PROMPT_V2 = """{_PROMPT_BEGIN_PLACEHOLDER}
+Instructions:
+You are engaged in a multi-round process to refine Google Search queries about a given STATEMENT. \
+Each round builds upon KNOWLEDGE (a list of previous queries and results, starting empty in round 1). \
+Your goal is to improve query quality and relevance over successive rounds.
+
+QUERY CONSTRUCTION CRITERIA: a well-crafted query should:
+  - Retrieve information to verify the STATEMENT's factual accuracy.
+  - Seek new information not present in the current KNOWLEDGE.
+  - Balance specificity for targeted results with breadth to avoid missing critical information.
+  - In rounds 2+, leverage insights from earlier queries and outcomes.
+
+Process:
+1. Construct a Useful Google Search Query: 
+  - Craft a query based on the QUERY CONSTRUCTION CRITERIA.
+  - Prioritize natural language queries that a typical user might enter.
+  - Use special operators (quotation marks, "site:", Boolean operators, intitle:, etc.) selectively and only when they significantly enhance the query's effectiveness.
+
+2. Provide Query Rationale (2-3 sentences): 
+  Explain how this query builds upon previous efforts and/or why it's likely to uncover new, relevant information about the STATEMENT's accuracy.
+
+3. Format Final Query: 
+  Present your query enclosed in square brackets, like [QUERY].
+
+KNOWLEDGE:
+{_KNOWLEDGE_PLACEHOLDER}
+
+STATEMENT:
+{_STATEMENT_PLACEHOLDER}
+"""
 
 class QueryBuilder:
     """
@@ -29,64 +93,48 @@ class QueryBuilder:
     used to retrieve results from Google Search, Wikipedia, ChromaDB.
     """
 
-    def __init__(self, model_id: str, prompt_version: str = "v1", backend: str = "rits"):
+    def __init__(self, model: str, prompt_version: str = "v1", llm_inference_provider: str = "rits"):
         """
-        Initialize the QueryBuilder.
+        Initialize the QueryBuilder
 
         Args:
-            model_id: str
+            model: str
                 The name of the LLM used for query generation.
-            prompt_version: str
-                The version of the prompt to use for query generation.
-            backend: str
-                The model's backend.
+            rits: bool
+                A boolean flag indicating a remote RITS model or a local model.
         """
 
-        self.model_id = model_id
+        self.model = model
         self.prompt_version = prompt_version
-        self.backend = backend
-        self.llm_handler = LLMHandler(model_id, backend)
-
-        self.prompt_begin = self.llm_handler.get_prompt_begin()
-        self.prompt_end = self.llm_handler.get_prompt_end()
-
-        print(f"[QueryBuilder] Using LLM on {self.backend}: {self.model_id}")
+        self.llm_inference_provider = llm_inference_provider
+        
+        self.llm_handler = LLMHandler(model, llm_inference_provider=llm_inference_provider)
+        print(f"[QueryBuilder] Using LLM on {self.llm_inference_provider}: {self.model}")
         print(f"[QueryBuilder] Using prompt version: {self.prompt_version}")
     
     def make_prompt(self, statement: str, knowledge: str = "") -> str:
         """
         Creat the prompt for a given atom and previous retrieved results.
-
-        Args:
-            statement: str
-                The input statement (e.g., an atomic unit).
-            knowledge: str
-                The input knowledge, i.e., a list of previuos queries and results.
-        Return:
-            A string containing the prompt for the LLM.
         """
 
         if self.prompt_version == "v1":
             prompt = QUERY_BUILDER_PROMPT_V1.format(
                 _STATEMENT_PLACEHOLDER=statement,
                 _KNOWLEDGE_PLACEHOLDER=knowledge,
-                _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end, 
+                _PROMPT_BEGIN_PLACEHOLDER=self.llm_handler.prompt_begin,
+                _PROMPT_END_PLACEHOLDER=self.llm_handler.prompt_end, 
             )
         elif self.prompt_version == "v2":
             prompt = QUERY_BUILDER_PROMPT_V2.format(
                 _STATEMENT_PLACEHOLDER=statement,
                 _KNOWLEDGE_PLACEHOLDER=knowledge,
-                _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-                _PROMPT_END_PLACEHOLDER=self.prompt_end, 
+                _PROMPT_BEGIN_PLACEHOLDER=self.llm_handler.prompt_begin,
+                _PROMPT_END_PLACEHOLDER=self.llm_handler.prompt_end, 
             )
-        else:
-            raise ValueError(f"Unknown prompt version: {self.prompt_version}. "
-                             f"Supported versions are: 'v1', 'v2'.")
 
         return prompt
 
-    def run(self, statement: str, knowledge: str = "") -> Dict[str, str]:
+    def run(self, statement: str, knowledge: str, credentials: Dict[str, Any]) -> Dict[str, str]:
         """
         Generate the query for a given statement and knowledge (if any).
 
@@ -101,14 +149,15 @@ class QueryBuilder:
         """
 
         prompt = self.make_prompt(statement, knowledge)
-        response = self.llm_handler.completion(prompt)
+        response = self.llm_handler.completion(prompt, credentials)
+
         generated_text = response.choices[0].message.content
         query = extract_last_square_brackets(generated_text)
 
         assert query is not None and len(query) > 0, f"Could not generate the `query`."
         return dict(query=query, response=generated_text)
 
-    def runall(self, statements: List[str], knowledges: List[str]) -> List[Dict[str, str]]:
+    def runall(self, statements: List[str], knowledges: List[str], credentials: Dict[str, Any]) -> List[Dict[str, str]]:
         """
         Generate the queries for a list of statements and knowledges (if any).
 
@@ -127,16 +176,28 @@ class QueryBuilder:
             f"Length of `statements` must be equal to the length of `knowledges`."
         
         prompts = [self.make_prompt(statements[i], knowledges[i]) for i in range(len(statements))]
+        print(f"[QueryBuilder] Prompts created: {len(prompts)}")
+
         generated_texts = []
-        for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(prompts)
-            ),
+        batch_size = 8 # Process 8 prompts at a time
+        
+        with tqdm(
             total=len(prompts),
             desc="Query Builder",
             unit="prompts",
-            ):
-                generated_texts.append(response.choices[0].message.content)
+        ) as pbar:
+            for i in range(0, len(prompts), batch_size):
+                batch_prompts = prompts[i:i + batch_size]
+                try:
+                    batch_responses = self.llm_handler.batch_completion(batch_prompts, credentials)
+                    for response in batch_responses:
+                        generated_texts.append(response.choices[0].message.content)
+                except (RateLimitError, Exception) as e:
+                    print(f"An error occurred during query generation on batch starting at index {i}: {e}")
+                    # Re-raise the exception to halt the entire process
+                    raise
+                finally:
+                    pbar.update(len(batch_prompts))
 
         result = []
         for generated_text in generated_texts:
@@ -148,17 +209,18 @@ class QueryBuilder:
 
 if __name__ == "__main__":
 
-    model_id = "mixtral-8x22b-instruct"
+    model = "llama-3.3-70b-instruct"
+    llm_inference_provider = "watsonx"
     prompt_version = "v1"
-    backend = "rits"
+    use_rits = True
 
-    qb = QueryBuilder(model_id, prompt_version, backend)
+    qbuilder = QueryBuilder(model=model, prompt_version=prompt_version, llm_inference_provider=llm_inference_provider)
 
     # Process a single atom (no knowledge)
     # atom = "The Apollo 14 mission to the Moon took place on January 31, 1971."
     atom = "You'd have to yell if your friend is outside the same location"
 
-    result = qb.run(atom)
+    result = qbuilder.run(atom)
     query = result["query"]
     response = result["response"]
     print(f"Atom: {atom}")

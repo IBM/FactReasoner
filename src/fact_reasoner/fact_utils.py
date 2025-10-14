@@ -13,22 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import nltk
-
-from typing import Tuple, Union, List, Optional
-from operator import itemgetter
+from collections import Counter
 from itertools import combinations
+from operator import itemgetter
+
+# Atom and Context classes
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import nltk
 from nltk.tokenize import sent_tokenize
 
-# Local imports
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.context_retriever import ContextRetriever
-from src.fact_reasoner.nli_extractor import NLIExtractor
-from src.fact_reasoner.utils import punctuation_only_inside_quotes
+# Local
+from fm_factual.atom_extractor import AtomExtractor
+from fm_factual.context_retriever import ContextRetriever
+from fm_factual.nli_extractor import NLIExtractor, NLIExtractorOld
+from fm_factual.utils import punctuation_only_inside_quotes
 
-# Defaut prior probabilities for atoms and contexts
 PRIOR_PROB_ATOM = 0.5
 PRIOR_PROB_CONTEXT = 0.9
+
 
 class Atom:
     """
@@ -216,7 +219,18 @@ class Context:
 
     def set_probability(self, probability):
         self.probability = probability
-        
+
+    def to_json(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "text": self.text,
+            "link": self.link,
+            "snippet": self.snippet,
+            "synthetic_summary": self.get_synthetic_summary(),
+            "probability": self.probability,
+        }
+            
 
 class Relation:
     """
@@ -277,6 +291,7 @@ class Relation:
 def predict_nli_relationships(
         object_pairs: List[Tuple[Union[Atom, Context], Union[Atom, Context]]],
         nli_extractor: NLIExtractor,
+        credentials: Dict[str, Any],
         links_type: str = "context_atom",
         text_only: bool = True,
     ) -> list[Relation]:
@@ -304,7 +319,7 @@ def predict_nli_relationships(
     # hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text(text_only) for pair in object_pairs]
 
 
-    results = nli_extractor.runall(premises, hypotheses)
+    results = nli_extractor.runall(premises, hypotheses, credentials=credentials)
 
     # print(f"Found: {len(results)} relationships")
     # print(results)
@@ -334,7 +349,7 @@ def get_nli_relations_prompting(
     ) -> list[Relation]:
         
     assert (nli_scorer is not None), "NLI extractor cannot be None."
-    # assert isinstance(nli_scorer, NLIExtractorOld), "NLI extractor must be NLIExtractorOld."
+    assert isinstance(nli_scorer, NLIExtractorOld), "NLI extractor must be NLIExtractorOld."
 
     premises = [pair[0] if isinstance(pair[0],str) else pair[0].get_text(text_only) for pair in atom_context_pairs]
     hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text(text_only) for pair in atom_context_pairs]
@@ -391,7 +406,7 @@ def get_nli_relations_prompting(
     return relations
 
 
-def build_atoms(response: str, atom_extractor: AtomExtractor) -> dict:
+def build_atoms(response: str, atom_extractor: AtomExtractor, credentials: Dict[str, Any]) -> dict:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
@@ -408,7 +423,7 @@ def build_atoms(response: str, atom_extractor: AtomExtractor) -> dict:
         f"Make sure that the response is not empty."
 
     print(f"[Building atoms ...]")
-    result = atom_extractor.run(response)
+    result = atom_extractor.run(response, credentials)
     candidates = [
         Atom(
             id="a" + str(i),
@@ -430,6 +445,7 @@ def build_contexts(
         atoms: dict = {},
         question: str = None,
         retriever: ContextRetriever = None,
+        credentials: Dict[str, Any] = None,
 ):
     """
     Retrieve the relevant contexts for the input atoms.
@@ -454,6 +470,7 @@ def build_contexts(
         
         retrieved_contexts = retriever.query(
             text=atom.text,
+            credentials=credentials
         )
         
         if len(retrieved_contexts) > 0:
@@ -476,6 +493,7 @@ def build_contexts(
     # we retrieve the contexts for the question
     retrieved_contexts = retriever.query(
         text=question,
+        credentials=credentials,
     )
     
     if len(retrieved_contexts) > 0:
@@ -495,6 +513,7 @@ def build_contexts(
             contexts[ctxt.id] = ctxt
     
     print(f"[Contexts built: {len(contexts)}]")
+
     return contexts
 
 def remove_duplicated_atoms(atoms: dict) -> dict:
@@ -523,6 +542,7 @@ def remove_duplicated_contexts(contexts: dict, atoms: dict) -> dict:
         if text not in duplicates:
             duplicates[text] = cid
             filtered_contexts[cid] = context
+        # Warning, unless running FactReasoner v4, this will delete from overall contexts.
         elif context.atom:
             del atoms[context.atom.id].contexts[cid]
     
@@ -582,6 +602,9 @@ def is_relevant_context(context: str) -> dict:
         "atom states",
     ]
 
+    if not context or not context.strip():
+        return False
+
     context_lower = context.lower()
     if not all(keyword.lower() not in context_lower for keyword in keywords):
         return False
@@ -610,8 +633,10 @@ def build_relations(
         contexts_per_atom_only: bool = False,
         rel_atom_context: bool = True, 
         rel_context_context: bool = True,
-        nli_extractor: NLIExtractor = None,
-        text_only: bool = True
+        nli_extractor: Union[NLIExtractor, NLIExtractorOld] = None,
+        text_only: bool = True,
+        exclude_neutral_labels: bool = False,
+        credentials: Dict[str, Any] = None,
 ) -> List[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
@@ -631,7 +656,7 @@ def build_relations(
             Flag indicating the presence of atom-to-context relationships.
         rel_context_context: bool (default is False)
             Flag indicating the presence of context-to-context relationships.
-        nli_extractor: NLIExtractor
+        nli_extractor: NLIExtractor or NLIExtractorOld
             The NLI model used for predicting the relationships.
         text_only: bool
             Flag indicating that contexts are text only. If False, then the
@@ -650,6 +675,11 @@ def build_relations(
 
     relations = []
 
+    relation_stats = {
+        "atom_context": Counter(),
+        "context_context": Counter()
+    }
+
     # Create atom-context relations (i.e., Context -> Atom)
     if rel_atom_context:
         print(f"[Building atom-context relations...]")
@@ -666,19 +696,31 @@ def build_relations(
                 for context in atom.get_contexts():
                     atom_context_pairs.append((context, atom))
 
-        # Get all relationships (NLI-prompt)
-        all_rels = predict_nli_relationships(
-            atom_context_pairs,
-            nli_extractor=nli_extractor,
-            links_type="context_atom",
-            text_only=text_only
-        )
+        if isinstance(nli_extractor, NLIExtractorOld):
+            # Get all relationships (NLI-prompt)
+            all_rels = get_nli_relations_prompting(
+                    atom_context_pairs,
+                    nli_scorer=nli_extractor,
+                    links_type="context_atom",
+                    text_only=text_only,
+            )
+        else:
+            # Get all relationships (NLI-prompt)
+            all_rels = predict_nli_relationships(
+                atom_context_pairs,
+                nli_extractor=nli_extractor,
+                links_type="context_atom",
+                text_only=text_only,
+                credentials=credentials
+            )
+        
+        relation_stats["atom_context"] = Counter(rel.get_type() for rel in all_rels)
 
         # Filter out the neutral relationships
         for rel in all_rels:
-            if rel.get_type() != "neutral":
-                print(rel)
-                relations.append(rel)
+            if exclude_neutral_labels and rel.get_type() == "neutral":
+                continue
+            relations.append(rel)
 
     # Create context-context relations
     if rel_context_context:
@@ -692,21 +734,40 @@ def build_relations(
             context_context_pairs1.append((context_i, context_j))
             context_context_pairs2.append((context_j, context_i))
 
-        # Get relationships (c_i, c_j)
-        relations1 = predict_nli_relationships(
-            context_context_pairs1,
-            nli_extractor=nli_extractor,
-            links_type="context_context",
-            text_only=text_only
-        )
+        if isinstance(nli_extractor, NLIExtractorOld):
+            # Get relationships (c_i, c_j)
+            relations1 = get_nli_relations_prompting(
+                context_context_pairs1,
+                nli_scorer=nli_extractor,
+                links_type="context_context",
+                text_only=text_only
+            )
 
-        # Get relationships (c_j, c_i)
-        relations2 = predict_nli_relationships(
-            context_context_pairs2,
-            nli_extractor=nli_extractor,
-            links_type="context_context",
-            text_only=text_only
-        )
+            # Get relationships (c_j, c_i)
+            relations2 = get_nli_relations_prompting(
+                context_context_pairs2,
+                nli_scorer=nli_extractor,
+                links_type="context_context",
+                text_only=text_only
+            )
+        else:
+            # Get relationships (c_i, c_j)
+            relations1 = predict_nli_relationships(
+                context_context_pairs1,
+                nli_extractor=nli_extractor,
+                links_type="context_context",
+                text_only=text_only,
+                credentials=credentials
+            )
+
+            # Get relationships (c_j, c_i)
+            relations2 = predict_nli_relationships(
+                context_context_pairs2,
+                nli_extractor=nli_extractor,
+                links_type="context_context",
+                text_only=text_only,
+                credentials=credentials
+            )
 
         relations_tmp = [pair[0] if pair[0].get_probability()>pair[1].get_probability() else pair[1] for pair in zip(relations1,relations2)]
         assert len(relations_tmp) == len(relations1) # safety checks
@@ -715,10 +776,13 @@ def build_relations(
             if not (relations1[rel_ind].get_type() == "entailment" and relations2[
                 rel_ind].get_type() == "entailment"): continue
             relations_tmp[rel_ind].type = "equivalence"
+
+        relation_stats["context_context"] = Counter(rel.get_type() for rel in relations_tmp)
+
         for rel in relations_tmp:
-            if rel.get_type() != "neutral":
-                print(rel)
-                relations.append(rel)
+            if exclude_neutral_labels and rel.get_type() == "neutral":
+                continue
+            relations.append(rel)
 
     print(f"[Relations built: {len(relations)}]")
-    return relations
+    return relations, relation_stats
