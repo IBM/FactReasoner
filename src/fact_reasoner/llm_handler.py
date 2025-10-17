@@ -14,14 +14,18 @@
 # limitations under the License.
 
 import os
+
 import litellm
 import torch
-
-from vllm import LLM, SamplingParams
 from dotenv import load_dotenv
+from vllm import LLM, SamplingParams
 
 # Local imports
-from src.fact_reasoner.utils import DEFAULT_PROMPT_BEGIN, DEFAULT_PROMPT_END, get_models_config
+from src.fact_reasoner.utils import (
+    DEFAULT_PROMPT_BEGIN,
+    DEFAULT_PROMPT_END,
+    get_models_config,
+)
 
 GPU = torch.cuda.is_available()
 DEVICE = GPU*"cuda" + (not GPU)*"cpu"
@@ -66,43 +70,52 @@ class LLMHandler:
             assert self.model_id is not None
             print(f"Loading local model with vLLM: {self.model_id}...")
             self.llm = LLM(model=self.model_id, device=DEVICE, dtype=dtype)  # Load model using vLLM
-        elif self.backend == "rits":
-
+        # It's an API provider
+        else:
+            # Load API params from env
             if not os.environ.get("_DOTENV_LOADED"):
-                load_dotenv(override=True) 
+                load_dotenv(override=True)
                 os.environ["_DOTENV_LOADED"] = "1"
             
-            self.RITS_API_KEY = os.getenv("RITS_API_KEY")
+            self.extra_headers = {}
             self.model_id = model_id
-            self.rits_model_info = self.models_config["RITS_MODELS"][model_id]
 
-            self.prompt_template = self.rits_model_info.get("prompt_template", None)
-            self.max_new_tokens = self.rits_model_info.get("max_new_tokens", None)
-            self.api_base = self.rits_model_info.get("api_base", None)
-            self.model_id = self.rits_model_info.get("model_id", None)
-            self.prompt_begin = self.rits_model_info.get("prompt_begin", DEFAULT_PROMPT_BEGIN)
-            self.prompt_end = self.rits_model_info.get("prompt_end", DEFAULT_PROMPT_END)
+            if self.backend == "rits":
+                self.api_key = os.getenv("RITS_API_KEY")
+                self.model_info = self.models_config["RITS_MODELS"][model_id]
+                self.extra_headers["RITS_API_KEY"] = self.api_key
+            elif self.backend == "wx":
+                self.api_key = os.getenv("WX_API_KEY")
+                self.model_info = self.models_config["WX_MODELS"][model_id]
+            else:
+                raise ValueError(f"Uknown backend value: {self.backend}")
+            
+            # Generic attributes
+            self.prompt_template = self.model_info.get("prompt_template", None)
+            self.max_new_tokens = self.model_info.get("max_new_tokens", None)
+            self.api_base = self.model_info.get("api_base", None)
+            self.model_id = self.model_info.get("model_id", None)
+            self.prompt_begin = self.model_info.get("prompt_begin", DEFAULT_PROMPT_BEGIN)
+            self.prompt_end = self.model_info.get("prompt_end", DEFAULT_PROMPT_END)
+
             assert self.prompt_template is not None \
                 and self.max_new_tokens is not None \
-                and self.api_base is not None \
                 and self.model_id is not None
             
-            print(f"[LLMHandler] Using API key: {self.RITS_API_KEY}")
+            if self.backend == "rits":
+                assert self.api_base is not None
+            
+            print(f"[LLMHandler] Using API key: {self.api_key}")
             print(f"[LLMHandler] Using model id: {self.model_id}")
-            print(f"[LLMHandler] Using model info: {self.rits_model_info}")
+            print(f"[LLMHandler] Using model info: {self.model_info}")
             print(f"[LLMHandler] Initialization completed.")
-
-        elif self.backend == "wx":
-            raise ValueError(f"WatsonX backend is not supported yet.")
-        else:
-            raise ValueError(f"Uknown backend value: {self.backend}")
 
     def get_prompt_begin(self):
         """
         Returns the prompt begin template for the model.
         """
 
-        if self.backend == "rits":
+        if self.backend in ["rits", "wx"]:
             return self.prompt_begin
         else:
             return ""  # vLLM does not use a prompt begin template
@@ -112,7 +125,7 @@ class LLMHandler:
         Returns the prompt end template for the model.
         """
 
-        if self.backend == "rits":
+        if self.backend in ["rits", "wx"]:
             return self.prompt_end
         else:
             return "" # vLLM does not use a prompt end template
@@ -163,29 +176,26 @@ class LLMHandler:
             **kwargs
         }  # Merge defaults with provided params
 
-        if self.backend == "rits":
+
+        if self.backend in ["rits", "wx"]:
             # Ensure we always send a list to batch_completion
             if isinstance(prompts, str):
                 return litellm.completion(
                     model=self.model_id,
                     api_base=self.api_base,
                     messages=[{"role": "user", "content": prompts}],  # Wrap prompt for compatibility
-                    api_key=self.RITS_API_KEY,
+                    api_key=self.api_key,
                     num_retries=num_retries,
-                    extra_headers={
-                        "RITS_API_KEY": self.RITS_API_KEY
-                    },
+                    extra_headers=self.extra_headers,
                     **params
                 )
             return litellm.batch_completion(
                 model=self.model_id,
                 api_base=self.api_base,
                 messages=[[{"role": "user", "content": p}] for p in prompts],  # Wrap each prompt
-                api_key=self.RITS_API_KEY,
+                api_key=self.api_key,
                 num_retries=num_retries,
-                extra_headers={
-                    "RITS_API_KEY": self.RITS_API_KEY
-                },
+                extra_headers=self.extra_headers,
                 **params
             )
 
