@@ -15,40 +15,40 @@
 
 # FactReasoner pipeline
 
-import os
-import json
-import math
 import argparse
+import json
+import logging
+import math
+import os
 import subprocess
 import uuid
-import logging
 
-from pgmpy.models import MarkovNetwork
 from pgmpy.factors.discrete import DiscreteFactor
-from pgmpy.readwrite import UAIWriter
 from pgmpy.global_vars import logger
+from pgmpy.models import MarkovNetwork
+from pgmpy.readwrite import UAIWriter
 
 # Local imports
 from src.fact_reasoner.atom_extractor import AtomExtractor
 from src.fact_reasoner.atom_reviser import AtomReviser
 from src.fact_reasoner.context_retriever import ContextRetriever
-from src.fact_reasoner.query_builder import QueryBuilder
 from src.fact_reasoner.context_summarizer import ContextSummarizer
-from src.fact_reasoner.nli_extractor import NLIExtractor
 from src.fact_reasoner.fact_graph import FactGraph
 from src.fact_reasoner.fact_utils import (
-    Atom, 
-    Context, 
-    Relation, 
-    build_atoms, 
-    build_contexts, 
+    PRIOR_PROB_ATOM,
+    PRIOR_PROB_CONTEXT,
+    Atom,
+    Context,
+    Relation,
+    build_atoms,
+    build_contexts,
     build_relations,
-    remove_duplicated_contexts, 
-    remove_duplicated_atoms, 
-    is_relevant_context, 
-    PRIOR_PROB_ATOM, 
-    PRIOR_PROB_CONTEXT
+    is_relevant_context,
+    remove_duplicated_atoms,
+    remove_duplicated_contexts,
 )
+from src.fact_reasoner.nli_extractor import NLIExtractor
+from src.fact_reasoner.query_builder import QueryBuilder
 
 # Set logging levels 
 # pgmpy set the root logger to INFO -- changed it to WARNING
@@ -299,6 +299,9 @@ class FactReasoner:
                 contexts are (Title, Snippet, Link, Text).
         """
 
+        if not self.query:
+            self.query = question
+
         # Initialize the reasoner
         self.fact_graph = None
         self.markov_network = None
@@ -426,7 +429,7 @@ class FactReasoner:
                 nli_extractor=self.nli_extractor,
                 text_only=text_only,
             )
-    
+
             # Build the fact graph and Markov network
             print(f"[FactReasoner] Building the graphical model ...")
             self._build_fact_graph()
@@ -439,6 +442,41 @@ class FactReasoner:
             print(f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved.")
         else:
             print(f"[FactReasoner] Could not create fact graph because no atoms are available.")
+
+
+    def pipeline_to_json(self, json_file_path: str = None):
+        """
+        Save the pipeline instance to a JSON file.
+        """
+
+        data = {}
+        data["input"] = self.query
+        data["output"] = self.response.strip()
+        data["topic"] = self.topic
+        data["atoms"] = []
+        data["contexts"] = []
+
+        for aid, atom in self.atoms.items():
+            atom_data = dict(
+                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
+            )
+            if atom.get_label() is not None:
+                atom_data["label"] = atom.get_label()
+            data["atoms"].append(atom_data)
+
+        for cid, ctxt in self.contexts.items():
+            ctxt_data = dict(id=cid, title=ctxt.get_title(), text=ctxt.get_text())
+            data["contexts"].append(ctxt_data)
+
+        data["contexts"] = [context.context_to_json() for context in self.contexts.values()]
+
+        if json_file_path:
+            with open(json_file_path, "w") as f:
+                f.write(f"{json.dumps(data)}\n")
+            f.close()
+            print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
+
+        return data
 
     def dump(self):
         """

@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import nltk
-
-from typing import Tuple, Union, List, Optional
-from operator import itemgetter
 from itertools import combinations
+from operator import itemgetter
+from typing import List, Optional, Tuple, Union
+
+import nltk
 from nltk.tokenize import sent_tokenize
 
 # Local imports
@@ -216,7 +216,18 @@ class Context:
 
     def set_probability(self, probability):
         self.probability = probability
-        
+
+    def context_to_json(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "text": self.text,
+            "link": self.link,
+            "snippet": self.snippet,
+            "synthetic_summary": self.get_synthetic_summary(),
+            "probability": self.probability,
+        }     
+
 
 class Relation:
     """
