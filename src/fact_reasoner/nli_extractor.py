@@ -16,22 +16,22 @@
 # NLI extractor using LLMs.
 
 import operator
-import numpy as np
-
-from typing import List
-from tqdm import tqdm
 from difflib import SequenceMatcher
 from operator import itemgetter
+from typing import List
+
+import numpy as np
+from tqdm import tqdm
 
 # Local imports
 from src.fact_reasoner.llm_handler import LLMHandler
-from src.fact_reasoner.utils import dotdict, extract_last_square_brackets
 from src.fact_reasoner.prompts import (
-    NLI_EXTRACTION_PROMPT_V1, 
-    NLI_EXTRACTION_PROMPT_V2, 
-    NLI_EXTRACTION_PROMPT_V3, 
-    NLI_EXTRACTION_PROMPT_V3_FEW_SHOTS
+    NLI_EXTRACTION_PROMPT_V1,
+    NLI_EXTRACTION_PROMPT_V2,
+    NLI_EXTRACTION_PROMPT_V3,
+    NLI_EXTRACTION_PROMPT_V3_FEW_SHOTS,
 )
+from src.fact_reasoner.utils import dotdict, extract_last_square_brackets
 
 # Define the NLI relationships (labels)
 NLI_LABELS = ['entailment', 'contradiction', 'neutral']
@@ -101,7 +101,8 @@ class NLIExtractor:
             method: str = "logprobs",
             prompt_version: str = "v1",
             debug: bool = False,
-            backend: str = "rits"
+            backend: str = "rits",
+            inference_batch_size = 8,
     ):
         """
         Initialize the NLIExtractor.
@@ -124,6 +125,7 @@ class NLIExtractor:
         self.prompt_version = prompt_version
         self.debug = debug
         self.backend = backend
+        self.inference_batch_size = inference_batch_size
 
         self.llm_handler = LLMHandler(model_id, backend)
         self.prompt_begin = self.llm_handler.get_prompt_begin()
@@ -322,20 +324,24 @@ class NLIExtractor:
         prompts = [self.make_prompt(premise, hypothesis) for premise, hypothesis in zip(premises, hypotheses)]
         print(f"[NLIExtractor] Prompts created: {len(prompts)}")
 
-        for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(
-                    prompts,
-                    logprobs=True,
-                    seed=12345  
-                )
-            ),
-            total=len(prompts),
-            desc="NLI",
-            unit="prompts",
+        batched_prompts = [prompts[i:i + self.inference_batch_size] for i in range(0, len(prompts), self.inference_batch_size)]
+
+        for batch_idx, current_batch in tqdm(
+            enumerate(batched_prompts),
+            total=len(batched_prompts),
+            desc="NLI (batches)",
+            unit="batches"
             ):
-                generated_texts.append(response.choices[0].message.content)
-                generated_logprobs.append(response.choices[0].logprobs['content'])
+                #responses = self.llm_handler.batch_completion(current_batch, logprobs=True, seed=12345)
+                responses = self.llm_handler.batch_completion(
+                    current_batch,
+                    logprobs=True,
+                    seed=12345,
+                )
+
+                for response in responses:
+                    generated_texts.append(response.choices[0].message.content)
+                    generated_logprobs.append(response.choices[0].logprobs['content'])
 
         results = []
         for text, logprobs in zip(generated_texts, generated_logprobs):
