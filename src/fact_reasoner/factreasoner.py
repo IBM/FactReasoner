@@ -464,10 +464,6 @@ class FactReasoner:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
-        for cid, ctxt in self.contexts.items():
-            ctxt_data = dict(id=cid, title=ctxt.get_title(), text=ctxt.get_text())
-            data["contexts"].append(ctxt_data)
-
         data["contexts"] = [context.context_to_json() for context in self.contexts.values()]
 
         if json_file_path:
