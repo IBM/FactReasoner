@@ -743,6 +743,10 @@ class FactReasoner:
             str_predictions += f" {aid}: {labels[aid]}"
         print(f"[FactReasoner] Predictions: {str_predictions}")
 
+        # Remove duplicate atoms in self.labels_human
+        if self.labels_human is not None:
+            self.labels_human = {k: v for i, (k, v) in enumerate(self.labels_human.items()) if k in self.atoms.keys() and k not in list(self.labels_human.keys())[:i]}
+
         # Check for ground truth annotations
         if self.labels_human is not None:
             true_atoms = 0
@@ -753,6 +757,7 @@ class FactReasoner:
             num_false_positive = 0
             num_false_negative = 0
             for aid, l in self.labels_human.items():
+
                 if l == "S":
                     avg_brier += (probabilities[aid] - 1.0) * (probabilities[aid] - 1.0)
                     true_atoms += 1
