@@ -534,7 +534,7 @@ def remove_duplicated_contexts(contexts: dict, atoms: dict) -> dict:
         if text not in duplicates:
             duplicates[text] = cid
             filtered_contexts[cid] = context
-        elif context.atom:
+        elif context.atom and context.atom.id in atoms:
             del atoms[context.atom.id].contexts[cid]
     
     return filtered_contexts, atoms

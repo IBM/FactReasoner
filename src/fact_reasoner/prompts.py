@@ -125,7 +125,88 @@ Your Task:
 TEXT: {_RESPONSE_PLACEHOLDER}
 
 UNITS:{_PROMPT_END_PLACEHOLDER}
-"""
+# """
+
+# ATOM_EXTRACTION_PROMPT_V2 = """{_PROMPT_BEGIN_PLACEHOLDER}
+
+# Instructions: 
+# - Exhaustively break down the following text into independent content units. Each content unit can take one of the following forms:
+#   a. Fact: An objective piece of information that can be proven or verified.
+#   b. Claim: A statement or assertion that expresses a position or viewpoint on a particular topic.
+#   c. Instruction: A directive or guidance on how to perform a specific task.
+#   d. Data Format: Any content presented in a specific format, including code, mathematical notations, equations, variables, technical symbols, tables, or structured data formats.
+#   e. Meta Statement: Disclaimers, acknowledgments, or any other statements about the nature of the response or the responder.
+#   f. Question: A query or inquiry about a particular topic.
+#   g. Other: Any other relevant content that doesn't fit into the above categories.
+# - Label each content unit with its corresponding unit type using the format: [content unit]: [content unit type]
+# - You should only output the independent content units as a list, with each item starting with "- ". Do not include other formatting or preamble text.
+# - Refer to the following correct and incorrect examples to understand the task and output formats. 
+
+# Example 1 (correct):
+# TEXT: Zhejiang Huafang Pharmaceutical Co., Ltd. is a leading chemical company based in China that specializes in the research, manufacturing, and sales of various pharmaceutical products, including excipients and intermediates. The company was founded in 2018 and is located in Hangzhou, a city with a rich history in eastern China. Zhejiang Huafang Pharmaceutical Co., Ltd. is committed to providing high-quality products to its customers in the healthcare industry. The company's manufacturing facilities are equipped with state-of-the-art technology and infrastructure that ensure the production of high-quality products. Overall, Zhejiang Huafang Pharmaceutical Co., Ltd. is a reputable pharmaceutical company with a long history of success in the healthcare industry. The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical research and development.
+
+# UNITS:
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. is a leading chemical company: Fact
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. is based in China: Fact
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the research of various pharmaceutical products: Fact
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the manufacturing of various pharmaceutical products: Fact
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. specializes in the sales of various pharmaceutical products: Fact
+# - excipients are the pharmaceutical products of the Zhejiang Huafang Pharmaceutical Co., Ltd.: Fact
+# - intermediates are the pharmaceutical products of the Zhejiang Huafang Pharmaceutical Co., Ltd.: Fact
+# - The company was founded in 2018: Fact
+# - The company is located in Hangzhou: Fact
+# - Hangzhou is a city: Fact
+# - Hangzhou has a rich history in eastern China: Fact
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. is committed to providing high-quality products to its customers in the healthcare industry: Claim
+# - The company's manufacturing facilities are equipped with state-of-the-art technology: Fact
+# - The company's manufacturing facilities are equipped with state-of-the-art infrastructure: Fact
+# - The company's manufacturing facilities are equipped with state-of-the-art technology and infrastructure that ensure the production of high-quality products: Claim
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. is a reputable pharmaceutical company: Claim
+# - Zhejiang Huafang Pharmaceutical Co., Ltd. has a long history of success in the healthcare industry: Claim
+# - The company is committed to quality: Claim
+# - The company is committed to innovation: Claim
+# - The company is committed to customer service: Claim
+# - The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical research: Claim
+# - The company's commitment to quality, innovation, and customer service has made it a leader in the field of pharmaceutical development: Claim
+
+# Example 2 (correct):
+# TEXT: I'm here to help you make an informed decision. Both the RTX 3060 Ti and RTX 3060 are powerful GPUs, and the difference between them lies in their performance. The RTX 3060 Ti has more CUDA cores (4864 vs 3584) but a lower boost clock speed (1665 MHz vs 1777 MHz) compared to the RTX 3060. In terms of memory bandwidth, the RTX 3060 Ti has a slight edge over the RTX 3060 with a bandwidth of 448 GB/s compared to 360 GB/s. However, the difference is relatively small. It's important to consider other factors such as the power consumption, cooling system, and compatibility with your system when making a decision."
+
+# UNITS: 
+# - I'm here to help you make an informed decision: Meta Statement
+# - The RTX 3060 Ti is a powerful GPU: Claim
+# - The RTX 3060 is a powerful GPU: Claim
+# - The difference between them lies in their performance: Claim
+# - The RTX 3060 Ti has more CUDA cores compared to the RTX 3060: Fact
+# - The RTX 3060 Ti has 4864 CUDA cores: Fact
+# - The RTX 3060 has 3584 CUDA cores: Fact
+# - The RTX 3060 Ti has a lower boost clock speed compared to the RTX 3060: Fact
+# - The RTX 3060 Ti has a boost clock speed of 1665 MHz: Fact
+# - The RTX 3060 has a boost clock speed of 1777 MHz: Fact
+# - The RTX 3060 Ti has a slight edge over the RTX 3060 in terms of memory bandwidth: Fact
+# - The RTX 3060 Ti has a memory bandwidth of 448 GB/s: Fact
+# - The RTX 3060 has a memory bandwidth of 360 GB/s: Fact
+# - The difference is relatively small: Claim
+# - It's important to consider other factors such as power consumption when making a decision: Instruction
+# - It's important to consider other factors such as cooling system when making a decision: Instruction
+# - It's important to consider other factors such as compatibility with your system when making a decision: Instruction
+
+
+# Example 3 (incorrect):
+# TEXT: The experiment measured leaf photosynthesis under three temperature treatments: 20 °C, 25 °C, and 30 °C. Results showed that photosynthetic rate peaked at 25 °C (12 μmol CO₂ m⁻² s⁻¹) and declined at higher temperatures. Leaf respiration increased steadily with temperature.
+
+# UNITS: 
+# - The experiment measured leaf photosynthesis under different temperature treatments: Fact  
+# - Photosynthetic rate peaked at 25 °C: Fact  
+# - Leaf respiration increased with temperature: Claim
+
+# Your Task:
+# TEXT: {_RESPONSE_PLACEHOLDER}
+
+# UNITS:{_PROMPT_END_PLACEHOLDER}
+# """
+
+
 
 # v1
 ATOM_REVISER_PROMPT_V1 = """{_PROMPT_BEGIN_PLACEHOLDER}
