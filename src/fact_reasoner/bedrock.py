@@ -129,9 +129,6 @@ class BedrockLlamaWithLogprobsClient:
         except Exception as e:
             print("Unhandled Bedrock exception:", str(e))
 
-        print(
-            f"[BEDROCK] Model response latency: {round(time.time() - start, 4)} seconds"
-        )
         request_id = resp["ResponseMetadata"]["RequestId"]
         raw_bytes = resp["body"].read()
         payload = json.loads(raw_bytes)

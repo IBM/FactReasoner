@@ -21,13 +21,9 @@ from typing import List
 from tqdm import tqdm
 import networkx as nx
 
+
 class Node:
-    def __init__(
-            self, 
-            id: str, 
-            type: str,
-            probability: float = 1.0
-    ):
+    def __init__(self, id: str, type: str, probability: float = 1.0):
         """
         Create a node in the graph.
 
@@ -40,23 +36,18 @@ class Node:
                 The prior probability associated with the "atom" or "context".
         """
 
-        assert (type in ["atom", "context"]), \
-            f"Uknown node type: {type}."
+        assert type in ["atom", "context"], f"Uknown node type: {type}."
         self.id = id
         self.type = type
         self.probability = probability
 
     def __str__(self):
         return f"Node {self.id} ({self.type}): {self.probability}"
-    
+
+
 class Edge:
     def __init__(
-            self, 
-            source: str, 
-            target: str, 
-            type: str, 
-            probability: float,
-            link: str
+        self, source: str, target: str, type: str, probability: float, link: str
     ):
         """
         Create an edge in the graph.
@@ -75,10 +66,16 @@ class Edge:
                 The type of link: context_atom, context_context, atom_atom
         """
 
-        assert (type in ["entailment", "contradiction", "equivalence"]), \
-            f"Unknown relation type: {type}."
-        assert (link in ["context_atom", "context_context", "atom_atom"]), \
-            f"Unknown link type: {link}"
+        assert type in [
+            "entailment",
+            "contradiction",
+            "equivalence",
+        ], f"Unknown relation type: {type}."
+        assert link in [
+            "context_atom",
+            "context_context",
+            "atom_atom",
+        ], f"Unknown link type: {link}"
         self.source = source
         self.target = target
         self.type = type
@@ -87,7 +84,8 @@ class Edge:
 
     def __str__(self):
         return f"[{self.source} -> {self.target} ({self.type}): {self.probability}]"
-    
+
+
 class FactGraph:
     """
     A graph representation of the atom-context relations.
@@ -95,10 +93,10 @@ class FactGraph:
     """
 
     def __init__(
-            self,
-            atoms: List = None,
-            contexts: List = None,
-            relations: List = None,
+        self,
+        atoms: List = None,
+        contexts: List = None,
+        relations: List = None,
     ):
         """
         FactGraph constructor.
@@ -119,18 +117,12 @@ class FactGraph:
 
         if atoms is not None:
             for atom in tqdm(atoms, desc="Atoms"):
-                node = Node(
-                    id=atom.id, 
-                    type="atom", 
-                    probability=atom.probability
-                )
+                node = Node(id=atom.id, type="atom", probability=atom.probability)
                 self.add_node(node)
         if contexts is not None:
             for context in tqdm(contexts, desc="Contexts"):
                 node = Node(
-                    id=context.id, 
-                    type="context", 
-                    probability=context.probability
+                    id=context.id, type="context", probability=context.probability
                 )
                 self.add_node(node)
 
@@ -142,20 +134,17 @@ class FactGraph:
                         target=rel.target.id,
                         type=rel.type,
                         probability=rel.probability,
-                        link=rel.link
+                        link=rel.link,
                     )
                 )
-        
+
     def get_nodes(self) -> list:
         return list(self.nodes.values())
-    
+
     def get_edges(self) -> list:
         return self.edges
-    
-    def add_node(
-            self, 
-            node: Node
-    ):
+
+    def add_node(self, node: Node):
         """
         Add a new node to the graph.
 
@@ -166,10 +155,7 @@ class FactGraph:
 
         self.nodes[node.id] = node
 
-    def add_edge(
-            self,
-            edge: Edge
-    ):
+    def add_edge(self, edge: Edge):
         """
         Add a new edge to the graph.
 
@@ -180,10 +166,7 @@ class FactGraph:
 
         self.edges.append(edge)
 
-    def from_json(
-            self,
-            json_file: str
-    ):
+    def from_json(self, json_file: str):
         """
         Create the FactGraph from a json file.
 
@@ -194,18 +177,18 @@ class FactGraph:
 
         with open(json_file, "r") as f:
             data = json.load(f)
-            assert ("nodes" in data and "edges" in data), f"Uknown graph format"
+            assert "nodes" in data and "edges" in data, f"Uknown graph format"
 
             self.nodes = {}
             for node in tqdm(data["nodes"], desc="Nodes"):
                 self.add_node(
                     Node(
-                        id=node["id"], 
+                        id=node["id"],
                         type=node["type"],
-                        probability=node["probability"]
+                        probability=node["probability"],
                     )
                 )
-            
+
             self.edges = []
             for edge in tqdm(data["edges"], desc="Edges"):
                 self.edges.append(
@@ -214,7 +197,7 @@ class FactGraph:
                         target=edge["to"],
                         type=edge["relation"],
                         probability=edge["probability"],
-                        link=edge["link"]
+                        link=edge["link"],
                     )
                 )
 
@@ -231,14 +214,58 @@ class FactGraph:
 
         for edge in self.edges:
             if edge.type == "entailment":
-                G.add_edge(edge.source, edge.target, color="green", label="{:.4g}".format(edge.probability))
+                G.add_edge(
+                    edge.source,
+                    edge.target,
+                    color="green",
+                    label="{:.4g}".format(edge.probability),
+                )
             elif edge.type == "contradiction":
-                G.add_edge(edge.source, edge.target, color="red", label="{:.4g}".format(edge.probability))
+                G.add_edge(
+                    edge.source,
+                    edge.target,
+                    color="red",
+                    label="{:.4g}".format(edge.probability),
+                )
             elif edge.type == "equivalence":
-                G.add_edge(edge.source, edge.target, color="blue", label="{:.4g}".format(edge.probability))
+                G.add_edge(
+                    edge.source,
+                    edge.target,
+                    color="blue",
+                    label="{:.4g}".format(edge.probability),
+                )
 
         return G
 
+    def as_json(self) -> dict:
+        """
+        Generate a full JSON-serializable representation of the FactGraph
+        that can be round-tripped into `from_json`.
+
+        Returns:
+            dict with 'nodes' and 'edges'.
+        """
+        graph = {"nodes": [], "edges": []}
+
+        for node in self.nodes.values():
+            node_data = {
+                "id": node.id,
+                "type": node.type,
+                "probability": node.probability,
+            }
+            graph["nodes"].append(node_data)
+
+        for edge in self.edges:
+            edge_data = {
+                "source": edge.source,
+                "target": edge.target,
+                "relation": edge.type,
+                "probability": edge.probability,
+                "link": edge.link,
+            }
+            graph["edges"].append(edge_data)
+
+        return graph
 
     def dump(self):
         print("Nodes:")
@@ -249,6 +276,7 @@ class FactGraph:
             print(e)
         print(f"Number of nodes: {len(self.nodes)}")
         print(f"Number of edges: {len(self.edges)}")
+
 
 if __name__ == "__main__":
 
