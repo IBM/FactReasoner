@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pathlib import Path
+
+import yaml
+import json
 import numpy as np
 import requests
 import tqdm
@@ -24,11 +26,8 @@ import torch
 import transformers
 
 from typing import Any, Dict, List, Union
+from pathlib import Path
 
-import yaml
-
-DEFAULT_PROMPT_BEGIN = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>"
-DEFAULT_PROMPT_END = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -187,3 +186,58 @@ def get_models_config() -> Dict[str, Any]:
     with open(filename, "r") as f:
         config = yaml.safe_load(f)
     return config
+
+def strip_code_fences(s: str) -> str:
+    """
+    Strip markdown code fences from a string if present.
+
+    Args:
+        s: str 
+            The input string.
+    Returns:
+        str: The string without code fences.
+    """
+
+    s = s.strip()
+
+    # Try a strict fenced block: ```json\n ... \n```
+    m = re.match(r"^```(?:json|JSON)?\s*\n(.*?)\n```$", s, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+
+    # Fallback: starts with ``` but may have irregular spacing/line breaks
+    if s.startswith("```"):
+        lines = s.splitlines()
+        # Remove the opening fence line
+        content_lines = lines[1:]
+        # If the last line is a closing fence, drop it
+        if content_lines and content_lines[-1].strip().startswith("```"):
+            content_lines = content_lines[:-1]
+        return "\n".join(content_lines).strip()
+
+    # No fences detected; return as-is
+    return s
+
+
+def validate_json_code_block(input_string: str) -> bool:
+    """
+    Checks if the input string is a valid JSON dictionary.
+
+    Args:
+        input_string: str
+            The string to check.
+
+    Returns:
+        bool: True if valid JSON dictionary, False otherwise.
+    """
+    try:
+        # Attempt to parse the string as JSON
+        # Remove markdown fences if present
+        cleaned = strip_code_fences(input_string)
+        data = json.loads(cleaned)
+
+        # Check if it's a dictionary
+        return isinstance(data, dict)
+    except json.JSONDecodeError:
+        # If parsing fails, it's not valid JSON
+        return False
