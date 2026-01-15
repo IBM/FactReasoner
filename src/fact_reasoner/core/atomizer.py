@@ -17,6 +17,7 @@
 # (context) to revise or decontextualize the atomc units if needed.
 
 import json
+import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict
@@ -25,7 +26,6 @@ from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext, CBlock
 from mellea.stdlib.requirement import req, check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-
 
 # Local imports
 from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences
@@ -217,13 +217,52 @@ class Atomizer(object):
         else:
             return {} # empty dict on failure
                         
+    async def arun(self, response: str) -> Dict[str, Any]:
+        """
+        Extract atomic units from a single response.
+        
+        Args:
+            response: str
+                The response from which to extract atomic units.
+        Returns:
+            dict: A dictionary containing the number of atomic units, the units themselves,
+            all atomic units as dictionaries, and all facts as dictionaries.
+        """
+        
+        # Perform the instruction with validation
+        output = await mfuncs.ainstruct(
+            INSTRUCTION_ATOMIZER,
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=[
+                check(
+                    "The output must be a valid JSON dictionary with markdown code fences.",
+                    validation_fn=simple_validate(
+                        lambda s: validate_json_code_block(s, required_keys=["atomic_units"])
+                    ),
+                )
+            ],
+            user_variables={"response": response},
+            icl_examples=self.icl_examples,
+            strategy=RejectionSamplingStrategy(loop_budget=3),
+            return_sampling_results=True,
+        )
+
+        # The output is a validated JSON string; parse it
+        if output.success:
+            cleaned = strip_code_fences(str(output))
+            return json.loads(cleaned)
+        else:
+            return {} # empty dict on failure
 
 if __name__ == "__main__":
 
-    # Create a Mellea session with RITS backend
+    use_async = False
+
+    # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-            RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500}
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500}
     )
 
     # Create the atomizer
@@ -241,14 +280,17 @@ if __name__ == "__main__":
       
     
     # Process the response to extract atomic units
-    result = atomizer.run(response)
-    print(f"Atomization result: {result}")
+    if not use_async:
+        result = atomizer.run(response)
+        print(f"Atomization result: {result}")
+    else:
+        result = asyncio.run(atomizer.arun(response))
+        print(f"Atomization result: {result}")
 
     # Print the extracted atomic units
     atoms = result.get("atomic_units", [])
     print(f"Extracted {len(atoms)} atomic units:")
     for atom in atoms:
         print(f"Atom {atom['id']}: {atom['text']}")
-
 
     print("Done.")
