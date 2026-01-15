@@ -219,16 +219,19 @@ def strip_code_fences(s: str) -> str:
     return s
 
 
-def validate_json_code_block(input_string: str) -> bool:
+def validate_json_code_block(input_string: str, required_keys: List[str] = None) -> bool:
     """
     Checks if the input string is a valid JSON dictionary.
 
     Args:
         input_string: str
             The string to check.
+        required_keys: List[str]
+            List of keys that must be present in the JSON dictionary.
 
     Returns:
-        bool: True if valid JSON dictionary, False otherwise.
+        bool: True if valid JSON, False otherwise. If required_keys is provided,
+        then also checks if it is a dictionary and contains the required keys.
     """
     try:
         # Attempt to parse the string as JSON
@@ -236,8 +239,12 @@ def validate_json_code_block(input_string: str) -> bool:
         cleaned = strip_code_fences(input_string)
         data = json.loads(cleaned)
 
-        # Check if it's a dictionary
-        return isinstance(data, dict)
+        # Check if it's a dictionary and has required keys
+        if isinstance(data, dict) and required_keys:
+            for key in required_keys:
+                if key not in data:
+                    return False
+        return True
     except json.JSONDecodeError:
         # If parsing fails, it's not valid JSON
         return False
