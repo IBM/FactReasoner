@@ -248,3 +248,21 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
     except json.JSONDecodeError:
         # If parsing fails, it's not valid JSON
         return False
+
+def validate_markdown_code_block(input_string: str) -> bool:
+    """
+    Checks if the input string is a valid markdown code block.
+
+    Args:
+        input_string: str
+            The string to check.
+
+    Returns:
+        bool: True if valid markdown code block, False otherwise.
+    """
+
+    if input_string.strip().startswith("```") and input_string.strip().endswith("```"):
+        return True
+    else:
+        return False
+    

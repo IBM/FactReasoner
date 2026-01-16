@@ -225,8 +225,8 @@ class Atomizer(object):
             response: str
                 The response from which to extract atomic units.
         Returns:
-            dict: A dictionary containing the number of atomic units, the units themselves,
-            all atomic units as dictionaries, and all facts as dictionaries.
+            dict: A dictionary containing the atomic units, each one being a dict
+            with 'id' and 'text' as keys.
         """
         
         # Perform the instruction with validation

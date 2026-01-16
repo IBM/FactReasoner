@@ -164,7 +164,10 @@ class Reviser:
             Dict[str, Any]: A dictionary containing the revised atomic unit.
         """
 
+        # Safety checks
         assert "atomic_units" in units, "Input units must contain 'atomic_units' key."
+
+        # Perform the instruction with validation
         results = {"revised_units": []}
         for unit in units["atomic_units"]:
             atom_id = unit["id"]
@@ -209,7 +212,10 @@ class Reviser:
             Dict[str, Any]: A dictionary containing the revised atomic unit.
         """
 
+        # Safety checks
         assert "atomic_units" in units, "Input units must contain 'atomic_units' key."
+
+        # Perform the instruction with validation
         results = {"revised_units": []}
         for unit in units["atomic_units"]:
             atom_id = unit["id"]
