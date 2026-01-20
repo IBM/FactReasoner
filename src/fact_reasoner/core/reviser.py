@@ -49,7 +49,7 @@ Follow the steps below for unit decontextualization:
 ```json
 {
   "revised_unit": "<REVISED_UNIT>",
-  "reasoning": "<YOUR_REASONING>"
+  "rationale": "<YOUR_REASONING>"
 }
 ```
 Where <REVISED_UNIT> is the decontextualized UNIT after resolving vague references, and <YOUR_REASONING> is your reasoning for the revisions made.
@@ -111,7 +111,7 @@ class Reviser:
             ```json
             {
                 "revised_unit": "Acorns is a financial technology company.",
-                "reasoning": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
+                "rationale": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
             }
             ```""",
             """Example 2: 
@@ -129,7 +129,7 @@ class Reviser:
             ```json
             {
                 "revised_unit": "The Syrian refugee victim had previously suffered a broken wrist.",
-                "reasoning": "The UNIT contains a vague reference, 'the victim.' This is a reference to an unknown entity, since it is unclear who the victim is. From the RESPONSE, we can see that the victim is a Syrian refugee. Thus, the vague reference 'the victim' should be replaced with 'the Syrian refugee victim.'"
+                "rationale": "The UNIT contains a vague reference, 'the victim.' This is a reference to an unknown entity, since it is unclear who the victim is. From the RESPONSE, we can see that the victim is a Syrian refugee. Thus, the vague reference 'the victim' should be replaced with 'the Syrian refugee victim.'"
             }
             ```""",
             """Example 3:
@@ -145,8 +145,8 @@ class Reviser:
             OUTPUT:
             ```json
             {
-            "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small.",
-            "reasoning": "The UNIT contains a vague reference, 'The difference.' From the RESPONSE, we can see that the difference is in memory bandwidth between the RTX 3060 Ti and RTX 3060. Thus, the vague reference 'The difference' should be replaced with 'The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060'. The sentence from which the UNIT is extracted includes coordinating conjunctions that potentially decompose the statement into multiple units. Thus, adding more context to the UNIT is not necessary."
+                "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small.",
+                "rationale": "The UNIT contains a vague reference, 'The difference.' From the RESPONSE, we can see that the difference is in memory bandwidth between the RTX 3060 Ti and RTX 3060. Thus, the vague reference 'The difference' should be replaced with 'The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060'. The sentence from which the UNIT is extracted includes coordinating conjunctions that potentially decompose the statement into multiple units. Thus, adding more context to the UNIT is not necessary."
             }
             ```"""
         ]
@@ -180,7 +180,7 @@ class Reviser:
                     check(
                         "The output must be a valid JSON code block.",
                         validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "reasoning"])
+                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
                         )
                     )
                 ],
@@ -228,7 +228,7 @@ class Reviser:
                     check(
                         "The output must be a valid JSON code block.",
                         validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "reasoning"])
+                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
                         )
                     )
                 ],
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     for atom in atoms:
         print(f"Original Atom {atom['id']}: {atom['text']}")
         print(f"Revised Atom {atom['id']}: {atom['revised_unit']}")
-        print(f"Reasoning: {atom['reasoning']}")
+        print(f"Rationale: {atom['rationale']}")
         print("-----")
 
     print("Done.")

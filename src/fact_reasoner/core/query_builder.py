@@ -145,6 +145,7 @@ class QueryBuilder:
             icl_examples=self.icl_examples,
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
+            model_options=dict(logprobs=True)
         )
 
         # The output is a validated JSON string; parse it
@@ -198,15 +199,15 @@ if __name__ == "__main__":
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500}
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
     )
 
     # Create the query builder
     qb = QueryBuilder(backend)
 
     # Process a single atom (no knowledge)        
-    # text = "The Apollo 14 mission to the Moon took place on January 31, 1971."
-    text = "You'd have to yell if your friend is outside the same location"
+    text = "The Apollo 14 mission to the Moon took place on January 31, 1971."
+    # text = "You'd have to yell if your friend is outside the same location"
 
     if not use_async:
         result = qb.run(text)
