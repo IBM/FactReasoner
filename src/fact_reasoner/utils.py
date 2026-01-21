@@ -219,6 +219,63 @@ def strip_code_fences(s: str) -> str:
     return s
 
 
+def _escape_inner_quotes(s: str) -> str:
+    """
+    Replaces any “ or ” characters with \" but only between
+    the first and last double quote (") in the string.
+    """
+    # Find first and last normal quotes
+    first = s.find('"')
+    last = s.rfind('"')
+
+    if first == -1 or last == -1 or first == last:
+        # Nothing to process if fewer than two quotes
+        return s
+
+    # Parts of the string
+    before = s[:first+1]
+    middle = s[first+1:last]
+    after = s[last:]
+
+    # Replace smart quotes inside the middle section
+    middle = middle.replace('"', r"\"")
+
+    return before + middle + after
+
+def escape_quotes(s: str) -> str:
+    
+    content_lines = []
+    for line in s.splitlines():
+        if ":" not in line:
+            content_lines.append(line)
+        else:
+            p = line.find(":")
+            temp = line[:p + 1] + _escape_inner_quotes(line[p+1:])
+            content_lines.append(temp)
+    return "\n".join(content_lines).strip()
+
+
+def normalize_ws(text: str) -> str:
+    """
+    - Collapse all runs of whitespace (spaces, tabs, newlines) into a single space.
+    - Escape inner pairs of double quotes:  ""phrase""  ->  \"phrase\"
+      (Only when the pair of quotes is not already escaped.)
+
+    Examples:
+        Input:  'He said  ""Hello  world"" \n  today.'
+        Output: 'He said \\"Hello world\\" today.'
+    """
+    if text is None:
+        return text  # or raise ValueError("text must not be None")
+
+    # Collapse all whitespace chunks to a single space
+    # This turns tabs/newlines into spaces as well.
+    collapsed = re.sub(r'\s+', ' ', text).strip()
+    collapsed = collapsed.replace('\n', '')
+
+    return collapsed
+
+
 def validate_json_code_block(input_string: str, required_keys: List[str] = None) -> bool:
     """
     Checks if the input string is a valid JSON dictionary.
@@ -234,9 +291,13 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
         then also checks if it is a dictionary and contains the required keys.
     """
     try:
-        # Attempt to parse the string as JSON
+
         # Remove markdown fences if present
         cleaned = strip_code_fences(input_string)
+        cleaned = escape_quotes(cleaned)
+        cleaned = normalize_ws(cleaned)
+        
+        # Attempt to parse the string as JSON
         data = json.loads(cleaned)
 
         # Check if it's a dictionary and has required keys
@@ -245,8 +306,10 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
                 if key not in data:
                     return False
         return True
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         # If parsing fails, it's not valid JSON
+        print(f"Error: {e}")
+        print(f"String: {cleaned}")
         return False
 
 def validate_markdown_code_block(input_string: str) -> bool:

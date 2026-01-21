@@ -280,7 +280,7 @@ class ContextSummarizer:
 if __name__ == "__main__":
     
     use_async = False
-    with_ref = False
+    with_ref = True
 
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS

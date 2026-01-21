@@ -56,6 +56,59 @@ Where <REVISED_UNIT> is the decontextualized UNIT after resolving vague referenc
 
 Use the provided examples to learn your task.
 
+Example 1: 
+UNIT: 
+Acorns is a financial technology company
+
+RESPONSE:
+Acorns is a financial technology company founded in 2012 by Walter Cruttenden, \
+Jeff Cruttenden, and Mark Dru that provides micro-investing services. The \
+company is headquartered in Irvine, California.
+
+OUTPUT:
+```json
+{
+    "revised_unit": "Acorns is a financial technology company.",
+    "rationale": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
+}
+```
+
+Example 2: 
+UNIT:
+The victim had previously suffered a broken wrist.
+
+RESPONSE:
+The clip shows the victim, with his arm in a cast, being dragged to the floor \
+by his neck as his attacker says "I'll drown you" on a school playing field, while forcing water from a bottle into the victim's mouth, \
+simulating waterboarding. The video was filmed in a lunch break. The clip shows the victim walking away, without reacting, as the attacker \
+and others can be heard continuing to verbally abuse him. The victim, a Syrian refugee, had previously suffered a broken wrist; this had also been \
+investigated by the police, who had interviewed three youths but took no further action.
+
+OUTPUT:
+```json
+{
+    "revised_unit": "The Syrian refugee victim had previously suffered a broken wrist.",
+    "rationale": "The UNIT contains a vague reference, 'the victim.' This is a reference to an unknown entity, since it is unclear who the victim is. From the RESPONSE, we can see that the victim is a Syrian refugee. Thus, the vague reference 'the victim' should be replaced with 'the Syrian refugee victim.'"
+}
+```
+
+Example 3:
+UNIT:
+The difference is relatively small.
+
+RESPONSE:
+Both the RTX 3060 Ti and RTX 3060 are powerful GPUs, and the difference between them lies in their performance. \
+The RTX 3060 Ti has more CUDA cores (4864 vs 3584) but a lower boost clock speed (1665 MHz vs 1777 MHz) compared to the RTX 3060. \
+In terms of memory bandwidth, the RTX 3060 Ti has a slight edge over the RTX 3060 with a bandwidth of 448 GB/s compared to 360 GB/s. \
+However, the difference is relatively small and may not be noticeable in real-world applications.
+
+OUTPUT:
+```json
+{
+    "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small.",
+    "rationale": "The UNIT contains a vague reference, 'The difference.' From the RESPONSE, we can see that the difference is in memory bandwidth between the RTX 3060 Ti and RTX 3060. Thus, the vague reference 'The difference' should be replaced with 'The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060'. The sentence from which the UNIT is extracted includes coordinating conjunctions that potentially decompose the statement into multiple units. Thus, adding more context to the UNIT is not necessary."
+}
+```
 
 Your task:
 UNIT:
@@ -66,7 +119,6 @@ RESPONSE:
 
 OUTPUT:
 """
-
 
 class Reviser:
     """
@@ -95,61 +147,6 @@ class Reviser:
         
         # Print backend info
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
-
-        # In-context learning examples
-        self.icl_examples = [
-            """Example 1: 
-            UNIT: 
-            Acorns is a financial technology company
-
-            RESPONSE:
-            Acorns is a financial technology company founded in 2012 by Walter Cruttenden, \
-            Jeff Cruttenden, and Mark Dru that provides micro-investing services. The \
-            company is headquartered in Irvine, California.
-
-            OUTPUT:
-            ```json
-            {
-                "revised_unit": "Acorns is a financial technology company.",
-                "rationale": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
-            }
-            ```""",
-            """Example 2: 
-            UNIT:
-            The victim had previously suffered a broken wrist.
-
-            RESPONSE:
-            The clip shows the victim, with his arm in a cast, being dragged to the floor \
-            by his neck as his attacker says "I'll drown you" on a school playing field, while forcing water from a bottle into the victim's mouth, \
-            simulating waterboarding. The video was filmed in a lunch break. The clip shows the victim walking away, without reacting, as the attacker \
-            and others can be heard continuing to verbally abuse him. The victim, a Syrian refugee, had previously suffered a broken wrist; this had also been \
-            investigated by the police, who had interviewed three youths but took no further action.
-
-            OUTPUT:
-            ```json
-            {
-                "revised_unit": "The Syrian refugee victim had previously suffered a broken wrist.",
-                "rationale": "The UNIT contains a vague reference, 'the victim.' This is a reference to an unknown entity, since it is unclear who the victim is. From the RESPONSE, we can see that the victim is a Syrian refugee. Thus, the vague reference 'the victim' should be replaced with 'the Syrian refugee victim.'"
-            }
-            ```""",
-            """Example 3:
-            UNIT:
-            The difference is relatively small.
-
-            RESPONSE:
-            Both the RTX 3060 Ti and RTX 3060 are powerful GPUs, and the difference between them lies in their performance. \
-            The RTX 3060 Ti has more CUDA cores (4864 vs 3584) but a lower boost clock speed (1665 MHz vs 1777 MHz) compared to the RTX 3060. \
-            In terms of memory bandwidth, the RTX 3060 Ti has a slight edge over the RTX 3060 with a bandwidth of 448 GB/s compared to 360 GB/s. \
-            However, the difference is relatively small and may not be noticeable in real-world applications.
-
-            OUTPUT:
-            ```json
-            {
-                "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small.",
-                "rationale": "The UNIT contains a vague reference, 'The difference.' From the RESPONSE, we can see that the difference is in memory bandwidth between the RTX 3060 Ti and RTX 3060. Thus, the vague reference 'The difference' should be replaced with 'The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060'. The sentence from which the UNIT is extracted includes coordinating conjunctions that potentially decompose the statement into multiple units. Thus, adding more context to the UNIT is not necessary."
-            }
-            ```"""
-        ]
 
     def run(self, units: Dict[str, Any], response: str) -> Dict[str, Any]:
         """
@@ -185,7 +182,6 @@ class Reviser:
                     )
                 ],
                 user_variables={"unit": atom_text, "response": response},
-                icl_examples=self.icl_examples,
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True
             )
@@ -233,7 +229,6 @@ class Reviser:
                     )
                 ],
                 user_variables={"unit": atom_text, "response": response},
-                icl_examples=self.icl_examples,
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True
             )

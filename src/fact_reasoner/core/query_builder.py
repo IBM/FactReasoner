@@ -22,12 +22,12 @@ import mellea.stdlib.functional as mfuncs
 from typing import Any, Dict
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
-from mellea.stdlib.base import SimpleContext, CBlock
-from mellea.stdlib.requirement import req, check, simple_validate
+from mellea.stdlib.base import SimpleContext
+from mellea.stdlib.requirement import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
-from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences
+from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, escape_quotes
 
 INSTRUCTION_QUERY_BUILDER = """
 Instructions:
@@ -43,6 +43,7 @@ Process:
    - Craft a query based on the QUERY CONSTRUCTION CRITERIA.
    - Prioritize natural language queries that a typical user might enter.
    - Use special operators (quotation marks, "site:", Boolean operators, intitle:, etc.) selectively and only when they significantly enhance the query's effectiveness.
+   
 
 2. Provide Query Rationale (2-3 sentences):
    Explain how this query builds upon previous efforts and/or why it's likely to uncover new, relevant information about the STATEMENT's accuracy.
@@ -56,7 +57,41 @@ Process:
    }
    ```
 
-STATEMENT: {{text}}
+Use the following examples to learn the task better.
+
+Example 1:
+STATEMENT: The Great Wall of China is visible from space
+OUTPUT:
+```json
+{
+    "query": "\"The Great Wall of China is visible from space\" fact check myth",
+    "rationale": "This query uses quotation marks to ensure the exact statement is searched and adds 'fact check' and 'myth' to retrieve authoritative sources that address the claim's accuracy."}
+```
+
+Example 2:
+STATEMENT: Apple will release a foldable iPhone in 2026
+OUTPUT:
+```json
+{
+    "query": "\"Apple will release a foldable iPhone in 2026\" rumor OR announcement",
+    "rationale": "Including the statement in quotes ensures precision, while adding keywords like 'rumor' and 'announcement' helps capture both official sources and credible tech news discussing the claim."
+}
+```
+
+Example 3:
+STATEMENT: Quantum computers can break RSA encryption easily
+OUTPUT:
+```json
+{
+    "query": "\"Quantum computers can break RSA encryption easily\" fact check cryptography experts",
+    "rationale": "The query uses quotation marks for accuracy and adds 'fact check' and 'cryptography experts' to find authoritative sources that evaluate the feasibility of this claim."
+}
+```
+
+Your task:
+
+STATEMENT: {{statement_text}}
+OUTPUT:
 """
 
 class QueryBuilder:
@@ -87,36 +122,6 @@ class QueryBuilder:
         # Print info
         print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
 
-        # In-context learning examples
-        self.icl_examples = [
-            """
-            STATEMENT: The Great Wall of China is visible from space
-            OUTPUT:
-            ```json
-            {
-                "query": "\"The Great Wall of China is visible from space\" fact check myth",
-                "rationale": "This query uses quotation marks to ensure the exact statement is searched and adds 'fact check' and 'myth' to retrieve authoritative sources that address the claim's accuracy."}
-            ```""",
-            """
-            STATEMENT: Apple will release a foldable iPhone in 2026
-            OUTPUT:
-            ```json
-            {
-                "query": "\"Apple will release a foldable iPhone in 2026\" rumor OR announcement",
-                "rationale": "Including the statement in quotes ensures precision, while adding keywords like 'rumor' and 'announcement' helps capture both official sources and credible tech news discussing the claim."
-            }
-            ```""",
-            """
-            STATEMENT: Quantum computers can break RSA encryption easily
-            OUTPUT:
-            ```json
-            {
-                "query": "\"Quantum computers can break RSA encryption easily\" fact check cryptography experts",
-                "rationale": "The query uses quotation marks for accuracy and adds 'fact check' and 'cryptography experts' to find authoritative sources that evaluate the feasibility of this claim."
-            }
-            ```"""
-        ]
-
     def run(self, text: str) -> Dict[str, Any]:
         """
         Build a Google search query for the given text.
@@ -137,20 +142,19 @@ class QueryBuilder:
                 check(
                     "The output must be a valid JSON dictionary with markdown code fences.",
                     validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(s, required_keys=["query"])
+                        lambda s: validate_json_code_block(s, required_keys=["query", "rationale"])
                     ),
                 )
             ],
-            user_variables={"text": text},
-            icl_examples=self.icl_examples,
+            user_variables={"statement_text": text},
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
-            model_options=dict(logprobs=True)
         )
 
         # The output is a validated JSON string; parse it
         if output.success:
             cleaned = strip_code_fences(str(output))
+            cleaned = escape_quotes(cleaned)
             return json.loads(cleaned)
         else:
             return {} # empty dict on failure
@@ -175,12 +179,11 @@ class QueryBuilder:
                 check(
                     "The output must be a valid JSON dictionary with markdown code fences.",
                     validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(s, required_keys=["query"])
+                        lambda s: validate_json_code_block(s, required_keys=["query", "rationale"])
                     ),
                 )
             ],
-            user_variables={"text": text},
-            icl_examples=self.icl_examples,
+            user_variables={"statement_text": text},
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
         )
