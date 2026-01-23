@@ -25,7 +25,7 @@ import torch
 from typing import Callable, List, Optional
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from langchain_text_splitters.character import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
