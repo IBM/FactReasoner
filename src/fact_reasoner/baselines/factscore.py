@@ -19,17 +19,23 @@ import os
 import json
 import string
 import argparse
+import mellea.stdlib.functional as mfuncs
 
-from typing import List
+from typing import List, Dict, Any
 from tqdm import tqdm
 from dotenv import load_dotenv
 
+from mellea.backends import Backend
+from mellea.backends.types import ModelOption
+from mellea.stdlib.base import SimpleContext, CBlock
+from mellea.stdlib.requirement import req, check, simple_validate
+from mellea.stdlib.sampling import RejectionSamplingStrategy
+
 # Local imports
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.atom_reviser import AtomReviser
-from src.fact_reasoner.context_retriever import ContextRetriever
+from src.fact_reasoner.core.atomizer import Atomizer
+from src.fact_reasoner.core.reviser import Reviser
+from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts
-from src.fact_reasoner.llm_handler import LLMHandler
 
 # Version 1 of the prompt (from the original FactScore paper)
 FACTSCORE_PROMPT = """{_PROMPT_BEGIN_PLACEHOLDER}
@@ -52,68 +58,56 @@ Output:{_PROMPT_END_PLACEHOLDER}
 
 class FactScore:
     """
-    Our implementation of the FactScore paper. 
+    Our implementation of the FactScore factuality assessor. 
     """
 
     def __init__(
             self,
+            backend: Backend,
             context_retriever: ContextRetriever = None,
-            atom_extractor: AtomReviser = None,
-            atom_reviser: AtomReviser = None,
-            model_id: str = "llama-3.3-70b-instruct",
-            debug_mode: bool = False,
+            atom_extractor: Atomizer = None,
+            atom_reviser: Reviser = None,
             add_topic: bool = False,
-            backend: str = "rits",
     ):
         """
         Construct the FactScore pipeline instance.
 
         Args:
+            backend: Backend
+                The Mellea backend to use for LLM interactions.
             context_retriever: ContextRetriever
                 The service used for retrieving external contexts.
-            atom_extractor: AtomExtractor
-                The service used for extracting atoms from the response.
-            atom_reviser: AtomReviser
-                The service used for decontextualizing the atoms.
-            model: str
-                The name of the model used by FactScore.
-            debug_mode: bool
-                Flaf indicating debug mode (default is False)
+            atom_extractor: Atomizer
+                The atom decomposition component.
+            atom_reviser: Reviser
+                The atom reviser component.
             add_topic: bool
                 If True, then the topic is added (relevant only for v1 and Biographies).
         """
 
+        self.backend = backend
         self.query = None
         self.response = None
         self.topic = None
-        self.debug_mode = debug_mode
         self.add_topic = add_topic # default is False
-
-        self.model_id = model_id
-        self.backend = backend
-        self.llm_handler = LLMHandler(model_id, backend)
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
         self.binary_output = True # default is True
     
-        self.prompt_begin = self.llm_handler.get_prompt_begin()
-        self.prompt_end = self.llm_handler.get_prompt_end()
-
         if not os.environ.get("_DOTENV_LOADED"):
             load_dotenv(override=True) 
             os.environ["_DOTENV_LOADED"] = "1"
          
-        print(f"[FactScore] Using LLM on {self.backend}: {self.model_id}")
+        print(f"[FactScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[FactScore] Binary output: {self.binary_output}")
 
         self.atoms = {} # indexed by atom id
         self.contexts = {} # indexed by context id
 
+        # Ground truth labels (if any)
         self.labels_human = None
-        self.labels_chatgpt = None
-        self.labels_llamanp = None
 
     def from_json(self, json_file: str):
         """
@@ -156,7 +150,7 @@ class FactScore:
 
     def from_dict_with_contexts(
             self,
-            data: dict,
+            data: Dict[str, Any],
     ):
         """
         Create a problem instance from a dict containing both atoms and contexts.
@@ -218,23 +212,26 @@ class FactScore:
 
     def build(
             self,
-            debug_mode: bool = False,
+            query: str = None,
+            response: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
-            decontextualize_atoms: bool = True,
+            revise_atoms: bool = True,
             no_contexts: bool = False
     ):
         """
         Build the atoms and contexts using the retrieval service.
 
         Args:
-            debug_mode: bool
-                Boolean flag indicating debugging mode (default False)
+            query: str
+                The input user query.
+            response: str
+                The LLM generated response to the input query.
             has_atoms: bool
                 A boolean flag indicating if the atoms have already been created.
             has_contexts: bool
                 A boolean flag indicating if the contexts have already been created.
-            decontextualize_atoms: bool
+            revise_atoms: bool
                 A boolean flag indicating that the atoms need to be decontextualized
                 (i.e., pronouns he, she, it, ... replaced by the actual entity)
             no_contexts: bool
@@ -244,8 +241,10 @@ class FactScore:
         """
 
         # Initialize the scorer
-        self.debug_mode = debug_mode
+        self.query = query
+        self.response = response
         self.no_contexts = no_contexts
+        self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
         assert self.atom_extractor is not None, f"Atom extractor must be created."
@@ -264,7 +263,7 @@ class FactScore:
         assert len(self.atoms) > 0, f"Atoms must be initialized if `has_atoms` is True!"
 
         # Decontextualize the atoms
-        if decontextualize_atoms:
+        if revise_atoms:
             print(f"[FactScore] Decontextualize the atoms ...")
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
@@ -288,7 +287,7 @@ class FactScore:
             self,
             atom: str,
             topic: str,
-            passages: List[dict],
+            passages: List[Dict[str, Any]],
     ):
         """
         Create the prompt for predicting the label of the atom given contexts.
@@ -363,13 +362,14 @@ class FactScore:
         assert len(self.atoms) > 0
 
         # Use the LLM to label the atom
-        print(f"[FactScore] Labeling atoms with {self.model_id} ...")
-        prompts = []
+        print(f"[FactScore] Labeling atoms with {self.backend.model_id} ...")
         atom_ids = []
 
-        # Create the prompts for each of the atoms
+        # Label each atom given its retrieved contexts
+        results = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
+            atom_text = atom.get_text()
             contexts = atom.get_contexts()
             if contexts is not None and len(contexts) > 0:
                 passages = []
@@ -381,34 +381,24 @@ class FactScore:
             else:
                 passages = [] # no passages retrieved for the atom
 
-            prompt = self.make_prompt(
-                atom=atom.get_text(),
-                topic=self.topic,
-                passages=passages
+            output = mfuncs.instruct(
+                INSTRUCTION_FACTSCORE,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be True or False"
+                    )
+                ],
+                user_variables={"atom": atom_text, "knowledge": knowledge},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True
             )
 
-            prompts.append(prompt)
-
-        print(f"[FactScore] Prompts created: {len(prompts)}")
-
-        # Prepare the LLM call
-        # Prepare the LLM call
-        results = []
-        for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(prompts)
-            ),
-            total=len(prompts),
-            desc="FactScore",
-            unit="prompts",
-            ):
-                results.append(response.choices[0].message.content)
-
-        if self.debug_mode:
-            for i, response in enumerate(results):
-                print(f"PROMPT:\n{prompts[i]}")
-                print(f"RESPONSE:\n{response}")
-
+            if output.success:
+                label = extract_label(str(output))
+                atom_labels.append(label)
+    
         # Postprocess the generated answers
         atom_labels = [self.extract_label(text) for text in results]
         return dict(zip(atom_ids, atom_labels))

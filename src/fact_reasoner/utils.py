@@ -294,7 +294,6 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
 
         # Remove markdown fences if present
         cleaned = strip_code_fences(input_string)
-        cleaned = escape_quotes(cleaned)
         cleaned = normalize_ws(cleaned)
         
         # Attempt to parse the string as JSON
@@ -308,8 +307,7 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
         return True
     except json.JSONDecodeError as e:
         # If parsing fails, it's not valid JSON
-        print(f"Error: {e}")
-        print(f"String: {cleaned}")
+        print(f"Malformed JSON string: {e}")
         return False
 
 def validate_markdown_code_block(input_string: str) -> bool:

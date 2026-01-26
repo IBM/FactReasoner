@@ -21,8 +21,8 @@ import nltk
 from nltk.tokenize import sent_tokenize
 
 # Local imports
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.context_retriever import ContextRetriever
+from src.fact_reasoner.core.atomizer import Atomizer
+from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.nli_extractor import NLIExtractor
 from src.fact_reasoner.utils import punctuation_only_inside_quotes
 
@@ -169,9 +169,6 @@ class Context:
             return self.synthetic_summary
         else:
             return self.get_text(text_only)
-
-    # def get_text2(self):
-    #    return f"{self.title}\n{self.snippet}\n{self.link}\n{self.text}"
 
     def get_snippet_and_text(self):
         if self.snippet != "" and self.text != "":
@@ -402,14 +399,14 @@ def get_nli_relations_prompting(
     return relations
 
 
-def build_atoms(response: str, atom_extractor: AtomExtractor) -> dict:
+def build_atoms(response: str, atom_extractor: Atomizer) -> dict:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
     Args:
         response: str
             The string representing the LLM response.
-        atom_extractor: AtomExtractor 
+        atom_extractor: Atomizer 
             The model based atom extractor.
     Returns:
         A dict containing the atoms of the response.
@@ -423,8 +420,8 @@ def build_atoms(response: str, atom_extractor: AtomExtractor) -> dict:
     candidates = [
         Atom(
             id="a" + str(i),
-            text=elem["atom"]
-        ) for i, elem in enumerate(result["all_facts"])
+            text=elem["text"]
+        ) for i, elem in enumerate(result["atomic_units"])
     ]
 
     atoms = {}

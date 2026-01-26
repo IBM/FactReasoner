@@ -30,6 +30,7 @@ from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
+from mellea.backends.types import ModelOption
 
 # Local imports
 from src.fact_reasoner.core.query_builder import QueryBuilder
@@ -459,7 +460,7 @@ class ContextRetriever:
 
             # Generate the query text if there is a query builder
             if self.query_builder is not None:
-                result = self.query_builder.run(text, knowledge="")
+                result = self.query_builder.run(text)
                 query_text = result.get("query", text)
             else:
                 query_text = text
@@ -565,26 +566,32 @@ class ContextRetriever:
            
 if __name__ == '__main__':
 
-    # query = "Lanny Flaherty has appeared in Law & Order."
-    # query = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
-    # cache_dir = "my_database.db"
-    # query_builder = QueryBuilder(model="llama-3.3-70b-instruct")
+    # Create a Mellea RITS backend
+    from mellea_ibm.rits import RITSBackend, RITS
+    backend = RITSBackend(
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500}
+    )
 
-    # retriever = ContextRetriever(
-    #     top_k=5,
-    #     service_type="google",
-    #     cache_dir=cache_dir,
-    #     fetch_text=True,
-    #     use_in_memory_vectorstore=True
-    #     # query_builder=query_builder
-    # )
+    # query = "Lanny Flaherty has appeared in Law & Order."
+    query = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
+    cache_dir = None #"my_database.db"
+    query_builder = QueryBuilder(backend)
+
+    retriever = ContextRetriever(
+        top_k=5,
+        service_type="google",
+        cache_dir=cache_dir,
+        fetch_text=True,
+        use_in_memory_vectorstore=False,
+        query_builder=query_builder
+    )
     
-    # contexts = retriever.query(text=query)
+    contexts = retriever.query(text=query)
     
-    # print(f"Number of contexts: {len(contexts)}")
-    # for context in contexts:
-    #     print(context)
-    #     print("****" * 20)
+    print(f"Number of contexts: {len(contexts)}")
+    for context in contexts:
+        print(context)
+        print("****" * 20)
 
     link = "https://www.ancientportsantiques.com/wp-content/uploads/Documents/AUTHORS/SeaPeoples/SeaPeoples-Fischer&B%C3%BCrge2017.pdf"
     text = fetch_text_from_link(link, max_size=4000)

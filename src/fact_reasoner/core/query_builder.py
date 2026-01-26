@@ -27,7 +27,7 @@ from mellea.stdlib.requirement import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
-from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, escape_quotes
+from src.fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
 
 INSTRUCTION_QUERY_BUILDER = """
 Instructions:
@@ -44,17 +44,10 @@ Process:
    - Prioritize natural language queries that a typical user might enter.
    - Use special operators (quotation marks, "site:", Boolean operators, intitle:, etc.) selectively and only when they significantly enhance the query's effectiveness.
    
-
-2. Provide Query Rationale (2-3 sentences):
-   Explain how this query builds upon previous efforts and/or why it's likely to uncover new, relevant information about the STATEMENT's accuracy.
-
-3. Format Final Query:
-   Present your query and rationale in the following JSON format:
-   ```json
-   {
-       "query": "<your generated query here>",
-       "rationale": "<your rationale here>"
-   }
+2. Format Final Query:
+   Present your query wrapped between Markdown code fences:
+   ```
+    <your generated query here>
    ```
 
 Use the following examples to learn the task better.
@@ -62,30 +55,22 @@ Use the following examples to learn the task better.
 Example 1:
 STATEMENT: The Great Wall of China is visible from space
 OUTPUT:
-```json
-{
-    "query": "\"The Great Wall of China is visible from space\" fact check myth",
-    "rationale": "This query uses quotation marks to ensure the exact statement is searched and adds 'fact check' and 'myth' to retrieve authoritative sources that address the claim's accuracy."}
+```
+"The Great Wall of China is visible from space" fact check myth
 ```
 
 Example 2:
 STATEMENT: Apple will release a foldable iPhone in 2026
 OUTPUT:
-```json
-{
-    "query": "\"Apple will release a foldable iPhone in 2026\" rumor OR announcement",
-    "rationale": "Including the statement in quotes ensures precision, while adding keywords like 'rumor' and 'announcement' helps capture both official sources and credible tech news discussing the claim."
-}
+```
+"Apple will release a foldable iPhone in 2026" rumor OR announcement
 ```
 
 Example 3:
 STATEMENT: Quantum computers can break RSA encryption easily
 OUTPUT:
-```json
-{
-    "query": "\"Quantum computers can break RSA encryption easily\" fact check cryptography experts",
-    "rationale": "The query uses quotation marks for accuracy and adds 'fact check' and 'cryptography experts' to find authoritative sources that evaluate the feasibility of this claim."
-}
+```
+"Quantum computers can break RSA encryption easily" fact check cryptography experts
 ```
 
 Your task:
@@ -122,7 +107,7 @@ class QueryBuilder:
         # Print info
         print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
 
-    def run(self, text: str) -> Dict[str, Any]:
+    def run(self, text: str) -> str:
         """
         Build a Google search query for the given text.
         
@@ -140,9 +125,9 @@ class QueryBuilder:
             backend=self.backend,
             requirements=[
                 check(
-                    "The output must be a valid JSON dictionary with markdown code fences.",
+                    "The output must be wrapped with markdown code fences.",
                     validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(s, required_keys=["query", "rationale"])
+                        lambda s: validate_markdown_code_block(s)
                     ),
                 )
             ],
@@ -154,12 +139,11 @@ class QueryBuilder:
         # The output is a validated JSON string; parse it
         if output.success:
             cleaned = strip_code_fences(str(output))
-            cleaned = escape_quotes(cleaned)
-            return json.loads(cleaned)
+            return cleaned
         else:
-            return {} # empty dict on failure
+            return text # the original text
                         
-    async def arun(self, text: str) -> Dict[str, Any]:
+    async def arun(self, text: str) -> str:
         """
         Build a Google search query for the given text.
         
@@ -177,9 +161,9 @@ class QueryBuilder:
             backend=self.backend,
             requirements=[
                 check(
-                    "The output must be a valid JSON dictionary with markdown code fences.",
+                    "The output must be wrapped with markdown code fences.",
                     validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(s, required_keys=["query", "rationale"])
+                        lambda s: validate_markdown_code_block(s)
                     ),
                 )
             ],
@@ -191,9 +175,9 @@ class QueryBuilder:
         # The output is a validated JSON string; parse it
         if output.success:
             cleaned = strip_code_fences(str(output))
-            return json.loads(cleaned)
+            return cleaned
         else:
-            return {} # empty dict on failure
+            return text # the original text
 
 if __name__ == "__main__":
 
@@ -221,6 +205,6 @@ if __name__ == "__main__":
 
     # Print the query
     print(f"Initial Text: {text}")
-    print(f"Query: {result.get('query', '')}")
+    print(f"Query: {result}")
 
     print("Done.")
