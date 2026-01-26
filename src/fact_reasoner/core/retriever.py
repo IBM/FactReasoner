@@ -460,8 +460,7 @@ class ContextRetriever:
 
             # Generate the query text if there is a query builder
             if self.query_builder is not None:
-                result = self.query_builder.run(text)
-                query_text = result.get("query", text)
+                query_text = self.query_builder.run(text)
             else:
                 query_text = text
             
@@ -572,8 +571,8 @@ if __name__ == '__main__':
         RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500}
     )
 
-    # query = "Lanny Flaherty has appeared in Law & Order."
-    query = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
+    # query_text = "Lanny Flaherty has appeared in Law & Order."
+    query_text = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
     cache_dir = None #"my_database.db"
     query_builder = QueryBuilder(backend)
 
@@ -586,12 +585,11 @@ if __name__ == '__main__':
         query_builder=query_builder
     )
     
-    contexts = retriever.query(text=query)
+    contexts = retriever.query(text=query_text)
     
     print(f"Number of contexts: {len(contexts)}")
     for context in contexts:
         print(context)
-        print("****" * 20)
 
     link = "https://www.ancientportsantiques.com/wp-content/uploads/Documents/AUTHORS/SeaPeoples/SeaPeoples-Fischer&B%C3%BCrge2017.pdf"
     text = fetch_text_from_link(link, max_size=4000)

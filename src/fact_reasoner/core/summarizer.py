@@ -25,9 +25,6 @@ from mellea.stdlib.base import SimpleContext
 from mellea.stdlib.base import ModelOutputThunk
 import mellea.stdlib.functional as mfuncs
 
-# Local imports
-# from src.fact_reasoner.utils import strip_code_fences, validate_markdown_code_block
-
 INSTRUCTION_WITHOUT_REFERENCE = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
 Follow these rules strictly:
@@ -132,6 +129,7 @@ are ongoing, with governments, environmental organizations, and indigenous commu
 
 SUMMARY:
 None
+
 
 Example 5:
 ATOM: Zeus was the creator of Nazgul.
