@@ -22,6 +22,7 @@ import math
 import os
 import subprocess
 import uuid
+import inspect
 
 from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
@@ -72,6 +73,7 @@ class FactReasoner:
         merlin_path: str = None,
         debug_mode: bool = False,
         use_priors: bool = True,
+        early_exit_evaluator: callable = None,
     ):
         """
         Construct the FactReasoner pipeline.
@@ -95,6 +97,14 @@ class FactReasoner:
                 Flag indicating the debug mode (default is False).
             use_priors: bool
                 Flag indicating that atom and context priors are used in the factor definition.
+            early_exit_evaluator: callable
+                A callable that, if provided, allows early exit from the reasoning process. Eg: a single call to the Granite Guardian 3.2 5b sft detect model. Should match the following signature:
+
+                def early_exit_evaluator(
+                    context: str,
+                    response: str
+                ) -> Dict{"_continue": bool, **kwargs}:
+                        ...
         """
 
         self.query = None
@@ -102,6 +112,7 @@ class FactReasoner:
         self.topic = None
         self.debug_mode = debug_mode
         self.use_priors = use_priors
+        self.early_exit_evaluator = early_exit_evaluator
 
         self.context_retriever = context_retriever
         self.context_summarizer = context_summarizer
@@ -437,6 +448,33 @@ class FactReasoner:
         # for tracking purposes
         self.num_summarized_contexts = len(self.contexts.keys())
 
+        # If the user submits the override early exit flag then this method
+        # will be set to None
+        if self.early_exit_evaluator:
+            print("[FactReasoner] Evaluating early exit condition ...")
+            self.early_exit_evaluation = self.early_exit_evaluator(
+                context="\n".join(
+                    [
+                        c.summary if hasattr(c, "summary") else c.text
+                        for c in self.contexts.values()
+                    ]
+                ),
+                response=self.response.strip(),
+            )
+
+        # set default choice to `True` so that full pipeline is executed
+        # if `_continue` is absent from the early exit evaluation dict
+        # for some reason
+        if self.early_exit_evaluation.get("_continue", True) is False:
+            print(
+                "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
+            )
+            return
+
+        print(
+            "[FactReasoner] Early exit condition not met, continuing with full reasoning pipeline."
+        )
+
         # Stage 4: Extract NLI relationships (Evaluator)
         if self.num_summarized_contexts > 0 and len(self.atoms.keys()) > 0:
 
@@ -493,6 +531,7 @@ class FactReasoner:
         data["contexts"] = [
             context.context_to_json() for context in self.contexts.values()
         ]
+        data["early_exit_evaluation"] = self.early_exit_evaluation
 
         if json_file_path:
             with open(json_file_path, "w") as f:
