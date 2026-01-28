@@ -103,7 +103,7 @@ class FactReasoner:
                 def early_exit_evaluator(
                     context: str,
                     response: str
-                ) -> Dict{"_continue": bool, **kwargs}:
+                ) -> Dict{"continue_pipeline_execution": bool, **additional_items}:
                         ...
         """
 
@@ -463,9 +463,9 @@ class FactReasoner:
             )
 
         # set default choice to `True` so that full pipeline is executed
-        # if `_continue` is absent from the early exit evaluation dict
+        # if `continue_pipeline_execution` is absent from the early exit evaluation dict
         # for some reason
-        if self.early_exit_evaluation.get("_continue", True) is False:
+        if self.early_exit_evaluation.get("continue_pipeline_execution", True) is False:
             print(
                 "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
             )
