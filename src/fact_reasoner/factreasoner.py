@@ -113,6 +113,7 @@ class FactReasoner:
         self.debug_mode = debug_mode
         self.use_priors = use_priors
         self.early_exit_evaluator = early_exit_evaluator
+        self.early_exit_evaluation = None
 
         self.context_retriever = context_retriever
         self.context_summarizer = context_summarizer
@@ -462,18 +463,21 @@ class FactReasoner:
                 response=self.response.strip(),
             )
 
-        # set default choice to `True` so that full pipeline is executed
-        # if `continue_pipeline_execution` is absent from the early exit evaluation dict
-        # for some reason
-        if self.early_exit_evaluation.get("continue_pipeline_execution", True) is False:
-            print(
-                "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
-            )
-            return
+            # set default choice to `True` so that full pipeline is executed
+            # if `continue_pipeline_execution` is absent from the early exit evaluation dict
+            # for some reason
+            if (
+                self.early_exit_evaluation.get("continue_pipeline_execution", True)
+                is False
+            ):
+                print(
+                    "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
+                )
+                return
 
-        print(
-            "[FactReasoner] Early exit condition not met, continuing with full reasoning pipeline."
-        )
+            print(
+                "[FactReasoner] Early exit condition not met, continuing with full reasoning pipeline."
+            )
 
         # Stage 4: Extract NLI relationships (Evaluator)
         if self.num_summarized_contexts > 0 and len(self.atoms.keys()) > 0:
@@ -531,7 +535,8 @@ class FactReasoner:
         data["contexts"] = [
             context.context_to_json() for context in self.contexts.values()
         ]
-        data["early_exit_evaluation"] = self.early_exit_evaluation
+        if self.early_exit_evaluation is not None:
+            data["early_exit_evaluation"] = self.early_exit_evaluation
 
         if json_file_path:
             with open(json_file_path, "w") as f:
