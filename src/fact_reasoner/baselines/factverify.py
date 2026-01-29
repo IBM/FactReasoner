@@ -547,7 +547,7 @@ if __name__ == "__main__":
     )
 
     # Load the problem instance from a file
-    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
+    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_google.json"
     with open(json_file, "r") as f:
         data = json.load(f)
 
