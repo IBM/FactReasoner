@@ -16,14 +16,13 @@
 # Context summarization using LLMs
 
 import math
-import asyncio
+import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext
 from mellea.stdlib.base import ModelOutputThunk
-import mellea.stdlib.functional as mfuncs
 
 INSTRUCTION_WITHOUT_REFERENCE = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
@@ -150,24 +149,6 @@ CONTEXT: {{context}}
 SUMMARY:
 """
 
-def get_probability(output: ModelOutputThunk) -> float:
-    """
-    Compute the average log probability of the generated tokens.
-
-    Args:
-        output: ModelOutputThunk
-            The model raw output (via Mellea).
-
-    Returns:
-        float: The average log probability of the generated tokens.
-    """
-
-    assert output._meta["oai_chat_response"]["logprobs"] is not None
-    logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
-    avg_logprob = sum(lp['logprob'] for lp in logprobs) / len(logprobs) if len(logprobs) > 0 else math.inf
-
-    return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
-
 class ContextSummarizer:
     """
     Context summarization given the atom.
@@ -205,6 +186,24 @@ class ContextSummarizer:
         else:
             self.instruction = INSTRUCTION_WITHOUT_REFERENCE
 
+    def _get_probability(self, output: ModelOutputThunk) -> float:
+        """
+        Compute the average log probability of the generated tokens.
+
+        Args:
+            output: ModelOutputThunk
+                The model raw output (via Mellea).
+
+        Returns:
+            float: The average log probability of the generated tokens.
+        """
+
+        assert output._meta["oai_chat_response"]["logprobs"] is not None
+        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+        avg_logprob = sum(lp['logprob'] for lp in logprobs) / len(logprobs) if len(logprobs) > 0 else math.inf
+
+        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
+
     def run(self, contexts: List[str], atom_text: str) -> List[Dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
@@ -234,42 +233,7 @@ class ContextSummarizer:
                 {
                     "context": context,
                     "summary": cleaned if cleaned != "None" else "",
-                    "probability": get_probability(output)
-                }
-            )
-
-        return results
-
-    async def arun(self, contexts: List[str], atom_text: str) -> List[str]:
-        """
-        Summarize a list of contexts with respect to an atomic unit.
-        
-        Args:
-            contexts: List[str]
-                The list of contexts to be summarized.
-            atom_text: str
-                The reference atomic unit text
-        Returns:
-            List[str]: A list of summarized contexts.
-        """
-        
-        # Perform the instruction with validation
-        results = []
-        for context in contexts:
-            output, _ = await mfuncs.ainstruct(
-                self.instruction,
-                context=SimpleContext(),
-                backend=self.backend,
-                user_variables={"context": context, "atom_text": atom_text},
-                model_options=dict(logprobs=True)
-            )
-
-            cleaned = str(output).strip()
-            results.append(
-                {
-                    "context": context,
-                    "summary": cleaned if cleaned != "None" else "",
-                    "probability": get_probability(output)
+                    "probability": self._get_probability(output)
                 }
             )
 
@@ -277,8 +241,7 @@ class ContextSummarizer:
        
 if __name__ == "__main__":
     
-    use_async = False
-    with_ref = True
+    with_ref = False
 
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
@@ -297,12 +260,8 @@ if __name__ == "__main__":
             "The sun hung low in the sky, casting a warm golden glow over the city as Emily wandered through the bustling streets, her mind drifting between thoughts of the past and the uncertain future. She passed the familiar old bookstore that always smelled like aged paper and adventure, a place she used to frequent with her grandmother, whose absence still left a hollow ache in her chest. The air was thick with the scent of coffee wafting from nearby cafés, mingling with the earthy smell of rain that had yet to fall. Despite the noise of the traffic, the chatter of pedestrians, and the hum of city life, there was a strange sense of stillness around her. It was as if time had slowed down, giving her a moment to breathe, to collect her scattered thoughts. She glanced up at the towering buildings that seemed to stretch endlessly into the sky, their glass facades reflecting the fading light. Everything around her was in constant motion, yet she felt an unexpected calm. Her phone buzzed in her pocket, pulling her back to reality, and she sighed, reluctantly slipping it out. It was a message from her best friend, asking if they still wanted to meet up later."
         ]
 
-        if not use_async:
-            result = summarizer.run(contexts, atom)
-            print(f"Summarizer result: {result}")
-        else:
-            result = asyncio.run(summarizer.arun(contexts, atom))
-            print(f"Summarizer result: {result}")
+        result = summarizer.run(contexts, atom)
+        print(f"Summarizer result: {result}")
 
         # Print the results
         for i, elem in enumerate(result):
@@ -324,12 +283,8 @@ designated parking zones for scooters. The implementation of these regulations \
 was expected to improve safety and the overall experience for both scooter \
 users and pedestrians."""
 
-        if not use_async:
-            result = summarizer.run([context], None)
-            print(f"Summarizer result: {result}")
-        else:
-            result = asyncio.run(summarizer.arun([context], None))
-            print(f"Summarizer result: {result}")
+        result = summarizer.run([context], None)
+        print(f"Summarizer result: {result}")
 
         # Print the results
         for i, elem in enumerate(result):

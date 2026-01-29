@@ -195,7 +195,7 @@ class Atomizer(object):
             backend=self.backend,
             requirements=[
                 check(
-                    "The output must be a valid JSON dictionary with markdown code fences.",
+                    "The output must be a valid JSON dictionary with markdown code fences",
                     validation_fn=simple_validate(
                         lambda s: validate_json_code_block(s, required_keys=["atomic_units"])
                     ),

@@ -35,6 +35,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
+from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts
 
 # Version 1 of the prompt (from the original FactScore paper)
@@ -111,7 +112,7 @@ class FactScore:
 
     def from_json(self, json_file: str):
         """
-        Create a problem instance from a json file containing both atoms and contexts.
+        Initialize FactScore from a json file containing both atoms and contexts.
 
         Args:
             json_file: str
@@ -123,11 +124,13 @@ class FactScore:
             data = json.load(f)
             f.close()
 
+        # Get the query, response and topic
         self.query = data["query"]
         self.response = data["response"]
         if self.add_topic:
             self.topic = data["topic"]
 
+        # Get the atoms
         for atom_dict in data["atoms"]:
             aid = atom_dict["id"]
             text = atom_dict["text"]
@@ -136,13 +139,21 @@ class FactScore:
         
         print(f"[FactScore] Atoms found: {len(self.atoms)}")
 
+        # Get the contexts
         for context_dict in data["contexts"]:
             cid = context_dict["id"]
             aid = context_dict["atom_id"]
             text = context_dict["text"]
 
             a = self.atoms[aid]
-            ctxt = Context(id=cid, atom=a, text=text, title="", snippet="", link="")
+            ctxt = Context(
+                id=cid, 
+                atom=a, 
+                text=text, 
+                title="", 
+                snippet="", 
+                link=""
+            )
             a.add_context(ctxt)
             self.contexts[cid] = ctxt
 
@@ -153,7 +164,7 @@ class FactScore:
             data: Dict[str, Any],
     ):
         """
-        Create a problem instance from a dict containing both atoms and contexts.
+        Initialize FactScore from a dict containing both atoms and contexts.
 
         Args:
             data: dict
@@ -539,24 +550,28 @@ if __name__ == "__main__":
     # Parse CLI arguments
     args = parser.parse_args()
 
-    # Define the model and backend
-    model_id = "llama-3.3-70b-instruct"
-    backend = "rits"
+    # Create a Mellea RITS backend
+    from mellea_ibm.rits import RITSBackend, RITS
+    backend = RITSBackend(
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
+    )
+
+    # Set cache dir for context retriever
     cache_dir = None # "/home/radu/data/cache"
 
     # Create the retriever, atomizer and reviser.
+    qb = QueryBuilder(backend)
     context_retriever = ContextRetriever(service_type="google", top_k=5, cache_dir=cache_dir)
-    atom_extractor = AtomExtractor(model_id=model_id, backend=backend)
-    atom_reviser = AtomReviser(model_id=model_id, backend=backend)
+    atom_extractor = Atomizer(backend)
+    atom_reviser = Reviser(backend)
 
     # Create the FactScore pipeline
     pipeline = FactScore(
+        backend=backend,
         context_retriever=context_retriever,
         atom_extractor=atom_extractor,
         atom_reviser=atom_reviser,
-        model_id=model_id,
         add_topic=True,
-        backend=backend,  # Use RITS for the LLM
     )
 
     # Load the problem instance from a file

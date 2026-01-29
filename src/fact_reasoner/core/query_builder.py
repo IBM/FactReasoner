@@ -15,11 +15,9 @@
 
 # Query builder for atoms to retrieve results from Google and/or Wikipedia
 
-import json
 import asyncio
 import mellea.stdlib.functional as mfuncs
 
-from typing import Any, Dict
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext
