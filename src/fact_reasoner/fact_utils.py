@@ -15,7 +15,7 @@
 
 from itertools import combinations
 from operator import itemgetter
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import nltk
 from nltk.tokenize import sent_tokenize
@@ -23,7 +23,7 @@ from nltk.tokenize import sent_tokenize
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.nli_extractor import NLIExtractor
+from src.fact_reasoner.core.nli import NLIExtractor
 from src.fact_reasoner.utils import punctuation_only_inside_quotes
 
 # Defaut prior probabilities for atoms and contexts
@@ -63,10 +63,10 @@ class Atom:
     def __str__(self) -> str:
         return f"Atom {self.id}: {self.text}"
 
-    def get_text(self, text_only: bool = True):
+    def get_text(self):
         return self.text
     
-    def get_synthetic_summary(self, text_only: bool = True):
+    def get_summary(self):
         return self.text
 
     def set_text(self, new_text: str):
@@ -164,11 +164,11 @@ class Context:
     def get_id(self):
         return self.id
 
-    def get_synthetic_summary(self, text_only: bool = True):
+    def get_summary(self):
         if self.synthetic_summary is not None:
             return self.synthetic_summary
         else:
-            return self.get_text(text_only)
+            return self.get_text()
 
     def get_snippet_and_text(self):
         if self.snippet != "" and self.text != "":
@@ -185,7 +185,6 @@ class Context:
             return self.text
         else:
             return self.get_snippet_and_text()
-            # return f"Title: {self.title}\nSummary: {self.snippet}\nLink: {self.link}\nText: {self.text}"
         
     def get_title(self):
         return self.title
@@ -286,8 +285,8 @@ def predict_nli_relationships(
         object_pairs: List[Tuple[Union[Atom, Context], Union[Atom, Context]]],
         nli_extractor: NLIExtractor,
         links_type: str = "context_atom",
-        text_only: bool = True,
-    ) -> list[Relation]:
+        use_summary: bool = False,
+    ) -> List[Relation]:
     """
     Predict the NLI relationship between two objects using an model based NLI extractor.
 
@@ -302,25 +301,28 @@ def predict_nli_relationships(
             The type of links represented by the object pairs (context_atom, context_context).
     """
 
+    # Safety checks
     assert (nli_extractor is not None), "NLI extractor cannot be None."
     assert isinstance(nli_extractor, NLIExtractor), "NLI extractor must be NLIExtractor."
 
-    premises = [pair[0] if isinstance(pair[0], str) else pair[0].get_synthetic_summary(text_only) for pair in object_pairs]
-    hypotheses = [pair[1] if isinstance(pair[1], str) else pair[1].get_synthetic_summary(text_only) for pair in object_pairs]
+    # Set up the premises and hypotheses
+    if use_summary:
+        premises = [pair[0] if isinstance(pair[0], str) else pair[0].get_summary() for pair in object_pairs]
+        hypotheses = [pair[1] if isinstance(pair[1], str) else pair[1].get_summary() for pair in object_pairs]
+    else:
+        premises = [pair[0] if isinstance(pair[0],str) else pair[0].get_text() for pair in object_pairs]
+        hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text() for pair in object_pairs]
 
-    # premises = [pair[0] if isinstance(pair[0],str) else pair[0].get_text(text_only) for pair in object_pairs]
-    # hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text(text_only) for pair in object_pairs]
+    # Safety checks
+    assert len(premises) == len(hypotheses)
 
-
-    results = nli_extractor.runall(premises, hypotheses)
-
-    # print(f"Found: {len(results)} relationships")
-    # print(results)
+    # Extract the NLI relationships between premises and hyptheses
+    results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
 
     relations = []
     for ii, result in enumerate(results):
-        label = result["label"]
-        probability = result["probability"]
+        label = result.get("label", "neutral")
+        probability = result.get("probability", 0.0)
         link_type = links_type if links_type is not None else "unknown"
         rel = Relation(
             source=object_pairs[ii][0],
@@ -332,72 +334,6 @@ def predict_nli_relationships(
         relations.append(rel)
    
     return relations
-
-def get_nli_relations_prompting(
-        atom_context_pairs: List[Tuple[Union[Atom, Context], Union[Atom, Context]]],
-        nli_scorer = None,
-        top_k_per_atom = None,
-        links_type: str = "context_atom",
-        text_only: bool = True
-    ) -> list[Relation]:
-        
-    assert (nli_scorer is not None), "NLI extractor cannot be None."
-    # assert isinstance(nli_scorer, NLIExtractorOld), "NLI extractor must be NLIExtractorOld."
-
-    premises = [pair[0] if isinstance(pair[0],str) else pair[0].get_text(text_only) for pair in atom_context_pairs]
-    hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text(text_only) for pair in atom_context_pairs]
-
-    results_labels = nli_scorer.score(
-        premises, 
-        hypotheses, 
-    )
-
-    # print(f"Found: {len(results_labels)} relationships")
-    # print(results_labels)
-
-    relations = []
-    if top_k_per_atom is None:
-        for ii, (label, score) in enumerate(results_labels):
-            #if label == 'neutral':continue
-            link = links_type if links_type is not None else "unknown"
-            relations.append(Relation(
-                        source=atom_context_pairs[ii][0],
-                        target=atom_context_pairs[ii][1],
-                        type=label,
-                        probability=score,
-                        link=link
-                    )
-                )
-    else: # TODO: I'm not sure it works correctly (debug)
-        candidates_per_atom = [[]]
-        for ii, (label, score) in enumerate(results_labels):
-            atom = atom_context_pairs[ii][0]
-            if ii==0:
-                previous_atom=atom
-            else:
-                if atom!=previous_atom:
-                    candidates_per_atom.append([])
-
-            #if label == 'neutral':continue
-            link = links_type if links_type is not None else "unknown"
-            rel = Relation(
-                    source=atom_context_pairs[ii][0],
-                    target=atom_context_pairs[ii][1],
-                    type=label,
-                    probability=score,
-                    link=link                   
-                )
-            candidates_per_atom[-1].append((rel.get_probability(), rel))
-
-        for candidates in candidates_per_atom:
-            k = min(top_k_per_atom, len(candidates))
-            candidates = sorted(candidates, key=itemgetter(0), reverse=True)
-            for i in range(k):
-                rel = candidates[i][1]
-                relations.append(rel)
-
-    return relations
-
 
 def build_atoms(response: str, atom_extractor: Atomizer) -> dict:
     """
@@ -458,6 +394,7 @@ def build_contexts(
     print(f"[Building contexts...]")
     contexts = {}
 
+    # Retrieve contexts for the atoms
     for aid, atom in atoms.items():
         
         retrieved_contexts = retriever.query(
@@ -473,7 +410,8 @@ def build_contexts(
                     title=context["title"],
                     link=context["link"],
                     snippet=context["snippet"]
-                    # An empty summary means that the context is not relevant, therefore we do not add it to the list of contexts for the pipeline
+                    # An empty summary means that the context is not relevant, 
+                    # therefore we do not add it to the list of contexts for the pipeline
                 ) for j, context in enumerate(retrieved_contexts) 
             ]
 
@@ -481,13 +419,13 @@ def build_contexts(
                 contexts[ctxt.id] = ctxt
             atoms[aid].add_contexts(contexts_per_atom)
 
-    # we retrieve the contexts for the question
+    # Retrieve the contexts for the question
     retrieved_contexts = retriever.query(
         text=question,
     )
     
     if len(retrieved_contexts) > 0:
-        contexts_per_atom = [
+        contexts_per_question = [
             Context(
                 id="c_q_" + str(j),
                 atom=None,
@@ -495,49 +433,66 @@ def build_contexts(
                 title=context["title"],
                 link=context["link"],
                 snippet=context["snippet"]
-                # An empty summary means that the context is not relevant, therefore we do not add it to the list of contexts for the pipeline
+                # An empty summary means that the context is not relevant, 
+                # therefore we do not add it to the list of contexts for the pipeline
             ) for j, context in enumerate(retrieved_contexts) 
         ]
 
-        for ctxt in contexts_per_atom:
+        for ctxt in contexts_per_question:
             contexts[ctxt.id] = ctxt
     
     print(f"[Contexts built: {len(contexts)}]")
     return contexts
 
-def remove_duplicated_atoms(atoms: dict) -> dict:
+def remove_duplicated_atoms(atoms: Dict[str, Atom]) -> Dict[str, Atom]:
     """
     Remove the duplicated atoms.
+
+    Args:
+        atoms: Dict[str, Any]
+            The dict containing the atoms.
+
+    Returns:
+        Dict[str, Any]: A dict containing the unique atoms.
     """
-    duplicates = {}
-    filtered_atoms = {}
-    for aid, atom in atoms.items():
-        text = atom.get_text(text_only=False)
-        if text not in duplicates:
-            duplicates[text] = aid
-            filtered_atoms[aid] = atom
-    
-    return filtered_atoms
+
+    seen = set()
+    out = {}
+    for k, v in atoms.items():
+        text = v.get_text()
+        if text not in seen:
+            out[k] = v
+            seen.add(text)
+    return out
 
 
-def remove_duplicated_contexts(contexts: dict, atoms: dict) -> dict:
+def remove_duplicated_contexts(contexts: Dict[str, Context], atoms: Dict[str, Atom]) -> dict:
     """
     Remove the duplicated contexts.
+    
+    Args:
+        contexts: Dict[str, Context]
+            The dict containing the contexts.
+        atoms: Dict[str, Atom]
+            The dict containing the atoms.
+
+    Returns:
+        The updated dicts containing the contexts and atoms.
     """
-    duplicates = {}
+
+    seen = ()
     filtered_contexts = {}
-    for cid, context in contexts.items():
-        text = context.get_text(text_only=False)
-        if text not in duplicates:
-            duplicates[text] = cid
-            filtered_contexts[cid] = context
-        elif context.atom and context.atom.id in atoms:
-            del atoms[context.atom.id].contexts[cid]
+    for k, v in contexts.items():
+        text = v.get_text(text_only=False)
+        if text not in seen:
+            seen.add(k)
+            filtered_contexts[k] = v
+        elif v.atom and v.atom.id in atoms:
+            del atoms[v.atom.id].contexts[k]
     
     return filtered_contexts, atoms
 
-
-def is_relevant_context(context: str) -> dict:
+def is_relevant_context(context: str) -> bool:
     """
     Check if context is relevant.
     """
@@ -613,18 +568,17 @@ def is_relevant_context(context: str) -> dict:
 
 
 def build_relations(
-        atoms: dict = {},
-        contexts: dict = {},
+        atoms: Dict[str, Atom] = {},
+        contexts: Dict[str, Context] = {},
         contexts_per_atom_only: bool = False,
         rel_atom_context: bool = True, 
         rel_context_context: bool = True,
         nli_extractor: NLIExtractor = None,
-        text_only: bool = True
+        use_summary: bool = False
 ) -> List[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
     pairwise relations are considered: atom-context and context-context.
-    Optionally, atom-atom relations can also be considered.
 
     Args:
         atoms: dict
@@ -633,17 +587,15 @@ def build_relations(
             A dict containing the contexts retrived from the vector store.
         contexts_per_atom_only: bool
             Flag indicating that for each atom only its corresponding contexts are considered. 
-        rel_atom_atom: bool (default is False)
-            Flag indicating the presence of atom-to-atom relationships.
         rel_atom_context: bool (default is True)
             Flag indicating the presence of atom-to-context relationships.
         rel_context_context: bool (default is False)
             Flag indicating the presence of context-to-context relationships.
         nli_extractor: NLIExtractor
             The NLI model used for predicting the relationships.
-        text_only: bool
-            Flag indicating that contexts are text only. If False, then the
-            contexts include (Title, Snippet, Link, Text).
+        use_summary: bool
+            Flag indicating that summarized contexts are used. If False, then the
+            contexts include the extracted text.
     Returns:
         A list of Relations.  
     """
@@ -679,13 +631,13 @@ def build_relations(
             atom_context_pairs,
             nli_extractor=nli_extractor,
             links_type="context_atom",
-            text_only=text_only
+            use_summary=use_summary
         )
 
         # Filter out the neutral relationships
         for rel in all_rels:
             if rel.get_type() != "neutral":
-                print(rel)
+                print(f"[NLI] Found relation: {rel}")
                 relations.append(rel)
 
     # Create context-context relations
@@ -705,7 +657,7 @@ def build_relations(
             context_context_pairs1,
             nli_extractor=nli_extractor,
             links_type="context_context",
-            text_only=text_only
+            use_summary=use_summary
         )
 
         # Get relationships (c_j, c_i)
@@ -713,7 +665,7 @@ def build_relations(
             context_context_pairs2,
             nli_extractor=nli_extractor,
             links_type="context_context",
-            text_only=text_only
+            use_summary=use_summary
         )
 
         relations_tmp = [pair[0] if pair[0].get_probability()>pair[1].get_probability() else pair[1] for pair in zip(relations1,relations2)]
@@ -725,8 +677,8 @@ def build_relations(
             relations_tmp[rel_ind].type = "equivalence"
         for rel in relations_tmp:
             if rel.get_type() != "neutral":
-                print(rel)
+                print(f"[NLI] Found relation: {rel}")
                 relations.append(rel)
 
-    print(f"[Relations built: {len(relations)}]")
+    print(f"[NLI] Relations built: {len(relations)}")
     return relations

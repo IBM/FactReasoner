@@ -205,12 +205,12 @@ class NLIExtractor:
 
         if output.success:
             return dict(
-                relation=self._get_label(output.result), 
+                label=self._get_label(output.result), 
                 probability=self._get_probability(output.result)
             )
         else:
             return dict(
-                relation="neutral", 
+                label="neutral", 
                 probability=1.0
             )
 
