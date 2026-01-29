@@ -213,14 +213,14 @@ class Context:
     def set_probability(self, probability):
         self.probability = probability
 
-    def context_to_json(self) -> dict:
+    def to_json(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "title": self.title,
             "text": self.text,
             "link": self.link,
             "snippet": self.snippet,
-            "synthetic_summary": self.get_synthetic_summary(),
+            "synthetic_summary": self.get_summary(),
             "probability": self.probability,
         }     
 
@@ -335,7 +335,7 @@ def predict_nli_relationships(
    
     return relations
 
-def build_atoms(response: str, atom_extractor: Atomizer) -> dict:
+def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
@@ -343,9 +343,10 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> dict:
         response: str
             The string representing the LLM response.
         atom_extractor: Atomizer 
-            The model based atom extractor.
+            The atom extractor.
+
     Returns:
-        A dict containing the atoms of the response.
+        Dict[str, Atom]: A dict containing the atoms of the response.
     """
 
     assert (response is not None and len(response) > 0), \
@@ -372,9 +373,9 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> dict:
 
 def build_contexts(
         atoms: dict = {},
-        question: str = None,
+        query: str = None,
         retriever: ContextRetriever = None,
-):
+) -> Dict[str, Context]:
     """
     Retrieve the relevant contexts for the input atoms.
 
@@ -383,6 +384,9 @@ def build_contexts(
             A dict containing the atoms in the response.
         retriever: ContextRetriever 
             The context retriever (chromadb, langchain, google).
+    
+    Returns:
+        Dict[str, Context]: A dict containing the retrieved contexts.
     """
 
     assert (len(atoms) > 0), \
@@ -421,11 +425,11 @@ def build_contexts(
 
     # Retrieve the contexts for the question
     retrieved_contexts = retriever.query(
-        text=question,
+        text=query,
     )
     
     if len(retrieved_contexts) > 0:
-        contexts_per_question = [
+        contexts_per_query = [
             Context(
                 id="c_q_" + str(j),
                 atom=None,
@@ -438,7 +442,7 @@ def build_contexts(
             ) for j, context in enumerate(retrieved_contexts) 
         ]
 
-        for ctxt in contexts_per_question:
+        for ctxt in contexts_per_query:
             contexts[ctxt.id] = ctxt
     
     print(f"[Contexts built: {len(contexts)}]")

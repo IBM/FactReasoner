@@ -15,24 +15,27 @@
 
 # FactReasoner pipeline
 
-import argparse
 import json
 import logging
 import math
 import os
 import subprocess
+from typing import Any, Dict
 import uuid
 
 from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
+from mellea.backends.types import ModelOption
 
 # Local imports
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.atom_reviser import AtomReviser
-from src.fact_reasoner.context_retriever import ContextRetriever
-from src.fact_reasoner.context_summarizer import ContextSummarizer
+from src.fact_reasoner.core.atomizer import Atomizer
+from src.fact_reasoner.core.reviser import Reviser
+from src.fact_reasoner.core.retriever import ContextRetriever
+from src.fact_reasoner.core.summarizer import ContextSummarizer
+from src.fact_reasoner.core.nli import NLIExtractor
+from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.fact_graph import FactGraph
 from src.fact_reasoner.fact_utils import (
     PRIOR_PROB_ATOM,
@@ -47,59 +50,45 @@ from src.fact_reasoner.fact_utils import (
     remove_duplicated_atoms,
     remove_duplicated_contexts,
 )
-from src.fact_reasoner.nli_extractor import NLIExtractor
-from src.fact_reasoner.query_builder import QueryBuilder
 
 # Set logging levels 
 # pgmpy set the root logger to INFO -- changed it to WARNING
-os.environ["LITELLM_LOG"] = 'ERROR'
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("datasets").setLevel(logging.WARNING)
-logging.getLogger("sentence_transformers.SentenceTransformer").setLevel(logging.WARNING)
-logging.getLogger("litellm").setLevel(logging.WARNING)
-logging.getLogger("pgmpy").setLevel(logging.WARNING)
-
 
 class FactReasoner:
     def __init__(
             self,
-            atom_extractor: AtomExtractor = None,
-            atom_reviser: AtomReviser = None,
+            atom_extractor: Atomizer = None,
+            atom_reviser: Reviser = None,
+            nli_extractor: NLIExtractor = None,
             context_retriever: ContextRetriever = None,
             context_summarizer: ContextSummarizer = None,
-            nli_extractor: NLIExtractor = None,
             merlin_path: str = None,
-            debug_mode: bool = False,
             use_priors: bool = True,
     ):
         """
-        Construct the FactReasoner pipeline.
+        Initialize the FactReasoner pipeline.
 
         Args:
+            atom_extractor: Atomizer
+                The service used for extracting atoms from the response.
+            atom_reviser: Reviser
+                The service used for decontextualizing the atoms.
             context_retriever: ContextRetriever
                 The service used for retrieving external contexts.
             context_summarizer: ContextSummarizer
                 The service used for summarizing contexts.
-            atom_extractor: AtomExtractor
-                The service used for extracting atoms from the response.
-            atom_reviser: AtomReviser
-                The service used for decontextualizing the atoms.
             nli_extractor: NLIExtractor
                 The service used for NLI relationship extraction.
-            query_builder: QueryBuilder
-                The query builder used to generating search queries for atoms.
             merlin_path: str
                 Path to the Merlin probabilistic reasoning engine (c++ implementation).
-            debug_mode: bool
-                Flag indicating the debug mode (default is False).
             use_priors: bool
                 Flag indicating that atom and context priors are used in the factor definition.
         """
 
+        # Initialize FactReasoner
         self.query = None
         self.response = None
         self.topic = None
-        self.debug_mode = debug_mode
         self.use_priors = use_priors
 
         self.context_retriever = context_retriever
@@ -108,11 +97,6 @@ class FactReasoner:
         self.atom_reviser = atom_reviser
         self.nli_extractor = nli_extractor
         self.merlin_path = merlin_path
-        self.query_builder = query_builder
-
-        # Inject the query builder into the context retriever
-        if self.context_retriever is not None:
-            self.context_retriever.set_query_builder(self.query_builder)
 
         # Safety checks
         assert self.merlin_path is not None, f"Path to `merlin` cannot be None."
@@ -131,16 +115,15 @@ class FactReasoner:
         self.fact_graph = None
         self.markov_network = None
 
+        # Ground truth labels (if any)
         self.labels_human = None
-        self.labels_chatgpt = None
-        self.labels_llamanp = None
 
     def from_fact_graph(
             self,
             fact_graph: FactGraph
     ):
         """
-        Create a FactReasoner instance from a FactGraph instance.
+        Initialize FactReasoner from a FactGraph instance.
 
         Args:
             fact_graph: FactGraph
@@ -195,21 +178,21 @@ class FactReasoner:
 
     def from_dict_with_contexts(
             self,
-            data: dict,
+            data: Dict[str, Any],
     ):
         """
-        Create a problem instance from a dict containing both atoms and contexts.
+        Initialize FactReasoner from a dict containing both atoms and contexts.
 
         Args:
-            data: str
-                The path to the json file containing the problem instance.
+            data: Dict[str, Any]
+                The dict containing the problem instance.
         """
 
         self.query = data["input"]
         self.response = data["output"]
         self.topic = data["topic"]
 
-        print(f"[FactReasoner] Loading the atoms ...")
+        print(f"[FactReasoner] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -226,55 +209,63 @@ class FactReasoner:
             gold_labels.append(label)
             self.atoms[aid] = a
             atom2contexts[aid] = contexts
+        
         print(f"[FactReasoner] Atoms found: {len(self.atoms.keys())}")
         for _, atom in self.atoms.items():
-            print(atom)
+            print(f"[FactReasoner] {atom}")
 
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[FactReasoner] Labels found: {self.labels_human}")
 
-        print(f"[FactReasoner] Loading the contexts ...")
+        print(f"[FactReasoner] Reading the contexts ...")
         for context_dict in data["contexts"]:
             cid = context_dict["id"]
             title = context_dict["title"]
             text = context_dict["text"]
             snippet = context_dict.get("snippet", "")
             link = context_dict.get("link", "")
-            ctxt = Context(id=cid, atom=None, text=text, title=title, snippet=snippet, link=link)
+            ctxt = Context(
+                id=cid, 
+                atom=None, 
+                text=text, 
+                title=title, 
+                snippet=snippet, 
+                link=link
+            )
             self.contexts[cid] = ctxt
 
-        print(f"[FactReasoner] Contexts retrieved: {len(self.contexts.keys())}")
+        print(f"[FactReasoner] Contexts found: {len(self.contexts)}")
         for aid, atom in self.atoms.items():
             ctxts = []
             for c in atom2contexts[aid]:
                 ctxts.append(self.contexts[c])
                 self.contexts[c].set_atom(atom)
             atom.add_contexts(ctxts)
-        return True
+        
+        print(f"[FactReasoner] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
 
     def build(
             self,
+            query: str = None,
             response: str = None,
-            debug_mode: bool = False,
             has_atoms: bool = False,
             has_contexts: bool = False,
-            revise_atoms: bool = True,
+            revise_atoms: bool = False,
             remove_duplicates: bool = False,
             summarize_contexts: bool = False,
             contexts_per_atom_only: bool = False,
             rel_atom_context: bool = True,
-            rel_context_context: bool = True,
-            question: str = None,
-            text_only: bool = True
+            rel_context_context: bool = False,
+            use_summary: bool = False
     ):
         """
         Build the atoms and contexts using the retrieval service.
 
         Args:
+            query: str
+                The input user query.
             response: str
-                The input LLM generated long-form response.
-            debug_mode: bool
-                Boolean flag indicating debugging mode (default False).
+                The LLM generated response to the input query.
             has_atoms: bool
                 Flag indicating if the atoms were previously initialized.
             has_contexts: bool
@@ -291,21 +282,17 @@ class FactReasoner:
                 Flag indicating the presence of atom-to-context relationships.
             rel_context_context: bool (default is False)
                 Flag indicating the presence of context-to-context relationships.
-            question: str (default is None)
-                If it is not None, it is a string used to retrieve contexts related to that string.
-            text_only: bool (default is True)
-                Flag indicating that contexts are text only. If False, then the
-                contexts are (Title, Snippet, Link, Text).
+            use_summary: bool (default is False)
+                Flag indicating that summarized contexts will be used. If False, then the
+                contexts are text retrieved from the link.
         """
 
-        if not self.query:
-            self.query = question
-
         # Initialize the reasoner
+        self.query = query
+        self.response = response
         self.fact_graph = None
         self.markov_network = None
-        self.debug_mode = debug_mode
-        self.response = response
+        self.revise_atoms = revise_atoms
 
         # Safety checks
         assert self.atom_extractor is not None, f"Atom extractor must be created."
@@ -313,24 +300,26 @@ class FactReasoner:
         assert self.nli_extractor is not None, f"NLI extractor must be created."
 
         # Output some info
-        print(f"[FactReasoner] Building the pipeline instance ...")
-        print(f"[FactReasoner] Using text only contexts: {text_only}")
+        print(f"[FactReasoner] Building the pipeline ...")
         
         # Stage 1: decompose the response into atomic units (Atomizer)
         if has_atoms == False:
-            assert self.response is not None, f"Response cannot be None for decomposition!"
+            print(f"[FactReasoner] Extracting the atoms ...")
+            assert self.response is not None, f"The atomizer requires a valid response."
             self.atoms = build_atoms(
                 response=self.response,
                 atom_extractor=self.atom_extractor
             )
+            self.revise_atoms = True # revise the atoms if newly created
 
         # Safety checks
         assert (len(self.atoms.keys()) > 0 or not has_atoms), \
             f"Atoms must be initialized if `has_atoms` is True!"
 
         # Stage 2: revise the atomic units to be self-contained (Reviser)
-        if revise_atoms:
+        if self.revise_atoms:
             print(f"[FactReasoner] Revise the atoms ...")
+            assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             result = self.atom_reviser.run(old_atoms, self.response)
@@ -339,23 +328,28 @@ class FactReasoner:
                 self.atoms[aid].set_text(elem["revised_atom"])
                 print(self.atoms[aid])
 
+        # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
-        
+        print(f"[FactReasoner] Found {len(self.atoms)} unique atoms.")
+
         # Stage 3: Build contexts (ContextRtriever)
         if not has_contexts:
+            print(f"[FactReasoner] Retrieving contexts for the atoms ...")
             self.contexts = build_contexts(
                 atoms=self.atoms,
-                question=question,
+                query=self.query,
                 retriever=self.context_retriever
             )
 
-        # for tracking purposes
+        # For tracking purposes
         self.num_retrieved_contexts = len(self.contexts.keys()) 
+        print(f"[FactReasoner] Retrieved {self.num_retrieved_contexts} contexts.")
 
         # Safety checks
         assert (len(self.contexts.keys()) > 0 or not has_contexts), \
             f"Contexts must be initialized if `has_contexts` is True!"
         
+        # Remove duplicated contexts
         if remove_duplicates:
             self.contexts, self.atoms = remove_duplicated_contexts(self.contexts, self.atoms)
             print(f"[FactReasoner] Found {len(self.contexts.keys())} unique contexts.")
@@ -363,22 +357,19 @@ class FactReasoner:
         # Summarize contexts given atoms       
         if summarize_contexts:
             print(f"[FactReasoner] Summarizing the contexts ...")
+                        
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts =  zip(*atom.contexts.items()) 
                     # 1 round of summarization instead of 2 rounds
                     results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], atom.text) 
-                    # results2 = self.context_summarizer.run([result["summary"] for result in results], atom.text) 
 
                     # for context_id, result, result2 in zip(contexts_ids, results, results2):
                     for context_id, result in zip(contexts_ids, results):
                         is_relevant = is_relevant_context(result["summary"])
-                        # if result2["summary"] != "":
                         if result["summary"] != "" and is_relevant:
-                            # self.contexts[context_id].set_synthetic_summary(result2["summary"])
                             self.contexts[context_id].set_synthetic_summary(result["summary"])
                             # update prior probability of context based on the confidence estimation of the summary
-                            # self.contexts[context_id].set_probability(result["probability"] * result2["probability"] * self.contexts[context_id].get_probability())
                             self.contexts[context_id].set_probability(result["probability"] * self.contexts[context_id].get_probability())
                         else:
                             # we remove the context because it is not related to the atom
@@ -392,29 +383,25 @@ class FactReasoner:
             if len(c_qs.keys()) > 0:
                 contexts_ids, contexts =  zip(*c_qs.items()) 
                 # 1 round of summarization instead of 2 rounds
-                results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], question) 
-                # results2 = self.context_summarizer.run([result["summary"] for result in results], question) 
+                results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], self.query) 
 
                 # for context_id, result, result2 in zip(contexts_ids, results, results2):
                 for context_id, result in zip(contexts_ids, results):
                     is_relevant = is_relevant_context(result["summary"])
-                    # if result2["summary"] != "":
                     if result["summary"] != "" and is_relevant:
-                        # self.contexts[context_id].set_synthetic_summary(result2["summary"])
                         self.contexts[context_id].set_synthetic_summary(result["summary"])
                         # update prior probability of context based on the confidence estimation of the summary
-                        # self.contexts[context_id].set_probability(result["probability"] * result2["probability"] * self.contexts[context_id].get_probability())
                         self.contexts[context_id].set_probability(result["probability"] * self.contexts[context_id].get_probability())
                     else:
                         # we remove the context because it is not related to the atom
-                        del self.contexts[context_id]
-                              
+                        del self.contexts[context_id]                              
         else:
             for context_id in self.contexts.keys():
                 self.contexts[context_id].set_synthetic_summary(self.contexts[context_id].get_snippet_and_text()) 
 
-        # for tracking purposes
+        # For tracking purposes
         self.num_summarized_contexts = len(self.contexts.keys()) 
+        print(f"[FactReasoner] Found {self.num_summarized_contexts} contexts.")
 
         # Stage 4: Extract NLI relationships (Evaluator)
         if self.num_summarized_contexts > 0 and len(self.atoms.keys()) > 0:
@@ -426,7 +413,7 @@ class FactReasoner:
                 rel_context_context=rel_context_context,
                 contexts_per_atom_only=contexts_per_atom_only,
                 nli_extractor=self.nli_extractor,
-                text_only=text_only,
+                use_summary=use_summary,
             )
 
             # Build the fact graph and Markov network
@@ -436,16 +423,20 @@ class FactReasoner:
 
             print(f"[FactReasoner] Pipeline instance created.")
         elif self.num_summarized_contexts == 0 and len(self.atoms.keys()) == 0:
-            print(f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved and no atoms are available.")
+            print(f"[FactReasoner] Could not create the fact graph because no relevant contexts were retrieved and no atoms are available.")
         elif self.num_summarized_contexts == 0:
-            print(f"[FactReasoner] Could not create fact graph because no relevant contexts were retrieved.")
+            print(f"[FactReasoner] Could not create the fact graph because no relevant contexts were retrieved.")
         else:
-            print(f"[FactReasoner] Could not create fact graph because no atoms are available.")
+            print(f"[FactReasoner] Could not create the fact graph because no atoms are available.")
 
 
-    def pipeline_to_json(self, json_file_path: str = None):
+    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
         """
-        Save the pipeline instance to a JSON file.
+        Save the FactReasoner instance to a JSON file.
+
+        Args:
+            json_file: str
+                The path to the output JSON file.
         """
 
         data = {}
@@ -463,7 +454,7 @@ class FactReasoner:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
-        data["contexts"] = [context.context_to_json() for context in self.contexts.values()]
+        data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
         if json_file_path:
             with open(json_file_path, "w") as f:
@@ -473,25 +464,11 @@ class FactReasoner:
 
         return data
 
-    def dump(self):
-        """
-        Dump the content of the fact reasoner for debugging purposes.
-        """
-
-        print("Atoms:")
-        for _, atom in self.atoms.items():
-            print(atom)
-        print("Contexts:")
-        for _, context in self.contexts.items():
-            print(context)
-        print("Relations:")
-        for rel in self.relations:
-            print(rel)
-
     def _build_fact_graph(self):
         """
         Create the fact graph representation from atoms, contexts and relations.
         """
+
         self.fact_graph = FactGraph(
             atoms=list(self.atoms.values()),
             contexts=list(self.contexts.values()),
@@ -596,15 +573,6 @@ class FactReasoner:
 
         # Output the content of the network
         print("[Markov network created.]")
-        print(self.markov_network)
-
-        if self.debug_mode:
-            print("[Markov network content...]")
-            for f in self.markov_network.get_factors():
-                print(f)
-
-        # writer = UAIWriter(model)
-        # writer.write_uai("/home/radu/git/fm-factual/examples/markov_network.uai")
 
     def run_merlin(self):
         """
@@ -616,7 +584,7 @@ class FactReasoner:
 
         # Dump the markov network to a temporary file
         net_id = str(uuid.uuid1())
-        input_filename = f"/tmp/markov_network_{net_id}.uai"
+        input_filename = f"markov_network_{net_id}.uai"
         writer = UAIWriter(self.markov_network)
         writer.write_uai(input_filename)
 
@@ -629,7 +597,7 @@ class FactReasoner:
         # Run merlin as a subprocess and collect the results
         exefile = self.merlin_path
         output_format = "json"
-        output_file = f"/tmp/output_{net_id}"
+        output_file = f"output_{net_id}"
         algorithm = "wmb"
         task = "MAR"
 
@@ -664,10 +632,10 @@ class FactReasoner:
         if os.path.exists(input_filename): os.remove(input_filename)
         if os.path.exists(output_filename): os.remove(output_filename)
 
-        print(f"All Marginals:\n{all_marginals}")
+        print(f"[Merlin] All Marginals:\n{all_marginals}")
         return marginals
 
-    def score(self):
+    def score(self) -> Dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts 
         retrieved for each of the atom in the answer.
@@ -679,8 +647,7 @@ class FactReasoner:
         only half of the atoms are correct, then the score is 50%.
 
         Returns:
-            dict
-                The results dictionary containing the marginals, factuality score i.e., a real value in [0, 1]
+            Dict[str, Any]: The results dictionary containing the marginals, factuality score i.e., a real value in [0, 1]
         """
 
         # Safety checks
@@ -691,9 +658,6 @@ class FactReasoner:
         if len(self.relations) == 0:
             print("WARNING: no relationships have been identified!")
 
-        # assert len(self.atoms) > 0
-        # assert len(self.contexts) > 0
-        # assert len(self.relations) > 0
         assert self.fact_graph is not None
         assert self.markov_network is not None
 
@@ -738,16 +702,7 @@ class FactReasoner:
             entropy += -probval * math.log(probval)
             norm_entropy += -(probval * math.log(probval) + (1.0 - probval) * math.log(1.0 - probval)) / math.log(2.0)
 
-            # probval = probs[1] if probs[1] > 0.0 else 1e-6
-            # if probval == 0.5:
-            #     num_uniform_atoms += 1
-            # avg_logprob += math.log(probval)
-            # entropy += -probval * math.log10(probval)
-
         # For now, return a dict with the posterior marginals of the atoms
-        # avg_logprob /= len(self.atoms.keys())
-        # avg_entropy = entropy / len(self.atoms.keys())
-        # fscore = num_true_atoms / len(self.atoms.keys())
         avg_logprob /= len(self.atoms)
         avg_prob /= len(self.atoms)
         avg_entropy = entropy / len(self.atoms)
@@ -832,43 +787,31 @@ class FactReasoner:
 
 if __name__ == "__main__":
 
-    # CLI arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--input_file',
-        type=str,
-        default=None,
-        required=True,
-        help="Path to the input test file (json)."
+    # Create a Mellea RITS backend
+    from mellea_ibm.rits import RITSBackend, RITS
+    backend = RITSBackend(
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
     )
 
-    parser.add_argument(
-        '--merlin_path',
-        type=str,
-        default=None,
-        required=True,
-        help="Path to the probabilistic inference engine merlin."
+    # Set cache dir for context retriever
+    cache_dir = None # "/home/radu/data/cache"
+
+    # Create the retriever, atomizer and reviser.
+    qb = QueryBuilder(backend)
+    atom_extractor = Atomizer(backend)
+    atom_reviser = Reviser(backend)
+    context_retriever = ContextRetriever(
+        service_type="google", 
+        top_k=5, 
+        cache_dir=cache_dir, 
+        fetch_text=True, 
+        query_builder=qb
     )
-
-    # Parse CLI arguments
-    args = parser.parse_args()
-
-    # Define the model and backend
-    model_id = "llama-3.3-70b-instruct"
-    cache_dir = None # "my_database.db"
-    backend = "rits"
-
-    # Create the pipeline modules
-    query_builder = QueryBuilder(model_id=model_id, prompt_version="v1", backend=backend)
-    context_retriever = ContextRetriever(service_type="google", top_k=5, cache_dir=cache_dir)
-    context_summarizer = ContextSummarizer(model_id=model_id, prompt_version="v1", backend=backend)
-    atom_extractor = AtomExtractor(model_id=model_id, backend=backend)
-    atom_reviser = AtomReviser(model_id=model_id, backend=backend)
-    nli_extractor = NLIExtractor(model_id=model_id, prompt_version="v1", backend=backend)
+    context_summarizer = ContextSummarizer(backend, False)
+    nli_extractor = NLIExtractor(backend)
 
     # Path to merlin (probabilistic inference engine)
-    assert args.merlin_path is not None, f"Path to merlin cannot be None. Aborting."
-    merlin_path = args.merlin_path
+    merlin_path = "/home/radu/git/merlin/build"
 
     # Create the FactReasoner pipeline
     pipeline = FactReasoner(
@@ -877,17 +820,15 @@ if __name__ == "__main__":
         atom_extractor=atom_extractor,
         atom_reviser=atom_reviser,
         nli_extractor=nli_extractor,
-        query_builder=query_builder,
         merlin_path=merlin_path,
     )
 
     # Load the problem instance from a file
-    assert args.input_file is not None, f"Path to the input file cannot be None. Aborting."
-    json_file = args.input_file
+    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
     with open(json_file, "r") as f:
         data = json.load(f)
 
-    # Instantiate the pipeline from a data file
+    print(f"[FactReasoner] Initializing the pipeline from {json_file}")
     pipeline.from_dict_with_contexts(data)
 
     # Build the FactReasoner pipeline (FR2 version)
@@ -899,7 +840,7 @@ if __name__ == "__main__":
         contexts_per_atom_only=False,
         rel_atom_context=True, 
         rel_context_context=False,
-        text_only=False
+        use_summary=False
     )
 
     # Compute the marginals

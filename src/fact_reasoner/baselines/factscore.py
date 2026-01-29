@@ -237,6 +237,40 @@ class FactScore:
             atom.add_contexts(ctxts)
         print(f"[FactScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
 
+    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+        """
+        Save the FactScore instance to a JSON file.
+
+        Args:
+            json_file: str
+                The path to the output JSON file.
+        """
+
+        data = {}
+        data["input"] = self.query
+        data["output"] = self.response.strip()
+        data["topic"] = self.topic
+        data["atoms"] = []
+        data["contexts"] = []
+
+        for aid, atom in self.atoms.items():
+            atom_data = dict(
+                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
+            )
+            if atom.get_label() is not None:
+                atom_data["label"] = atom.get_label()
+            data["atoms"].append(atom_data)
+
+        data["contexts"] = [context.to_json() for context in self.contexts.values()]
+
+        if json_file_path:
+            with open(json_file_path, "w") as f:
+                f.write(f"{json.dumps(data)}\n")
+            f.close()
+            print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
+
+        return data
+
     def build(
             self,
             query: str = None,
