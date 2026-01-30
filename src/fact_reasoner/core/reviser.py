@@ -16,20 +16,19 @@
 # Atomic fact decontextualization using LLMs
 
 import json
-import asyncio
 import mellea.stdlib.functional as mfuncs
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
-from mellea.stdlib.base import SimpleContext, CBlock
-from mellea.stdlib.requirement import req, check, simple_validate
+from mellea.stdlib.base import SimpleContext
+from mellea.stdlib.requirement import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
-from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences
+from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
 
-INSTRUCTION = """
+INSTRUCTION_REVISER = """
 Instructions:
 You task is to decontextualize a UNIT to make it standalone. Each UNIT is an independent content unit or atomic unit extracted from the broader context of a RESPONSE.   
 
@@ -148,29 +147,24 @@ class Reviser:
         # Print backend info
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
 
-    def run(self, units: Dict[str, Any], response: str) -> Dict[str, Any]:
+    def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
         
         Args:
-            units: Dict[str, Any]
+            units: List[str]
                 The atomic units to be decontextualized.
             response: str
                 The response from which the atomic unit is decontextualized.
         Returns:
-            Dict[str, Any]: A dictionary containing the revised atomic unit.
+            List[str]: A dictionary containing the revised atomic unit.
         """
 
-        # Safety checks
-        assert "atomic_units" in units, "Input units must contain 'atomic_units' key."
-
         # Perform the instruction with validation
-        results = {"revised_units": []}
-        for unit in units["atomic_units"]:
-            atom_id = unit["id"]
-            atom_text = unit["text"]
+        results = []
+        for atom_text in units:
             output = mfuncs.instruct(
-                INSTRUCTION,
+                INSTRUCTION_REVISER,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[
@@ -181,70 +175,22 @@ class Reviser:
                         )
                     )
                 ],
-                user_variables={"unit": atom_text, "response": response},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                user_variables={"atomic_unit": atom_text, "response": response},
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True
             )
 
             if output.success:
                 cleaned = strip_code_fences(str(output))
                 revised_unit = json.loads(cleaned)
-                revised_unit.update({"id": atom_id, "text": atom_text})
-                results["revised_units"].append(revised_unit)
+                revised_unit.update({"text": atom_text})
+                results.append(revised_unit)
         
         return results
 
-
-    async def arun(self, units: Dict[str, Any], response: str) -> Dict[str, Any]:
-        """
-        Decontextualize the input atomic units using the response as context.
-        
-        Args:
-            units: Dict[str, Any]
-                The atomic units to be decontextualized.
-            response: str
-                The response from which the atomic unit is decontextualized.
-        Returns:
-            Dict[str, Any]: A dictionary containing the revised atomic unit.
-        """
-
-        # Safety checks
-        assert "atomic_units" in units, "Input units must contain 'atomic_units' key."
-
-        # Perform the instruction with validation
-        results = {"revised_units": []}
-        for unit in units["atomic_units"]:
-            atom_id = unit["id"]
-            atom_text = unit["text"]
-            output = await mfuncs.ainstruct(
-                INSTRUCTION,
-                context=SimpleContext(),
-                backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must be a valid JSON code block.",
-                        validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
-                        )
-                    )
-                ],
-                user_variables={"unit": atom_text, "response": response},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
-                return_sampling_results=True
-            )
-
-            if output.success:
-                cleaned = strip_code_fences(str(output))
-                revised_unit = json.loads(cleaned)
-                revised_unit.update({"id": atom_id, "text": atom_text})
-                results["revised_units"].append(revised_unit)
-        
-        return results
     
 if __name__ == "__main__":
     
-    use_async = False
-
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
@@ -266,29 +212,22 @@ if __name__ == "__main__":
         and deep gravelly voice, which have made him a memorable character \
         actor in the industry."
 
-    atoms = {
-        "atomic_units": [
-            {"id": 1, "text": "He has appeared in numerous films."},
-            {"id": 2, "text": "He has appeared in numerous television shows."},
-            {"id": 3, "text": "He has appeared in numerous theater productions."},
-            {"id": 4, "text": "His career began in the late 1970s."}
-        ]
-    }
+    atoms = [
+        "He has appeared in numerous films.",
+        "He has appeared in numerous television shows.",
+        "He has appeared in numerous theater productions.",
+        "His career began in the late 1970s."
+    ]
 
-    # Process the atoms (sync or async)
-    if not use_async:
-        result = reviser.run(atoms, response)
-        print(f"Reviser result: {result}")
-    else:
-        result = asyncio.run(reviser.arun(atoms, response))
-        print(f"Reviser result: {result}")
+    # Process the atoms
+    result = reviser.run(atoms, response)
+    print(f"Reviser result: {result}")
 
     # Print the revised atomic units
-    atoms = result.get("revised_units", [])
-    print(f"Number of revised atomic units: {len(atoms)}")
-    for atom in atoms:
-        print(f"Original Atom {atom['id']}: {atom['text']}")
-        print(f"Revised Atom {atom['id']}: {atom['revised_unit']}")
+    print(f"Number of revised atomic units: {len(result)}")
+    for atom in result:
+        print(f"Original Atom: {atom['text']}")
+        print(f"Revised Atom:  {atom['revised_unit']}")
         print(f"Rationale: {atom['rationale']}")
         print("-----")
 

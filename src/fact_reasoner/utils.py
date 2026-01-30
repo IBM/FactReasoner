@@ -28,7 +28,7 @@ import transformers
 from typing import Any, Dict, List, Union
 from pathlib import Path
 
-
+LOOP_BUDGET = 5
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
     __getattr__ = dict.get

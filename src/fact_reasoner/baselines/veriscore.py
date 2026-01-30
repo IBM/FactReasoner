@@ -22,7 +22,7 @@ import os
 import json
 import mellea.stdlib.functional as mfuncs
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from dotenv import load_dotenv
 
 from mellea.backends import Backend
@@ -382,7 +382,7 @@ class VeriScore:
             else:
                 return "U"
                 
-    def predict_atom_labels(self) -> Dict[str, Any]:
+    def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom predict its label given the corresponding retrieved contexts.
         """
@@ -407,22 +407,19 @@ class VeriScore:
         # Create the prompts for each of the atoms
         atom_ids = []
         atom_labels = []
+        atom_outputs = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
             contexts = atom.get_contexts()
+            passages = []
             if contexts is not None and len(contexts) > 0:
-                passages = []
                 for _, c in contexts.items():
-                    if len(c.get_text()) == 0:
-                        passages.append(dict(title=c.get_title(), text=c.get_snippet()))
-                    else:
-                        passages.append(dict(title=c.get_title(), text=c.get_text()))
-            else:
-                passages = [] # no passages retrieved for the atom
+                    passages.append(dict(title=c.get_title(), text=c.get_text()))
 
             # prepare the context
             knowledge_text = make_knowledge(passages)
+            print(f"[VeriScore] Processing atom: ({aid}) {atom_text}")
 
             # Execute the instruction
             output = mfuncs.instruct(
@@ -441,9 +438,10 @@ class VeriScore:
 
             label = self._get_label(output.result)
             atom_labels.append(label)
+            atom_outputs.append(str(output))
 
         # Return the labeled atoms
-        return dict(zip(atom_ids, atom_labels))
+        return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
     
     def score(self) -> Dict[str, Any]:
         """
@@ -464,7 +462,7 @@ class VeriScore:
         num_true_atoms = 0
         num_false_atoms = 0
         num_uniform_atoms = 0
-        labels = self.predict_atom_labels()
+        labels, raw_outputs = self.predict_atom_labels()
         for _, label in labels.items():
             if self.binary_output:
                 if label == "S":
@@ -558,7 +556,9 @@ class VeriScore:
         if self.topic is not None and len(self.topic) > 0:
             results["topic"] = self.topic
         results["input"] = self.query
-
+        results["predictions"] = labels
+        results["raw_outputs"] = raw_outputs
+        
         return results
 
 if __name__ == "__main__":

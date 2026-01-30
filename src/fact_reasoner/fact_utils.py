@@ -344,29 +344,21 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
     """
 
     assert (response is not None and len(response) > 0), \
-        f"Make sure that the response is not empty."
+        f"Please ensure a non empty response."
 
-    print(f"[Building atoms ...]")
     result = atom_extractor.run(response)
     candidates = [
         Atom(
             id="a" + str(i),
-            text=elem["text"]
-        ) for i, elem in enumerate(result["atomic_units"])
+            text=v
+        ) for i, v in enumerate(result.values())
     ]
 
-    atoms = {}
-    for atom in candidates:
-        print(atom)
-        atoms[atom.id] = atom
-
-    print(f"[Atoms built: {len(atoms)}]")
-
-    return atoms
+    return {atom.id: atom for atom in candidates}
 
 
 def build_contexts(
-        atoms: dict = {},
+        atoms: Dict[str, Atom] = {},
         query: str = None,
         retriever: ContextRetriever = None,
 ) -> Dict[str, Context]:
@@ -389,7 +381,6 @@ def build_contexts(
         "Please ensure an existing context retriever instance."
 
     # Building the contexts
-    print(f"[Building contexts...]")
     contexts = {}
 
     # Retrieve contexts for the atoms
@@ -439,7 +430,6 @@ def build_contexts(
         for ctxt in contexts_per_query:
             contexts[ctxt.id] = ctxt
     
-    print(f"[Contexts built: {len(contexts)}]")
     return contexts
 
 def remove_duplicated_atoms(atoms: Dict[str, Atom]) -> Dict[str, Atom]:

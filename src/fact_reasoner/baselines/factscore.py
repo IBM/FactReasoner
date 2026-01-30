@@ -20,7 +20,7 @@ import json
 import string
 import mellea.stdlib.functional as mfuncs
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
 
 from mellea.backends import Backend
@@ -39,7 +39,8 @@ from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_conte
 # Version 1 of the prompt (from the original FactScore paper)
 INSTRUCTION_FACTSCORE = """
 Answer the question about {{topic_text}} based on the given context.
- 
+Your answer must be either True or False. Do not add any other information.
+
 {{knowledge_text}}
 
 Input: {{atom_text}} True or False?
@@ -48,7 +49,8 @@ Output:
 
 INSTRUCTION_FACTSCORE_NOTOPIC = """
 Answer the input question based on the given context.
- 
+Your answer must be either True or False. Do not add any other information.
+
 {{knowledge_text}}
 
 Input: {{atom_text}} True or False?
@@ -77,7 +79,6 @@ class FactScore:
             context_retriever: ContextRetriever = None,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
-            add_topic: bool = False,
     ):
         """
         Initialize the FactScore pipeline.
@@ -99,17 +100,12 @@ class FactScore:
         self.query = None
         self.response = None
         self.topic = None
-        self.add_topic = add_topic # default is False
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
         self.binary_output = True # default is True
     
-        if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True) 
-            os.environ["_DOTENV_LOADED"] = "1"
-         
         print(f"[FactScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[FactScore] Binary output: {self.binary_output}")
 
@@ -136,8 +132,7 @@ class FactScore:
         # Get the query, response and topic
         self.query = data["query"]
         self.response = data["response"]
-        if self.add_topic:
-            self.topic = data["topic"]
+        self.topic = data.get("topic", None)
 
         # Get the atoms
         for atom_dict in data["atoms"]:
@@ -182,8 +177,7 @@ class FactScore:
 
         self.query = data["input"]
         self.response = data["output"]
-        if self.add_topic:
-            self.topic = data["topic"]
+        self.topic = data.get("topic", None)
         
         print(f"[FactScore] Reading the atoms ...")                
         gold_labels = []
@@ -275,6 +269,7 @@ class FactScore:
             self,
             query: str = None,
             response: str = None,
+            topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
             revise_atoms: bool = False
@@ -287,6 +282,8 @@ class FactScore:
                 The input user query.
             response: str
                 The LLM generated response to the input query.
+            topic: str
+                The topic of the input query/response.
             has_atoms: bool
                 A boolean flag indicating if the atoms have already been created.
             has_contexts: bool
@@ -299,6 +296,7 @@ class FactScore:
         # Initialize the scorer
         self.query = query
         self.response = response
+        self.topic = topic
         self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
@@ -316,6 +314,9 @@ class FactScore:
                 atom_extractor=self.atom_extractor
             )
             self.revise_atoms = True # revise atoms is newly created
+            print(f"[FactScore] Extracted {len(self.atoms)} atoms.")
+            for aid in self.atoms.keys():
+                print(f"[FactScore] {self.atoms[aid]}")
 
         # Safety checks
         assert len(self.atoms) > 0, \
@@ -323,14 +324,14 @@ class FactScore:
 
         # Decontextualize the atoms
         if self.revise_atoms:
-            print(f"[FactScore] Revise the atoms ...")
+            print(f"[FactScore] Revising the atoms ...")
             assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             result = self.atom_reviser.run(old_atoms, self.response)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
-                self.atoms[aid].set_text(elem["revised_atom"])
+                self.atoms[aid].set_text(elem["revised_unit"])
                 print(f"[FactScore] {self.atoms[aid]}")
 
         # Remove duplicated atoms (if any)
@@ -369,7 +370,7 @@ class FactScore:
         label = "S" if is_supported else "NS"
         return label
                 
-    def predict_atom_labels(self) -> Dict[str, Any]:
+    def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom predict its label (S or NS) given the corresponding
         retrieved contexts.
@@ -395,43 +396,56 @@ class FactScore:
         # Label each atom given its retrieved contexts
         atom_ids = []
         atom_labels = []
+        atom_outputs = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
             contexts = atom.get_contexts()
+            passages = []
             if contexts is not None and len(contexts) > 0:
-                passages = []
                 for _, c in contexts.items():
-                    if len(c.get_text()) == 0:
-                        passages.append(dict(title=c.get_title(), text=c.get_snippet()))
-                    else:
-                        passages.append(dict(title=c.get_title(), text=c.get_text()))
-            else:
-                passages = [] # no passages retrieved for the atom
+                    passages.append(dict(title=c.get_title(), text=c.get_text()))
             
             # Prepare the context
             knowledge_text = make_knowledge(passages)
+            print(f"[FactScore] Processing atom: ({aid}) {atom_text}")
+
+            # Prepare the instruction
+            if self.topic is not None:
+                instruction = INSTRUCTION_FACTSCORE
+                user_variables = {
+                    "topic_text": self.topic, 
+                    "atom_text": atom_text, 
+                    "knowledge_text": knowledge_text
+                }
+            else:
+                instruction = INSTRUCTION_FACTSCORE_NOTOPIC
+                user_variables = {
+                    "atom_text": atom_text, 
+                    "knowledge_text": knowledge_text
+                }
 
             # Execute the instruction
             output = mfuncs.instruct(
-                INSTRUCTION_FACTSCORE,
+                instruction,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[
                     check(
-                        "The output must be True or False"
+                        "The output must contain the tokens True or False"
                     )
                 ],
-                user_variables={"atom_text": atom_text, "knowledge_text": knowledge_text},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                user_variables=user_variables,
+                strategy=RejectionSamplingStrategy(loop_budget=5),
                 return_sampling_results=True
             )
 
             label = self._get_label(output.result)
             atom_labels.append(label)
-    
-        # Return the labeled atoms
-        return dict(zip(atom_ids, atom_labels))
+            atom_outputs.append(str(output))
+
+        # Return the labeled atoms (and also the outputs)
+        return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
     
     def score(self) -> Dict[str, Any]:
         """
@@ -452,7 +466,7 @@ class FactScore:
         num_true_atoms = 0
         num_false_atoms = 0
         num_uniform_atoms = 0
-        labels = self.predict_atom_labels()
+        labels, raw_outputs = self.predict_atom_labels()
         for _, label in labels.items():
             if self.binary_output:
                 if label == "S":
@@ -546,10 +560,18 @@ class FactScore:
         if self.topic is not None and len(self.topic) > 0:
             results["topic"] = self.topic
         results["input"] = self.query
+        results["predictions"] = labels
+        results["raw_outputs"] = raw_outputs
 
         return results
 
 if __name__ == "__main__":
+
+    # Example query and response
+    query = "Tell me a biography of Lanny Flaherty"
+    response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
+    topic = "Lanny Flaherty"
+    init_from_file = False
 
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
@@ -578,24 +600,33 @@ if __name__ == "__main__":
         context_retriever=context_retriever,
         atom_extractor=atom_extractor,
         atom_reviser=atom_reviser,
-        add_topic=True,
     )
 
     # Load the problem instance from a file
-    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
-    with open(json_file, "r") as f:
-        data = json.load(f)
-    
-    # Load the file (json)
-    print(f"[FactScore] Initializing pipeline from: {json_file}")
-    pipeline.from_dict_with_contexts(data)
+    if init_from_file:
+        json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
+        with open(json_file, "r") as f:
+            data = json.load(f)
+        
+        # Load the file (json)
+        print(f"[FactScore] Initializing pipeline from: {json_file}")
+        pipeline.from_dict_with_contexts(data)
 
-    # Build the scorer
-    pipeline.build(
-        has_atoms=True,
-        has_contexts=True,
-        revise_atoms=False
-    )
+        # Build the scorer
+        pipeline.build(
+            has_atoms=True,
+            has_contexts=True,
+            revise_atoms=False
+        )
+    else:
+        pipeline.build(
+            query=query,
+            response=response,
+            topic=topic,
+            has_atoms=False,
+            has_contexts=False,
+            revise_atoms=True
+        )
 
     # Print the results
     results = pipeline.score()
