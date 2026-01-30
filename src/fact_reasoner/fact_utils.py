@@ -170,7 +170,7 @@ class Context:
         else:
             return self.get_text()
 
-    def get_snippet_and_text(self):
+    def get_text(self):
         if self.snippet != "" and self.text != "":
             return "Snippet/Summary of Text:\n\n" + self.snippet + "\n\n" + "Text:\n\n" + self.text 
         elif self.snippet == "" and self.text != "":
@@ -179,13 +179,7 @@ class Context:
             return self.snippet
         else:
             return ""
-
-    def get_text(self, text_only: bool = True):
-        if text_only:
-            return self.text
-        else:
-            return self.get_snippet_and_text()
-        
+       
     def get_title(self):
         return self.title
 

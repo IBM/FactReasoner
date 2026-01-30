@@ -34,7 +34,7 @@ from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts
+from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 from src.fact_reasoner.utils import extract_last_wrapped_response
 
 
@@ -309,8 +309,10 @@ class FactVerify:
         self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
-        assert self.atom_extractor is not None, f"Atom extractor must be created."
-        assert self.atom_reviser is not None, f"Atom reviser must be created."
+        assert self.atom_extractor is not None, \
+            f"The atom extractor must be created."
+        assert self.atom_reviser is not None, \
+            f"The atom reviser must be created."
 
         print(f"[FactVerify] Building the pipeline ...")
         
@@ -322,7 +324,8 @@ class FactVerify:
             )
             self.revise_atoms = True # revise atoms if newly created
 
-        assert len(self.atoms) > 0, f"Atoms must be initialized if `has_atoms` is True!"
+        assert len(self.atoms) > 0, \
+            f"The atoms must be initialized before running the pipeline."
 
         # Decontextualize the atoms
         if self.revise_atoms:
@@ -335,6 +338,10 @@ class FactVerify:
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_atom"])
                 print(f"[FactVerify] {self.atoms[aid]}")
+
+        # Remove duplicated atoms (if any)
+        self.atoms = remove_duplicated_atoms(self.atoms)
+        print(f"[FactVerify] Found {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
         if has_contexts == False: # check if contexts already in file

@@ -34,7 +34,7 @@ from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts
+from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 
 # Version 1 of the prompt (from the original FactScore paper)
 INSTRUCTION_FACTSCORE = """
@@ -302,8 +302,10 @@ class FactScore:
         self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
-        assert self.atom_extractor is not None, f"Atom extractor must be created."
-        assert self.atom_reviser is not None, f"Atom reviser must be created."
+        assert self.atom_extractor is not None, \
+            f"The atom extractor must be created."
+        assert self.atom_reviser is not None, \
+            f"The atom reviser must be created."
 
         print(f"[FactScore] Building the pipeline ...")
         
@@ -315,7 +317,9 @@ class FactScore:
             )
             self.revise_atoms = True # revise atoms is newly created
 
-        assert len(self.atoms) > 0, f"Atoms must be initialized if `has_atoms` is True!"
+        # Safety checks
+        assert len(self.atoms) > 0, \
+            f"The atoms must be initialized before running the pipeline."
 
         # Decontextualize the atoms
         if self.revise_atoms:
@@ -328,6 +332,10 @@ class FactScore:
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_atom"])
                 print(f"[FactScore] {self.atoms[aid]}")
+
+        # Remove duplicated atoms (if any)
+        self.atoms = remove_duplicated_atoms(self.atoms)
+        print(f"[FactScore] Found {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
         if has_contexts == False: # check if contexts already in file

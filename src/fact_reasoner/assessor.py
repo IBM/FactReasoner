@@ -256,7 +256,6 @@ class FactReasoner:
             contexts_per_atom_only: bool = False,
             rel_atom_context: bool = True,
             rel_context_context: bool = False,
-            use_summary: bool = False
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -282,9 +281,6 @@ class FactReasoner:
                 Flag indicating the presence of atom-to-context relationships.
             rel_context_context: bool (default is False)
                 Flag indicating the presence of context-to-context relationships.
-            use_summary: bool (default is False)
-                Flag indicating that summarized contexts will be used. If False, then the
-                contexts are text retrieved from the link.
         """
 
         # Initialize the reasoner
@@ -293,6 +289,7 @@ class FactReasoner:
         self.fact_graph = None
         self.markov_network = None
         self.revise_atoms = revise_atoms
+        self.summarize_contexts = summarize_contexts # default is False
 
         # Safety checks
         assert self.atom_extractor is not None, f"Atom extractor must be created."
@@ -313,8 +310,8 @@ class FactReasoner:
             self.revise_atoms = True # revise the atoms if newly created
 
         # Safety checks
-        assert (len(self.atoms.keys()) > 0 or not has_atoms), \
-            f"Atoms must be initialized if `has_atoms` is True!"
+        assert (len(self.atoms) > 0), \
+            f"The atoms must be initialized before running the pipeline."
 
         # Stage 2: revise the atomic units to be self-contained (Reviser)
         if self.revise_atoms:
@@ -355,14 +352,14 @@ class FactReasoner:
             print(f"[FactReasoner] Found {len(self.contexts.keys())} unique contexts.")
 
         # Summarize contexts given atoms       
-        if summarize_contexts:
+        if self.summarize_contexts:
             print(f"[FactReasoner] Summarizing the contexts ...")
                         
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts =  zip(*atom.contexts.items()) 
                     # 1 round of summarization instead of 2 rounds
-                    results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], atom.text) 
+                    results = self.context_summarizer.run([context.get_text() for context in contexts], atom.text) 
 
                     # for context_id, result, result2 in zip(contexts_ids, results, results2):
                     for context_id, result in zip(contexts_ids, results):
@@ -376,14 +373,12 @@ class FactReasoner:
                             del self.contexts[context_id]
                             del self.atoms[atom_id].contexts[context_id]
 
-            # summarize contexts for question
-            
-            # first get contexts for the question
+            # Summarize contexts for question
             c_qs = {c_id: context for c_id, context in self.contexts.items() if c_id.startswith("c_q")} 
             if len(c_qs.keys()) > 0:
                 contexts_ids, contexts =  zip(*c_qs.items()) 
                 # 1 round of summarization instead of 2 rounds
-                results = self.context_summarizer.run([context.get_snippet_and_text() for context in contexts], self.query) 
+                results = self.context_summarizer.run([context.get_text() for context in contexts], self.query) 
 
                 # for context_id, result, result2 in zip(contexts_ids, results, results2):
                 for context_id, result in zip(contexts_ids, results):
@@ -395,40 +390,29 @@ class FactReasoner:
                     else:
                         # we remove the context because it is not related to the atom
                         del self.contexts[context_id]                              
-        else:
-            for context_id in self.contexts.keys():
-                self.contexts[context_id].set_synthetic_summary(self.contexts[context_id].get_snippet_and_text()) 
 
-        # For tracking purposes
-        self.num_summarized_contexts = len(self.contexts.keys()) 
-        print(f"[FactReasoner] Found {self.num_summarized_contexts} contexts.")
+            # For tracking purposes
+            self.num_summarized_contexts = len(self.contexts.keys()) 
+            print(f"[FactReasoner] Found {self.num_summarized_contexts} contexts.")
 
         # Stage 4: Extract NLI relationships (Evaluator)
-        if self.num_summarized_contexts > 0 and len(self.atoms.keys()) > 0:
-            # Build the NLI relationships
-            self.relations = build_relations(
-                atoms=self.atoms,
-                contexts=self.contexts,
-                rel_atom_context=rel_atom_context,
-                rel_context_context=rel_context_context,
-                contexts_per_atom_only=contexts_per_atom_only,
-                nli_extractor=self.nli_extractor,
-                use_summary=use_summary,
-            )
+        assert len(self.atoms) > 0, f"The atoms must be initialized."
+        self.relations = build_relations(
+            atoms=self.atoms,
+            contexts=self.contexts,
+            rel_atom_context=rel_atom_context,
+            rel_context_context=rel_context_context,
+            contexts_per_atom_only=contexts_per_atom_only,
+            nli_extractor=self.nli_extractor,
+            use_summary=self.summarize_contexts,
+        )
 
-            # Build the fact graph and Markov network
-            print(f"[FactReasoner] Building the graphical model ...")
-            self._build_fact_graph()
-            self._build_markov_network()
+        # Build the fact graph and Markov network
+        print(f"[FactReasoner] Building the graphical model ...")
+        self._build_fact_graph()
+        self._build_markov_network()
 
-            print(f"[FactReasoner] Pipeline instance created.")
-        elif self.num_summarized_contexts == 0 and len(self.atoms.keys()) == 0:
-            print(f"[FactReasoner] Could not create the fact graph because no relevant contexts were retrieved and no atoms are available.")
-        elif self.num_summarized_contexts == 0:
-            print(f"[FactReasoner] Could not create the fact graph because no relevant contexts were retrieved.")
-        else:
-            print(f"[FactReasoner] Could not create the fact graph because no atoms are available.")
-
+        print(f"[FactReasoner] Pipeline instance created.")
 
     def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
         """
