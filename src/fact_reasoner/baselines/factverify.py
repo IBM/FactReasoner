@@ -16,12 +16,9 @@
 # Our implementation of the SAFE paper with LLAMA3 models where facts/claims
 # are checked against Google search results.
  
-import os
 import json
 import mellea.stdlib.functional as mfuncs
-
 from typing import List, Dict, Any, Tuple
-from dotenv import load_dotenv
 
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
@@ -34,7 +31,7 @@ from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from src.fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 from src.fact_reasoner.utils import extract_last_wrapped_response
 
 
@@ -310,7 +307,7 @@ class FactVerify:
         self.topic = topic
         self.revise_atoms = revise_atoms
 
-        # Create the atomizer (for the response)
+        # Safety checks
         assert self.atom_extractor is not None, \
             f"The atom extractor must be created."
         assert self.atom_reviser is not None, \
@@ -332,7 +329,7 @@ class FactVerify:
         assert len(self.atoms) > 0, \
             f"The atoms must be initialized before running the pipeline."
 
-        # Decontextualize the atoms
+        # Revise the atoms
         if self.revise_atoms:
             print(f"[FactVerify] Revise the atoms ...")
             assert self.response is not None, f"The atom reviser requires a response."

@@ -33,7 +33,7 @@ from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from src.fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 from src.fact_reasoner.utils import extract_last_square_brackets
 
 # Version 2 of the prompt (based on more recent work VeriScore, FactBench)
@@ -312,7 +312,7 @@ class VeriScore:
         self.topic = topic
         self.revise_atoms = revise_atoms
 
-        # Create the atomizer (for the response)
+        # Safety checks
         assert self.atom_extractor is not None, \
             f"The atom extractor must be created."
         assert self.atom_reviser is not None, \
@@ -334,7 +334,7 @@ class VeriScore:
         assert len(self.atoms) > 0, \
             f"The atoms must be initialized before running the pipeline."
 
-        # Decontextualize the atoms
+        # Revise the atoms
         if self.revise_atoms:
             print(f"[VeriScore] Revise the atoms ...")
             assert self.response is not None, f"The atom reviser requires a response."

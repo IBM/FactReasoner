@@ -16,12 +16,12 @@
 # FactReasoner pipeline
 
 import json
-import logging
 import math
 import os
 import subprocess
-from typing import Any, Dict
 import uuid
+
+from typing import Any, Dict
 
 from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
@@ -37,7 +37,7 @@ from src.fact_reasoner.core.summarizer import ContextSummarizer
 from src.fact_reasoner.core.nli import NLIExtractor
 from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.fact_graph import FactGraph
-from src.fact_reasoner.fact_utils import (
+from src.fact_reasoner.core.utils import (
     PRIOR_PROB_ATOM,
     PRIOR_PROB_CONTEXT,
     Atom,
@@ -190,7 +190,7 @@ class FactReasoner:
 
         self.query = data["input"]
         self.response = data["output"]
-        self.topic = data["topic"]
+        self.topic = data.get("topic", None)
 
         print(f"[FactReasoner] Reading the atoms ...")
         gold_labels = []
@@ -248,6 +248,7 @@ class FactReasoner:
             self,
             query: str = None,
             response: str = None,
+            topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
             revise_atoms: bool = False,
@@ -265,6 +266,8 @@ class FactReasoner:
                 The input user query.
             response: str
                 The LLM generated response to the input query.
+            topic: str
+                The topic of the input query/response.
             has_atoms: bool
                 Flag indicating if the atoms were previously initialized.
             has_contexts: bool
@@ -286,52 +289,55 @@ class FactReasoner:
         # Initialize the reasoner
         self.query = query
         self.response = response
+        self.topic = topic
         self.fact_graph = None
         self.markov_network = None
         self.revise_atoms = revise_atoms
         self.summarize_contexts = summarize_contexts # default is False
 
         # Safety checks
-        assert self.atom_extractor is not None, f"Atom extractor must be created."
-        assert self.atom_reviser is not None, f"Atom reviser must be created."
-        assert self.nli_extractor is not None, f"NLI extractor must be created."
+        assert self.atom_extractor is not None, \
+            f"The atom extractor must be created."
+        assert self.atom_reviser is not None, \
+            f"The atom reviser must be created."
+        assert self.nli_extractor is not None, \
+            f"The NLI extractor must be created."
 
-        # Output some info
         print(f"[FactReasoner] Building the pipeline ...")
         
-        # Stage 1: decompose the response into atomic units (Atomizer)
+        # Build the atoms
         if has_atoms == False:
-            print(f"[FactReasoner] Extracting the atoms ...")
-            assert self.response is not None, f"The atomizer requires a valid response."
             self.atoms = build_atoms(
                 response=self.response,
                 atom_extractor=self.atom_extractor
             )
             self.revise_atoms = True # revise the atoms if newly created
+            print(f"[FactReasoner] Extracted {len(self.atoms)} atoms.")
+            for aid in self.atoms.keys():
+                print(f"[FactReasoner] {self.atoms[aid]}")
 
         # Safety checks
         assert (len(self.atoms) > 0), \
             f"The atoms must be initialized before running the pipeline."
 
-        # Stage 2: revise the atomic units to be self-contained (Reviser)
+        # Revise the atoms
         if self.revise_atoms:
-            print(f"[FactReasoner] Revise the atoms ...")
+            print(f"[FactReasoner] Revising the atoms ...")
             assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             result = self.atom_reviser.run(old_atoms, self.response)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
-                self.atoms[aid].set_text(elem["revised_atom"])
-                print(self.atoms[aid])
+                self.atoms[aid].set_text(elem["revised_unit"])
+                print(f"[FactReasoner] {self.atoms[aid]}")
 
         # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
-        print(f"[FactReasoner] Found {len(self.atoms)} unique atoms.")
+        print(f"[FactReasoner] Created {len(self.atoms)} unique atoms.")
 
-        # Stage 3: Build contexts (ContextRtriever)
-        if not has_contexts:
-            print(f"[FactReasoner] Retrieving contexts for the atoms ...")
+        # Build the contexts (per atom)
+        if has_contexts == False: # check if contexts already in file
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 query=self.query,
@@ -349,7 +355,7 @@ class FactReasoner:
         # Remove duplicated contexts
         if remove_duplicates:
             self.contexts, self.atoms = remove_duplicated_contexts(self.contexts, self.atoms)
-            print(f"[FactReasoner] Found {len(self.contexts.keys())} unique contexts.")
+            print(f"[FactReasoner] Created {len(self.contexts.keys())} unique contexts.")
 
         # Summarize contexts given atoms       
         if self.summarize_contexts:
@@ -358,10 +364,8 @@ class FactReasoner:
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts =  zip(*atom.contexts.items()) 
-                    # 1 round of summarization instead of 2 rounds
                     results = self.context_summarizer.run([context.get_text() for context in contexts], atom.text) 
 
-                    # for context_id, result, result2 in zip(contexts_ids, results, results2):
                     for context_id, result in zip(contexts_ids, results):
                         is_relevant = is_relevant_context(result["summary"])
                         if result["summary"] != "" and is_relevant:
@@ -377,10 +381,8 @@ class FactReasoner:
             c_qs = {c_id: context for c_id, context in self.contexts.items() if c_id.startswith("c_q")} 
             if len(c_qs.keys()) > 0:
                 contexts_ids, contexts =  zip(*c_qs.items()) 
-                # 1 round of summarization instead of 2 rounds
                 results = self.context_summarizer.run([context.get_text() for context in contexts], self.query) 
 
-                # for context_id, result, result2 in zip(contexts_ids, results, results2):
                 for context_id, result in zip(contexts_ids, results):
                     is_relevant = is_relevant_context(result["summary"])
                     if result["summary"] != "" and is_relevant:
@@ -393,10 +395,9 @@ class FactReasoner:
 
             # For tracking purposes
             self.num_summarized_contexts = len(self.contexts.keys()) 
-            print(f"[FactReasoner] Found {self.num_summarized_contexts} contexts.")
+            print(f"[FactReasoner] Created {self.num_summarized_contexts} contexts.")
 
-        # Stage 4: Extract NLI relationships (Evaluator)
-        assert len(self.atoms) > 0, f"The atoms must be initialized."
+        # Build the NLI relationships
         self.relations = build_relations(
             atoms=self.atoms,
             contexts=self.contexts,
