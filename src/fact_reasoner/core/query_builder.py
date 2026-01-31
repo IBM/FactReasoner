@@ -15,11 +15,9 @@
 
 # Query builder for atoms to retrieve results from Google and/or Wikipedia
 
-import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from mellea.backends import Backend
-from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext
 from mellea.stdlib.requirement import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
@@ -103,7 +101,7 @@ class QueryBuilder:
         self.backend = backend
         
         # Print info
-        print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
+        print(f"[QueryBuilder] Using Mellea backend: {self.backend.model_id}")
 
     def run(self, text: str) -> str:
         """
@@ -141,68 +139,3 @@ class QueryBuilder:
         else:
             return text # the original text
                         
-    async def arun(self, text: str) -> str:
-        """
-        Build a Google search query for the given text.
-        
-        Args:
-            text: str
-                The text for which to build the Google search query.
-        Returns:
-            dict: A dictionary containing the query text.
-        """
-        
-        # Perform the instruction with validation
-        output = await mfuncs.ainstruct(
-            INSTRUCTION_QUERY_BUILDER,
-            context=SimpleContext(),
-            backend=self.backend,
-            requirements=[
-                check(
-                    "The output must be wrapped with markdown code fences.",
-                    validation_fn=simple_validate(
-                        lambda s: validate_markdown_code_block(s)
-                    ),
-                )
-            ],
-            user_variables={"statement_text": text},
-            strategy=RejectionSamplingStrategy(loop_budget=3),
-            return_sampling_results=True,
-        )
-
-        # The output is a validated JSON string; parse it
-        if output.success:
-            cleaned = strip_code_fences(str(output))
-            return cleaned
-        else:
-            return text # the original text
-
-if __name__ == "__main__":
-
-    use_async = False
-
-    # Create a Mellea RITS backend
-    from mellea_ibm.rits import RITSBackend, RITS
-    backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
-    )
-
-    # Create the query builder
-    qb = QueryBuilder(backend)
-
-    # Process a single atom (no knowledge)        
-    text = "The Apollo 14 mission to the Moon took place on January 31, 1971."
-    # text = "You'd have to yell if your friend is outside the same location"
-
-    if not use_async:
-        result = qb.run(text)
-        print(f"Query builder result: {result}")
-    else:
-        result = asyncio.run(qb.arun(text))
-        print(f"Async query builder result: {result}")
-
-    # Print the query
-    print(f"Initial Text: {text}")
-    print(f"Query: {result}")
-
-    print("Done.")

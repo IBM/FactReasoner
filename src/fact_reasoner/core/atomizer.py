@@ -22,7 +22,6 @@ import mellea.stdlib.functional as mfuncs
 
 from typing import Dict, List
 from mellea.backends import Backend
-from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext
 from mellea.stdlib.requirement import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy

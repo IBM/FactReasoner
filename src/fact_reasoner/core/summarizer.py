@@ -16,6 +16,7 @@
 # Context summarization using LLMs
 
 import math
+import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List
@@ -23,8 +24,11 @@ from mellea.backends import Backend
 from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext
 from mellea.stdlib.base import ModelOutputThunk
+from mellea.stdlib.sampling import RejectionSamplingStrategy
 
-INSTRUCTION_WITHOUT_REFERENCE = """
+from src.fact_reasoner.utils import LOOP_BUDGET
+
+INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
 Follow these rules strictly:
 
@@ -65,7 +69,7 @@ Input:
 Summary:
 """
 
-INSTRUCTION_WITH_REFERENCE = """
+INSTRUCTION_WITH_REF = """
 
 Your task is to summarize the CONTEXT with respect to the ATOM.
 
@@ -157,7 +161,6 @@ class ContextSummarizer:
     def __init__(
             self,
             backend: Backend,
-            with_reference: bool = True
     ):
         """
         Initialize the ContextSummarizer.
@@ -175,16 +178,9 @@ class ContextSummarizer:
 
         # Initialize the extractor
         self.backend = backend
-        self.with_reference = with_reference
         
         # Print info
         print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
-
-        # Initialize the instruction and icl examples
-        if self.with_reference:
-            self.instruction = INSTRUCTION_WITH_REFERENCE
-        else:
-            self.instruction = INSTRUCTION_WITHOUT_REFERENCE
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
@@ -204,7 +200,7 @@ class ContextSummarizer:
 
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
 
-    def run(self, contexts: List[str], atom_text: str) -> List[Dict[str, Any]]:
+    async def run_batch(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
         
@@ -216,24 +212,35 @@ class ContextSummarizer:
         Returns:
             List[Dict[str, Any]]: A list of summarized contexts.
         """
-        
+
+        # Initialize the instruction
+        instruction = INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
+
         # Perform the instruction with validation
         results = []
+        corutines = []
         for context in contexts:
-            output, _ = mfuncs.instruct(
-                self.instruction,
+            corutine = mfuncs.ainstruct(
+                instruction,
                 context=SimpleContext(),
                 backend=self.backend,
+                requirements=[],
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
+                return_sampling_results=True,                    
                 user_variables={"context": context, "atom_text": atom_text},
                 model_options=dict(logprobs=True)
             )
+            corutines.append(corutine)
 
+        results = []
+        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        for output in outputs:
             cleaned = str(output).strip()
             results.append(
                 {
                     "context": context,
                     "summary": cleaned if cleaned != "None" else "",
-                    "probability": self._get_probability(output)
+                    "probability": self._get_probability(output.result)
                 }
             )
 
@@ -250,17 +257,18 @@ if __name__ == "__main__":
     )
 
     # Create the context summarizer
-    summarizer = ContextSummarizer(backend=backend, with_reference=with_ref)
+    summarizer = ContextSummarizer(backend=backend)
 
     if with_ref:
         atom = "The city council has approved new regulations for electric scooters."
-        contexts = ["In the past year, the city had seen a rapid increase in the use of electric scooters. They seemed like a perfect solution to reduce traffic and provide an eco-friendly transportation option. However, problems arose quickly. Riders often ignored traffic laws, riding on sidewalks, and causing accidents. Additionally, the scooters were frequently left haphazardly around public spaces, obstructing pedestrians. City officials were under increasing pressure to act, and after numerous public consultations and debates, the council finally passed new regulations. The new rules included mandatory helmet use, restricted riding areas, and designated parking zones for scooters. The implementation of these regulations was expected to improve safety and the overall experience for both scooter users and pedestrians.",
+        contexts = [
+            "In the past year, the city had seen a rapid increase in the use of electric scooters. They seemed like a perfect solution to reduce traffic and provide an eco-friendly transportation option. However, problems arose quickly. Riders often ignored traffic laws, riding on sidewalks, and causing accidents. Additionally, the scooters were frequently left haphazardly around public spaces, obstructing pedestrians. City officials were under increasing pressure to act, and after numerous public consultations and debates, the council finally passed new regulations. The new rules included mandatory helmet use, restricted riding areas, and designated parking zones for scooters. The implementation of these regulations was expected to improve safety and the overall experience for both scooter users and pedestrians.",
             "With the rise of shared electric scooters and bikes in cities across the country, municipal governments have been scrambling to develop effective policies to handle this new form of transportation. Many cities, including the local area, were caught off guard by the sudden popularity of scooters, and their original infrastructure was ill-prepared for this new trend. Early attempts to regulate the scooters were chaotic and ineffective, often leading to public frustration. Some cities took drastic steps, such as banning scooters altogether, while others focused on infrastructure improvements, like adding dedicated lanes for scooters and bicycles. The city council's recent approval of new regulations was part of a larger effort to stay ahead of the curve and provide a balanced approach to regulating modern transportation options while encouraging their growth. These regulations were designed not only to ensure the safety of riders but also to integrate the scooters more seamlessly into the city's broader transportation network.",
             "",
             "The sun hung low in the sky, casting a warm golden glow over the city as Emily wandered through the bustling streets, her mind drifting between thoughts of the past and the uncertain future. She passed the familiar old bookstore that always smelled like aged paper and adventure, a place she used to frequent with her grandmother, whose absence still left a hollow ache in her chest. The air was thick with the scent of coffee wafting from nearby cafés, mingling with the earthy smell of rain that had yet to fall. Despite the noise of the traffic, the chatter of pedestrians, and the hum of city life, there was a strange sense of stillness around her. It was as if time had slowed down, giving her a moment to breathe, to collect her scattered thoughts. She glanced up at the towering buildings that seemed to stretch endlessly into the sky, their glass facades reflecting the fading light. Everything around her was in constant motion, yet she felt an unexpected calm. Her phone buzzed in her pocket, pulling her back to reality, and she sighed, reluctantly slipping it out. It was a message from her best friend, asking if they still wanted to meet up later."
         ]
 
-        result = summarizer.run(contexts, atom)
+        result = asyncio.run(summarizer.run_batch(contexts, atom))
         print(f"Summarizer result: {result}")
 
         # Print the results
@@ -283,7 +291,7 @@ designated parking zones for scooters. The implementation of these regulations \
 was expected to improve safety and the overall experience for both scooter \
 users and pedestrians."""
 
-        result = summarizer.run([context], None)
+        result = asyncio.run(summarizer.run_batch([context], None))
         print(f"Summarizer result: {result}")
 
         # Print the results
