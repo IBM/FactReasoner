@@ -112,17 +112,12 @@ class VeriScore:
         self.query = None
         self.response = None
         self.topic = None
-        self.add_topic = False # default is False
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
         self.binary_output = False # default is False
     
-        if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True) 
-            os.environ["_DOTENV_LOADED"] = "1"
-         
         print(f"[VeriScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[VeriScore] Binary output: {self.binary_output}")
 
@@ -149,8 +144,7 @@ class VeriScore:
         # Get the query, response and topic
         self.query = data["query"]
         self.response = data["response"]
-        if self.add_topic:
-            self.topic = data["topic"]
+        self.topic = data.get("topic", None)
 
         # Get the atoms
         for atom_dict in data["atoms"]:
@@ -195,8 +189,7 @@ class VeriScore:
 
         self.query = data["input"]
         self.response = data["output"]
-        if self.add_topic:
-            self.topic = data["topic"]
+        self.topic = data.get("topic", None)
         
         print(f"[VeriScore] Reading the atoms ...")                
         gold_labels = []
@@ -267,6 +260,7 @@ class VeriScore:
         data["atoms"] = []
         data["contexts"] = []
 
+        # Write the atoms
         for aid, atom in self.atoms.items():
             atom_data = dict(
                 id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
@@ -275,13 +269,15 @@ class VeriScore:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
+        # Write the contexts
         data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
+        # Write to a JSON file (if any)
         if json_file_path:
             with open(json_file_path, "w") as f:
-                f.write(f"{json.dumps(data)}\n")
+                json.dump(data, f, indent=4)
             f.close()
-            print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
+            print(f"[VeriScore] Pipeline instance written to: {json_file_path}")
 
         return data
 
@@ -289,6 +285,7 @@ class VeriScore:
             self,
             query: str = None,
             response: str = None,
+            topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
             revise_atoms: bool = False,
@@ -301,6 +298,8 @@ class VeriScore:
                 The input user query.
             response: str
                 The LLM generated response to the input query.
+            topic: str
+                The topic of the input query/response.
             has_atoms: bool
                 A boolean flag indicating if the atoms have already been created.
             has_contexts: bool
@@ -313,6 +312,7 @@ class VeriScore:
         # Initialize the scorer
         self.query = query
         self.response = response
+        self.topic = topic
         self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
@@ -330,6 +330,9 @@ class VeriScore:
                 atom_extractor=self.atom_extractor
             )
             self.revise_atoms = True # revise atoms if newly created
+            print(f"[VeriScore] Extracted {len(self.atoms)} atoms.")
+            for aid in self.atoms.keys():
+                print(f"[VeriScore] {self.atoms[aid]}")
 
         assert len(self.atoms) > 0, \
             f"The atoms must be initialized before running the pipeline."
@@ -343,12 +346,12 @@ class VeriScore:
             result = self.atom_reviser.run(old_atoms, self.response)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
-                self.atoms[aid].set_text(elem["revised_atom"])
+                self.atoms[aid].set_text(elem["revised_unit"])
                 print(f"[VeriScore] {self.atoms[aid]}")
 
         # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
-        print(f"[VeriScore] Found {len(self.atoms)} unique atoms.")
+        print(f"[VeriScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
         if has_contexts == False: # check if contexts already in file
@@ -357,6 +360,7 @@ class VeriScore:
                 retriever=self.context_retriever,
             )
 
+        print(f"[VeriScore] Retrieved {len(self.contexts)} contexts.")
         print(f"[VeriScore] Pipeline building completed.")
 
     def _get_label(self, output: ModelOutputThunk) -> str:
@@ -558,15 +562,21 @@ class VeriScore:
         results["input"] = self.query
         results["predictions"] = labels
         results["raw_outputs"] = raw_outputs
-        
+
         return results
 
 if __name__ == "__main__":
 
+    # Example query and response
+    query = "Tell me a biography of Lanny Flaherty"
+    response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
+    topic = "Lanny Flaherty"
+    init_from_file = False
+
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
     )
 
     # Set cache dir for context retriever
@@ -592,22 +602,39 @@ if __name__ == "__main__":
     )
 
     # Load the problem instance from a file
-    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
-    with open(json_file, "r") as f:
-        data = json.load(f)
-    
-    print(f"[VeriScore] Initializing pipeline from: {json_file}")
-    pipeline.from_dict_with_contexts(data)
+    if init_from_file:
+        json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
+        with open(json_file, "r") as f:
+            data = json.load(f)
+        
+        print(f"[VeriScore] Initializing pipeline from: {json_file}")
+        pipeline.from_dict_with_contexts(data)
 
-    # Build the scorer
-    pipeline.build(
-        has_atoms=True,
-        has_contexts=True,
-        revise_atoms=False
-    )
+        # Build the scorer
+        pipeline.build(
+            has_atoms=True,
+            has_contexts=True,
+            revise_atoms=False
+        )
+    else:
+        pipeline.build(
+            query=query,
+            response=response,
+            topic=topic,
+            has_atoms=False,
+            has_contexts=False,
+            revise_atoms=True
+        )
 
     # Print the results
     results = pipeline.score()
     print(f"[VeriScore] Results: {results}")
+
+    # Save the pipeline to a JSON file
+    output_file = "/home/radu/storage/git/FactReasoner/examples/test.json"
+    output = pipeline.to_json()
+    output["results"] = results
+    with open(output_file, "w") as fp:
+        json.dump(output, fp, indent=4)
     print(f"Done.")
 
