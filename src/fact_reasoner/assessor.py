@@ -20,6 +20,7 @@ import math
 import os
 import subprocess
 import uuid
+import logging
 
 from typing import Any, Dict
 
@@ -53,6 +54,7 @@ from src.fact_reasoner.core.utils import (
 
 # Set logging levels 
 # pgmpy set the root logger to INFO -- changed it to WARNING
+logging.getLogger("httpx").setLevel(logging.ERROR)
 
 class FactReasoner:
     def __init__(
@@ -287,9 +289,13 @@ class FactReasoner:
         """
 
         # Initialize the reasoner
-        self.query = query
-        self.response = response
-        self.topic = topic
+        if query is not None: 
+            self.query = query
+        if response is not None:
+            self.response = response
+        if topic is not None:
+            self.topic = topic
+
         self.fact_graph = None
         self.markov_network = None
         self.revise_atoms = revise_atoms
@@ -426,11 +432,12 @@ class FactReasoner:
 
         data = {}
         data["input"] = self.query
-        data["output"] = self.response.strip()
+        data["output"] = self.response
         data["topic"] = self.topic
         data["atoms"] = []
         data["contexts"] = []
 
+        # Write the atoms
         for aid, atom in self.atoms.items():
             atom_data = dict(
                 id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
@@ -439,11 +446,13 @@ class FactReasoner:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
+        # Write the contexts
         data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
+        # Write to a JSON file (if any)
         if json_file_path:
             with open(json_file_path, "w") as f:
-                f.write(f"{json.dumps(data)}\n")
+                json.dump(data, f, indent=4)
             f.close()
             print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
 
@@ -663,8 +672,8 @@ class FactReasoner:
             var = marginal["variable"]
             probs = marginal["probabilities"]
 
-            print(f"[{var}]: Probability for {var}=0 is: {probs[0]}")
-            print(f"[{var}]: Probability for {var}=1 is: {probs[1]}")
+            print(f"[FactReasoner] ({var}): Probability for {var}=0 is: {probs[0]}")
+            print(f"[FactReasoner] ({var}): Probability for {var}=1 is: {probs[1]}")
 
             # Check if atom is true or not
             probabilities[var] = probs[1] # probability of true
@@ -709,6 +718,8 @@ class FactReasoner:
         results["avg_prob"] = avg_prob
         results["avg_logprob"] = avg_logprob # math.exp(avg_logprob)
         results["avg_explogprob"] = math.exp(avg_logprob)
+        results["marginals"] = marginals
+        results["predictions"] = labels
 
         # Print the predicted labels
         str_predictions = ""
@@ -762,21 +773,30 @@ class FactReasoner:
             results["references"] = str_references
             results["avg_brier"] = avg_brier
 
-        # if self.topic is not None and len(self.topic) > 0:
-        #     results["topic"] = self.topic
-        results["input"] = self.query
-        results["marginals"] = marginals
+        if self.topic is not None and len(self.topic) > 0:
+            results["topic"] = self.topic
+        results["query"] = self.query
+        results["response"] = self.response
 
         return results, marginals
 
 
 if __name__ == "__main__":
 
+    # Example query and response
+    query = "Tell me a biography of Lanny Flaherty"
+    response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
+    topic = "Lanny Flaherty"
+    init_from_file = True
+
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
     )
+
+    from mellea.helpers.fancy_logger import FancyLogger
+    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     # Set cache dir for context retriever
     cache_dir = None # "/home/radu/data/cache"
@@ -796,7 +816,7 @@ if __name__ == "__main__":
     nli_extractor = NLIExtractor(backend)
 
     # Path to merlin (probabilistic inference engine)
-    merlin_path = "/home/radu/git/merlin/build"
+    merlin_path = "/home/radu/git/merlin/build/merlin"
 
     # Create the FactReasoner pipeline
     pipeline = FactReasoner(
@@ -809,28 +829,49 @@ if __name__ == "__main__":
     )
 
     # Load the problem instance from a file
-    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
-    with open(json_file, "r") as f:
-        data = json.load(f)
+    if init_from_file:
+        json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
+        with open(json_file, "r") as f:
+            data = json.load(f)
 
-    print(f"[FactReasoner] Initializing the pipeline from {json_file}")
-    pipeline.from_dict_with_contexts(data)
+        print(f"[FactReasoner] Initializing the pipeline from {json_file}")
+        pipeline.from_dict_with_contexts(data)
 
-    # Build the FactReasoner pipeline (FR2 version)
-    pipeline.build(
-        has_atoms=True,
-        has_contexts=True,
-        revise_atoms=False,
-        remove_duplicates=True,
-        contexts_per_atom_only=False,
-        rel_atom_context=True, 
-        rel_context_context=False,
-        use_summary=False
-    )
+        # Build the FactReasoner pipeline (FR2 version)
+        pipeline.build(
+            has_atoms=True,
+            has_contexts=True,
+            revise_atoms=False,
+            remove_duplicates=True,
+            summarize_contexts=False,
+            contexts_per_atom_only=False,
+            rel_atom_context=True, 
+            rel_context_context=False,
+        )
+    else:
+        pipeline.build(
+            query=query,
+            response=response,
+            topic=topic,
+            has_atoms=False,
+            has_contexts=False,
+            revise_atoms=True,
+            remove_duplicates=True,
+            summarize_contexts=False,
+            rel_atom_context=True,
+            rel_context_context=False
+        )
 
-    # Compute the marginals
+    # Print the results
     results, marginals = pipeline.score()
     print(f"[FactReasoner] Marginals: {marginals}")
     print(f"[FactReasoner] Results: {results}")
+
+    # Save the pipeline to a JSON file
+    output_file = "/home/radu/storage/git/FactReasoner/examples/test.json"
+    output = pipeline.to_json()
+    output["results"] = results
+    with open(output_file, "w") as fp:
+        json.dump(output, fp, indent=4)
     print(f"Done.")
 

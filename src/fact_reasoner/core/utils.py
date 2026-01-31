@@ -16,6 +16,7 @@
 from itertools import combinations
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import asyncio
 import nltk
 from nltk.tokenize import sent_tokenize
 
@@ -307,7 +308,9 @@ def predict_nli_relationships(
     assert len(premises) == len(hypotheses)
 
     # Extract the NLI relationships between premises and hyptheses
-    results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
+    print(f"[NLI] Processing {len(premises)} potential relationships ...")
+    # results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
+    results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
 
     relations = []
     for ii, result in enumerate(results):
@@ -464,17 +467,17 @@ def remove_duplicated_contexts(contexts: Dict[str, Context], atoms: Dict[str, At
         The updated dicts containing the contexts and atoms.
     """
 
-    seen = ()
-    filtered_contexts = {}
+    seen = set()
+    out = {}
     for k, v in contexts.items():
-        text = v.get_text(text_only=False)
+        text = v.get_text()
         if text not in seen:
-            seen.add(k)
-            filtered_contexts[k] = v
+            seen.add(text)
+            out[k] = v
         elif v.atom and v.atom.id in atoms:
             del atoms[v.atom.id].contexts[k]
     
-    return filtered_contexts, atoms
+    return out, atoms
 
 def is_relevant_context(context: str) -> bool:
     """
@@ -596,15 +599,15 @@ def build_relations(
 
     # Create atom-context relations (i.e., Context -> Atom)
     if rel_atom_context:
-        print(f"[Building atom-context relations...]")
+        print(f"[NLI] Building atom-context relations...")
         if not contexts_per_atom_only:  # use all contexts for each atom
             # Create the (context, atom) pairs
-            print(f"Using all contexts retrieved per atom.")
+            print(f"[NLI] Using all contexts retrieved.")
             for _, atom in atoms.items():
                 for _, context in contexts.items():
                     atom_context_pairs.append((context, atom))
         else:
-            print(f"Using only the contexts retrieved per atom.")
+            print(f"[NLI] Using only the contexts retrieved per atom.")
             # Create the (context, atom) pairs
             for _, atom in atoms.items():
                 for context in atom.get_contexts():
@@ -626,7 +629,7 @@ def build_relations(
 
     # Create context-context relations
     if rel_context_context:
-        print(f"[Building context-context relations...]")
+        print(f"[NLI] Building context-context relations...")
         clist = [ci for ci in sorted(contexts.keys())]
         all_pairs = list(combinations(clist, 2))
         # Create all (context, context) pairs

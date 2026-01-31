@@ -15,15 +15,11 @@
 
 # NLI extractor using LLMs.
 
+import asyncio
 import math
-import operator
-import numpy as np
+import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List
-from tqdm import tqdm
-from difflib import SequenceMatcher
-from operator import itemgetter
-import mellea.stdlib.functional as mfuncs
 
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
@@ -181,7 +177,7 @@ class NLIExtractor:
                 The hypothesis text (e.g., atom).
 
         Returns:
-            dict: A dictionary containing the relationship and its probability.
+            Dict[str, Any]: A dictionary containing the relationship and its probability.
         """
         
         # Perform the instruction with validation
@@ -214,6 +210,61 @@ class NLIExtractor:
                 probability=1.0
             )
 
+    async def run_batch(self, premises: List[str], hypotheses: List[str]) -> List[Dict[str, Any]]:
+        """
+        Extract the NLI relationships between premises and hypotheses. The 
+        following relationships are allowed: entailment, contradiction, neutral.
+        
+        Args:
+            premises: List[str]
+                The list of premise texts (e.g., context).
+            hypotheses: List[str]
+                The list of hypothesis texts (e.g., atom).
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing the 
+            relationships and their probabilities.
+        """
+
+        corutines = []
+        for premise, hypothesis in zip(premises, hypotheses):
+            corutine = mfuncs.ainstruct(
+                INSTRUCTION_NLI,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be a wrapped in square brackets",
+                        validation_fn=simple_validate(
+                            lambda s: extract_last_square_brackets(s) != ''
+                        ),
+                    )
+                ],
+                user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True,
+                model_options=dict(logprobs=True),
+            )
+            corutines.append(corutine)
+
+        results = []
+        print(f"[NLI] Awaiting for async execution ...")
+        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        for output in outputs:
+            if output.success:
+                label = self._get_label(output.result)
+                probability = self._get_probability(output.result)
+                results.append(dict(
+                    label=label,
+                    probability=probability
+                ))
+            else:
+                results.append(dict(
+                    label="neutral",
+                    probability=1.0
+                ))
+
+        return results
 
 if __name__ == "__main__":
 

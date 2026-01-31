@@ -19,6 +19,7 @@
 # the passage retrieved from the corresponding link).
 
 import json
+import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List, Tuple
@@ -307,9 +308,13 @@ class VeriScore:
         """
 
         # Initialize the scorer
-        self.query = query
-        self.response = response
-        self.topic = topic
+        if query is not None: 
+            self.query = query
+        if response is not None:
+            self.response = response
+        if topic is not None:
+            self.topic = topic
+
         self.revise_atoms = revise_atoms
 
         # Safety checks
@@ -340,7 +345,7 @@ class VeriScore:
             assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
-            result = self.atom_reviser.run(old_atoms, self.response)
+            result = asyncio.run(self.atom_reviser.run_batch(old_atoms, self.response))
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])
@@ -383,7 +388,7 @@ class VeriScore:
             else:
                 return "U"
                 
-    def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom predict its label given the corresponding retrieved contexts.
         """
@@ -409,6 +414,7 @@ class VeriScore:
         atom_ids = []
         atom_labels = []
         atom_outputs = []
+        corutines = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
@@ -423,7 +429,7 @@ class VeriScore:
             print(f"[VeriScore] Processing atom: ({aid}) {atom_text}")
 
             # Execute the instruction
-            output = mfuncs.instruct(
+            corutine = mfuncs.ainstruct(
                 INSTRUCTION_VERISCORE,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -436,7 +442,11 @@ class VeriScore:
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True
             )
+            corutines.append(corutine)
 
+        print(f"[VeriScore] Awaiting for async execution ...")
+        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)
             atom_outputs.append(str(output))
@@ -463,7 +473,7 @@ class VeriScore:
         num_true_atoms = 0
         num_false_atoms = 0
         num_uniform_atoms = 0
-        labels, raw_outputs = self.predict_atom_labels()
+        labels, raw_outputs = asyncio.run(self.predict_atom_labels())
         for _, label in labels.items():
             if self.binary_output:
                 if label == "S":
@@ -554,9 +564,9 @@ class VeriScore:
             results["false_positive"] = num_false_positive
             results["false_negative"] = num_false_negative
 
-        if self.topic is not None and len(self.topic) > 0:
-            results["topic"] = self.topic
-        results["input"] = self.query
+        results["topic"] = self.topic
+        results["query"] = self.query
+        results["response"] = self.response
         results["predictions"] = labels
         results["raw_outputs"] = raw_outputs
 
@@ -568,13 +578,17 @@ if __name__ == "__main__":
     query = "Tell me a biography of Lanny Flaherty"
     response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
     topic = "Lanny Flaherty"
-    init_from_file = False
+    init_from_file = True
 
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
         RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
     )
+
+    # Disable Mellea logging
+    from mellea.helpers.fancy_logger import FancyLogger
+    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     # Set cache dir for context retriever
     cache_dir = None # "/home/radu/data/cache"

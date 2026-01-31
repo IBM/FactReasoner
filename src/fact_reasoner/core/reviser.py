@@ -16,6 +16,7 @@
 # Atomic fact decontextualization using LLMs
 
 import json
+import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List
@@ -188,6 +189,52 @@ class Reviser:
         
         return results
 
+    async def run_batch(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+        """
+        Decontextualize the input atomic units using the response as context.
+        
+        Args:
+            units: List[str]
+                The atomic units to be decontextualized.
+            response: str
+                The response from which the atomic unit is decontextualized.
+        Returns:
+            List[str]: A dictionary containing the revised atomic unit.
+        """
+
+        # Perform the instruction with validation
+        
+        corutines = []
+        for atom_text in units:
+            corutine = mfuncs.ainstruct(
+                INSTRUCTION_REVISER,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be a valid JSON code block.",
+                        validation_fn=simple_validate(
+                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
+                        )
+                    )
+                ],
+                user_variables={"atomic_unit": atom_text, "response": response},
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
+                return_sampling_results=True
+            )
+            corutines.append(corutine)
+
+        results = []
+        print(f"[Reviser] Awaiting for async execution ...")
+        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        for output in outputs:
+            if output.success:
+                cleaned = strip_code_fences(str(output))
+                revised_unit = json.loads(cleaned)
+                revised_unit.update({"text": atom_text})
+                results.append(revised_unit)
+        
+        return results
     
 if __name__ == "__main__":
     
