@@ -76,9 +76,9 @@ class FactScore:
     def __init__(
             self,
             backend: Backend,
-            context_retriever: ContextRetriever = None,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
+            context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the FactScore pipeline.
@@ -86,14 +86,12 @@ class FactScore:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
-            context_retriever: ContextRetriever
-                The service used for retrieving external contexts.
             atom_extractor: Atomizer
                 The atom decomposition component.
             atom_reviser: Reviser
                 The atom reviser component.
-            add_topic: bool
-                If True, then the topic is added (relevant only for Biographies).
+            context_retriever: ContextRetriever
+                The service used for retrieving external contexts.
         """
 
         self.backend = backend

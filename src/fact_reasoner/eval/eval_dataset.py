@@ -20,31 +20,19 @@ import json
 import argparse
 import pandas as pd
 
+from mellea.backends.types import ModelOption
+
 # Local imports
-from src.fact_reasoner.factreasoner import FactReasoner
+from src.fact_reasoner.assessor import FactReasoner
 from src.fact_reasoner.baselines.factscore import FactScore
 from src.fact_reasoner.baselines.factverify import FactVerify
 from src.fact_reasoner.baselines.veriscore import VeriScore
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.atom_reviser import AtomReviser
-from src.fact_reasoner.context_retriever import ContextRetriever
-from src.fact_reasoner.query_builder import QueryBuilder
-from src.fact_reasoner.context_summarizer import ContextSummarizer
-from src.fact_reasoner.nli_extractor import NLIExtractor
-from src.fact_reasoner.fact_graph import FactGraph
-from src.fact_reasoner.fact_utils import (
-    Atom, 
-    Context, 
-    Relation, 
-    build_atoms, 
-    build_contexts, 
-    build_relations,
-    remove_duplicated_contexts, 
-    remove_duplicated_atoms, 
-    is_relevant_context, 
-    PRIOR_PROB_ATOM, 
-    PRIOR_PROB_CONTEXT
-)
+from src.fact_reasoner.core.atomizer import Atomizer
+from src.fact_reasoner.core.reviser import Reviser
+from src.fact_reasoner.core.retriever import ContextRetriever
+from src.fact_reasoner.core.query_builder import QueryBuilder
+from src.fact_reasoner.core.summarizer import ContextSummarizer
+from src.fact_reasoner.core.nli import NLIExtractor
 
 if __name__ == "__main__":
 
@@ -81,7 +69,7 @@ if __name__ == "__main__":
         '--service_type',
         type=str,
         default="google",
-        help="Service type (langchain, chromadb, google)."
+        help="Service type (wikipedia, chromadb, google)."
     )
 
     parser.add_argument(
@@ -100,17 +88,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        '--version',
-        type=int,
-        default=2,
-        help="FactReasoner version: 1, 2 or 3"
-    )
-
-    parser.add_argument(
-        "--backend",
+        '--pipeline_version',
         type=str,
-        default="rits",
-        help="The model's backend (rits, hf, wx)"
+        default="v2",
+        help="FactReasoner version: v1, v2 or v3"
     )
 
     parser.add_argument(
@@ -128,38 +109,17 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        '--use_summarizer', 
+        default=False, 
+        action='store_true', 
+        help="Use the ContextSummarizer to summarize contexts (FactReasoner only)."
+    )
+
+    parser.add_argument(
         '--use_query_builder', 
         default=False, 
         action='store_true', 
         help="Use the QueryBuilder to generate queries for Google search."
-    )
-
-    parser.add_argument(
-        '--text_only', 
-        default=False, 
-        action='store_true', 
-        help="Contexts are considered text only."
-    )
-
-    parser.add_argument(
-        '--nli_prompt_version', 
-        type=str, 
-        default="v1", 
-        help="NLI prompt version: v1 (original) or v2 (more recent - some reasoning)"
-    )
-
-    parser.add_argument(
-        '--atomizer_prompt_version', 
-        type=str, 
-        default="v2", 
-        help="Atomizer prompt version: v1 (original) or v2 (newer)"
-    )
-
-    parser.add_argument(
-        '--reviser_prompt_version', 
-        type=str, 
-        default="v1", 
-        help="Reviser prompt version: v1 (newer) or v2 (original)"
     )
 
     parser.add_argument(
@@ -173,17 +133,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # FactReasoner versions:
-    if args.version == 1:  # 1 - context-atom relationships only, allow duplicated contexts
+    if args.pipeline_version == "v1":  # 1 - context-atom relationships only, allow duplicated contexts
         rel_context_context = False
         remove_duplicates = False
         contexts_per_atom_only = True
         option = "1"
-    elif args.version == 2:  # 2 - context-atom relationships only, no duplicated contexts
+    elif args.pipeline_version == "v2":  # 2 - context-atom relationships only, no duplicated contexts
         rel_context_context = False
         remove_duplicates = True
         contexts_per_atom_only = False
         option = "2"
-    elif args.version == 3:  # 3 - context-atom and context-context relationships, no duplicated contexts
+    elif args.pipeline_version == "v3":  # 3 - context-atom and context-context relationships, no duplicated contexts
         rel_context_context = True
         remove_duplicates = True
         contexts_per_atom_only = False
@@ -191,44 +151,62 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unknown FactReasoner version: {args.version}")
 
+    # Create the Mellea backend
+    from mellea_ibm.rits import RITSBackend, RITS
+
+    # Create a Mellea RITS backend
+    if args.model_id == "llama3":
+        backend = RITSBackend(
+            RITS.LLAMA_3_3_70B_INSTRUCT, 
+            model_options={ModelOption.MAX_NEW_TOKENS: 4096}
+        )
+    elif args.model_id == "granite4":
+        backend = RITSBackend(
+            RITS.GRANITE_4_H_SMALL, 
+            model_options={ModelOption.MAX_NEW_TOKENS: 4096}
+        )
+    elif args.model_id == "mistral":
+        backend = RITSBackend(
+            RITS.MISTRAL_LARGE_3_675B_2512, 
+            model_options={ModelOption.MAX_NEW_TOKENS: 4096}
+        )
+    elif args.model_id == "gpt-oss":
+        backend = RITSBackend(
+            RITS.GPT_OSS_120B,
+            model_options={ModelOption.MAX_NEW_TOKENS: 4096}
+        )
+    else:
+        raise ValueError(f"Unknown LLM backend.")
+
+    from mellea.helpers.fancy_logger import FancyLogger
+    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+
     # Create the atom extractor
-    atom_extractor = AtomExtractor(
-        model_id=args.model_id, 
-        prompt_version=args.atomizer_prompt_version,
-        backend=args.backend
-    )
+    atom_extractor = Atomizer(backend)
     
     # Create the atom reviser
-    atom_reviser = AtomReviser(
-        model_id=args.model_id, 
-        prompt_version=args.reviser_prompt_version,
-        backend=args.backend
-    )
+    atom_reviser = Reviser(backend)
 
     # Create the NLI extractor
-    nli_extractor = NLIExtractor(
-        model_id=args.model_id, 
-        prompt_version=args.nli_prompt_version, 
-        backend=args.backend
-    )
+    nli_extractor = NLIExtractor(backend)
 
     # Create the Query Builder
-    if args.use_query_builder:
-        query_builder = QueryBuilder(model_id=args.model_id, backend=args.backend)
-    else:
-        query_builder = None
+    query_builder = QueryBuilder(backend) if args.use_query_builder else None
 
-    # Create context retriever
+    # Create context retriever and summarizer
+    context_summarizer = ContextSummarizer(backend)
     context_retriever = ContextRetriever(
         service_type=args.service_type, 
         top_k=args.top_k, 
         cache_dir=args.cache_dir,
-        query_builder=query_builder
+        query_builder=query_builder,
+        fetch_text=True if args.pipeline != "factverify" else False,
     )
 
     print(f"Processing input dataset: {args.input_file}")
     filename = args.input_file  # a jsonl file
 
+    # Load the dataset
     with open(filename) as f:
         lines = f.read().splitlines()
     df_inter = pd.DataFrame(lines)
@@ -240,22 +218,24 @@ if __name__ == "__main__":
     print(f"Loading data from: {filename}")
     print(f"Found {len(dataset)} elements")
 
+    # Set the pipeline name
     if args.pipeline in ["factscore", "factverify", "veriscore"]:
         pipeline_name = args.pipeline
     elif args.pipeline == "factreasoner":
-        pipeline_name = f"{args.pipeline}{args.version}"
+        pipeline_name = f"{args.pipeline}-{args.version}"
     else:
         raise ValueError(f"Unknown pipeline: {args.pipeline}. Aborting.")
 
     # Check if previous results exist. If yes, load them and skip over them
     # when processing the input dataset.
-    filename = "eval_results_{}_{}_{}_{}.jsonl".format(
+    filename = "eval_{}_{}_{}_{}.jsonl".format(
         pipeline_name,
         args.service_type,
         args.dataset_name,
         args.model_id
     )
 
+    # Prepare the output file
     output_filename = os.path.join(args.output_dir, filename)
     print(f"Reading previous results from: {output_filename}")
     evaluation_data = []
@@ -284,41 +264,33 @@ if __name__ == "__main__":
         # Process the data point with the FactReasoner pipeline
         if args.pipeline == "factreasoner":
             pipeline = FactReasoner(
-                context_retriever=context_retriever,
                 atom_extractor=atom_extractor,
                 atom_reviser=atom_reviser,
                 nli_extractor=nli_extractor,
-                query_builder=query_builder,
+                context_retriever=context_retriever,
+                context_summarizer=context_summarizer,
                 merlin_path=args.merlin_path,
                 use_priors=args.use_priors
             )
         elif args.pipeline == "factscore":
             pipeline = FactScore(
-                context_retriever=context_retriever,
+                backend=backend,
                 atom_extractor=atom_extractor,
                 atom_reviser=atom_reviser,
-                model_id=args.model_id,
-                debug_mode=False,
-                add_topic=True,
-                backend=args.backend
+                context_retriever=context_retriever,
             )
         elif args.pipeline == "veriscore":
             pipeline = VeriScore(
-                context_retriever=context_retriever,
+                backend=backend,
                 atom_extractor=atom_extractor,
                 atom_reviser=atom_reviser,
-                model_id=args.model_id,
-                debug_mode=False,
-                binary_output=False,
-                backend=args.backend
+                context_retriever=context_retriever,
             )
         elif args.pipeline == "factverify":
             pipeline = FactVerify(
-                context_retriever=context_retriever,
                 atom_extractor=atom_extractor,
                 atom_reviser=atom_reviser,
-                model_id=args.model_id,
-                backend=args.backend
+                context_retriever=context_retriever,
             )
 
         # Load the problem instance from a file or dict
@@ -336,7 +308,7 @@ if __name__ == "__main__":
                 revise_atoms=False,
                 rel_atom_context=True,
                 rel_context_context=rel_context_context,
-                text_only=args.text_only
+                summarize_contexts=args.use_summarizer
             )
 
             results, marginals = pipeline.score()
@@ -348,7 +320,7 @@ if __name__ == "__main__":
             pipeline.build(
                 has_atoms=True,
                 has_contexts=True,
-                decontextualize_atoms=False
+                revise_atoms=False
             )
 
             # Print the results
@@ -360,7 +332,7 @@ if __name__ == "__main__":
             pipeline.build(
                 has_atoms=True,
                 has_contexts=True,
-                decontextualize_atoms=False
+                revise_atoms=False
             )
 
             # Print the results
@@ -372,7 +344,7 @@ if __name__ == "__main__":
             pipeline.build(
                 has_atoms=True,
                 has_contexts=True,
-                decontextualize_atoms=False
+                revise_atoms=False
             )
 
             # Print the results
@@ -382,7 +354,7 @@ if __name__ == "__main__":
             print(f"[FactVerify] Results: {results}")
 
         # Save results to a file
-        filename = "eval_results_{}_{}_{}_{}.jsonl".format(
+        filename = "eval_{}_{}_{}_{}.jsonl".format(
             pipeline_name,
             args.service_type,
             args.dataset_name,

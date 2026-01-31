@@ -86,9 +86,9 @@ class VeriScore:
     def __init__(
             self,
             backend: Backend,
-            context_retriever: ContextRetriever = None,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
+            context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the VeriScore pipeline.
@@ -96,15 +96,12 @@ class VeriScore:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
-            context_retriever: ContextRetriever
-                The service used for retrieving external contexts.
             atom_extractor: Atomizer
                 The atom decomposition component.
             atom_reviser: Reviser
                 The atom reviser component.
-            binary_output: bool
-                If true, the output labels are [S - Supported, NS - NotSupported].
-                Otherwise, the output labels are [S - Supported, C - Contradicted, U - Unverifiable or Undediced]
+            context_retriever: ContextRetriever
+                The service used for retrieving external contexts.
         """
 
         self.backend = backend

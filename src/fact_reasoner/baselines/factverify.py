@@ -133,9 +133,9 @@ class FactVerify:
     def __init__(
             self,
             backend: Backend,
-            context_retriever: ContextRetriever = None,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
+            context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the FactVerify pipeline.
@@ -143,12 +143,12 @@ class FactVerify:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
-            context_retriever: ContextRetriever
-                The service used for retrieving external contexts.
             atom_extractor: Atomizer
                 The atom decomposition component.
             atom_reviser: Reviser
                 The atom reviser component.
+            context_retriever: ContextRetriever
+                The service used for retrieving external contexts.
         """
 
         self.backend = backend
@@ -569,7 +569,7 @@ class FactVerify:
         results["predictions"] = labels
         results["raw_outputs"] = raw_outputs
         print(f"[FactVerify] Elapsed time: {elapsed_time:.4f} seconds.")
-        
+
         return results
 
 if __name__ == "__main__":
