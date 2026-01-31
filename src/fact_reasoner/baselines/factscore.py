@@ -257,7 +257,7 @@ class FactScore:
         # Write the contexts
         data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
-        # Write to JSON file (if any)
+        # Write to a JSON file (if any)
         if json_file_path:
             with open(json_file_path, "w") as f:
                 json.dump(data, f, indent=4)

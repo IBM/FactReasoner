@@ -157,17 +157,12 @@ class FactVerify:
         self.query = None
         self.response = None
         self.topic = None
-        self.add_topic = False
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
         self.binary_output = False # we have a 3-label output
-
-        if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True) 
-            os.environ["_DOTENV_LOADED"] = "1"
-        
+       
         print(f"[FactVerify] Using Mellea backend: {self.backend.model_id}")
         print(f"[FactVerify] Binary output: {self.binary_output}")
 
@@ -260,6 +255,7 @@ class FactVerify:
         data["atoms"] = []
         data["contexts"] = []
 
+        # Write the atoms
         for aid, atom in self.atoms.items():
             atom_data = dict(
                 id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
@@ -268,11 +264,13 @@ class FactVerify:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
+        # Write the contexts
         data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
+        # Write to a JSON file (if any)
         if json_file_path:
             with open(json_file_path, "w") as f:
-                f.write(f"{json.dumps(data)}\n")
+                json.dump(data, f, indent=4)
             f.close()
             print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
 
@@ -282,6 +280,7 @@ class FactVerify:
             self,
             query: str = None,
             response: str = None,
+            topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
             revise_atoms: bool = False,
@@ -294,6 +293,8 @@ class FactVerify:
                 The input user query.
             response: str
                 The LLM generated response to the input query.
+            topic: str
+                The topic of the input query/response.
             has_atoms: bool
                 A boolean flag indicating if the atoms have already been created.
             has_contexts: bool
@@ -306,6 +307,7 @@ class FactVerify:
         # Initialize the scorer
         self.query = query
         self.response = response
+        self.topic = topic
         self.revise_atoms = revise_atoms
 
         # Create the atomizer (for the response)
@@ -323,6 +325,9 @@ class FactVerify:
                 atom_extractor=self.atom_extractor
             )
             self.revise_atoms = True # revise atoms if newly created
+            print(f"[FactVerify] Extracted {len(self.atoms)} atoms.")
+            for aid in self.atoms.keys():
+                print(f"[FactVerify] {self.atoms[aid]}")
 
         assert len(self.atoms) > 0, \
             f"The atoms must be initialized before running the pipeline."
@@ -336,12 +341,12 @@ class FactVerify:
             result = self.atom_reviser.run(old_atoms, self.response)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
-                self.atoms[aid].set_text(elem["revised_atom"])
+                self.atoms[aid].set_text(elem["revised_unit"])
                 print(f"[FactVerify] {self.atoms[aid]}")
 
         # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
-        print(f"[FactVerify] Found {len(self.atoms)} unique atoms.")
+        print(f"[FactVerify] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
         if has_contexts == False: # check if contexts already in file
@@ -558,10 +563,16 @@ class FactVerify:
 
 if __name__ == "__main__":
 
+    # Example query and response
+    query = "Tell me a biography of Lanny Flaherty"
+    response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
+    topic = "Lanny Flaherty"
+    init_from_file = False
+
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
     )
 
     # Set cache dir for context retriever
@@ -575,7 +586,7 @@ if __name__ == "__main__":
         service_type="google", 
         top_k=5, 
         cache_dir=cache_dir, 
-        fetch_text=True, 
+        fetch_text=False, # no retrieving from the link
         query_builder=qb
     )
 
@@ -588,22 +599,39 @@ if __name__ == "__main__":
     )
 
     # Load the problem instance from a file
-    json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_google.json"
-    with open(json_file, "r") as f:
-        data = json.load(f)
+    if init_from_file:
+        json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_google.json"
+        with open(json_file, "r") as f:
+            data = json.load(f)
 
-    print(f"[FactVerify] Initializing pipeline from: {json_file}")
-    pipeline.from_dict_with_contexts(data)
+        print(f"[FactVerify] Initializing pipeline from: {json_file}")
+        pipeline.from_dict_with_contexts(data)
 
-    # Build the FactVerify pipeline
-    pipeline.build(
-        has_atoms=True,
-        has_contexts=True,
-        revise_atoms=False
-    )
+        # Build the FactVerify pipeline
+        pipeline.build(
+            has_atoms=True,
+            has_contexts=True,
+            revise_atoms=False
+        )
+    else:
+        pipeline.build(
+            query=query,
+            response=response,
+            topic=topic,
+            has_atoms=False,
+            has_contexts=False,
+            revise_atoms=True
+        )
 
     # Print the results
     results = pipeline.score()
     print(f"[FactVerify] Results: {results}")
+
+    # Save the pipeline to a JSON file
+    output_file = "/home/radu/storage/git/FactReasoner/examples/test.json"
+    output = pipeline.to_json()
+    output["results"] = results
+    with open(output_file, "w") as fp:
+        json.dump(output, fp, indent=4)
     print(f"Done.")
 

@@ -18,13 +18,10 @@
 # external source such as Wikipedia or Google Search (for the latter we consider
 # the passage retrieved from the corresponding link).
 
-import os
 import json
 import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List, Tuple
-from dotenv import load_dotenv
-
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext, ModelOutputThunk
