@@ -18,6 +18,7 @@
 import json
 import asyncio
 import string
+import time
 import mellea.stdlib.functional as mfuncs
 
 from typing import List, Dict, Any, Tuple
@@ -99,6 +100,7 @@ class FactScore:
         self.query = None
         self.response = None
         self.topic = None
+        self.start_time = time.perf_counter() # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
@@ -113,54 +115,6 @@ class FactScore:
 
         # Ground truth labels (if any)
         self.labels_human = None
-
-    def from_json(self, json_file: str):
-        """
-        Initialize FactScore from a json file containing both atoms and contexts.
-
-        Args:
-            json_file: str
-                The path to the json file containing the problem instance.
-        """
-        
-        print(f"[FactScore] Reading JSON instance from: {json_file}")
-        with open(json_file) as f:
-            data = json.load(f)
-            f.close()
-
-        # Get the query, response and topic
-        self.query = data["query"]
-        self.response = data["response"]
-        self.topic = data.get("topic", None)
-
-        # Get the atoms
-        for atom_dict in data["atoms"]:
-            aid = atom_dict["id"]
-            text = atom_dict["text"]
-            a = Atom(id=aid, text=text)
-            self.atoms[aid] = a
-        
-        print(f"[FactScore] Atoms found: {len(self.atoms)}")
-
-        # Get the contexts
-        for context_dict in data["contexts"]:
-            cid = context_dict["id"]
-            aid = context_dict["atom_id"]
-            text = context_dict["text"]
-
-            a = self.atoms[aid]
-            ctxt = Context(
-                id=cid, 
-                atom=a, 
-                text=text, 
-                title="", 
-                snippet="", 
-                link=""
-            )
-            a.add_context(ctxt)
-            self.contexts[cid] = ctxt
-
-        print(f"[FactScore] Contexts found: {len(self.contexts)}")
 
     def from_dict_with_contexts(
             self,
@@ -457,7 +411,7 @@ class FactScore:
 
         # Return the labeled atoms (and also the outputs)
         return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
-    
+
     def score(self) -> Dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts 
@@ -494,6 +448,7 @@ class FactScore:
       
         # Precision i.e., factuality score
         fscore = float(num_true_atoms)/float(len(self.atoms))
+        elapsed_time = time.perf_counter() - self.start_time # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -570,8 +525,11 @@ class FactScore:
 
         results["topic"] = self.topic
         results["query"] = self.query
+        results["response"] = self.response
+        results["elapsed_time"] = elapsed_time
         results["predictions"] = labels
         results["raw_outputs"] = raw_outputs
+        print(f"[FactScore] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results
 

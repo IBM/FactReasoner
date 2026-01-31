@@ -18,6 +18,7 @@
 import json
 import math
 import os
+import time
 import subprocess
 import uuid
 import logging
@@ -92,6 +93,7 @@ class FactReasoner:
         self.response = None
         self.topic = None
         self.use_priors = use_priors
+        self.start_time = time.perf_counter() # get the start time
 
         self.context_retriever = context_retriever
         self.context_summarizer = context_summarizer
@@ -668,6 +670,7 @@ class FactReasoner:
         labels = {}
         probabilities = {}
         fscore_per_atom = []
+        elapsed_time = time.perf_counter() - self.start_time # total elapsed time
         for marginal in marginals:
             var = marginal["variable"]
             probs = marginal["probabilities"]
@@ -773,11 +776,12 @@ class FactReasoner:
             results["references"] = str_references
             results["avg_brier"] = avg_brier
 
-        if self.topic is not None and len(self.topic) > 0:
-            results["topic"] = self.topic
+        results["topic"] = self.topic
         results["query"] = self.query
         results["response"] = self.response
-
+        results["elapsed_time"] = elapsed_time
+        print(f"[FactReasoner] Elapsed time: {elapsed_time:.4f} seconds.")
+        
         return results, marginals
 
 

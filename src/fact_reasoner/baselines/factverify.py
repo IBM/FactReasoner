@@ -18,6 +18,7 @@
  
 import json
 import asyncio
+import time
 import mellea.stdlib.functional as mfuncs
 from typing import List, Dict, Any, Tuple
 
@@ -154,6 +155,7 @@ class FactVerify:
         self.query = None
         self.response = None
         self.topic = None
+        self.start_time = time.perf_counter() # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
@@ -484,6 +486,7 @@ class FactVerify:
         
         # Precision
         fscore = float(num_true_atoms)/float(len(self.atoms))
+        elapsed_time = time.perf_counter() - self.start_time # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -562,9 +565,11 @@ class FactVerify:
         results["topic"] = self.topic
         results["query"] = self.query
         results["response"] = self.response
+        results["elapsed_time"] = elapsed_time
         results["predictions"] = labels
         results["raw_outputs"] = raw_outputs
-
+        print(f"[FactVerify] Elapsed time: {elapsed_time:.4f} seconds.")
+        
         return results
 
 if __name__ == "__main__":
