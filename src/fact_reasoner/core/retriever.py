@@ -333,7 +333,7 @@ class ContextRetriever:
 
         Args:
             service_type: str
-                The type of the context retriever (chromadb, langchain, google)
+                The type of the context retriever (chromadb, wikipedia, google)
             collection_name: str
                 Name of the collection of documents stored in the vectorstore
             persist_directory: str
@@ -367,7 +367,7 @@ class ContextRetriever:
         self.google_retriever = None
         self.in_memory_vectorstore = None
 
-        assert self.service_type in ["chromadb", "langchain", "google"]
+        assert self.service_type in ["chromadb", "wikipedia", "google"]
 
         if self.service_type == "chromadb":
             self.chromadb_retriever = ChromaReader(
@@ -376,7 +376,7 @@ class ContextRetriever:
                 embedding_model=EMBEDDING_MODEL, 
                 collection_metadata={"hnsw:space": "cosine"}
             )
-        elif self.service_type == "langchain":
+        elif self.service_type == "wikipedia":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
             self.langchain_retriever = WikipediaRetriever(lang="en", top_k_results=top_k)
@@ -386,7 +386,9 @@ class ContextRetriever:
                 self.in_memory_vectorstore = InMemoryVectorStore(
                     HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
                 )
-
+        else:
+            raise ValueError(f"Unknown retriever service: {self.service_type}")
+        
     def set_query_builder(self, query_builder: QueryBuilder = None):
         self.query_builder = query_builder
     
@@ -431,7 +433,7 @@ class ContextRetriever:
                 passages.append(passage)
 
             results.extend(passages)
-        elif self.service_type == "langchain":
+        elif self.service_type == "wikipedia":
             print(f"[Retriever] Retrieving {self.top_k} relevant documents for query: {text}")
             print(f"[Retriever] Using {self.service_type} WikipediaRetriever")
 

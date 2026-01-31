@@ -165,10 +165,7 @@ class Context:
         return self.id
 
     def get_summary(self):
-        if self.synthetic_summary is not None:
-            return self.synthetic_summary
-        else:
-            return self.get_text()
+        return self.synthetic_summary if self.synthetic_summary is not None else ""
 
     def get_text(self):
         if self.snippet != "" and self.text != "":

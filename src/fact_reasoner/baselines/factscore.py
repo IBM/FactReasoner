@@ -15,14 +15,11 @@
 
 # Our implementation of the FactScore paper using LLAMA3 models
 
-import os
 import json
 import string
 import mellea.stdlib.functional as mfuncs
 
 from typing import List, Dict, Any, Tuple
-from dotenv import load_dotenv
-
 from mellea.backends import Backend
 from mellea.backends.types import ModelOption
 from mellea.stdlib.base import SimpleContext, ModelOutputThunk
@@ -35,6 +32,7 @@ from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from src.fact_reasoner.utils import LOOP_BUDGET
 
 # Version 1 of the prompt (from the original FactScore paper)
 INSTRUCTION_FACTSCORE = """
@@ -247,6 +245,7 @@ class FactScore:
         data["atoms"] = []
         data["contexts"] = []
 
+        # Write the atoms
         for aid, atom in self.atoms.items():
             atom_data = dict(
                 id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
@@ -255,13 +254,15 @@ class FactScore:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
 
+        # Write the contexts
         data["contexts"] = [context.to_json() for context in self.contexts.values()]
 
+        # Write to JSON file (if any)
         if json_file_path:
             with open(json_file_path, "w") as f:
-                f.write(f"{json.dumps(data)}\n")
+                json.dump(data, f, indent=4)
             f.close()
-            print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
+            print(f"[FactScore] Pipeline instance written to: {json_file_path}")
 
         return data
 
@@ -336,7 +337,7 @@ class FactScore:
 
         # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
-        print(f"[FactScore] Found {len(self.atoms)} unique atoms.")
+        print(f"[FactScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
         if has_contexts == False: # check if contexts already in file
@@ -344,7 +345,7 @@ class FactScore:
                 atoms=self.atoms,
                 retriever=self.context_retriever,
             )
-
+        print(f"[FactScore] Retrieved {len(self.contexts)} contexts.")
         print(f"[FactScore] Pipeline building completed.")
 
     def _get_label(self, output: ModelOutputThunk) -> str:
@@ -436,7 +437,7 @@ class FactScore:
                     )
                 ],
                 user_variables=user_variables,
-                strategy=RejectionSamplingStrategy(loop_budget=5),
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True
             )
 
@@ -576,7 +577,7 @@ if __name__ == "__main__":
     # Create a Mellea RITS backend
     from mellea_ibm.rits import RITSBackend, RITS
     backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 500},
+        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
     )
 
     # Set cache dir for context retriever
@@ -631,5 +632,12 @@ if __name__ == "__main__":
     # Print the results
     results = pipeline.score()
     print(f"[FactScore] Results: {results}")
+
+    # Save the pipeline to a JSON file
+    output_file = "/home/radu/storage/git/FactReasoner/examples/test.json"
+    output = pipeline.to_json()
+    output["results"] = results
+    with open(output_file, "w") as fp:
+        json.dump(output, fp, indent=4)
     print(f"Done.")
 
