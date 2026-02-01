@@ -1,7 +1,10 @@
 ![Static Badge](https://img.shields.io/badge/build-passing-brightgreen?style=flat)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-![Static Badge](https://img.shields.io/badge/version-1.0.0-red?style=flat)
+![Static Badge](https://img.shields.io/badge/version-0.5.0-red?style=flat)
+![Static Badge](https://img.shields.io/badge/mellea-0.3.0-blue?style=flat)
+
+<img src="docs/mellea.png" width="100">
 
 
 # `FactReasoner`: A Probabilistic Approach to Long-Form Factuality for Large Language Models

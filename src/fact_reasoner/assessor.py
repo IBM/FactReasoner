@@ -30,6 +30,7 @@ from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
 from mellea.backends.types import ModelOption
+from mellea.helpers.fancy_logger import FancyLogger
 
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer
@@ -121,6 +122,9 @@ class FactReasoner:
 
         # Ground truth labels (if any)
         self.labels_human = None
+
+        # Disable Mellea logging
+        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def from_fact_graph(
             self,
@@ -723,12 +727,7 @@ class FactReasoner:
         results["avg_explogprob"] = math.exp(avg_logprob)
         results["marginals"] = marginals
         results["predictions"] = labels
-
-        # Print the predicted labels
-        str_predictions = ""
-        for aid in sorted(labels.keys()):
-            str_predictions += f" {aid}: {labels[aid]}"
-        print(f"[FactReasoner] Predictions: {str_predictions}")
+        print(f"[FactReasoner] Predictions: {labels}")
 
         # Remove duplicate atoms in self.labels_human
         if self.labels_human is not None:
@@ -761,10 +760,7 @@ class FactReasoner:
                         num_false_positive += 1
             fscore_gold = true_atoms / len(self.labels_human.keys())
             avg_brier /= len(self.atoms)
-            str_references = ""
-            for aid in sorted(self.labels_human.keys()):
-                str_references += f" {aid}: {self.labels_human[aid]}"
-            print(f"[FactReasoner] Gold labels: {str_references}")
+            print(f"[FactReasoner] Gold labels: {self.labels_human}")
             print(f"[FactReasoner] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human.keys())})")
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
@@ -772,8 +768,7 @@ class FactReasoner:
             results["true_negative"] = num_true_negative
             results["false_positive"] = num_false_positive
             results["false_negative"] = num_false_negative
-            results["predictions"] = str_predictions
-            results["references"] = str_references
+            results["references"] = self.labels_human
             results["avg_brier"] = avg_brier
 
         results["topic"] = self.topic
@@ -781,101 +776,6 @@ class FactReasoner:
         results["response"] = self.response
         results["elapsed_time"] = elapsed_time
         print(f"[FactReasoner] Elapsed time: {elapsed_time:.4f} seconds.")
-        
+
         return results, marginals
-
-
-if __name__ == "__main__":
-
-    # Example query and response
-    query = "Tell me a biography of Lanny Flaherty"
-    response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
-    topic = "Lanny Flaherty"
-    init_from_file = True
-
-    # Create a Mellea RITS backend
-    from mellea_ibm.rits import RITSBackend, RITS
-    backend = RITSBackend(
-        RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-    )
-
-    from mellea.helpers.fancy_logger import FancyLogger
-    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
-
-    # Set cache dir for context retriever
-    cache_dir = None # "/home/radu/data/cache"
-
-    # Create the retriever, atomizer and reviser.
-    qb = QueryBuilder(backend)
-    atom_extractor = Atomizer(backend)
-    atom_reviser = Reviser(backend)
-    context_retriever = ContextRetriever(
-        service_type="google", 
-        top_k=5, 
-        cache_dir=cache_dir, 
-        fetch_text=True, 
-        query_builder=qb
-    )
-    context_summarizer = ContextSummarizer(backend, False)
-    nli_extractor = NLIExtractor(backend)
-
-    # Path to merlin (probabilistic inference engine)
-    merlin_path = "/home/radu/git/merlin/build/merlin"
-
-    # Create the FactReasoner pipeline
-    pipeline = FactReasoner(
-        context_retriever=context_retriever,
-        context_summarizer=context_summarizer,
-        atom_extractor=atom_extractor,
-        atom_reviser=atom_reviser,
-        nli_extractor=nli_extractor,
-        merlin_path=merlin_path,
-    )
-
-    # Load the problem instance from a file
-    if init_from_file:
-        json_file = "/home/radu/storage/git/FactReasoner/examples/flaherty_wikipedia.json"
-        with open(json_file, "r") as f:
-            data = json.load(f)
-
-        print(f"[FactReasoner] Initializing the pipeline from {json_file}")
-        pipeline.from_dict_with_contexts(data)
-
-        # Build the FactReasoner pipeline (FR2 version)
-        pipeline.build(
-            has_atoms=True,
-            has_contexts=True,
-            revise_atoms=False,
-            remove_duplicates=True,
-            summarize_contexts=False,
-            contexts_per_atom_only=False,
-            rel_atom_context=True, 
-            rel_context_context=False,
-        )
-    else:
-        pipeline.build(
-            query=query,
-            response=response,
-            topic=topic,
-            has_atoms=False,
-            has_contexts=False,
-            revise_atoms=True,
-            remove_duplicates=True,
-            summarize_contexts=False,
-            rel_atom_context=True,
-            rel_context_context=False
-        )
-
-    # Print the results
-    results, marginals = pipeline.score()
-    print(f"[FactReasoner] Marginals: {marginals}")
-    print(f"[FactReasoner] Results: {results}")
-
-    # Save the pipeline to a JSON file
-    output_file = "/home/radu/storage/git/FactReasoner/examples/test.json"
-    output = pipeline.to_json()
-    output["results"] = results
-    with open(output_file, "w") as fp:
-        json.dump(output, fp, indent=4)
-    print(f"Done.")
 
