@@ -29,7 +29,6 @@ from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
-from mellea.backends.types import ModelOption
 from mellea.helpers.fancy_logger import FancyLogger
 
 # Local imports
@@ -38,7 +37,6 @@ from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.summarizer import ContextSummarizer
 from src.fact_reasoner.core.nli import NLIExtractor
-from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.fact_graph import FactGraph
 from src.fact_reasoner.core.utils import (
     PRIOR_PROB_ATOM,
