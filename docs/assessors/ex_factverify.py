@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from mellea.backends.types import ModelOption
+from mellea.backends import ModelOption
 
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer
