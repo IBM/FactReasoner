@@ -176,17 +176,6 @@ def save_response_content(response, destination):
             if chunk: # filter out keep-alive new chunks
                 f.write(chunk)
 
-def get_models_config() -> Dict[str, Any]:
-    """
-    Return the models config from configs/models.yaml.
-    """
-
-    d = Path(__file__).resolve().parent
-    filename = Path.joinpath(d, "configs", "models.yaml")
-    with open(filename, "r") as f:
-        config = yaml.safe_load(f)
-    return config
-
 def strip_code_fences(s: str) -> str:
     """
     Strip markdown code fences from a string if present.
@@ -217,43 +206,6 @@ def strip_code_fences(s: str) -> str:
 
     # No fences detected; return as-is
     return s
-
-
-def _escape_inner_quotes(s: str) -> str:
-    """
-    Replaces any “ or ” characters with \" but only between
-    the first and last double quote (") in the string.
-    """
-    # Find first and last normal quotes
-    first = s.find('"')
-    last = s.rfind('"')
-
-    if first == -1 or last == -1 or first == last:
-        # Nothing to process if fewer than two quotes
-        return s
-
-    # Parts of the string
-    before = s[:first+1]
-    middle = s[first+1:last]
-    after = s[last:]
-
-    # Replace smart quotes inside the middle section
-    middle = middle.replace('"', r"\"")
-
-    return before + middle + after
-
-def escape_quotes(s: str) -> str:
-    
-    content_lines = []
-    for line in s.splitlines():
-        if ":" not in line:
-            content_lines.append(line)
-        else:
-            p = line.find(":")
-            temp = line[:p + 1] + _escape_inner_quotes(line[p+1:])
-            content_lines.append(temp)
-    return "\n".join(content_lines).strip()
-
 
 def normalize_ws(text: str) -> str:
     """
