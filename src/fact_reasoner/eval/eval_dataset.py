@@ -20,7 +20,7 @@ import json
 import argparse
 import pandas as pd
 
-from mellea.backends.types import ModelOption
+from mellea.backends import ModelOption
 
 # Local imports
 from src.fact_reasoner.assessor import FactReasoner

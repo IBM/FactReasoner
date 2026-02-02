@@ -25,10 +25,11 @@ import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List, Tuple
 from mellea.backends import Backend
-from mellea.stdlib.base import SimpleContext, ModelOutputThunk
-from mellea.stdlib.requirement import check
+from mellea.stdlib.context import SimpleContext
+from mellea.core import ModelOutputThunk
+from mellea.stdlib.requirements import check
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.helpers.fancy_logger import FancyLogger
+from mellea.core import FancyLogger
 
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer

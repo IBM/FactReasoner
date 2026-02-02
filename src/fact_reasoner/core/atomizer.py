@@ -22,9 +22,10 @@ import mellea.stdlib.functional as mfuncs
 
 from typing import Dict, List
 from mellea.backends import Backend
-from mellea.stdlib.base import SimpleContext
-from mellea.stdlib.requirement import check, simple_validate
+from mellea.stdlib.context import SimpleContext
+from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
+from mellea.core import FancyLogger
 
 # Local imports
 from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
@@ -169,6 +170,9 @@ class Atomizer(object):
         
         # Print info
         print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
+
+        # Disable Mellea logging
+        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def run(self, response: str) -> Dict[str, str]:
         """

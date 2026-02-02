@@ -18,9 +18,10 @@
 import mellea.stdlib.functional as mfuncs
 
 from mellea.backends import Backend
-from mellea.stdlib.base import SimpleContext
-from mellea.stdlib.requirement import check, simple_validate
+from mellea.stdlib.context import SimpleContext
+from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
+from mellea.core import FancyLogger
 
 # Local imports
 from src.fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
@@ -102,6 +103,10 @@ class QueryBuilder:
         
         # Print info
         print(f"[QueryBuilder] Using Mellea backend: {self.backend.model_id}")
+
+        # Disable Mellea logging
+        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+
 
     def run(self, text: str) -> str:
         """

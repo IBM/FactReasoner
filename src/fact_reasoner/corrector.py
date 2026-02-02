@@ -29,5 +29,5 @@ from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
-from mellea.backends.types import ModelOption
-from mellea.helpers.fancy_logger import FancyLogger
+from mellea.backends import ModelOption
+from mellea.core import FancyLogger

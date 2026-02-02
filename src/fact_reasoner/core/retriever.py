@@ -30,7 +30,6 @@ from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from mellea.backends.types import ModelOption
 
 # Local imports
 from src.fact_reasoner.core.query_builder import QueryBuilder

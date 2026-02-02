@@ -29,7 +29,7 @@ from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
-from mellea.helpers.fancy_logger import FancyLogger
+from mellea.core import FancyLogger
 
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer

@@ -1,4 +1,4 @@
-from mellea.backends.types import ModelOption
+from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports

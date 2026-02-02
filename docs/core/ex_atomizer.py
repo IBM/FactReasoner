@@ -2,10 +2,8 @@
 
 import asyncio
 
-from mellea.backends.types import ModelOption
+from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
-
-from mellea.backends.types import ModelOption
 
 # Local imports
 from src.fact_reasoner.core.atomizer import Atomizer
@@ -14,10 +12,6 @@ from src.fact_reasoner.core.atomizer import Atomizer
 backend = RITSBackend(
     RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096}
 )
-
-# Disable Mellea logging
-from mellea.helpers.fancy_logger import FancyLogger
-FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
 # Create the atomizer
 atomizer = Atomizer(backend=backend)
