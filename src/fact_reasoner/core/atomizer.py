@@ -256,4 +256,6 @@ class Atomizer(object):
                 results.append({}) # empty dict on failure
 
         return results
-    
+
+    def __str__(self) -> str:
+        return "This is the atomizer"    
