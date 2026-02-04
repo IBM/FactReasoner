@@ -14,12 +14,13 @@ backend = RITSBackend(
 )
 
 # query_text = "Lanny Flaherty has appeared in Law & Order."
-query_text = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
+# query_text = "Unsupervised learning is the primary method used for analyzing soil quality in oil palm plantations"
+query_text = "rootstock for honey crisp apples in wayne county, ny"
 cache_dir = None #"my_database.db"
 query_builder = QueryBuilder(backend)
 
 retriever = ContextRetriever(
-    top_k=5,
+    top_k=10,
     service_type="google",
     cache_dir=cache_dir,
     fetch_text=True,
@@ -33,8 +34,8 @@ print(f"Number of contexts: {len(contexts)}")
 for context in contexts:
     print(context)
 
-link = "https://www.ancientportsantiques.com/wp-content/uploads/Documents/AUTHORS/SeaPeoples/SeaPeoples-Fischer&B%C3%BCrge2017.pdf"
-text = fetch_text_from_link(link, max_size=4000)
-print(f"Text length: {len(text)}")
-print(f"Text: {text}")  # Print text
+# link = "https://www.ancientportsantiques.com/wp-content/uploads/Documents/AUTHORS/SeaPeoples/SeaPeoples-Fischer&B%C3%BCrge2017.pdf"
+# text = fetch_text_from_link(link, max_size=4000)
+# print(f"Text length: {len(text)}")
+# print(f"Text: {text}")  # Print text
 print("Done.")

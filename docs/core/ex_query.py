@@ -16,8 +16,9 @@ backend = RITSBackend(
 qb = QueryBuilder(backend)
 
 # Process a single atom (no knowledge)        
-text = "The Apollo 14 mission to the Moon took place on January 31, 1971."
+# text = "The Apollo 14 mission to the Moon took place on January 31, 1971."
 # text = "You'd have to yell if your friend is outside the same location"
+text = "rootstock for honey crisp apples in wayne county, ny"
 
 result = qb.run(text)
 print(f"Query builder result: {result}")

@@ -394,6 +394,7 @@ class ContextRetriever:
     def query(
             self, 
             text: str,
+            max_size: int = 4000
     ) -> List[Dict[str, Any]]:
         """
         Retrieve a number of contexts relevant to the input text.
@@ -498,7 +499,7 @@ class ContextRetriever:
 
                         # if using in memory vector store, do not set a max size initially on the page text
                         # it will be determined by the splitter chunk size and number of chunks.
-                        raw_page_text = fetch_text_from_link(link, max_size=None if self.use_in_memory_vectorstore else 4000)
+                        raw_page_text = fetch_text_from_link(link, max_size=None if self.use_in_memory_vectorstore else max_size)
                         if is_content_valid(link, raw_page_text):
                             page_text = raw_page_text
                         else:
