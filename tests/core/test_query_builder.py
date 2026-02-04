@@ -17,7 +17,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.core.query_builder import QueryBuilder, INSTRUCTION_QUERY_BUILDER
+from fact_reasoner.core.query_builder import QueryBuilder, INSTRUCTION_QUERY_BUILDER
 
 
 class TestQueryBuilderInit:

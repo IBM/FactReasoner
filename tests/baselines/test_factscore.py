@@ -17,7 +17,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.baselines.factscore import (
+from fact_reasoner.baselines.factscore import (
     FactScore,
     INSTRUCTION_FACTSCORE,
     INSTRUCTION_FACTSCORE_NOTOPIC,

@@ -16,7 +16,7 @@
 """Unit tests for fact_reasoner.core.utils module."""
 
 import pytest
-from src.fact_reasoner.core.utils import (
+from fact_reasoner.core.utils import (
     Atom,
     Context,
     Relation,

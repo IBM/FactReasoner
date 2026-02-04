@@ -17,7 +17,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.baselines.veriscore import VeriScore, INSTRUCTION_VERISCORE
+from fact_reasoner.baselines.veriscore import VeriScore, INSTRUCTION_VERISCORE
 
 
 class TestVeriScoreInit:

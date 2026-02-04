@@ -18,7 +18,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.fact_reasoner.core.retriever import (
+from fact_reasoner.core.retriever import (
     _clean_text,
     make_uniform,
     get_title,

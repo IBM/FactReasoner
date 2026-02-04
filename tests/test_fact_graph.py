@@ -20,8 +20,8 @@ import json
 import tempfile
 import os
 
-from src.fact_reasoner.fact_graph import Node, Edge, FactGraph
-from src.fact_reasoner.core.utils import Atom, Context, Relation
+from fact_reasoner.fact_graph import Node, Edge, FactGraph
+from fact_reasoner.core.utils import Atom, Context, Relation
 
 
 class TestNode:

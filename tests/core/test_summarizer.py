@@ -17,7 +17,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.core.summarizer import (
+from fact_reasoner.core.summarizer import (
     ContextSummarizer,
     INSTRUCTION_WITH_REF,
     INSTRUCTION_WITHOUT_REF,

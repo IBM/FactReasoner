@@ -18,7 +18,7 @@
 import pytest
 import math
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.core.nli import NLIExtractor, INSTRUCTION_NLI
+from fact_reasoner.core.nli import NLIExtractor, INSTRUCTION_NLI
 
 
 class TestNLIExtractorInit:

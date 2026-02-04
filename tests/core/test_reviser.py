@@ -17,7 +17,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.core.reviser import Reviser, INSTRUCTION_REVISER
+from fact_reasoner.core.reviser import Reviser, INSTRUCTION_REVISER
 
 
 class TestReviserInit:

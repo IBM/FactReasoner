@@ -20,7 +20,7 @@ import tempfile
 import os
 from unittest.mock import patch, MagicMock
 
-from src.fact_reasoner.search_api import SearchAPI
+from fact_reasoner.search_api import SearchAPI
 
 
 class TestSearchAPIInit:

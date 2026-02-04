@@ -21,9 +21,9 @@ import tempfile
 import os
 from unittest.mock import MagicMock, patch
 
-from src.fact_reasoner.assessor import FactReasoner
-from src.fact_reasoner.fact_graph import FactGraph
-from src.fact_reasoner.core.utils import Atom, Context, Relation
+from fact_reasoner.assessor import FactReasoner
+from fact_reasoner.fact_graph import FactGraph
+from fact_reasoner.core.utils import Atom, Context, Relation
 
 
 class TestFactReasonerInit:

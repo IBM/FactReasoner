@@ -18,7 +18,7 @@
 from typing import Any
 import pytest
 from unittest.mock import MagicMock, patch
-from src.fact_reasoner.core.atomizer import Atomizer, INSTRUCTION_ATOMIZER
+from fact_reasoner.core.atomizer import Atomizer, INSTRUCTION_ATOMIZER
 
 
 class TestAtomizerInit:
