@@ -13,11 +13,6 @@ from src.fact_reasoner.core.nli import NLIExtractor
 from src.fact_reasoner.core.query_builder import QueryBuilder
 from src.fact_reasoner.assessor import FactReasoner
 
-# Example query and response
-query = "Tell me a biography of Lanny Flaherty"
-response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
-topic = "Lanny Flaherty"
-
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS
 backend = RITSBackend(
@@ -55,18 +50,24 @@ pipeline = FactReasoner(
     merlin_path=merlin_path,
 )
 
+# Load the problem instance from a file
+json_file = os.path.join(cwd, "flaherty_wikipedia.json")
+with open(json_file, "r") as f:
+    data = json.load(f)
+
+print(f"[FactReasoner] Initializing the pipeline from {json_file}")
+pipeline.from_dict_with_contexts(data)
+
 # Build the FactReasoner pipeline (FR2 version)
 pipeline.build(
-    query=query,
-    response=response,
-    topic=topic,
-    has_atoms=False,
-    has_contexts=False,
-    revise_atoms=True,
+    has_atoms=True,
+    has_contexts=True,
+    revise_atoms=False,
     remove_duplicates=True,
     summarize_contexts=False,
-    rel_atom_context=True,
-    rel_context_context=False
+    contexts_per_atom_only=False,
+    rel_atom_context=True, 
+    rel_context_context=False,
 )
 
 # Print the results

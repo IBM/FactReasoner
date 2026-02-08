@@ -128,23 +128,23 @@ For internal access to IBM RITS backends, install `mellea-ibm` as follows:
 pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ```
 
-Set up the following environmet variable:
-```bash
-export RITS_API_KEY=your_RITS_api_key
-```
 ### Dependencies
 
 FactReasoner requires:
 - Python >= 3.10
-- [Merlin](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
-- [Mellea](https://pypi.org/project/mellea/) >= 0.3.0 - LLM interaction library
+- [`Merlin`](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
+- [`Mellea`](https://pypi.org/project/mellea/) == 0.3.0 - LLM interaction library
 
 ### Environment Variables
 
-For Google Search retrieval via Serper API:
+Set up the following env variables:
 
 ```bash
+# Google Search retrieval via Serper API:
 export SERPER_API_KEY=your_serper_api_key
+
+# Internal IBM inference service
+export RITS_API_KEY=your_RITS_api_key
 ```
 
 ## Quick Start
@@ -267,7 +267,7 @@ LLM Response
     │
     ▼
 ┌─────────────┐
-│     NLI     │ ──► Entailment/Contradiction edges
+│     NLI     │ ──► Entailment/Contradiction relationships
 └─────────────┘
     │
     ▼
@@ -283,7 +283,7 @@ Factuality Score + Per-atom Marginals
 
 ### Pipeline Versions
 
-FactReasoner supports three relationship configurations:
+FactReasoner supports three configurations:
 
 | Version | Description |
 |---------|-------------|

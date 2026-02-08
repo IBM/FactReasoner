@@ -8,12 +8,7 @@ from src.fact_reasoner.core.atomizer import Atomizer
 from src.fact_reasoner.core.reviser import Reviser
 from src.fact_reasoner.core.retriever import ContextRetriever
 from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.baselines.veriscore import VeriScore
-
-# Example query and response
-query = "Tell me a biography of Lanny Flaherty"
-response = "Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola, Florida. He has appeared in numerous films, television shows, and theater productions throughout his career, which began in the late 1970s. Some of his notable film credits include \"King of New York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" and \"The Straight Story.\" On television, he has appeared in shows such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" and \"The Leftovers.\" Flaherty has also worked extensively in theater, including productions at the Public Theater and the New York Shakespeare Festival. He is known for his distinctive looks and deep gravelly voice, which have made him a memorable character actor in the industry."
-topic = "Lanny Flaherty"
+from src.fact_reasoner.baselines.factscore import FactScore
 
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS
@@ -36,30 +31,37 @@ context_retriever = ContextRetriever(
     fetch_text=True, 
     query_builder=qb
 )
-# Create the VeriScore pipeline
-pipeline = VeriScore(
+
+# Create the FactScore pipeline
+pipeline = FactScore(
     backend=backend,
     context_retriever=context_retriever,
     atom_extractor=atom_extractor,
     atom_reviser=atom_reviser,
 )
 
+# Load the problem instance from a file
+json_file = os.path.join(cwd, "flaherty_wikipedia.json")
+with open(json_file, "r") as f:
+    data = json.load(f)
+
+# Load the file (json)
+print(f"[FactScore] Initializing pipeline from: {json_file}")
+pipeline.from_dict_with_contexts(data)
+
 # Build the scorer
 pipeline.build(
-    query=query,
-    response=response,
-    topic=topic,
-    has_atoms=False,
-    has_contexts=False,
-    revise_atoms=True
+    has_atoms=True,
+    has_contexts=True,
+    revise_atoms=False
 )
 
 # Print the results
 results = pipeline.score()
-print(f"[VeriScore] Results: {results}")
+print(f"[FactScore] Results: {results}")
 
 # Save the pipeline to a JSON file
-output_file = os.path.join(cwd, "veriscore_output.json")
+output_file = os.path.join(cwd, "factscore_output.json")
 output = pipeline.to_json()
 output["results"] = results
 with open(output_file, "w") as fp:
