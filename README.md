@@ -2,7 +2,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.5.0-red.svg)](https://github.com/IBM/FactReasoner)
 ![Static Badge](https://img.shields.io/badge/mellea-0.3.0-blue?style=flat)
-
+![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
 # FactReasoner
 
@@ -109,7 +109,7 @@ Traditional factuality methods (like FactScore) make independent binary decision
 
 ### From PyPi
 ```bash
-pip install fact-reasoner
+uv pip install fact_reasoner
 ```
 
 ### From Source
@@ -119,7 +119,7 @@ git clone git@github.com:IBM/FactReasoner.git
 cd FactReasoner
 conda create -n fr python=3.10
 conda activate fr
-pip install -e .
+uv pip install -e .
 ```
 
 ### Internal IBM Usage
