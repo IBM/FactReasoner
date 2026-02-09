@@ -1,50 +1,47 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
 version = "0.5.0"
 description = "Factuality Assessment for Foundation Models"
 authors = [
-    {name = "Radu Marinescu",email = "radu.marinescu@ie.ibm.com"},
-    {name = "Javier Carnerero Cano",email = "javier.cano@ibm.com"},
-    {name = "Massimiliano Pronesti",email = "massimiliano.pronesti@ibm.com"},
+    {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
+    {name = "Javier Carnerero Cano", email = "javier.cano@ibm.com"},
+    {name = "Massimiliano Pronesti", email = "massimiliano.pronesti@ibm.com"},
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10"
-classifiers=[
+classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 
 dependencies = [
+    "beautifulsoup4",
+    "chromadb",
+    "langchain-community",
+    "langchain-core",
+    "langchain-huggingface",
+    "langchain-text-splitters",
+    "mellea==0.3.0",
+    "networkx",
+    "nltk",
     "numpy",
     "pandas",
-    "tqdm",
-    "nltk",
-    "networkx",
-    "protobuf",
-    "sentencepiece",
-    "transformers",
-    "python-dotenv",
-    "matplotlib",
-    "rank_bm25",
     "pgmpy",
-    "spacy",
-    "helper-utils",
-    "langchain",
-    "langchain-community",
-    "wikipedia",
-    "chromadb",
-    "beautifulsoup4",
-    "lxml",
     "pypdf2",
-    "html2text",
+    "pyparsing",
+    "python-dotenv",
+    "pyyaml",
+    "requests",
     "thefuzz",
-    "langchain_huggingface",
-    "mellea==0.3.0",
+    "torch",
+    "tqdm",
+    "transformers",
 ]
 
 [project.optional-dependencies]
@@ -53,11 +50,8 @@ dev = ["pytest", "ruff", "mypy", "build", "twine"]
 [project.urls]
 Source = "https://github.com/IBM/FactReasoner"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-include-package-data = false
+[tool.hatch.build.targets.wheel]
+packages = ["src/fact_reasoner"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-exclude = ["tests", "tests.*"]
-namespaces = false
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/", "data/", "lib/", "tests/"]
