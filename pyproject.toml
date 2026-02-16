@@ -1,71 +1,57 @@
 [build-system]
-requires = [
-    "setuptools>=60",
-    "setuptools-scm>=8.0"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
-version = "0.3.0"
+version = "0.5.2"
 description = "Factuality Assessment for Foundation Models"
 authors = [
-    {name = "Radu Marinescu",email = "radu.marinescu@ie.ibm.com"},
-    {name = "Javier Carnerero Cano",email = "javier.cano@ibm.com"},
-    {name = "Massimiliano Pronesti",email = "massimiliano.pronesti@ibm.com"},
+    {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
+    {name = "Javier Carnerero Cano", email = "javier.cano@ibm.com"},
+    {name = "Massimiliano Pronesti", email = "massimiliano.pronesti@ibm.com"},
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10"
-classifiers=[
-    "License :: OSI Approved :: Apache Software License"
-]
-dependencies = [
-    # TODO: figure out correct versions dependencies
-    "accelerate>=0.22.0",
-    "datasets>=2.4.0",
-    "huggingface-hub",
-    "numpy>=1.22.4",
-    "pandas>=1.5.0",
-    "scikit-learn>=1.1",
-    "scipy>=1.8.1",
-    "tokenizers>=0.13.3",
-    "torch>=2.0.1",
-    "tqdm>=4.65.0",
-    "transformers>=4.32.0",
-    "peft>=0.6.0",
-    "evaluate>=0.4.1",
-    "rouge>=1.0.1",
-    "rouge_score>=0.1.2",
-    "nltk>=3.6.6",
-    "protobuf",
-    "sentencepiece",
-    "python-dotenv",
-    "matplotlib",
-    "ipykernel",
-    "ipywidgets",
-    "rank_bm25",
-    "pgmpy",
-    "spacy",
-    "flask",
-    "bert-score",
-    "helper-utils",
-    "langchain",
-    "langchain-community",
-    "wikipedia",
-    "chromadb",
-    "litellm",
-    "beautifulsoup4",
-    "lxml",
-    "pypdf",
-    "html2text",
-    "pytorch-lightning",
-    "thefuzz",
-    "vllm",
-    "langchain_huggingface"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
 ]
 
-[tool.setuptools.packages.find]
-exclude = ["tests", "tests.*"]
-namespaces = false
+dependencies = [
+    "beautifulsoup4",
+    "chromadb",
+    "langchain-community",
+    "langchain-core",
+    "langchain-huggingface",
+    "langchain-text-splitters",
+    "mellea==0.3.0",
+    "networkx",
+    "nltk",
+    "numpy",
+    "pandas",
+    "pgmpy",
+    "pypdf2",
+    "pyparsing",
+    "python-dotenv",
+    "pyyaml",
+    "requests",
+    "thefuzz",
+    "torch",
+    "tqdm",
+    "transformers",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy", "build", "twine"]
 
 [project.urls]
 Source = "https://github.com/IBM/FactReasoner"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fact_reasoner"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/", "data/", "lib/", "tests/"]

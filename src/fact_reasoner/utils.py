@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pathlib import Path
+
+import yaml
+import json
 import numpy as np
 import requests
 import tqdm
@@ -24,12 +26,9 @@ import torch
 import transformers
 
 from typing import Any, Dict, List, Union
+from pathlib import Path
 
-import yaml
-
-DEFAULT_PROMPT_BEGIN = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>"
-DEFAULT_PROMPT_END = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
-
+LOOP_BUDGET = 5
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
     __getattr__ = dict.get
@@ -177,13 +176,106 @@ def save_response_content(response, destination):
             if chunk: # filter out keep-alive new chunks
                 f.write(chunk)
 
-def get_models_config() -> Dict[str, Any]:
+def strip_code_fences(s: str) -> str:
     """
-    Return the models config from configs/models.yaml.
+    Strip markdown code fences from a string if present.
+
+    Args:
+        s: str 
+            The input string.
+    Returns:
+        str: The string without code fences.
     """
 
-    d = Path(__file__).resolve().parent
-    filename = Path.joinpath(d, "configs", "models.yaml")
-    with open(filename, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+    s = s.strip()
+
+    # Try a strict fenced block: ```json\n ... \n```
+    m = re.match(r"^```(?:json|JSON)?\s*\n(.*?)\n```$", s, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+
+    # Fallback: starts with ``` but may have irregular spacing/line breaks
+    if s.startswith("```"):
+        lines = s.splitlines()
+        # Remove the opening fence line
+        content_lines = lines[1:]
+        # If the last line is a closing fence, drop it
+        if content_lines and content_lines[-1].strip().startswith("```"):
+            content_lines = content_lines[:-1]
+        return "\n".join(content_lines).strip()
+
+    # No fences detected; return as-is
+    return s
+
+def normalize_ws(text: str) -> str:
+    """
+    - Collapse all runs of whitespace (spaces, tabs, newlines) into a single space.
+    - Escape inner pairs of double quotes:  ""phrase""  ->  \"phrase\"
+      (Only when the pair of quotes is not already escaped.)
+
+    Examples:
+        Input:  'He said  ""Hello  world"" \n  today.'
+        Output: 'He said \\"Hello world\\" today.'
+    """
+    if text is None:
+        return text  # or raise ValueError("text must not be None")
+
+    # Collapse all whitespace chunks to a single space
+    # This turns tabs/newlines into spaces as well.
+    collapsed = re.sub(r'\s+', ' ', text).strip()
+    collapsed = collapsed.replace('\n', '')
+
+    return collapsed
+
+
+def validate_json_code_block(input_string: str, required_keys: List[str] = None) -> bool:
+    """
+    Checks if the input string is a valid JSON dictionary.
+
+    Args:
+        input_string: str
+            The string to check.
+        required_keys: List[str]
+            List of keys that must be present in the JSON dictionary.
+
+    Returns:
+        bool: True if valid JSON, False otherwise. If required_keys is provided,
+        then also checks if it is a dictionary and contains the required keys.
+    """
+    try:
+
+        # Remove markdown fences if present
+        cleaned = strip_code_fences(input_string)
+        cleaned = normalize_ws(cleaned)
+        
+        # Attempt to parse the string as JSON
+        data = json.loads(cleaned)
+
+        # Check if it's a dictionary and has required keys
+        if isinstance(data, dict) and required_keys:
+            for key in required_keys:
+                if key not in data:
+                    return False
+        return True
+    except json.JSONDecodeError as e:
+        # If parsing fails, it's not valid JSON
+        print(f"Malformed JSON string: {e}")
+        return False
+
+def validate_markdown_code_block(input_string: str) -> bool:
+    """
+    Checks if the input string is a valid markdown code block.
+
+    Args:
+        input_string: str
+            The string to check.
+
+    Returns:
+        bool: True if valid markdown code block, False otherwise.
+    """
+
+    if input_string.strip().startswith("```") and input_string.strip().endswith("```"):
+        return True
+    else:
+        return False
+    
