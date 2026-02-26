@@ -28,7 +28,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
+from fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
 
 INSTRUCTION_ATOMIZER = """
 Instructions:

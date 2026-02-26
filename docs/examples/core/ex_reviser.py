@@ -2,7 +2,7 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.reviser import Reviser
 
 # Create a Mellea RITS backend
 backend = RITSBackend(

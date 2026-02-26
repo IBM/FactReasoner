@@ -23,16 +23,16 @@ import pandas as pd
 from mellea.backends import ModelOption
 
 # Local imports
-from src.fact_reasoner.assessor import FactReasoner
-from src.fact_reasoner.baselines.factscore import FactScore
-from src.fact_reasoner.baselines.factverify import FactVerify
-from src.fact_reasoner.baselines.veriscore import VeriScore
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.core.summarizer import ContextSummarizer
-from src.fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.assessor import FactReasoner
+from fact_reasoner.baselines.factscore import FactScore
+from fact_reasoner.baselines.factverify import FactVerify
+from fact_reasoner.baselines.veriscore import VeriScore
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.nli import NLIExtractor
 
 if __name__ == "__main__":
 
@@ -178,8 +178,8 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unknown LLM backend.")
 
-    from mellea.helpers.fancy_logger import FancyLogger
-    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+    # from mellea.helpers.fancy_logger import FancyLogger
+    # FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     # Create the atom extractor
     atom_extractor = Atomizer(backend)

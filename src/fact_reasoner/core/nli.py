@@ -29,7 +29,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.utils import extract_last_square_brackets
 
 INSTRUCTION_NLI = """
 

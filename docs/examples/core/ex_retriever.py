@@ -4,8 +4,8 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.core.retriever import ContextRetriever, fetch_text_from_link
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.retriever import ContextRetriever, fetch_text_from_link
 
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS

@@ -6,7 +6,7 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.atomizer import Atomizer
 
 # Create a Mellea RITS backend
 backend = RITSBackend(
