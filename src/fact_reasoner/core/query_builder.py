@@ -24,7 +24,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
+from fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
 
 INSTRUCTION_QUERY_BUILDER = """
 Instructions:

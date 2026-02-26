@@ -4,7 +4,7 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.summarizer import ContextSummarizer
 
 with_ref = False
 

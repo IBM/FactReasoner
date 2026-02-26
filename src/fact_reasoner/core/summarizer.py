@@ -27,7 +27,7 @@ from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
-from src.fact_reasoner.utils import LOOP_BUDGET
+from fact_reasoner.utils import LOOP_BUDGET
 
 INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 

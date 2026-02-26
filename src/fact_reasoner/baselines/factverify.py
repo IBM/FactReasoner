@@ -30,11 +30,11 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
-from src.fact_reasoner.utils import extract_last_wrapped_response, LOOP_BUDGET
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from fact_reasoner.utils import extract_last_wrapped_response, LOOP_BUDGET
 
 INSTRUCTION_FACTVERIFY = """
 
