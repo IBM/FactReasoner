@@ -32,13 +32,13 @@ from pgmpy.readwrite import UAIWriter
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.summarizer import ContextSummarizer
-from src.fact_reasoner.core.nli import NLIExtractor
-from src.fact_reasoner.fact_graph import FactGraph
-from src.fact_reasoner.core.utils import (
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.fact_graph import FactGraph
+from fact_reasoner.core.utils import (
     PRIOR_PROB_ATOM,
     PRIOR_PROB_CONTEXT,
     Atom,

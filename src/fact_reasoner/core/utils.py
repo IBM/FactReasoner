@@ -21,10 +21,10 @@ import nltk
 from nltk.tokenize import sent_tokenize
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.nli import NLIExtractor
-from src.fact_reasoner.utils import punctuation_only_inside_quotes
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.utils import punctuation_only_inside_quotes
 
 # Defaut prior probabilities for atoms and contexts
 PRIOR_PROB_ATOM = 0.5

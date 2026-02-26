@@ -29,7 +29,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.utils import extract_last_square_brackets
 
 INSTRUCTION_NLI = """
 
@@ -87,6 +87,7 @@ PREMISE: {{premise_text}}
 HYPOTHESIS: {{hypothesis_text}}
 """
 
+
 class NLIExtractor:
     """
     Predict the NLI relationship between a premise and a hypothesis, optionally
@@ -97,10 +98,10 @@ class NLIExtractor:
     v2 - more recent (with reasoning)
     v3 - only for Google search results
     """
-    
+
     def __init__(
-            self,
-            backend: Backend,
+        self,
+        backend: Backend,
     ):
         """
         Initialize the NLIExtractor.
@@ -110,9 +111,11 @@ class NLIExtractor:
                 The Mellea backend to use for LLM interaction.
         """
 
-        # Safety checks        
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea backend is None. Please provide a valid Mellea backend.")
+            raise ValueError(
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
 
         self.method = "logprobs"
         self.backend = backend
@@ -122,7 +125,6 @@ class NLIExtractor:
 
         # Disable Mellea logging
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
-
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
@@ -137,23 +139,25 @@ class NLIExtractor:
         """
 
         assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][
+            :-1
+        ]  # last token is EOS
 
         # Go backwards and collect the logprobs of the tokens between ']' and ']'
         avg_logprob = 0
         count = 0
         for item in reversed(logprobs):
-            if item['token'] == '[':
+            if item["token"] == "[":
                 break
-            elif item['token'] == ']':
+            elif item["token"] == "]":
                 continue
             else:
-                avg_logprob += item['logprob']
+                avg_logprob += item["logprob"]
                 count += 1
 
         # Compute the probability
         avg_logprob = avg_logprob / count if count > 0 else math.inf
-        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
+        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
 
     def _get_label(self, output: ModelOutputThunk) -> str:
         """
@@ -164,16 +168,16 @@ class NLIExtractor:
                 The model raw output (via Mellea)
 
         Returns:
-            str: The string representing the NLI label (entailment, contradiction, neutral).        
+            str: The string representing the NLI label (entailment, contradiction, neutral).
         """
 
         return extract_last_square_brackets(str(output))
 
     def run(self, premise: str, hypothesis: str) -> Dict[str, Any]:
         """
-        Extract the NLI relationship between premise and hypothesis. The 
+        Extract the NLI relationship between premise and hypothesis. The
         following relationships are allowed: entailment, contradiction, neutral.
-        
+
         Args:
             premise: str
                 The premise text (e.g., context).
@@ -183,7 +187,7 @@ class NLIExtractor:
         Returns:
             Dict[str, Any]: A dictionary containing the relationship and its probability.
         """
-        
+
         # Perform the instruction with validation
         output = mfuncs.instruct(
             INSTRUCTION_NLI,
@@ -193,7 +197,7 @@ class NLIExtractor:
                 check(
                     "The output must be a wrapped in square brackets",
                     validation_fn=simple_validate(
-                        lambda s: extract_last_square_brackets(s) != ''
+                        lambda s: extract_last_square_brackets(s) != ""
                     ),
                 )
             ],
@@ -205,20 +209,19 @@ class NLIExtractor:
 
         if output.success:
             return dict(
-                label=self._get_label(output.result), 
-                probability=self._get_probability(output.result)
+                label=self._get_label(output.result),
+                probability=self._get_probability(output.result),
             )
         else:
-            return dict(
-                label="neutral", 
-                probability=1.0
-            )
+            return dict(label="neutral", probability=1.0)
 
-    async def run_batch(self, premises: List[str], hypotheses: List[str]) -> List[Dict[str, Any]]:
+    async def run_batch(
+        self, premises: List[str], hypotheses: List[str]
+    ) -> List[Dict[str, Any]]:
         """
-        Extract the NLI relationships between premises and hypotheses. The 
+        Extract the NLI relationships between premises and hypotheses. The
         following relationships are allowed: entailment, contradiction, neutral.
-        
+
         Args:
             premises: List[str]
                 The list of premise texts (e.g., context).
@@ -226,7 +229,7 @@ class NLIExtractor:
                 The list of hypothesis texts (e.g., atom).
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries containing the 
+            List[Dict[str, Any]]: A list of dictionaries containing the
             relationships and their probabilities.
         """
 
@@ -240,7 +243,7 @@ class NLIExtractor:
                     check(
                         "The output must be a wrapped in square brackets",
                         validation_fn=simple_validate(
-                            lambda s: extract_last_square_brackets(s) != ''
+                            lambda s: extract_last_square_brackets(s) != ""
                         ),
                     )
                 ],
@@ -258,15 +261,8 @@ class NLIExtractor:
             if output.success:
                 label = self._get_label(output.result)
                 probability = self._get_probability(output.result)
-                results.append(dict(
-                    label=label,
-                    probability=probability
-                ))
+                results.append(dict(label=label, probability=probability))
             else:
-                results.append(dict(
-                    label="neutral",
-                    probability=1.0
-                ))
+                results.append(dict(label="neutral", probability=1.0))
 
         return results
-

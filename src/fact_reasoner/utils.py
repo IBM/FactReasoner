@@ -32,6 +32,8 @@ import yaml
 
 
 LOOP_BUDGET = 5
+
+
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
 
@@ -192,17 +194,13 @@ def save_response_content(response, destination):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
 
-<<<<<<< HEAD
 
-def get_models_config() -> Dict[str, Any]:
-=======
 def strip_code_fences(s: str) -> str:
->>>>>>> main
     """
     Strip markdown code fences from a string if present.
 
     Args:
-        s: str 
+        s: str
             The input string.
     Returns:
         str: The string without code fences.
@@ -228,6 +226,7 @@ def strip_code_fences(s: str) -> str:
     # No fences detected; return as-is
     return s
 
+
 def normalize_ws(text: str) -> str:
     """
     - Collapse all runs of whitespace (spaces, tabs, newlines) into a single space.
@@ -243,13 +242,15 @@ def normalize_ws(text: str) -> str:
 
     # Collapse all whitespace chunks to a single space
     # This turns tabs/newlines into spaces as well.
-    collapsed = re.sub(r'\s+', ' ', text).strip()
-    collapsed = collapsed.replace('\n', '')
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    collapsed = collapsed.replace("\n", "")
 
     return collapsed
 
 
-def validate_json_code_block(input_string: str, required_keys: List[str] = None) -> bool:
+def validate_json_code_block(
+    input_string: str, required_keys: List[str] = None
+) -> bool:
     """
     Checks if the input string is a valid JSON dictionary.
 
@@ -268,7 +269,7 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
         # Remove markdown fences if present
         cleaned = strip_code_fences(input_string)
         cleaned = normalize_ws(cleaned)
-        
+
         # Attempt to parse the string as JSON
         data = json.loads(cleaned)
 
@@ -282,6 +283,7 @@ def validate_json_code_block(input_string: str, required_keys: List[str] = None)
         # If parsing fails, it's not valid JSON
         print(f"Malformed JSON string: {e}")
         return False
+
 
 def validate_markdown_code_block(input_string: str) -> bool:
     """
@@ -299,4 +301,3 @@ def validate_markdown_code_block(input_string: str) -> bool:
         return True
     else:
         return False
-    

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Decompose the input string into atomic units. Use the same Mellea session 
+# Decompose the input string into atomic units. Use the same Mellea session
 # (context) to revise or decontextualize the atomc units if needed.
 
 import json
@@ -28,7 +28,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
+from fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
 
 INSTRUCTION_ATOMIZER = """
 Instructions:
@@ -143,6 +143,7 @@ INPUT: {{response}}
 OUTPUT:
 """
 
+
 class Atomizer(object):
     """
     The Atomizer class implements the atomic decomposition of the response.
@@ -159,15 +160,17 @@ class Atomizer(object):
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
-        """ 
+        """
 
-        # Safety checks        
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea backend is None. Please provide a valid Mellea backend.")
+            raise ValueError(
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
 
         # Initialize the extractor
         self.backend = backend
-        
+
         # Print info
         print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
 
@@ -177,7 +180,7 @@ class Atomizer(object):
     def run(self, response: str) -> Dict[str, str]:
         """
         Extract atomic units from a single response.
-        
+
         Args:
             response: str
                 The response from which to extract atomic units.
@@ -185,7 +188,7 @@ class Atomizer(object):
             Dict[str, str]: A dictionary containing the atomic units, each with
             a unique identifier.
         """
-        
+
         # Perform the instruction with validation
         output = mfuncs.instruct(
             INSTRUCTION_ATOMIZER,
@@ -209,12 +212,12 @@ class Atomizer(object):
             cleaned = strip_code_fences(str(output))
             return json.loads(cleaned)
         else:
-            return {} # empty dict on failure
-        
+            return {}  # empty dict on failure
+
     async def run_batch(self, responses: List[str]) -> List[Dict[str, str]]:
         """
         Extract atomic units from a list of responses.
-        
+
         Args:
             responses: List[str]
                 The list of response from which to extract atomic units.
@@ -222,7 +225,7 @@ class Atomizer(object):
             dict: A dictionary containing the number of atomic units, the units themselves,
             all atomic units as dictionaries, and all facts as dictionaries.
         """
-        
+
         # Perform the instruction with validation
         corutines = []
         for response in responses:
@@ -253,9 +256,9 @@ class Atomizer(object):
                 cleaned = strip_code_fences(str(output))
                 results.append(json.loads(cleaned))
             else:
-                results.append({}) # empty dict on failure
+                results.append({})  # empty dict on failure
 
         return results
 
     def __str__(self) -> str:
-        return "This is the atomizer"    
+        return "This is the atomizer"

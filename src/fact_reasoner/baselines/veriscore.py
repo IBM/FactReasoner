@@ -32,11 +32,17 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
-from src.fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.utils import (
+    Atom,
+    Context,
+    build_atoms,
+    build_contexts,
+    remove_duplicated_atoms,
+)
+from fact_reasoner.utils import extract_last_square_brackets
 
 # Version 2 of the prompt (based on more recent work VeriScore, FactBench)
 INSTRUCTION_VERISCORE = """
@@ -67,28 +73,29 @@ STATEMENT:
 {{atom_text}}
 """
 
+
 class VeriScore:
     """
-    Implementation of the VeriScore/FactBench paper. 
+    Implementation of the VeriScore/FactBench paper.
 
     Source:
         @misc{bayat2025factbench,
-            title={FactBench: A Dynamic Benchmark for In-the-Wild Language Model Factuality Evaluation}, 
+            title={FactBench: A Dynamic Benchmark for In-the-Wild Language Model Factuality Evaluation},
             author={Farima Fatahi Bayat and Lechen Zhang and Sheza Munir and Lu Wang},
             year={2025},
             eprint={2410.22257},
             archivePrefix={arXiv},
             primaryClass={cs.CL},
-            url={https://arxiv.org/abs/2410.22257}, 
+            url={https://arxiv.org/abs/2410.22257},
         }
     """
 
     def __init__(
-            self,
-            backend: Backend,
-            atom_extractor: Atomizer = None,
-            atom_reviser: Reviser = None,
-            context_retriever: ContextRetriever = None,
+        self,
+        backend: Backend,
+        atom_extractor: Atomizer = None,
+        atom_reviser: Reviser = None,
+        context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the VeriScore pipeline.
@@ -108,28 +115,28 @@ class VeriScore:
         self.query = None
         self.response = None
         self.topic = None
-        self.start_time = time.perf_counter() # get the start time
+        self.start_time = time.perf_counter()  # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
-        self.binary_output = False # default is False
-    
+        self.binary_output = False  # default is False
+
         print(f"[VeriScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[VeriScore] Binary output: {self.binary_output}")
 
-        self.atoms = {} # indexed by atom id
-        self.contexts = {} # indexed by context id
+        self.atoms = {}  # indexed by atom id
+        self.contexts = {}  # indexed by context id
 
         # Ground truth labels (if any)
         self.labels_human = None
-        
+
         # Disable Mellea logging
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def from_dict_with_contexts(
-            self,
-            data: Dict[str, Any],
+        self,
+        data: Dict[str, Any],
     ):
         """
         Initialize VeriScore from a dict containing both atoms and contexts.
@@ -142,8 +149,8 @@ class VeriScore:
         self.query = data["input"]
         self.response = data["output"]
         self.topic = data.get("topic", None)
-        
-        print(f"[VeriScore] Reading the atoms ...")                
+
+        print(f"[VeriScore] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -165,7 +172,7 @@ class VeriScore:
         print(f"[VeriScore] Atoms found: {len(self.atoms)}")
         for _, atom in self.atoms.items():
             print(f"[VeriScore] {atom}")
-        
+
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[VeriScore] Lables found: {self.labels_human}")
 
@@ -177,12 +184,7 @@ class VeriScore:
             snippet = context_dict.get("snippet", "")
             link = context_dict.get("link", "")
             ctxt = Context(
-                id=cid, 
-                atom=None, 
-                text=text, 
-                title=title, 
-                snippet=snippet, 
-                link=link
+                id=cid, atom=None, text=text, title=title, snippet=snippet, link=link
             )
             self.contexts[cid] = ctxt
 
@@ -193,8 +195,10 @@ class VeriScore:
                 ctxts.append(self.contexts[c])
                 self.contexts[c].set_atom(atom)
             atom.add_contexts(ctxts)
-        
-        print(f"[VeriScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
+
+        print(
+            f"[VeriScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
+        )
 
     def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
         """
@@ -234,13 +238,13 @@ class VeriScore:
         return data
 
     def build(
-            self,
-            query: str = None,
-            response: str = None,
-            topic: str = None,
-            has_atoms: bool = False,
-            has_contexts: bool = False,
-            revise_atoms: bool = False,
+        self,
+        query: str = None,
+        response: str = None,
+        topic: str = None,
+        has_atoms: bool = False,
+        has_contexts: bool = False,
+        revise_atoms: bool = False,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -262,7 +266,7 @@ class VeriScore:
         """
 
         # Initialize the scorer
-        if query is not None: 
+        if query is not None:
             self.query = query
         if response is not None:
             self.response = response
@@ -272,26 +276,24 @@ class VeriScore:
         self.revise_atoms = revise_atoms
 
         # Safety checks
-        assert self.atom_extractor is not None, \
-            f"The atom extractor must be created."
-        assert self.atom_reviser is not None, \
-            f"The atom reviser must be created."
+        assert self.atom_extractor is not None, f"The atom extractor must be created."
+        assert self.atom_reviser is not None, f"The atom reviser must be created."
 
         print(f"[VeriScore] Building the pipeline ...")
-        
-        # Build the atoms 
+
+        # Build the atoms
         if has_atoms == False:
             self.atoms = build_atoms(
-                response=self.response,
-                atom_extractor=self.atom_extractor
+                response=self.response, atom_extractor=self.atom_extractor
             )
-            self.revise_atoms = True # revise atoms if newly created
+            self.revise_atoms = True  # revise atoms if newly created
             print(f"[VeriScore] Extracted {len(self.atoms)} atoms.")
             for aid in self.atoms.keys():
                 print(f"[VeriScore] {self.atoms[aid]}")
 
-        assert len(self.atoms) > 0, \
-            f"The atoms must be initialized before running the pipeline."
+        assert (
+            len(self.atoms) > 0
+        ), f"The atoms must be initialized before running the pipeline."
 
         # Revise the atoms
         if self.revise_atoms:
@@ -310,7 +312,7 @@ class VeriScore:
         print(f"[VeriScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if has_contexts == False: # check if contexts already in file
+        if has_contexts == False:  # check if contexts already in file
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
@@ -330,18 +332,18 @@ class VeriScore:
         text = str(output)
         label = extract_last_square_brackets(text)
         if self.binary_output:
-            if len(label) > 0 and label.lower() in ['supported']:
+            if len(label) > 0 and label.lower() in ["supported"]:
                 return "S"
             else:
                 return "NS"
         else:
-            if len(label) > 0 and label.lower() in ['supported']:
+            if len(label) > 0 and label.lower() in ["supported"]:
                 return "S"
-            elif len(label) > 0 and label.lower() in ['contradicted']:
+            elif len(label) > 0 and label.lower() in ["contradicted"]:
                 return "C"
             else:
                 return "U"
-                
+
     async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom predict its label given the corresponding retrieved contexts.
@@ -357,8 +359,10 @@ class VeriScore:
                 title = psg["title"]
                 text = psg["text"]
                 snippet = psg.get("snippet", "")
-                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(title, snippet, text)
-            
+                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(
+                    title, snippet, text
+                )
+
             return knowledge
 
         # Use the LLM to label the atom
@@ -392,9 +396,12 @@ class VeriScore:
                         "The output must contain [Supported], [Contradicted] or [Unverifiable]"
                     )
                 ],
-                user_variables={"atom_text": atom_text, "knowledge_text": knowledge_text},
+                user_variables={
+                    "atom_text": atom_text,
+                    "knowledge_text": knowledge_text,
+                },
                 strategy=RejectionSamplingStrategy(loop_budget=3),
-                return_sampling_results=True
+                return_sampling_results=True,
             )
             corutines.append(corutine)
 
@@ -407,10 +414,10 @@ class VeriScore:
 
         # Return the labeled atoms
         return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
-    
+
     def score(self) -> Dict[str, Any]:
         """
-        Compute the factuality score taking into consideration the contexts 
+        Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
 
         Factuality score = # atoms(true) / # atoms
@@ -441,10 +448,10 @@ class VeriScore:
                     num_false_atoms += 1
                 else:
                     num_uniform_atoms += 1
-      
+
         # Precision
-        fscore = float(num_true_atoms)/float(len(self.atoms))
-        elapsed_time = time.perf_counter() - self.start_time # elapsed time
+        fscore = float(num_true_atoms) / float(len(self.atoms))
+        elapsed_time = time.perf_counter() - self.start_time  # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -476,11 +483,13 @@ class VeriScore:
                     if labels[aid] == "NS":
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1                    
-            fscore_gold = true_atoms/len(self.labels_human)
+                        num_false_positive += 1
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[VeriScore] Gold labels: {self.labels_human}")
             print(f"[VeriScore] Predictions: {labels}")
-            print(f"[VeriScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[VeriScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -494,7 +503,7 @@ class VeriScore:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items(): # true labels are either S or NS
+            for aid, l in self.labels_human.items():  # true labels are either S or NS
                 if l == "S":
                     true_atoms += 1
                     if labels[aid] == "S":
@@ -506,12 +515,14 @@ class VeriScore:
                     if labels[aid] in ["C", "U"]:
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1     
+                        num_false_positive += 1
 
-            fscore_gold = true_atoms/len(self.labels_human)
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[VeriScore] Gold labels: {self.labels_human}")
             print(f"[VeriScore] Predictions: {labels}")
-            print(f"[VeriScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[VeriScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -528,4 +539,3 @@ class VeriScore:
         print(f"[VeriScore] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results
-

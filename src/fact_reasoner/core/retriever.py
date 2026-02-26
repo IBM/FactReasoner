@@ -34,8 +34,8 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Local imports
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.search_api import SearchAPI
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.search_api import SearchAPI
 
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
 DEFAULT_DB_PATH = (
