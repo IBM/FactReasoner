@@ -124,6 +124,8 @@ class SearchAPI():
         payload = json.dumps({"q": query})
         response = requests.request("POST", self.url, params={"num": 15}, headers=self.headers, data=payload)
         response_json = literal_eval(response.text)
+        if response is not None:
+            response.close()
         try:
             if self.do_caching:
                 self._save_to_cache(cache_key, response_json)

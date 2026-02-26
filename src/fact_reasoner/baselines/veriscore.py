@@ -18,31 +18,28 @@
 # external source such as Wikipedia or Google Search (for the latter we consider
 # the passage retrieved from the corresponding link).
 
-import os
 import json
-import sys
-import argparse
+import asyncio
+import time
+import mellea.stdlib.functional as mfuncs
 
-from typing import List
-from tqdm import tqdm
-from dotenv import load_dotenv
-
-if not __package__:
-    # Make CLI runnable from source tree with
-    #    python src/package
-    package_source_path = os.path.dirname(os.path.dirname(__file__))
-    sys.path.insert(0, package_source_path)
+from typing import Any, Dict, List, Tuple
+from mellea.backends import Backend
+from mellea.stdlib.context import SimpleContext
+from mellea.core import ModelOutputThunk
+from mellea.stdlib.requirements import check
+from mellea.stdlib.sampling import RejectionSamplingStrategy
+from mellea.core import FancyLogger
 
 # Local imports
-from src.fact_reasoner.atom_extractor import AtomExtractor
-from src.fact_reasoner.atom_reviser import AtomReviser
-from src.fact_reasoner.context_retriever import ContextRetriever
-from src.fact_reasoner.fact_utils import Atom, Context, build_atoms, build_contexts
+from src.fact_reasoner.core.atomizer import Atomizer
+from src.fact_reasoner.core.reviser import Reviser
+from src.fact_reasoner.core.retriever import ContextRetriever
+from src.fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 from src.fact_reasoner.utils import extract_last_square_brackets
-from src.fact_reasoner.llm_handler import LLMHandler
 
 # Version 2 of the prompt (based on more recent work VeriScore, FactBench)
-VERISCORE_PROMPT = """{_PROMPT_BEGIN_PLACEHOLDER}
+INSTRUCTION_VERISCORE = """
 
 Instructions:
 You are provided with a STATEMENT and several KNOWLEDGE points. \
@@ -64,137 +61,89 @@ Your final answer must be one of the following, wrapped in square brackets:
 Your task:
 
 KNOWLEDGE: 
-{_KNOWLEDGE_PLACEHOLDER}
+{{knowledge_text}}
 
 STATEMENT:
-{_STATEMENT_PLACEHOLDER}{_PROMPT_END_PLACEHOLDER}
+{{atom_text}}
 """
 
 class VeriScore:
     """
-    Our implementation of the VeriScore/FactBench paper. We implement both the original
-    FactScore pipeline that works with contexts retrieved from wikipedia (texts)
-    as well as the more recent version presented in the FactBench paper.
+    Implementation of the VeriScore/FactBench paper. 
 
+    Source:
+        @misc{bayat2025factbench,
+            title={FactBench: A Dynamic Benchmark for In-the-Wild Language Model Factuality Evaluation}, 
+            author={Farima Fatahi Bayat and Lechen Zhang and Sheza Munir and Lu Wang},
+            year={2025},
+            eprint={2410.22257},
+            archivePrefix={arXiv},
+            primaryClass={cs.CL},
+            url={https://arxiv.org/abs/2410.22257}, 
+        }
     """
 
     def __init__(
             self,
+            backend: Backend,
+            atom_extractor: Atomizer = None,
+            atom_reviser: Reviser = None,
             context_retriever: ContextRetriever = None,
-            atom_extractor: AtomReviser = None,
-            atom_reviser: AtomReviser = None,
-            model_id: str = "llama-3.3-70b-instruct",
-            debug_mode: bool = False,
-            binary_output: bool = True,
-            backend: str = "rits",
     ):
         """
-        Construct the FactScore pipeline instance.
+        Initialize the VeriScore pipeline.
 
         Args:
+            backend: Backend
+                The Mellea backend to use for LLM interactions.
+            atom_extractor: Atomizer
+                The atom decomposition component.
+            atom_reviser: Reviser
+                The atom reviser component.
             context_retriever: ContextRetriever
                 The service used for retrieving external contexts.
-            atom_extractor: AtomExtractor
-                The service used for extracting atoms from the response.
-            atom_reviser: AtomReviser
-                The service used for decontextualizing the atoms.
-            model_id: str
-                The name of the model used by VeriScore.
-            debug_mode: bool
-                Flaf indicating debug mode (default is False)
-            binary_output: bool
-                If true, the output labels are [S - Supported, NS - NotSupported].
-                Otherwise, the output labels are [S - Supported, C - Contradicted, U - Unverifiable or Undediced]
         """
 
+        self.backend = backend
         self.query = None
         self.response = None
         self.topic = None
-        self.debug_mode = debug_mode
-
-        self.model_id = model_id
-        self.backend = backend
-        self.llm_handler = LLMHandler(model_id, backend)
+        self.start_time = time.perf_counter() # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
-        self.binary_output = False
+        self.binary_output = False # default is False
     
-        self.prompt_begin = self.llm_handler.get_prompt_begin()
-        self.prompt_end = self.llm_handler.get_prompt_end()
-
-        if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True) 
-            os.environ["_DOTENV_LOADED"] = "1"
-         
-        print(f"[VeriScore] Using LLM on {self.backend}: {self.model_id}")
+        print(f"[VeriScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[VeriScore] Binary output: {self.binary_output}")
 
         self.atoms = {} # indexed by atom id
         self.contexts = {} # indexed by context id
 
+        # Ground truth labels (if any)
         self.labels_human = None
-        self.labels_chatgpt = None
-        self.labels_llamanp = None
-
-    def from_json(self, json_file: str):
-        """
-        Create a problem instance from a json file containing both atoms and contexts.
-
-        Args:
-            json_file: str
-                The path to the json file containing the problem instance.
-        """
         
-        print(f"[FactScore] Reading JSON instance from: {json_file}")
-        with open(json_file) as f:
-            data = json.load(f)
-            f.close()
-
-        self.query = data["query"]
-        self.response = data["response"]
-        if self.add_topic:
-            self.topic = data["topic"]
-
-        for atom_dict in data["atoms"]:
-            aid = atom_dict["id"]
-            text = atom_dict["text"]
-            a = Atom(id=aid, text=text)
-            self.atoms[aid] = a
-        
-        print(f"[VeriScore] Atoms found: {len(self.atoms)}")
-
-        for context_dict in data["contexts"]:
-            cid = context_dict["id"]
-            aid = context_dict["atom_id"]
-            text = context_dict["text"]
-
-            a = self.atoms[aid]
-            ctxt = Context(id=cid, atom=a, text=text, title="", snippet="", link="")
-            a.add_context(ctxt)
-            self.contexts[cid] = ctxt
-
-        print(f"[VeriScore] Contexts found: {len(self.contexts)}")
+        # Disable Mellea logging
+        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def from_dict_with_contexts(
             self,
-            data: dict,
+            data: Dict[str, Any],
     ):
         """
-        Create a problem instance from a dict containing both atoms and contexts.
+        Initialize VeriScore from a dict containing both atoms and contexts.
 
         Args:
-            data: dict
+            data: Dict[str, Any]
                 The dict containing the problem instance.
         """
 
         self.query = data["input"]
         self.response = data["output"]
-        if self.topic:
-            self.topic = data["topic"]
+        self.topic = data.get("topic", None)
         
-        print(f"[VeriScore] Reading the human annotated atoms ...")                
+        print(f"[VeriScore] Reading the atoms ...")                
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -215,7 +164,7 @@ class VeriScore:
 
         print(f"[VeriScore] Atoms found: {len(self.atoms)}")
         for _, atom in self.atoms.items():
-            print(atom)
+            print(f"[VeriScore] {atom}")
         
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[VeriScore] Lables found: {self.labels_human}")
@@ -227,7 +176,14 @@ class VeriScore:
             text = context_dict["text"]
             snippet = context_dict.get("snippet", "")
             link = context_dict.get("link", "")
-            ctxt = Context(id=cid, atom=None, text=text, title=title, snippet=snippet, link=link)
+            ctxt = Context(
+                id=cid, 
+                atom=None, 
+                text=text, 
+                title=title, 
+                snippet=snippet, 
+                link=link
+            )
             self.contexts[cid] = ctxt
 
         print(f"[VeriScore] Contexts found: {len(self.contexts)}")
@@ -237,45 +193,91 @@ class VeriScore:
                 ctxts.append(self.contexts[c])
                 self.contexts[c].set_atom(atom)
             atom.add_contexts(ctxts)
-        return True
+        
+        print(f"[VeriScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
+
+    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+        """
+        Save the VeriScore instance to a JSON file.
+
+        Args:
+            json_file: str
+                The path to the output JSON file.
+        """
+
+        data = {}
+        data["input"] = self.query
+        data["output"] = self.response.strip()
+        data["topic"] = self.topic
+        data["atoms"] = []
+        data["contexts"] = []
+
+        # Write the atoms
+        for aid, atom in self.atoms.items():
+            atom_data = dict(
+                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
+            )
+            if atom.get_label() is not None:
+                atom_data["label"] = atom.get_label()
+            data["atoms"].append(atom_data)
+
+        # Write the contexts
+        data["contexts"] = [context.to_json() for context in self.contexts.values()]
+
+        # Write to a JSON file (if any)
+        if json_file_path:
+            with open(json_file_path, "w") as f:
+                json.dump(data, f, indent=4)
+            f.close()
+            print(f"[VeriScore] Pipeline instance written to: {json_file_path}")
+
+        return data
 
     def build(
             self,
-            debug_mode: bool = False,
+            query: str = None,
+            response: str = None,
+            topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
-            decontextualize_atoms: bool = True,
-            no_contexts: bool = False
+            revise_atoms: bool = False,
     ):
         """
         Build the atoms and contexts using the retrieval service.
 
         Args:
-            debug_mode: bool
-                Boolean flag indicating debugging mode (default False)
+            query: str
+                The input user query.
+            response: str
+                The LLM generated response to the input query.
+            topic: str
+                The topic of the input query/response.
             has_atoms: bool
                 A boolean flag indicating if the atoms have already been created.
             has_contexts: bool
                 A boolean flag indicating if the contexts have already been created.
-            decontextualize_atoms: bool
+            revise_atoms: bool
                 A boolean flag indicating that the atoms need to be decontextualized
                 (i.e., pronouns he, she, it, ... replaced by the actual entity)
-            no_contexts: bool
-                A boolean flag indicating if contexts are to be retrieved or not.
-                If True, then we run a version that only leverages the internal
-                knowledge of the language model.
         """
 
         # Initialize the scorer
-        self.debug_mode = debug_mode
-        self.no_contexts = no_contexts
+        if query is not None: 
+            self.query = query
+        if response is not None:
+            self.response = response
+        if topic is not None:
+            self.topic = topic
 
-        # Create the atomizer (for the response)
-        assert self.atom_extractor is not None, f"Atom extractor must be created."
-        assert self.atom_reviser is not None, f"Atom reviser must be created."
+        self.revise_atoms = revise_atoms
 
-        print(f"[VeriScore] Building the pipeline instance ...]")
-        print(f"[VeriScore] Using contexts: {not no_contexts}")
+        # Safety checks
+        assert self.atom_extractor is not None, \
+            f"The atom extractor must be created."
+        assert self.atom_reviser is not None, \
+            f"The atom reviser must be created."
+
+        print(f"[VeriScore] Building the pipeline ...")
         
         # Build the atoms 
         if has_atoms == False:
@@ -283,77 +285,49 @@ class VeriScore:
                 response=self.response,
                 atom_extractor=self.atom_extractor
             )
+            self.revise_atoms = True # revise atoms if newly created
+            print(f"[VeriScore] Extracted {len(self.atoms)} atoms.")
+            for aid in self.atoms.keys():
+                print(f"[VeriScore] {self.atoms[aid]}")
 
-        assert len(self.atoms) > 0, f"Atoms must be initialized if `has_atoms` is True!"
+        assert len(self.atoms) > 0, \
+            f"The atoms must be initialized before running the pipeline."
 
-        # Decontextualize the atoms
-        if decontextualize_atoms:
-            print(f"[VeriScore] Decontextualize the atoms ...")
+        # Revise the atoms
+        if self.revise_atoms:
+            print(f"[VeriScore] Revise the atoms ...")
+            assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
-            result = self.atom_reviser.run(old_atoms, self.response)
+            result = asyncio.run(self.atom_reviser.run_batch(old_atoms, self.response))
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
-                self.atoms[aid].set_text(elem["revised_atom"])
-                print(self.atoms[aid])
+                self.atoms[aid].set_text(elem["revised_unit"])
+                print(f"[VeriScore] {self.atoms[aid]}")
+
+        # Remove duplicated atoms (if any)
+        self.atoms = remove_duplicated_atoms(self.atoms)
+        print(f"[VeriScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if no_contexts:
-            self.contexts = {}
-        else:
-            if has_contexts == False: # check if contexts already in file
-                self.contexts = build_contexts(
-                    atoms=self.atoms,
-                    retriever=self.context_retriever,
-                )
+        if has_contexts == False: # check if contexts already in file
+            self.contexts = build_contexts(
+                atoms=self.atoms,
+                retriever=self.context_retriever,
+            )
 
-    def make_prompt(
-            self,
-            atom: str,
-            passages: List[dict],
-    ):
-        """
-        Create the prompt for predicting the label of the atom given contexts.
+        print(f"[VeriScore] Retrieved {len(self.contexts)} contexts.")
+        print(f"[VeriScore] Pipeline building completed.")
 
-        Args:
-            atom: str
-                The string representing the atom.
-            topic: str
-                The topic (str) associated with the atom.
-            passages: List[dict]
-                A list of dictionaries representing the retrieved passages 
-                relevant to the atom. Each passage is a dict with two keys:
-                title - title of the article and text - passage in that article.
-            model_id: str
-                The model id used for prediction.
-
-        Returns:
-            A string representing the prompt (follow the FactScore paper instructions).
-        """
-
-        knowledge = ""
-        for _, psg in enumerate(passages):
-            title = psg["title"]
-            text = psg["text"]
-            snippet = psg.get("snippet", "")
-            knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(title, snippet, text)
-
-        prompt = VERISCORE_PROMPT.format(
-            _PROMPT_BEGIN_PLACEHOLDER=self.prompt_begin,
-            _PROMPT_END_PLACEHOLDER=self.prompt_end,
-            _STATEMENT_PLACEHOLDER=atom,
-            _KNOWLEDGE_PLACEHOLDER=knowledge,
-        )
-
-        return prompt
-
-    def extract_label(self, text: str) -> str:
+    def _get_label(self, output: ModelOutputThunk) -> str:
         """
         Extract the atom label from the generated text. We expect the label to
         be on the last line of the response, and be one of the following:
             [Supported], [Contradicted], [Unverifiable].
         We only consider [Supported]/S atoms, the others will be [NotSupported]/NS.
         """
+
+        text = str(output)
         label = extract_last_square_brackets(text)
         if self.binary_output:
             if len(label) > 0 and label.lower() in ['supported']:
@@ -368,63 +342,73 @@ class VeriScore:
             else:
                 return "U"
                 
-    def predict_atom_labels(self) -> dict:
+    async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
-        Use a strong LLM to predict the label S or NS of an atom given its contexts.
+        For each atom predict its label given the corresponding retrieved contexts.
         """
 
+        # Safety checks
         assert len(self.atoms) > 0
 
+        # Utility function to assemble the context of an atom
+        def make_knowledge(passages: List[Dict[str, Any]]) -> str:
+            knowledge = ""
+            for _, psg in enumerate(passages):
+                title = psg["title"]
+                text = psg["text"]
+                snippet = psg.get("snippet", "")
+                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(title, snippet, text)
+            
+            return knowledge
+
         # Use the LLM to label the atom
-        print(f"[VeriScore] Labeling atoms with {self.model_id} ...")
-        prompts = []
-        atom_ids = []
+        print(f"[VeriScore] Labeling atoms with {self.backend.model_id} ...")
 
         # Create the prompts for each of the atoms
+        atom_ids = []
+        atom_labels = []
+        atom_outputs = []
+        corutines = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
+            atom_text = atom.get_text()
             contexts = atom.get_contexts()
+            passages = []
             if contexts is not None and len(contexts) > 0:
-                passages = []
-                for cid, c in contexts.items():
-                    if len(c.get_text()) == 0:
-                        passages.append(dict(title=c.get_title(), text=c.get_snippet()))
-                    else:
-                        passages.append(dict(title=c.get_title(), text=c.get_text()))
-            else:
-                passages = [] # no passages retrieved for the atom
+                for _, c in contexts.items():
+                    passages.append(dict(title=c.get_title(), text=c.get_text()))
 
-            prompt = self.make_prompt(
-                atom=atom.get_text(),
-                passages=passages
+            # prepare the context
+            knowledge_text = make_knowledge(passages)
+            print(f"[VeriScore] Processing atom: ({aid}) {atom_text}")
+
+            # Execute the instruction
+            corutine = mfuncs.ainstruct(
+                INSTRUCTION_VERISCORE,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must contain [Supported], [Contradicted] or [Unverifiable]"
+                    )
+                ],
+                user_variables={"atom_text": atom_text, "knowledge_text": knowledge_text},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True
             )
+            corutines.append(corutine)
 
-            prompts.append(prompt)
+        print(f"[VeriScore] Awaiting for the async execution ...")
+        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        for output in outputs:
+            label = self._get_label(output.result)
+            atom_labels.append(label)
+            atom_outputs.append(str(output))
 
-        print(f"[VeriScore] Prompts created: {len(prompts)}")
-        
-        # Prepare the LLM call
-        results = []
-        for _, response in tqdm(
-            enumerate(
-                self.llm_handler.batch_completion(prompts)
-            ),
-            total=len(prompts),
-            desc="VeriScore",
-            unit="prompts",
-            ):
-                results.append(response.choices[0].message.content)
-
-        if self.debug_mode:
-            for i, response in enumerate(results):
-                print(f"PROMPT:\n{prompts[i]}")
-                print(f"RESPONSE:\n{response}")
-
-        # Postprocess the generated answers
-        atom_labels = [self.extract_label(text) for text in results]
-        return dict(zip(atom_ids, atom_labels))
+        # Return the labeled atoms
+        return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
     
-    def score(self):
+    def score(self) -> Dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts 
         retrieved for each of the atom in the answer.
@@ -436,19 +420,14 @@ class VeriScore:
         only half of the atoms are correct, then the score is 50%.
 
         Returns:
-            dict
-                The results dictionary containing the factuality score i.e., a real value in [0, 1]
+            Dict[str, Any]: The results dictionary containing the factuality score i.e., a real value in [0, 1]
         """
 
-        # Safety checks
-        # assert len(self.atoms) > 0
-        # assert len(self.contexts) > 0
-
-        # Compute the FactScore
+        # Run the VeriScore pipeline
         num_true_atoms = 0
         num_false_atoms = 0
         num_uniform_atoms = 0
-        labels = self.predict_atom_labels()
+        labels, raw_outputs = asyncio.run(self.predict_atom_labels())
         for _, label in labels.items():
             if self.binary_output:
                 if label == "S":
@@ -465,6 +444,7 @@ class VeriScore:
       
         # Precision
         fscore = float(num_true_atoms)/float(len(self.atoms))
+        elapsed_time = time.perf_counter() - self.start_time # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -539,63 +519,13 @@ class VeriScore:
             results["false_positive"] = num_false_positive
             results["false_negative"] = num_false_negative
 
-        if self.topic is not None and len(self.topic) > 0:
-            results["topic"] = self.topic
-        results["input"] = self.query
+        results["topic"] = self.topic
+        results["query"] = self.query
+        results["response"] = self.response
+        results["elapsed_time"] = elapsed_time
+        results["predictions"] = labels
+        results["raw_outputs"] = raw_outputs
+        print(f"[VeriScore] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results
-
-if __name__ == "__main__":
-
-    # CLI arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--input_file',
-        type=str,
-        default=None,
-        required=True,
-        help="Path to the input test file (json)."
-    )
-
-    # Parse CLI arguments
-    args = parser.parse_args()
-
-    # Define the model and backend
-    model_id = "llama-3.3-70b-instruct"
-    backend = "rits"
-    cache_dir = None # "/home/radu/data/cache"
-
-    context_retriever = ContextRetriever(service_type="google", top_k=5, cache_dir=cache_dir)
-    atom_extractor = AtomExtractor(model_id=model_id, backend=backend)
-    atom_reviser = AtomReviser(model_id=model_id, backend=backend)
-
-    # Create the VeriScore pipeline
-    pipeline = VeriScore(
-        context_retriever=context_retriever,
-        atom_extractor=atom_extractor,
-        atom_reviser=atom_reviser,
-        model_id=model_id,
-        binary_output=False,
-        backend="rits",  # Use RITS for the LLM
-    )
-
-    # Load the problem instance from a file
-    assert args.input_file is not None, f"Input file cannot be None. Aborting."
-    json_file = args.input_file
-    with open(json_file, "r") as f:
-        data = json.load(f)
-    
-    print(f"[VeriScore] Initializing pipeline from: {json_file}")
-    pipeline.from_dict_with_contexts(data)
-
-    # Build the scorer
-    pipeline.build(
-        has_atoms=True,
-        has_contexts=True,
-        decontextualize_atoms=False
-    )
-
-    results = pipeline.score()
-    print(f"[VeriScore] Results: {results}")
-    print(f"Done.")
 
