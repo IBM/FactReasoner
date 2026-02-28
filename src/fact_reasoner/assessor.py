@@ -426,6 +426,40 @@ class FactReasoner:
             self.num_summarized_contexts = len(self.contexts.keys())
             print(f"[FactReasoner] Created {self.num_summarized_contexts} contexts.")
 
+        # If the user submits the override early exit flag then this method
+        # will be set to None
+        if self.early_exit_evaluator is not None:
+            if not isinstance(self.early_exit_evaluator, callable):
+                raise ValueError(
+                    f"The `early_exit_evaluator` must be a callable function that takes in input the context and response and outputs a dict with the key `continue_pipeline_execution` (boolean) and optionally other keys with additional information about the evaluation."
+                )
+            print("[FactReasoner] Evaluating early exit condition ...")
+            self.early_exit_evaluation = self.early_exit_evaluator(
+                context="\n".join(
+                    [
+                        c.summary if hasattr(c, "summary") else c.text
+                        for c in self.contexts.values()
+                    ]
+                ),
+                response=self.response.strip(),
+            )
+
+            # set default choice to `True` so that full pipeline is executed
+            # if `continue_pipeline_execution` is absent from the early exit evaluation dict
+            # for some reason
+            if (
+                self.early_exit_evaluation.get("continue_pipeline_execution", True)
+                is False
+            ):
+                print(
+                    "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
+                )
+                return
+
+            print(
+                "[FactReasoner] Early exit condition not met, continuing with full reasoning pipeline."
+            )
+
         # Build the NLI relationships
         self.relations = build_relations(
             atoms=self.atoms,
