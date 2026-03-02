@@ -708,9 +708,23 @@ class FactReasoner:
         avg_norm_entropy = norm_entropy / len(self.atoms)
         fscore = num_true_atoms / len(self.atoms)
 
+        # Precision, R@K and F1@K
+        fscore = float(num_true_atoms)/float(len(self.atoms))
+        K = int(len(self.atoms) / 2) # K is assumed to be half
+        recall_k = min(float(num_true_atoms/K), 1.0)
+        try:
+            f1k = 2 * fscore * recall_k / (fscore + recall_k)
+        except Exception as _:
+            f1k = 0.0
+
+        # Elapsed time
+        elapsed_time = time.perf_counter() - self.start_time # elapsed time
+
         results = {}
         results["factuality_score_per_atom"] = fscore_per_atom
         results["factuality_score"] = fscore
+        results["recall_k"] = recall_k
+        results["f1_k"] = f1k
         results["num_atoms"] = len(self.atoms)
         results["num_contexts"] = len(self.contexts)
         results["num_true_atoms"] = num_true_atoms
