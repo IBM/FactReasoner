@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import yaml
 import json
 import numpy as np
 import requests
@@ -25,8 +23,7 @@ import random
 import torch
 import transformers
 
-from typing import Any, Dict, List, Union
-from pathlib import Path
+from typing import List, Union
 
 LOOP_BUDGET = 5
 class dotdict(dict):

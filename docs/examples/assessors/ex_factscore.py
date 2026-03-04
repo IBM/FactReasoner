@@ -6,7 +6,7 @@ from mellea.backends import ModelOption
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.factscore import FactScore
 
@@ -34,13 +34,18 @@ context_retriever = ContextRetriever(
     top_k=5, 
     cache_dir=cache_dir, 
     fetch_text=True, 
-    query_builder=qb
+    query_builder=qb,
+    num_workers=4,
+)
+context_retriever_fast = ContextRetrieverFast(
+    context_retriever=context_retriever,
+    num_workers=4
 )
 
 # Create the FactScore pipeline
 pipeline = FactScore(
     backend=backend,
-    context_retriever=context_retriever,
+    context_retriever=context_retriever_fast,
     atom_extractor=atom_extractor,
     atom_reviser=atom_reviser,
 )
@@ -52,7 +57,8 @@ pipeline.build(
     topic=topic,
     has_atoms=False,
     has_contexts=False,
-    revise_atoms=True
+    revise_atoms=True,
+    use_fast_retriever=True
 )
 
 # Print the results

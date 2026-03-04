@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.5.0-red.svg)](https://github.com/IBM/FactReasoner)
+[![Version](https://img.shields.io/badge/version-0.5.5-red.svg)](https://github.com/IBM/FactReasoner)
 ![Static Badge](https://img.shields.io/badge/mellea-0.3.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 

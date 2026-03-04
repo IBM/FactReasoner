@@ -32,8 +32,9 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from fact_reasoner.core.retriever import ContextRetrieverFast
+from fact_reasoner.core.base import Atom, Context
+from fact_reasoner.core.utils import build_atoms, build_contexts, remove_duplicated_atoms
 from fact_reasoner.utils import extract_last_wrapped_response, LOOP_BUDGET
 
 INSTRUCTION_FACTVERIFY = """
@@ -135,7 +136,7 @@ class FactVerify:
             backend: Backend,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
-            context_retriever: ContextRetriever = None,
+            context_retriever: ContextRetrieverFast = None,
     ):
         """
         Initialize the FactVerify pipeline.
@@ -286,6 +287,7 @@ class FactVerify:
             has_atoms: bool = False,
             has_contexts: bool = False,
             revise_atoms: bool = False,
+            use_fast_retriever: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -304,6 +306,8 @@ class FactVerify:
             revise_atoms: bool
                 A boolean flag indicating that the atoms need to be decontextualized
                 (i.e., pronouns he, she, it, ... replaced by the actual entity)
+            use_fast_retriever: bool
+                Use the fast multi-threaded context retriever.
         """
 
         # Initialize the scorer
@@ -359,6 +363,7 @@ class FactVerify:
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
+                use_fast_retriever=use_fast_retriever,
             )
 
     def _get_label(self, output: ModelOutputThunk) -> str:
