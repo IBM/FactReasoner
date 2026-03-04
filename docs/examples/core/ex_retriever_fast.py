@@ -5,9 +5,8 @@ from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
 from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.retriever_fast import ContextRetrieverFast
-from fact_reasoner.core.utils import Atom
+from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
+from fact_reasoner.core.base import Atom
 
 # Create a Mellea RITS backend (used by the query builder)
 backend = RITSBackend(

@@ -7,7 +7,7 @@ from mellea.backends import ModelOption
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -37,10 +37,15 @@ context_retriever = ContextRetriever(
     top_k=5, 
     cache_dir=cache_dir, 
     fetch_text=True, 
-    query_builder=qb
+    query_builder=qb,
+    num_workers=4,
 )
 context_summarizer = ContextSummarizer(backend)
 nli_extractor = NLIExtractor(backend)
+context_retriever_fast = ContextRetrieverFast(
+    context_retriever=context_retriever,
+    num_workers=4
+)
 
 # Path to merlin (probabilistic inference engine)
 merlin_path = os.path.join(os.getcwd(), "lib", "merlin") # Linux RedHat version

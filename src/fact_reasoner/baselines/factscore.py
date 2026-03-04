@@ -21,7 +21,7 @@ import string
 import time
 import mellea.stdlib.functional as mfuncs
 
-from typing import List, Dict, Any, Tuple, Union
+from typing import List, Dict, Any, Tuple
 from mellea.backends import Backend
 from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
@@ -32,8 +32,9 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever_fast import ContextRetrieverFast
-from fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
+from fact_reasoner.core.retriever import ContextRetrieverFast
+from fact_reasoner.core.base import Atom, Context
+from fact_reasoner.core.utils import build_atoms, build_contexts, remove_duplicated_atoms
 from fact_reasoner.utils import LOOP_BUDGET
 
 # Version 1 of the prompt (from the original FactScore paper)
@@ -78,7 +79,7 @@ class FactScore:
             backend: Backend,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
-            context_retriever: Union[ContextRetriever, ContextRetrieverFast] = None,
+            context_retriever: ContextRetrieverFast = None,
     ):
         """
         Initialize the FactScore pipeline.

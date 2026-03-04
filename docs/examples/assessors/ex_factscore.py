@@ -6,8 +6,7 @@ from mellea.backends import ModelOption
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.retriever_fast import ContextRetrieverFast
+from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.factscore import FactScore
 

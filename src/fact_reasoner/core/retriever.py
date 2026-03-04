@@ -18,6 +18,11 @@ import re
 import chromadb
 import requests
 import torch
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional
+
+from tqdm import tqdm
 
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
@@ -28,6 +33,7 @@ from PyPDF2 import PdfReader
 from itertools import islice
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL)
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import WikipediaRetriever
@@ -36,7 +42,9 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Local imports
+from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.search_api import SearchAPI
 
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
@@ -559,3 +567,95 @@ class ContextRetriever:
             logger.info(f"Retrieved {len(results)} results for query.")
         return results
            
+
+class ContextRetrieverFast:
+    """
+    Parallel context retriever that wraps a ContextRetriever and dispatches
+    retrieval tasks across a thread pool.
+    """
+
+    def __init__(
+        self,
+        context_retriever: ContextRetriever,
+        context_summarizer: Optional[ContextSummarizer] = None,
+        num_workers: int = 4,
+    ):
+        self.context_retriever = context_retriever
+        self.context_summarizer = context_summarizer
+        self.num_workers = num_workers
+
+    def _retrieve_for_item(
+        self,
+        text: str,
+        atom: Optional[Atom] = None,
+        id_prefix: str = "c",
+    ) -> List[Context]:
+        """Worker function: retrieve contexts (and optionally summarize) for one item."""
+        retrieved = self.context_retriever.query(text=text)
+
+        contexts = []
+        for j, ctx in enumerate(retrieved):
+            context = Context(
+                id=f"{id_prefix}_{j}",
+                atom=atom,
+                text=ctx["text"],
+                title=ctx["title"],
+                link=ctx["link"],
+                snippet=ctx["snippet"],
+            )
+            contexts.append(context)
+
+        # Summarize in the same worker thread if summarizer is provided
+        if self.context_summarizer is not None and atom is not None and len(contexts) > 0:
+            results = asyncio.run(
+                self.context_summarizer.run_batch(
+                    [c.get_text() for c in contexts], atom.text
+                )
+            )
+            for context, result in zip(contexts, results):
+                if result["summary"]:
+                    context.set_synthetic_summary(result["summary"])
+                    context.set_probability(result["probability"] * context.get_probability())
+            # Filter out irrelevant contexts (empty summary means not relevant)
+            contexts = [c for c in contexts if c.get_summary()]
+
+        return contexts
+
+    def retrieve_all(
+        self,
+        atoms: Dict[str, Atom],
+        query: Optional[str] = None,
+    ) -> Dict[str, Context]:
+        """Retrieve contexts for all atoms (and optionally the query) in parallel."""
+        all_contexts: Dict[str, Context] = {}
+        futures = {}
+
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            # Submit one task per atom
+            for aid, atom in atoms.items():
+                future = executor.submit(
+                    self._retrieve_for_item, atom.text, atom, f"c_{aid}"
+                )
+                futures[future] = (aid, atom)
+
+            # Submit query task
+            if query:
+                future = executor.submit(
+                    self._retrieve_for_item, query, None, "c_q"
+                )
+                futures[future] = ("query", None)
+
+            # Collect results with progress bar
+            for future in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="Retrieving contexts",
+            ):
+                aid, atom = futures[future]
+                contexts = future.result()
+                for ctx in contexts:
+                    all_contexts[ctx.id] = ctx
+                if atom is not None:
+                    atom.add_contexts(contexts)
+
+        return all_contexts
