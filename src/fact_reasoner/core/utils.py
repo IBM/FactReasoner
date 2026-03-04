@@ -21,9 +21,9 @@ import nltk
 from nltk.tokenize import sent_tokenize
 
 # Local imports
-from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.nli import NLIExtractor
+from .atomizer import Atomizer
+from .retriever_fast import ContextRetrieverFast
+from .nli import NLIExtractor
 from fact_reasoner.utils import punctuation_only_inside_quotes
 
 # Defaut prior probabilities for atoms and contexts
@@ -359,7 +359,8 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
 def build_contexts(
         atoms: Dict[str, Atom] = {},
         query: str = None,
-        retriever: ContextRetriever = None,
+        retriever: ContextRetrieverFast = None,
+        use_fast_retriever: bool = True
 ) -> Dict[str, Context]:
     """
     Retrieve the relevant contexts for the input atoms.
@@ -367,8 +368,12 @@ def build_contexts(
     Args:
         atoms: dict
             A dict containing the atoms in the response.
+        query: str
+            The user query text.
         retriever: ContextRetriever 
             The context retriever (chromadb, langchain, google).
+        use_fast_retriever: bool
+            Use the fast multi-threaded context retriever.
     
     Returns:
         Dict[str, Context]: A dict containing the retrieved contexts.
@@ -382,18 +387,43 @@ def build_contexts(
     # Building the contexts
     contexts = {}
 
-    # Retrieve contexts for the atoms
-    for aid, atom in atoms.items():
-        
-        retrieved_contexts = retriever.query(
-            text=atom.text,
+    if not use_fast_retriever:
+        # Retrieve contexts for the atoms
+        for aid, atom in atoms.items():
+            
+            # Sequential but with multi-threaded top-k retrieval
+            retrieved_contexts = retriever.context_retriever.query(
+                text=atom.text,
+            )
+            
+            if len(retrieved_contexts) > 0:
+                contexts_per_atom = [
+                    Context(
+                        id="c_" + aid + "_" + str(j),
+                        atom=atom,
+                        text=context["text"],
+                        title=context["title"],
+                        link=context["link"],
+                        snippet=context["snippet"]
+                        # An empty summary means that the context is not relevant, 
+                        # therefore we do not add it to the list of contexts for the pipeline
+                    ) for j, context in enumerate(retrieved_contexts) 
+                ]
+
+                for ctxt in contexts_per_atom:
+                    contexts[ctxt.id] = ctxt
+                atoms[aid].add_contexts(contexts_per_atom)
+
+        # Retrieve the contexts for the question
+        retrieved_contexts = retriever.context_retriever.query(
+            text=query,
         )
-        
+    
         if len(retrieved_contexts) > 0:
-            contexts_per_atom = [
+            contexts_per_query = [
                 Context(
-                    id="c_" + aid + "_" + str(j),
-                    atom=atom,
+                    id="c_q_" + str(j),
+                    atom=None,
                     text=context["text"],
                     title=context["title"],
                     link=context["link"],
@@ -403,31 +433,11 @@ def build_contexts(
                 ) for j, context in enumerate(retrieved_contexts) 
             ]
 
-            for ctxt in contexts_per_atom:
+            for ctxt in contexts_per_query:
                 contexts[ctxt.id] = ctxt
-            atoms[aid].add_contexts(contexts_per_atom)
-
-    # Retrieve the contexts for the question
-    retrieved_contexts = retriever.query(
-        text=query,
-    )
-    
-    if len(retrieved_contexts) > 0:
-        contexts_per_query = [
-            Context(
-                id="c_q_" + str(j),
-                atom=None,
-                text=context["text"],
-                title=context["title"],
-                link=context["link"],
-                snippet=context["snippet"]
-                # An empty summary means that the context is not relevant, 
-                # therefore we do not add it to the list of contexts for the pipeline
-            ) for j, context in enumerate(retrieved_contexts) 
-        ]
-
-        for ctxt in contexts_per_query:
-            contexts[ctxt.id] = ctxt
+    else:
+        # Retrieve contexts for all atoms in parallel
+        contexts = retriever.retrieve_all(atoms=atoms, query=query)
     
     return contexts
 

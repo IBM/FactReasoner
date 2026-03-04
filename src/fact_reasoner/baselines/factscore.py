@@ -21,7 +21,7 @@ import string
 import time
 import mellea.stdlib.functional as mfuncs
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Union
 from mellea.backends import Backend
 from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
@@ -32,7 +32,7 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.retriever_fast import ContextRetrieverFast
 from fact_reasoner.core.utils import Atom, Context, build_atoms, build_contexts, remove_duplicated_atoms
 from fact_reasoner.utils import LOOP_BUDGET
 
@@ -78,7 +78,7 @@ class FactScore:
             backend: Backend,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
-            context_retriever: ContextRetriever = None,
+            context_retriever: Union[ContextRetriever, ContextRetrieverFast] = None,
     ):
         """
         Initialize the FactScore pipeline.
@@ -90,7 +90,7 @@ class FactScore:
                 The atom decomposition component.
             atom_reviser: Reviser
                 The atom reviser component.
-            context_retriever: ContextRetriever
+            context_retriever: ContextRetriever or ContextRetrieverFast
                 The service used for retrieving external contexts.
         """
 
@@ -229,7 +229,8 @@ class FactScore:
             topic: str = None,
             has_atoms: bool = False,
             has_contexts: bool = False,
-            revise_atoms: bool = False
+            revise_atoms: bool = False,
+            use_fast_retriever: bool = True
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -248,6 +249,9 @@ class FactScore:
             revise_atoms: bool
                 A boolean flag indicating that the atoms need to be decontextualized
                 (i.e., pronouns he, she, it, ... replaced by the actual entity)
+            use_fast_retriever: bool
+                Use a fast multi-threaded context retriever if True, else the
+                standard sequential retriever.
         """
 
         # Initialize the scorer
@@ -304,6 +308,7 @@ class FactScore:
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
+                use_fast_retriever=use_fast_retriever,
             )
         print(f"[FactScore] Retrieved {len(self.contexts)} contexts.")
         print(f"[FactScore] Pipeline building completed.")

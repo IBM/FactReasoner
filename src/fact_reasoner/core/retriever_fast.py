@@ -20,9 +20,9 @@ from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.summarizer import ContextSummarizer
-from fact_reasoner.core.utils import Atom, Context
+from .retriever import ContextRetriever
+from .summarizer import ContextSummarizer
+from .utils import Atom, Context
 
 logger = logging.getLogger()
 logger.setLevel(logging.CRITICAL)

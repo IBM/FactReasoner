@@ -2,7 +2,7 @@
 
 from .atomizer import Atomizer
 from .reviser import Reviser
-from .retriever import ContextRetriever
+from .retriever_fast import ContextRetrieverFast
 from .nli import NLIExtractor
 from .query_builder import QueryBuilder
 from .summarizer import ContextSummarizer
@@ -18,7 +18,7 @@ from .utils import (
 __all__ = [
     "Atomizer",
     "Reviser",
-    "ContextRetriever",
+    "ContextRetrieverFast",
     "NLIExtractor",
     "QueryBuilder",
     "ContextSummarizer",

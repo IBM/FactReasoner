@@ -34,7 +34,7 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.retriever_fast import ContextRetrieverFast
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.fact_graph import FactGraph
