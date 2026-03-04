@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import re
 import chromadb
 import requests
@@ -20,10 +21,13 @@ import torch
 
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 from io import BytesIO
 from PyPDF2 import PdfReader
 from itertools import islice
+
+logger = logging.getLogger(__name__)
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import WikipediaRetriever
@@ -170,7 +174,7 @@ def extract_text_from_url(url: str, timeout: int = 10, max_pages: int = 1) -> st
         return _extract_html_paragraphs(soup)
 
     except Exception as e:
-        print(f"Error extracting text: {e}")
+        logger.error(f"Error extracting text: {e}")
         return ""
 
     finally:
@@ -182,7 +186,7 @@ def extract_text_from_url(url: str, timeout: int = 10, max_pages: int = 1) -> st
             pass
 
 def fetch_text_from_link(link: str, max_size: int = None) -> str:
-    print(f"[Retriever] Fetching text from link: {link}")
+    logger.info(f"Fetching text from link: {link}")
     url_text = extract_text_from_url(url=link)
     if max_size is not None and len(url_text) > max_size:
         url_text = url_text[:max_size]
@@ -291,7 +295,7 @@ def is_content_valid(link: str, page_text: str) -> bool:
     text_lower = page_text.lower()
     for phrase in restriction_phrases:
         if phrase in text_lower:
-            print(f"Redundant content detected due to restriction phrase: '{phrase}'")
+            logger.warning(f"Redundant content detected for {link} due to restriction phrase: '{phrase}'")
             return False
 
     if len(page_text) > 50:
@@ -302,7 +306,7 @@ def is_content_valid(link: str, page_text: str) -> bool:
         except ZeroDivisionError:
             ratio = 0
         if ratio > 0.10:
-            print(f"Redundant content detected due to high ratio of replacement characters: {ratio:.2%}")
+            logger.warning(f"Redundant content detected for {link} due to high ratio of replacement characters: {ratio:.2%}")
             return False
 
     # we consider the content as valid
@@ -325,7 +329,8 @@ class ContextRetriever:
             cache_dir: Optional[str] = None,
             fetch_text: bool = False,
             use_in_memory_vectorstore: bool = False,
-            query_builder: QueryBuilder = None
+            query_builder: QueryBuilder = None,
+            num_workers: int = 4
     ):
         """
         Initialize the context retriever component.
@@ -350,9 +355,12 @@ class ContextRetriever:
                 the input will be truncated to a `max_size`.
             query_builder: QueryBuilder
                 An instance of QueryBuilder to generate search queries.
+            num_workers: int
+                Number of threads for parallel link fetching (default: 4).
         """
-        
+
         self.top_k = top_k
+        self.num_workers = num_workers
         self.service_type = service_type
         self.cache_dir = cache_dir
         self.persist_dir = persist_dir
@@ -411,8 +419,7 @@ class ContextRetriever:
 
         results = []
         if self.service_type == "chromadb":
-            print(f"[Retriever] Retrieving {self.top_k} relevant documents for query: {text}")
-            print(f"[Retriever] Using service type: {self.service_type}")
+            logger.info(f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})")
 
             relevant_chunks = self.chromadb_retriever.query(
                 query_texts=[text],
@@ -434,8 +441,7 @@ class ContextRetriever:
 
             results.extend(passages)
         elif self.service_type == "wikipedia":
-            print(f"[Retriever] Retrieving {self.top_k} relevant documents for query: {text}")
-            print(f"[Retriever] Using {self.service_type} WikipediaRetriever")
+            logger.info(f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})")
 
             passages = []                
 
@@ -454,8 +460,7 @@ class ContextRetriever:
                 results.append(passages[i]) # a passage is a dict with title and text as keys
 
         elif self.service_type == "google":
-            print(f"[Retriever] Retrieving {self.top_k} search results for: {text}")
-            print(f"[Retriever] Using {self.service_type} SearchAPI")
+            logger.info(f"Retrieving {self.top_k} search results for: {text} (service: {self.service_type})")
 
             if not text:
                 return results # empty list
@@ -468,7 +473,7 @@ class ContextRetriever:
             
             # Truncate the text if too long (for Google)
             query_text = query_text if len(query_text) < 2048 else query_text[:2048]
-            print(f"[Retriever] Using query text: {query_text}")
+            logger.info(f"Using query text: {query_text}")
             passages = []
 
             # Get the search results
@@ -481,87 +486,76 @@ class ContextRetriever:
                 query_text = query_text.replace('"', '') # relax query text
                 search_results = self.google_retriever.get_snippets([query_text])
 
-            n = len(search_results[query_text])
+            search_hits = search_results[query_text]
+            n = len(search_hits)
 
-            i = 0
-            count_content = 0
+            # --- Parallel fetch all links ---
+            if self.fetch_text:
+                max_sz = None if self.use_in_memory_vectorstore else max_size
+                with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                    fetch_futures = {
+                        executor.submit(fetch_text_from_link, hit["link"], max_sz): i
+                        for i, hit in enumerate(search_hits)
+                    }
+                    fetched_texts = [""] * n
+                    for future in as_completed(fetch_futures):
+                        idx = fetch_futures[future]
+                        try:
+                            fetched_texts[idx] = future.result()
+                        except Exception:
+                            fetched_texts[idx] = ""
+            else:
+                fetched_texts = [""] * n
+
+            # --- Select top_k valid results ---
+            passages = []
             index_available = []
+            count_content = 0
 
-            while ((i < n) and (count_content < self.top_k)):
-                # we retrieve content from the link
+            for i, hit in enumerate(search_hits):
+                if count_content >= self.top_k:
+                    break
+
+                title, snippet, link = hit["title"], hit["snippet"], hit["link"]
+                raw_page_text = fetched_texts[i]
+
                 if self.fetch_text:
-                    # loop to check that the content retrieved is not empty: if it is empty, check the next link
-                    while (i < n):
-                        res = search_results[query_text][i]
-                        title = res['title']
-                        snippet = res['snippet']
-                        link = res['link']
+                    if not is_content_valid(link, raw_page_text):
+                        raw_page_text = ""
+                    doc_content = make_uniform(raw_page_text) if raw_page_text else ""
 
-                        # if using in memory vector store, do not set a max size initially on the page text
-                        # it will be determined by the splitter chunk size and number of chunks.
-                        raw_page_text = fetch_text_from_link(link, max_size=None if self.use_in_memory_vectorstore else max_size)
-                        if is_content_valid(link, raw_page_text):
-                            page_text = raw_page_text
-                        else:
-                            page_text = False  # The content is redundant, set page_text to False
-                        
-                        if page_text:
-                            doc_content = make_uniform(page_text) if len(page_text) > 0 else ""
-                        else:
-                            doc_content = ""
+                    if not doc_content or any(kw in doc_content.lower() for kw in ("chatgpt", "factscore", "dataset viewer")):
+                        doc_content = ""
+                        index_available.append(i)
+                        continue
 
-                        if not doc_content or ("chatgpt" in doc_content.lower()) or ("factscore" in doc_content.lower()) or ("dataset viewer" in doc_content.lower()):
-                            doc_content = ""
-                            index_available.append(i)
-                            i += 1
+                    if self.use_in_memory_vectorstore:
+                        split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
+                        documents = [Document(id=f"{doc_id}", page_content=chunk, metadata={"source": link})
+                            for doc_id, chunk in enumerate(split_doc_content)
+                        ]
+                        self.in_memory_vectorstore.add_documents(documents=documents)
+                        retriever = self.in_memory_vectorstore.as_retriever(search_kwargs={"k": 3})
+                        retrieved_docs = retriever.invoke(query_text)
+                        doc_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
 
-                        else: 
-                            if self.use_in_memory_vectorstore:
-                                original_doc_content = doc_content
-                                # make documents for vectorstore
-                                split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
-                                documents = [Document(id=f"{doc_id}", page_content=text, metadata={"source": link})
-                                    for doc_id, text in enumerate(split_doc_content)
-                                ]
-                                self.in_memory_vectorstore.add_documents(documents=documents)
-                                retriever = self.in_memory_vectorstore.as_retriever(search_kwargs={"k": 3})
-                                retrieved_docs = retriever.invoke(query_text)
-                                doc_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
-
-                            # progress
-                            count_content += 1
-                            i += 1
-                            break
-
-                # we do not retrieve content from the link
+                    count_content += 1
                 else:
-                    res = search_results[query_text][i]
-                    title = res['title']
-                    snippet = res['snippet']
-                    link = res['link']
                     doc_content = ""
-                    i += 1
                     count_content += 1
 
                 passages.append(dict(title=title, text=doc_content, snippet=snippet, link=link))
 
-            # in case we run out of links and we have to come back to the previous ones, whose content is empty
-            if (count_content < self.top_k):
+            # --- Fallback to empty-content entries ---
+            if count_content < self.top_k:
                 for i in index_available:
-                    res = search_results[query_text][i]
-                    title = res['title']
-                    snippet = res['snippet']
-                    link = res['link']
-                    doc_content = ""
-
-                    passages.append(dict(title=title, text=doc_content, snippet=snippet, link=link))
-
-                    count_content += 1
-                    if count_content == self.top_k:
+                    if count_content >= self.top_k:
                         break
+                    hit = search_hits[i]
+                    passages.append(dict(title=hit["title"], text="", snippet=hit["snippet"], link=hit["link"]))
+                    count_content += 1
 
-            for passage in passages:
-                results.append(passage) # a passage is a dict with title and text as keys
-            print(f"[Retriever] Retrieved {len(results)} results for query.")
+            results.extend(passages)
+            logger.info(f"Retrieved {len(results)} results for query.")
         return results
            
