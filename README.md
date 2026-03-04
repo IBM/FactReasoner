@@ -158,7 +158,7 @@ from mellea_ibm.rits import RITSBackend, RITS
 from fact_reasoner import FactReasoner
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.retriever import ContextRetriever, Retriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -173,13 +173,18 @@ backend = RITSBackend(
 query_builder = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
-context_retriever = ContextRetriever(
+retriever = ContextRetriever(
     service_type="google",  # or "wikipedia", "chromadb"
     top_k=5,
     fetch_text=True,
-    query_builder=query_builder
+    query_builder=query_builder,
+    num_workers=4
 )
 context_summarizer = ContextSummarizer(backend)
+context_retriever = ContextRetriever(
+    retriever=retriever,
+    num_workers=4,
+)
 nli_extractor = NLIExtractor(backend)
 
 # Create the FactReasoner pipeline

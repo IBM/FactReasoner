@@ -34,7 +34,7 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetrieverFast
+from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.utils import build_atoms, build_contexts, remove_duplicated_atoms
 from fact_reasoner.utils import extract_last_square_brackets, LOOP_BUDGET
@@ -89,7 +89,7 @@ class VeriScore:
             backend: Backend,
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
-            context_retriever: ContextRetrieverFast = None,
+            context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the VeriScore pipeline.

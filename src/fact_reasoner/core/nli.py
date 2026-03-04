@@ -43,7 +43,7 @@ Your task is to evaluate the relationship between the PREMISE and the HYPOTHESIS
 - If the PREMISE is insufficient to confirm or deny the HYPOTHESIS, explain why the evidence is inconclusive.
 2. Provide the reasoning behind your evaluation of the relationship between PREMISE and HYPOTHESIS, justifying each decision.
 3. Final Answer: Based on your reasoning, the HYPOTHESIS and the PREMISE, determine your final answer. \
-Your final answer must be one of the following, wrapped in square brackets:
+Your final answer must be one of the following: entailment, contradiction or neutral, wrapped in square brackets:
 - [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS.
 - [contradiction] if the PREMISE contradicts the HYPOTHESIS.
 - [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other.
@@ -204,9 +204,14 @@ class NLIExtractor:
         )
 
         if output.success:
+            label = self._get_label(output.result)
+            probability = self._get_probability(output.result)
+            if label not in ["entailment", "contradiction", "neutral"]:
+                label = "neutral"
+
             return dict(
-                label=self._get_label(output.result), 
-                probability=self._get_probability(output.result)
+                label=label, 
+                probability=probability
             )
         else:
             return dict(

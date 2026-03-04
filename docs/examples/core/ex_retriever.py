@@ -5,7 +5,7 @@ from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
 from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.retriever import ContextRetriever, fetch_text_from_link
+from fact_reasoner.core.retriever import Retriever, fetch_text_from_link
 
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS
@@ -19,7 +19,7 @@ query_text = "rootstock for honey crisp apples in wayne county, ny"
 cache_dir = None #"my_database.db"
 query_builder = QueryBuilder(backend)
 
-retriever = ContextRetriever(
+retriever = Retriever(
     top_k=10,
     service_type="google",
     cache_dir=cache_dir,

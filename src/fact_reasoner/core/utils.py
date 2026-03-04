@@ -23,7 +23,7 @@ from nltk.tokenize import sent_tokenize
 # Local imports
 from .base import Atom, Context, Relation
 from .atomizer import Atomizer
-from .retriever import ContextRetrieverFast
+from .retriever import ContextRetriever
 from .nli import NLIExtractor
 from fact_reasoner.utils import punctuation_only_inside_quotes
 
@@ -114,7 +114,7 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
 def build_contexts(
         atoms: Dict[str, Atom] = {},
         query: str = None,
-        retriever: ContextRetrieverFast = None,
+        retriever: ContextRetriever = None,
         use_fast_retriever: bool = True
 ) -> Dict[str, Context]:
     """
