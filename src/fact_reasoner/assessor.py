@@ -34,7 +34,7 @@ from mellea.core import FancyLogger
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetrieverFast
+from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.fact_graph import FactGraph
@@ -64,7 +64,7 @@ class FactReasoner:
             atom_extractor: Atomizer = None,
             atom_reviser: Reviser = None,
             nli_extractor: NLIExtractor = None,
-            context_retriever: ContextRetrieverFast = None,
+            context_retriever: ContextRetriever = None,
             context_summarizer: ContextSummarizer = None,
             merlin_path: str = None,
             use_priors: bool = True,
@@ -77,7 +77,7 @@ class FactReasoner:
                 The service used for extracting atoms from the response.
             atom_reviser: Reviser
                 The service used for decontextualizing the atoms.
-            context_retriever: ContextRetrieverFast
+            context_retriever: ContextRetriever
                 The service used for retrieving external contexts.
             context_summarizer: ContextSummarizer
                 The service used for summarizing contexts.
@@ -265,7 +265,7 @@ class FactReasoner:
             contexts_per_atom_only: bool = False,
             rel_atom_context: bool = True,
             rel_context_context: bool = False,
-            use_fast_retriever: bool = True,
+            use_fast_retriever: bool = True
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -293,8 +293,6 @@ class FactReasoner:
                 Flag indicating the presence of atom-to-context relationships.
             rel_context_context: bool (default is False)
                 Flag indicating the presence of context-to-context relationships.
-            use_fast_retriever: bool (default is True)
-                Use fast multi-threaded context retriever.
         """
 
         # Initialize the reasoner

@@ -321,9 +321,9 @@ def is_content_valid(link: str, page_text: str) -> bool:
     return True
 
 
-class ContextRetriever:
+class Retriever:
     """
-    The ContextRetriever component. We implement several versions of this component
+    The Retriever component. We implement several versions of this component
     using a remote chromadb store (API exists), a local chromadb store, langchain
     based wikipedia retriever, and possibly others.
     """
@@ -568,7 +568,7 @@ class ContextRetriever:
         return results
            
 
-class ContextRetrieverFast:
+class ContextRetriever:
     """
     Parallel context retriever that wraps a ContextRetriever and dispatches
     retrieval tasks across a thread pool.
@@ -576,11 +576,11 @@ class ContextRetrieverFast:
 
     def __init__(
         self,
-        context_retriever: ContextRetriever,
+        retriever: Retriever,
         context_summarizer: Optional[ContextSummarizer] = None,
         num_workers: int = 4,
     ):
-        self.context_retriever = context_retriever
+        self.retriever = retriever
         self.context_summarizer = context_summarizer
         self.num_workers = num_workers
 
@@ -591,7 +591,7 @@ class ContextRetrieverFast:
         id_prefix: str = "c",
     ) -> List[Context]:
         """Worker function: retrieve contexts (and optionally summarize) for one item."""
-        retrieved = self.context_retriever.query(text=text)
+        retrieved = self.retriever.query(text=text)
 
         contexts = []
         for j, ctx in enumerate(retrieved):

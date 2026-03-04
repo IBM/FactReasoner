@@ -5,7 +5,7 @@ from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
 from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
+from fact_reasoner.core.retriever import ContextRetriever, Retriever
 from fact_reasoner.core.base import Atom
 
 # Create a Mellea RITS backend (used by the query builder)
@@ -16,13 +16,14 @@ backend = RITSBackend(
 # Build a query builder and retriever
 query_builder = QueryBuilder(backend)
 
-retriever = ContextRetriever(
+retriever = Retriever(
     top_k=3,
     service_type="google",
     cache_dir=None,
     fetch_text=True,
     use_in_memory_vectorstore=False,
     query_builder=query_builder,
+    num_workers=4
 )
 
 # Create a set of atoms to retrieve contexts for
@@ -35,8 +36,8 @@ atoms = {
 query = "Facts about famous landmarks and scientists"
 
 # Create the fast retriever with 4 worker threads
-fast_retriever = ContextRetrieverFast(
-    context_retriever=retriever,
+fast_retriever = ContextRetriever(
+    retriever=retriever,
     num_workers=4,
 )
 
