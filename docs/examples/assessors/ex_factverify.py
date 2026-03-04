@@ -34,7 +34,7 @@ context_retriever = ContextRetriever(
     top_k=5, 
     cache_dir=cache_dir, 
     fetch_text=False, # no retrieving from the link
-    query_builder=qb
+    query_builder=qb,
     num_workers=4
 )
 context_retriever_fast = ContextRetrieverFast(

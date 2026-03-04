@@ -21,7 +21,7 @@ topic = "Lanny Flaherty"
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS
 backend = RITSBackend(
-    RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
+    RITS.GRANITE_4_H_SMALL, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
 )
 
 # Set cache dir for context retriever
@@ -52,7 +52,7 @@ merlin_path = os.path.join(os.getcwd(), "lib", "merlin") # Linux RedHat version
 
 # Create the FactReasoner pipeline
 pipeline = FactReasoner(
-    context_retriever=context_retriever,
+    context_retriever=context_retriever_fast,
     context_summarizer=context_summarizer,
     atom_extractor=atom_extractor,
     atom_reviser=atom_reviser,
@@ -71,7 +71,8 @@ pipeline.build(
     remove_duplicates=True,
     summarize_contexts=False,
     rel_atom_context=True,
-    rel_context_context=False
+    rel_context_context=False,
+    use_fast_retriever=True
 )
 
 # Print the results
