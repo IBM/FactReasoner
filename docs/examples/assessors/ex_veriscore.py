@@ -7,6 +7,7 @@ from mellea.backends import ModelOption
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever, ContextRetrieverFast
+from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.veriscore import VeriScore
 
@@ -37,8 +38,10 @@ context_retriever = ContextRetriever(
     query_builder=qb,
     num_workers=4,
 )
+
 context_retriever_fast = ContextRetrieverFast(
     context_retriever=context_retriever,
+    context_summarizer=ContextSummarizer(backend),
     num_workers=4
 )
 
