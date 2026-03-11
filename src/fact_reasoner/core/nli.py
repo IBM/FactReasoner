@@ -138,20 +138,50 @@ class NLIExtractor:
             float: The average log probability of the generated tokens.
         """
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][
-            :-1
-        ]  # last token is EOS
+        # Support OpenAIBackend ("oai_chat_response") and LiteLLMBackend /
+        # _BedrockNativeLlamaBackend ("litellm_chat_response", bridged to
+        # "oai_chat_response" in post_processing).
 
-        # Go backwards and collect the logprobs of the tokens between ']' and ']'
+        response_data = output._meta.get("oai_chat_response") or output._meta.get(
+            "litellm_chat_response"
+        )
+        assert response_data is not None, (
+            "No chat response found in ModelOutputThunk._meta. "
+            "Expected 'oai_chat_response' or 'litellm_chat_response'."
+        )
+        assert response_data.get("logprobs") is not None, (
+            "logprobs missing from response. " "Ensure the backend supports logprobs."
+        )
+
+        # last token is EOS
+        logprobs = response_data["logprobs"]["content"][:-1]
+
+        # OpenAI-compatible backends return string tokens (e.g. "[", "]").
+        # The native Bedrock InvokeModel API returns numeric token IDs as
+        # strings (e.g. "58"). Detect which format we have.
+        has_string_tokens = any(item["token"] in ("[", "]") for item in logprobs)
+
         avg_logprob = 0
         count = 0
-        for item in reversed(logprobs):
-            if item["token"] == "[":
-                break
-            elif item["token"] == "]":
-                continue
-            else:
+
+        if has_string_tokens:
+            # Original logic: walk backwards, collect logprobs of tokens
+            # between the last ']' and the matching '['.
+            for item in reversed(logprobs):
+                if item["token"] == "[":
+                    break
+                elif item["token"] == "]":
+                    continue
+                else:
+                    avg_logprob += item["logprob"]
+                    count += 1
+        else:
+            # Bedrock native: numeric token IDs — can't identify '['/']'
+            # without the tokenizer. Proxy confidence via the last few
+            # tokens, which correspond to the label at end of generation
+            # (e.g. "[entailment]" tokenises to ~4 tokens).
+            label_window = logprobs[-5:] if len(logprobs) >= 5 else logprobs
+            for item in label_window:
                 avg_logprob += item["logprob"]
                 count += 1
 

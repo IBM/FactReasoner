@@ -373,7 +373,7 @@ class FactReasoner:
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts = zip(*atom.contexts.items())
-                    results = self.context_summarizer.run(
+                    results = self.context_summarizer.run_batch(
                         [context.get_text() for context in contexts], atom.text
                     )
 
