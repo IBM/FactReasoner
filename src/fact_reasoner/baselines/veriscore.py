@@ -35,14 +35,13 @@ from mellea.core import FancyLogger
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.utils import (
-    Atom,
-    Context,
     build_atoms,
     build_contexts,
     remove_duplicated_atoms,
 )
-from fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.utils import extract_last_square_brackets, LOOP_BUDGET
 
 # Version 2 of the prompt (based on more recent work VeriScore, FactBench)
 INSTRUCTION_VERISCORE = """
@@ -245,6 +244,7 @@ class VeriScore:
         has_atoms: bool = False,
         has_contexts: bool = False,
         revise_atoms: bool = False,
+        use_fast_retriever: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -316,6 +316,7 @@ class VeriScore:
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
+                use_fast_retriever=use_fast_retriever,
             )
 
         print(f"[VeriScore] Retrieved {len(self.contexts)} contexts.")
@@ -400,7 +401,7 @@ class VeriScore:
                     "atom_text": atom_text,
                     "knowledge_text": knowledge_text,
                 },
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
             corutines.append(corutine)
@@ -449,12 +450,22 @@ class VeriScore:
                 else:
                     num_uniform_atoms += 1
 
-        # Precision
+        # Precision, R@K and F1@K
         fscore = float(num_true_atoms) / float(len(self.atoms))
+        K = int(len(self.atoms) / 2)  # K is assumed to be half
+        recall_k = min(float(num_true_atoms) / K, 1.0)
+        try:
+            f1k = 2 * fscore * recall_k / (fscore + recall_k)
+        except Exception as _:
+            f1k = 0.0
+
+        # Elapsed time
         elapsed_time = time.perf_counter() - self.start_time  # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
+        results["recall_k"] = recall_k
+        results["f1_k"] = f1k
         results["num_atoms"] = len(self.atoms)
         results["num_contexts"] = len(self.contexts)
         results["num_true_atoms"] = num_true_atoms

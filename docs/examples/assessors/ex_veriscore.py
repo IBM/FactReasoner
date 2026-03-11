@@ -4,11 +4,12 @@ from pathlib import Path
 from mellea.backends import ModelOption
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.baselines.veriscore import VeriScore
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.baselines.veriscore import VeriScore
 
 # Example query and response
 query = "Tell me a biography of Lanny Flaherty"
@@ -29,13 +30,21 @@ cwd = Path(__file__).resolve().parent
 qb = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
-context_retriever = ContextRetriever(
+retriever = Retriever(
     service_type="google", 
     top_k=5, 
     cache_dir=cache_dir, 
     fetch_text=True, 
-    query_builder=qb
+    query_builder=qb,
+    num_workers=4,
 )
+
+context_retriever = ContextRetriever(
+    retriever=retriever,
+    context_summarizer=ContextSummarizer(backend),
+    num_workers=4
+)
+
 # Create the VeriScore pipeline
 pipeline = VeriScore(
     backend=backend,
@@ -51,7 +60,8 @@ pipeline.build(
     topic=topic,
     has_atoms=False,
     has_contexts=False,
-    revise_atoms=True
+    revise_atoms=True,
+    use_fast_retriever=True
 )
 
 # Print the results

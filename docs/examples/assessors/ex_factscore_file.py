@@ -4,11 +4,11 @@ from pathlib import Path
 from mellea.backends import ModelOption
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.baselines.factscore import FactScore
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.baselines.factscore import FactScore
 
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS

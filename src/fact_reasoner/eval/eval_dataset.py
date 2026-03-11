@@ -173,9 +173,8 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unknown LLM backend.")
 
-    from mellea.helpers.fancy_logger import FancyLogger
-
-    FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+    # from mellea.helpers.fancy_logger import FancyLogger
+    # FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     # Create the atom extractor
     atom_extractor = Atomizer(backend)

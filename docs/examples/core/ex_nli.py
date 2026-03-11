@@ -4,7 +4,7 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli import NLIExtractor
 
 # Create a Mellea RITS backend
 backend = RITSBackend(

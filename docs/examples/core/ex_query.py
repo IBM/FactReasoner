@@ -4,7 +4,7 @@ from mellea.backends import ModelOption
 from mellea_ibm.rits import RITSBackend, RITS
 
 # Local imports
-from src.fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.query_builder import QueryBuilder
 
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS

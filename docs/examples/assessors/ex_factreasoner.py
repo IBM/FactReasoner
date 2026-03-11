@@ -5,13 +5,13 @@ from pathlib import Path
 from mellea.backends import ModelOption
 
 # Local imports
-from src.fact_reasoner.core.atomizer import Atomizer
-from src.fact_reasoner.core.reviser import Reviser
-from src.fact_reasoner.core.retriever import ContextRetriever
-from src.fact_reasoner.core.summarizer import ContextSummarizer
-from src.fact_reasoner.core.nli import NLIExtractor
-from src.fact_reasoner.core.query_builder import QueryBuilder
-from src.fact_reasoner.assessor import FactReasoner
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.assessor import FactReasoner
 
 # Example query and response
 query = "Tell me a biography of Lanny Flaherty"
@@ -21,7 +21,7 @@ topic = "Lanny Flaherty"
 # Create a Mellea RITS backend
 from mellea_ibm.rits import RITSBackend, RITS
 backend = RITSBackend(
-    RITS.LLAMA_3_3_70B_INSTRUCT, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
+    RITS.GRANITE_4_H_SMALL, model_options={ModelOption.MAX_NEW_TOKENS: 4096},
 )
 
 # Set cache dir for context retriever
@@ -32,15 +32,20 @@ cwd = Path(__file__).resolve().parent
 qb = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
-context_retriever = ContextRetriever(
+retriever = Retriever(
     service_type="google", 
     top_k=5, 
     cache_dir=cache_dir, 
     fetch_text=True, 
-    query_builder=qb
+    query_builder=qb,
+    num_workers=4,
 )
 context_summarizer = ContextSummarizer(backend)
 nli_extractor = NLIExtractor(backend)
+context_retriever = ContextRetriever(
+    retriever=retriever,
+    num_workers=4
+)
 
 # Path to merlin (probabilistic inference engine)
 merlin_path = os.path.join(os.getcwd(), "lib", "merlin") # Linux RedHat version
@@ -66,7 +71,8 @@ pipeline.build(
     remove_duplicates=True,
     summarize_contexts=False,
     rel_atom_context=True,
-    rel_context_context=False
+    rel_context_context=False,
+    use_fast_retriever=True
 )
 
 # Print the results

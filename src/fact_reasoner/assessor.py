@@ -38,12 +38,14 @@ from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.fact_graph import FactGraph
-from fact_reasoner.core.utils import (
+from fact_reasoner.core.base import (
     PRIOR_PROB_ATOM,
     PRIOR_PROB_CONTEXT,
     Atom,
     Context,
     Relation,
+)
+from fact_reasoner.core.utils import (
     build_atoms,
     build_contexts,
     build_relations,
@@ -262,6 +264,7 @@ class FactReasoner:
         contexts_per_atom_only: bool = False,
         rel_atom_context: bool = True,
         rel_context_context: bool = False,
+        use_fast_retriever: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -345,7 +348,10 @@ class FactReasoner:
         # Build the contexts (per atom)
         if has_contexts == False:  # check if contexts already in file
             self.contexts = build_contexts(
-                atoms=self.atoms, query=self.query, retriever=self.context_retriever
+                atoms=self.atoms,
+                query=self.query,
+                retriever=self.context_retriever,
+                use_fast_retriever=use_fast_retriever,
             )
 
         # For tracking purposes
@@ -801,9 +807,23 @@ class FactReasoner:
         avg_norm_entropy = norm_entropy / len(self.atoms)
         fscore = num_true_atoms / len(self.atoms)
 
+        # Precision, R@K and F1@K
+        fscore = float(num_true_atoms) / float(len(self.atoms))
+        K = int(len(self.atoms) / 2)  # K is assumed to be half
+        recall_k = min(float(num_true_atoms / K), 1.0)
+        try:
+            f1k = 2 * fscore * recall_k / (fscore + recall_k)
+        except Exception as _:
+            f1k = 0.0
+
+        # Elapsed time
+        elapsed_time = time.perf_counter() - self.start_time  # elapsed time
+
         results = {}
         results["factuality_score_per_atom"] = fscore_per_atom
         results["factuality_score"] = fscore
+        results["recall_k"] = recall_k
+        results["f1_k"] = f1k
         results["num_atoms"] = len(self.atoms)
         results["num_contexts"] = len(self.contexts)
         results["num_true_atoms"] = num_true_atoms

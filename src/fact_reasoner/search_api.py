@@ -52,6 +52,8 @@ class SearchAPI():
         if cache_dir is not None:
             self.do_caching = True
             self.cache_dir = cache_dir
+            os.makedirs(self.cache_dir, exist_ok=True)
+            self.database = os.path.join(cache_dir, "my_database.db")
             self.similarity_threshold = similarity_threshold
             self._init_db()
         else:
@@ -64,7 +66,7 @@ class SearchAPI():
         """
         assert (self.do_caching is True), f"Caching requires an existing cache dir."
 
-        with sqlite3.connect(self.cache_dir) as conn:
+        with sqlite3.connect(self.database) as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA journal_mode=WAL;")  # Enable Write-Ahead Logging
             cursor.execute("""
@@ -149,7 +151,7 @@ class SearchAPI():
         # Escape double quotes for FTS5
         query = query.replace('"', '""')
 
-        with sqlite3.connect(self.cache_dir) as conn:
+        with sqlite3.connect(self.database) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT query, response FROM search_cache
@@ -187,7 +189,7 @@ class SearchAPI():
         if len(organic_res) == 0:
             return
         
-        conn = sqlite3.connect(self.cache_dir)
+        conn = sqlite3.connect(self.database)
         try:
             cursor = conn.cursor()
             cursor.execute("BEGIN TRANSACTION;")  # Start transaction
