@@ -17,7 +17,6 @@ import logging
 import re
 import chromadb
 import requests
-import torch
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
@@ -26,11 +25,13 @@ from tqdm import tqdm
 
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
+from chromadb.config import Settings as ChromaSettings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 from io import BytesIO
 from PyPDF2 import PdfReader
 from itertools import islice
+import wikipedia
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.CRITICAL)
@@ -248,7 +249,13 @@ class ChromaReader:
             path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)
         )
 
-        self.collection = self.client.get_collection(name=collection_name)
+        self.collection = self.client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=EMBEDDING_MODEL
+            ),
+            metadata={"hnsw:space": "cosine"},
+        )
 
         print(f"[ChromaDB] initialized with {self.collection.count()} items.")
 
@@ -388,14 +395,12 @@ class Retriever:
             self.chromadb_retriever = ChromaReader(
                 collection_name=self.collection_name,
                 persist_directory=self.persist_dir,
-                embedding_model=EMBEDDING_MODEL,
-                collection_metadata={"hnsw:space": "cosine"},
             )
         elif self.service_type == "wikipedia":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
             self.langchain_retriever = WikipediaRetriever(
-                lang="en", top_k_results=top_k
+                lang="en", top_k_results=top_k, wiki_client=wikipedia
             )
         elif self.service_type == "google":
             self.google_retriever = SearchAPI(cache_dir=self.cache_dir)

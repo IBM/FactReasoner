@@ -379,7 +379,7 @@ class FactReasoner:
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts = zip(*atom.contexts.items())
-                    results = self.context_summarizer.run_batch(
+                    results = self.context_summarizer.run(
                         [context.get_text() for context in contexts], atom.text
                     )
 
@@ -435,7 +435,7 @@ class FactReasoner:
         # If the user submits the override early exit flag then this method
         # will be set to None
         if self.early_exit_evaluator is not None:
-            if not isinstance(self.early_exit_evaluator, callable):
+            if not callable(self.early_exit_evaluator):
                 raise ValueError(
                     f"The `early_exit_evaluator` must be a callable function that takes in input the context and response and outputs a dict with the key `continue_pipeline_execution` (boolean) and optionally other keys with additional information about the evaluation."
                 )
@@ -896,3 +896,35 @@ class FactReasoner:
         print(f"[FactReasoner] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results, marginals
+
+    def pipeline_to_json(self, json_file_path: str = None):
+        """
+        Save the pipeline instance to a JSON file.
+        """
+
+        data = {}
+        data["input"] = self.query
+        data["output"] = self.response.strip()
+        data["topic"] = self.topic
+        data["atoms"] = []
+        data["contexts"] = []
+
+        for aid, atom in self.atoms.items():
+            atom_data = dict(
+                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
+            )
+            if atom.get_label() is not None:
+                atom_data["label"] = atom.get_label()
+            data["atoms"].append(atom_data)
+
+        data["contexts"] = [context.to_json() for context in self.contexts.values()]
+        if self.early_exit_evaluation is not None:
+            data["early_exit_evaluation"] = self.early_exit_evaluation
+
+        if json_file_path:
+            with open(json_file_path, "w") as f:
+                f.write(f"{json.dumps(data)}\n")
+            f.close()
+            print(f"[FactReasoner] Pipeline instance written to: {json_file_path}")
+
+        return data

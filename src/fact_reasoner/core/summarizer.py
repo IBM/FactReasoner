@@ -201,10 +201,15 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][
-            :-1
-        ]  # last token is EOS
+        logprobs_object = (
+            output._meta.get("logprobs")
+            or output._meta.get("oai_chat_response", {}).get("logprobs")
+            or output._meta.get("litellm_chat_response", {}).get("logprobs")
+        )
+        assert (
+            logprobs_object is not None
+        ), "logprobs missing from response. Ensure the backend supports logprobs."
+        logprobs = logprobs_object["content"][:-1]  # last token is EOS
         avg_logprob = (
             sum(lp["logprob"] for lp in logprobs) / len(logprobs)
             if len(logprobs) > 0
@@ -212,6 +217,25 @@ class ContextSummarizer:
         )
 
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
+
+    def run(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
+        """
+        Summarize a list of contexts with respect to an atomic unit.
+
+        Args:
+            contexts: List[str]
+                The list of contexts to be summarized.
+            atom_text: str
+                The reference atomic unit text
+        Returns:
+            List[Dict[str, Any]]: A list of summarized contexts.
+        """
+
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, self.run_batch(contexts, atom_text))
+            return future.result()
 
     async def run_batch(
         self, contexts: List[str], atom_text: str = None
@@ -245,7 +269,10 @@ class ContextSummarizer:
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
                 user_variables={"context": context, "atom_text": atom_text},
-                model_options=dict(logprobs=True),
+                model_options={
+                    "logprobs": True,
+                    "top_logprobs": 5,
+                },
             )
             corutines.append(corutine)
 

@@ -188,8 +188,8 @@ class Atomizer(object):
             Dict[str, str]: A dictionary containing the atomic units, each with
             a unique identifier.
         """
-
         # Perform the instruction with validation
+
         output = mfuncs.instruct(
             INSTRUCTION_ATOMIZER,
             context=SimpleContext(),

@@ -138,23 +138,20 @@ class NLIExtractor:
             float: The average log probability of the generated tokens.
         """
 
-        # Support OpenAIBackend ("oai_chat_response") and LiteLLMBackend /
-        # _BedrockNativeLlamaBackend ("litellm_chat_response", bridged to
-        # "oai_chat_response" in post_processing).
-
-        response_data = output._meta.get("oai_chat_response") or output._meta.get(
-            "litellm_chat_response"
+        # Supports new direct path (updated mellea, incl. Bedrock converse),
+        # OpenAIBackend ("oai_chat_response"), and LiteLLMBackend
+        # ("litellm_chat_response").
+        logprobs_object = (
+            output._meta.get("logprobs")
+            or output._meta.get("oai_chat_response", {}).get("logprobs")
+            or output._meta.get("litellm_chat_response", {}).get("logprobs")
         )
-        assert response_data is not None, (
-            "No chat response found in ModelOutputThunk._meta. "
-            "Expected 'oai_chat_response' or 'litellm_chat_response'."
-        )
-        assert response_data.get("logprobs") is not None, (
-            "logprobs missing from response. " "Ensure the backend supports logprobs."
-        )
+        assert (
+            logprobs_object is not None
+        ), "logprobs missing from response. Ensure the backend supports logprobs."
 
         # last token is EOS
-        logprobs = response_data["logprobs"]["content"][:-1]
+        logprobs = logprobs_object["content"][:-1]
 
         # OpenAI-compatible backends return string tokens (e.g. "[", "]").
         # The native Bedrock InvokeModel API returns numeric token IDs as
@@ -234,7 +231,10 @@ class NLIExtractor:
             user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
-            model_options=dict(logprobs=True),
+            model_options={
+                "logprobs": True,
+                "top_logprobs": 5,
+            },
         )
 
         if output.success:
@@ -282,7 +282,6 @@ class NLIExtractor:
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True,
-                model_options=dict(logprobs=True),
             )
             corutines.append(corutine)
 
