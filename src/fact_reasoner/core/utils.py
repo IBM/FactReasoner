@@ -19,6 +19,8 @@ from typing import Dict, List, Tuple, Union
 import asyncio
 import nltk
 from nltk.tokenize import sent_tokenize
+import concurrent.futures
+
 
 # Local imports
 from .base import Atom, Context, Relation
@@ -80,11 +82,19 @@ def predict_nli_relationships(
     # Extract the NLI relationships between premises and hyptheses
     print(f"[NLI] Processing {len(premises)} potential relationships ...")
     # results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
-    results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
+    try:
+        loop = asyncio.get_running_loop()
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            results = pool.submit(
+                asyncio.run, nli_extractor.run_batch(premises, hypotheses)
+            ).result()
+    except RuntimeError:
+        results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
 
     relations = []
     for ii, result in enumerate(results):
-        label = result.get("label", "neutral")
+        label = result.get("label") or "neutral"
         probability = result.get("probability", 0.0)
         link_type = links_type if links_type is not None else "unknown"
         rel = Relation(

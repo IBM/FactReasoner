@@ -282,6 +282,10 @@ class NLIExtractor:
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True,
+                model_options={
+                    "logprobs": True,
+                    "top_logprobs": 5,
+                },
             )
             corutines.append(corutine)
 

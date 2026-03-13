@@ -33,9 +33,6 @@ from PyPDF2 import PdfReader
 from itertools import islice
 import wikipedia
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL)
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
@@ -47,6 +44,9 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.search_api import SearchAPI
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
 DEFAULT_DB_PATH = "/tmp/nasa_contrib/accelerated-discovery/chroma_db"
@@ -399,6 +399,9 @@ class Retriever:
         elif self.service_type == "wikipedia":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
+            wikipedia.set_user_agent(
+                "Accelerated Knowledge Discovery (NASA IMPACT)/1.0 (leo@developmentseed.org)"
+            )
             self.langchain_retriever = WikipediaRetriever(
                 lang="en", top_k_results=top_k, wiki_client=wikipedia
             )
@@ -461,7 +464,11 @@ class Retriever:
             passages = []
 
             # Get most relevant docs to the query
-            rel_docs = self.langchain_retriever.invoke(text)
+            try:
+                rel_docs = self.langchain_retriever.invoke(text)
+            except Exception as e:
+                logger.warning(f"Wikipedia retrieval failed for query '{text}': {e}")
+                return results
             for doc in rel_docs:
                 title = doc.metadata["title"]
                 summary = doc.metadata["summary"]
