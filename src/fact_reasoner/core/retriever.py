@@ -254,7 +254,6 @@ class ChromaReader:
             embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=EMBEDDING_MODEL
             ),
-            metadata={"hnsw:space": "cosine"},
         )
 
         print(f"[ChromaDB] initialized with {self.collection.count()} items.")
