@@ -400,7 +400,7 @@ class Retriever:
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
             wikipedia.set_user_agent(
-                "Accelerated Knowledge Discovery (NASA IMPACT)/1.0 (leo@developmentseed.org)"
+                "NASA IMPACT Accelerated Knowledge Discovery (AKD)/1.0 (leo@developmentseed.org)"
             )
             self.langchain_retriever = WikipediaRetriever(
                 lang="en", top_k_results=top_k, wiki_client=wikipedia
