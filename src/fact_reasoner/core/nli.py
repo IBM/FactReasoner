@@ -44,9 +44,9 @@ Your task is to evaluate the relationship between the PREMISE and the HYPOTHESIS
 2. Provide the reasoning behind your evaluation of the relationship between PREMISE and HYPOTHESIS, justifying each decision.
 3. Final Answer: Based on your reasoning, the HYPOTHESIS and the PREMISE, determine your final answer. \
 Your final answer must be one of the following: entailment, contradiction or neutral, wrapped in square brackets:
-- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS.
-- [contradiction] if the PREMISE contradicts the HYPOTHESIS.
-- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other.
+- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS
+- [contradiction] if the PREMISE contradicts the HYPOTHESIS
+- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other
 
 Use the following examples to better understand your task.
 
@@ -57,7 +57,7 @@ HYPOTHESIS: Robert Smith holds the title of Baron Smith of Kelvin.
 The PREMISE states that Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. It also mentions that Smith was appointed to the House of Lords as an independent crossbench peer in 2008. This information directly supports the HYPOTHESIS that Robert Smith holds the title of Baron Smith of Kelvin.
 2: Reasoning:
 The PREMISE explicitly mentions that Robert Smith is Baron Smith of Kelvin, which directly supports the HYPOTHESIS. The additional information about his knighthood, appointment to the House of Lords, and other titles further confirms his status as a peer, but it is not necessary to support the specific HYPOTHESIS about him holding the title of Baron Smith of Kelvin.
-3. Final Answer: 
+3. Final Answer:
 [entailment]
 
 Example 2:
@@ -265,9 +265,9 @@ class NLIExtractor:
             relationships and their probabilities.
         """
 
-        corutines = []
+        coroutines = []
         for premise, hypothesis in zip(premises, hypotheses):
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_NLI,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -287,12 +287,13 @@ class NLIExtractor:
                     "top_logprobs": 5,
                 },
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
         print(f"[NLI] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
+
             if output.success:
                 label = self._get_label(output.result)
                 probability = self._get_probability(output.result)

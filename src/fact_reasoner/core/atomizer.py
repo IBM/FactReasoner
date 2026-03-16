@@ -227,9 +227,9 @@ class Atomizer(object):
         """
 
         # Perform the instruction with validation
-        corutines = []
+        coroutines = []
         for response in responses:
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_ATOMIZER,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -245,11 +245,11 @@ class Atomizer(object):
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
         print(f"[Atomizer] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             # The output is a validated JSON string; parse it
             if output.success:

@@ -212,9 +212,9 @@ class Reviser:
 
         # Perform the instruction with validation
 
-        corutines = []
+        coroutines = []
         for atom_text in units:
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_REVISER,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -232,11 +232,11 @@ class Reviser:
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
         print(f"[Reviser] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             if output.success:
                 cleaned = strip_code_fences(str(output))

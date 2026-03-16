@@ -446,10 +446,13 @@ class Retriever:
 
             passages = []
             for doc_content, metadata in zip(docs, metadatas):
+                cleaned = _clean_text(doc_content)
+                first_sentence, _, _ = cleaned.partition(". ")
+                snippet = (first_sentence + ".") if first_sentence and _ else cleaned[:200]
                 passage = {
                     "title": metadata.get("title", "No Title Provided"),
-                    "text": make_uniform(doc_content),
-                    "snippet": "",
+                    "text": make_uniform(cleaned),
+                    "snippet": snippet,
                     "link": metadata.get("source", ""),
                 }
                 passages.append(passage)

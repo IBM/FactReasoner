@@ -259,9 +259,9 @@ class ContextSummarizer:
 
         # Perform the instruction with validation
         results = []
-        corutines = []
+        coroutines = []
         for context in contexts:
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -274,10 +274,10 @@ class ContextSummarizer:
                     "top_logprobs": 5,
                 },
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             cleaned = str(output).strip()
             results.append(

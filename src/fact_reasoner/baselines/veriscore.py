@@ -373,7 +373,7 @@ class VeriScore:
         atom_ids = []
         atom_labels = []
         atom_outputs = []
-        corutines = []
+        coroutines = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
@@ -388,7 +388,7 @@ class VeriScore:
             print(f"[VeriScore] Processing atom: ({aid}) {atom_text}")
 
             # Execute the instruction
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_VERISCORE,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -404,10 +404,10 @@ class VeriScore:
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         print(f"[VeriScore] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)

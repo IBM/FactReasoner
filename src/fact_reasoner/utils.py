@@ -112,7 +112,7 @@ def extract_first_square_brackets(input_string: str) -> str:
 
 
 def extract_last_square_brackets(input_string: str) -> str:
-    """Extracts the contents of the FIRST string between square brackets."""
+    """Extracts the contents of the LAST string between square brackets."""
     raw_result = re.findall(r"\[.*?\]", input_string, flags=re.DOTALL)
 
     if raw_result:
