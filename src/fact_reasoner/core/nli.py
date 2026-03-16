@@ -29,7 +29,10 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.utils import (
+    extract_last_square_brackets,
+    extract_logprobs_from_output,
+)
 
 INSTRUCTION_NLI = """
 
@@ -137,21 +140,7 @@ class NLIExtractor:
         Returns:
             float: The average log probability of the generated tokens.
         """
-
-        # Supports new direct path (updated mellea, incl. Bedrock converse),
-        # OpenAIBackend ("oai_chat_response"), and LiteLLMBackend
-        # ("litellm_chat_response").
-        logprobs_object = (
-            output._meta.get("logprobs")
-            or output._meta.get("oai_chat_response", {}).get("logprobs")
-            or output._meta.get("litellm_chat_response", {}).get("logprobs")
-        )
-        assert (
-            logprobs_object is not None
-        ), "logprobs missing from response. Ensure the backend supports logprobs."
-
-        # last token is EOS
-        logprobs = logprobs_object["content"][:-1]
+        logprobs = extract_logprobs_from_output(output)
 
         # OpenAI-compatible backends return string tokens (e.g. "[", "]").
         # The native Bedrock InvokeModel API returns numeric token IDs as

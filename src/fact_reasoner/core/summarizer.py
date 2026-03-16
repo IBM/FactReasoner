@@ -27,7 +27,7 @@ from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
-from fact_reasoner.utils import LOOP_BUDGET
+from fact_reasoner.utils import LOOP_BUDGET, extract_logprobs_from_output
 
 INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
@@ -201,15 +201,8 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        logprobs_object = (
-            output._meta.get("logprobs")
-            or output._meta.get("oai_chat_response", {}).get("logprobs")
-            or output._meta.get("litellm_chat_response", {}).get("logprobs")
-        )
-        assert (
-            logprobs_object is not None
-        ), "logprobs missing from response. Ensure the backend supports logprobs."
-        logprobs = logprobs_object["content"][:-1]  # last token is EOS
+        logprobs = extract_logprobs_from_output(output)
+
         avg_logprob = (
             sum(lp["logprob"] for lp in logprobs) / len(logprobs)
             if len(logprobs) > 0

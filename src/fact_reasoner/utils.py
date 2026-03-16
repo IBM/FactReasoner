@@ -23,9 +23,7 @@ import random
 import torch
 import transformers
 
-from typing import List, Union
-
-import yaml
+from typing import List, Union, Dict, Any
 
 
 LOOP_BUDGET = 5
@@ -140,6 +138,40 @@ def extract_first_code_block(input_string: str, ignore_language: bool = False) -
 
     match = pattern.search(input_string)
     return strip_string(match.group(1)) if match else ""
+
+
+def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
+    """
+    Extract the log probabilities from the output metadata and compute the average log probability.
+
+    Args:
+        output: The output object containing the metadata with log probabilities.
+
+    Returns:
+        A list of log probabilities extracted from the output.
+    """
+
+    # handle different logprobs formats across backends
+    logprobs_object = (
+        output._meta.get("logprobs")
+        or output._meta.get("chat_response", {}).get("logprobs")
+        or output._meta.get("oai_chat_response", {}).get("logprobs")
+        or output._meta.get("litellm_chat_response", {}).get("logprobs")
+    )
+
+    assert (
+        logprobs_object is not None
+    ), "logprobs missing from response. Ensure the backend supports logprobs."
+
+    # handle openai/litllm logprobs format (dict with 'content' key) vs other backends (list of logprobs)
+    if isinstance(logprobs_object, dict):
+        if "content" not in logprobs_object:
+            raise ValueError(
+                "logprobs object missing 'content' key. Check backend response format."
+            )
+        logprobs_object = logprobs_object["content"]
+
+    return logprobs_object[:-1]  # drop last token (EOS)
 
 
 def batcher(iterator, batch_size=4, progress=False):
