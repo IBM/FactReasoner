@@ -136,8 +136,9 @@ class NLIExtractor:
             float: The average log probability of the generated tokens.
         """
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+        chat_response = output._meta.get("oai_chat_response") or output._meta.get("litellm_chat_response")
+        assert chat_response["logprobs"] is not None
+        logprobs = chat_response["logprobs"]["content"][:-1] # last token is EOS
 
         # Go backwards and collect the logprobs of the tokens between ']' and ']'
         avg_logprob = 0
