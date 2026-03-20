@@ -110,13 +110,28 @@ def extract_first_square_brackets(input_string: str) -> str:
 
 
 def extract_last_square_brackets(input_string: str) -> str:
-    """Extracts the contents of the LAST string between square brackets."""
-    raw_result = re.findall(r"\[.*?\]", input_string, flags=re.DOTALL)
+    """Extracts the last NLI label from square brackets in the input string.
 
-    if raw_result:
-        return raw_result[-1][1:-1]
-    else:
-        return ""
+    Matches 'neutral', 'entailment', or 'contradiction' (case-insensitive),
+    tolerating trailing punctuation inside the brackets.
+    """
+    matches = re.findall(
+        r"\[\s*(neutral|entailment|contradiction)\s*[.!?]?\s*\]",
+        input_string,
+        flags=re.IGNORECASE,
+    )
+    if matches:
+        return matches[-1].lower()
+
+    # Fallback: scan input for any bare label word (handles cases where
+    # the LLM drops the brackets entirely)
+    words = re.findall(
+        r"\b(neutral|entailment|contradiction)\b", input_string, flags=re.IGNORECASE
+    )
+    if words:
+        return words[-1].lower()
+
+    return ""
 
 
 def extract_last_wrapped_response(input_string: str) -> str:
@@ -171,6 +186,22 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
             )
         logprobs_object = logprobs_object["content"]
 
+    if not isinstance(logprobs_object, list):
+
+        # If logprobs is not a list, it may be a ChoiceLogprobs object from litellm. Try to extract logprobs from it and massage into the format expected by the _get_probability() functions in Summarizer and NLI extractor  (list of dicts with 'token' and 'logprob' keys).
+        try:
+            from litellm.types.utils import ChoiceLogprobs
+
+            if isinstance(logprobs_object, ChoiceLogprobs):
+                # logprobs_object = [
+                #     {"token": item.token, "logprob": item.logprob}
+                #     for item in logprobs_object.content  # drop EOS
+                # ]
+                logprobs_object = logprobs_object.content
+        except ImportError:
+            raise ValueError(
+                "Unable to extract logprobs: logprobs is not a recognized format (one of: list, dict with 'content' key) and litellm is not installed to validate possible litellm.types.utils.ChoiceLogprobs format. Check backend response format."
+            )
     return logprobs_object[:-1]  # drop last token (EOS)
 
 
