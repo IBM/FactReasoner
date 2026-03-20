@@ -1,7 +1,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.5.5-red.svg)](https://github.com/IBM/FactReasoner)
-![Static Badge](https://img.shields.io/badge/mellea-0.3.0-blue?style=flat)
+[![Python 3.11+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-0.5.6-red.svg)](https://github.com/IBM/FactReasoner)
+![Static Badge](https://img.shields.io/badge/mellea-0.4.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
 # FactReasoner
@@ -117,7 +117,7 @@ uv pip install fact_reasoner
 ```bash
 git clone git@github.com:IBM/FactReasoner.git
 cd FactReasoner
-conda create -n fr python=3.10
+conda create -n fr python=3.12
 conda activate fr
 uv pip install -e .
 ```
@@ -131,9 +131,9 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ### Dependencies
 
 FactReasoner requires:
-- Python >= 3.10
+- Python >= 3.11
 - [`Merlin`](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
-- [`Mellea`](https://pypi.org/project/mellea/) == 0.3.0 - LLM interaction library
+- [`Mellea`](https://pypi.org/project/mellea/) - LLM interaction library
 
 ### Environment Variables
 
