@@ -57,7 +57,7 @@ from fact_reasoner.core.utils import (
 # Set logging levels 
 # pgmpy set the root logger to INFO -- changed it to WARNING
 logging.getLogger("httpx").setLevel(logging.ERROR)
-
+logger.setLevel(logging.WARNING)
 class FactReasoner:
     def __init__(
             self,
@@ -261,7 +261,7 @@ class FactReasoner:
             has_contexts: bool = False,
             revise_atoms: bool = False,
             remove_duplicates: bool = False,
-            summarize_contexts: bool = False,
+            summarize_contexts: bool = True,
             contexts_per_atom_only: bool = False,
             rel_atom_context: bool = True,
             rel_context_context: bool = False,
