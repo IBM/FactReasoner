@@ -69,7 +69,7 @@ pipeline.build(
     has_contexts=False,
     revise_atoms=True,
     remove_duplicates=True,
-    summarize_contexts=False,
+    summarize_contexts=True,
     rel_atom_context=True,
     rel_context_context=False,
     use_fast_retriever=True

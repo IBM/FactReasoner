@@ -245,7 +245,7 @@ def remove_duplicated_atoms(atoms: Dict[str, Atom]) -> Dict[str, Atom]:
 
 
 def remove_duplicated_contexts(
-    contexts: Dict[str, Context], atoms: Dict[str, Atom]
+    contexts: Dict[str, Context], atoms: Dict[str, Atom], check_summary: bool = False
 ) -> dict:
     """
     Remove the duplicated contexts.
@@ -255,6 +255,8 @@ def remove_duplicated_contexts(
             The dict containing the contexts.
         atoms: Dict[str, Atom]
             The dict containing the atoms.
+        check_summary: bool
+            Whether to check the summary of the contexts.
 
     Returns:
         The updated dicts containing the contexts and atoms.
@@ -263,7 +265,11 @@ def remove_duplicated_contexts(
     seen = set()
     out = {}
     for k, v in contexts.items():
-        text = v.get_text()
+        text = (
+            v.get_text()
+            if not check_summary or v.get_summary() is None
+            else v.get_summary()
+        )
         if text not in seen:
             seen.add(text)
             out[k] = v
@@ -349,7 +355,7 @@ def build_relations(
     rel_atom_context: bool = True,
     rel_context_context: bool = True,
     nli_extractor: NLIExtractor = None,
-    use_summary: bool = False,
+    use_summarized_contexts: bool = False,
 ) -> List[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
@@ -368,7 +374,7 @@ def build_relations(
             Flag indicating the presence of context-to-context relationships.
         nli_extractor: NLIExtractor
             The NLI model used for predicting the relationships.
-        use_summary: bool
+        use_summarized_contexts: bool
             Flag indicating that summarized contexts are used. If False, then the
             contexts include the extracted text.
     Returns:
@@ -406,7 +412,7 @@ def build_relations(
             atom_context_pairs,
             nli_extractor=nli_extractor,
             links_type="context_atom",
-            use_summary=use_summary,
+            use_summary=use_summarized_contexts,
         )
 
         # Filter out the neutral relationships
@@ -432,7 +438,7 @@ def build_relations(
             context_context_pairs1,
             nli_extractor=nli_extractor,
             links_type="context_context",
-            use_summary=use_summary,
+            use_summary=use_summarized_contexts,
         )
 
         # Get relationships (c_j, c_i)
@@ -440,7 +446,7 @@ def build_relations(
             context_context_pairs2,
             nli_extractor=nli_extractor,
             links_type="context_context",
-            use_summary=use_summary,
+            use_summary=use_summarized_contexts,
         )
 
         relations_tmp = [

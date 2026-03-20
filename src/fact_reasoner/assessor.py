@@ -22,6 +22,7 @@ import time
 import subprocess
 import uuid
 import logging
+import asyncio
 
 from typing import Any, Dict
 
@@ -57,6 +58,7 @@ from fact_reasoner.core.utils import (
 # Set logging levels
 # pgmpy set the root logger to INFO -- changed it to WARNING
 logging.getLogger("httpx").setLevel(logging.ERROR)
+logger.setLevel(logging.WARNING)
 
 
 class FactReasoner:
@@ -260,7 +262,7 @@ class FactReasoner:
         has_contexts: bool = False,
         revise_atoms: bool = False,
         remove_duplicates: bool = False,
-        summarize_contexts: bool = False,
+        summarize_contexts: bool = True,
         contexts_per_atom_only: bool = False,
         rel_atom_context: bool = True,
         rel_context_context: bool = False,
@@ -372,17 +374,26 @@ class FactReasoner:
                 f"[FactReasoner] Created {len(self.contexts.keys())} unique contexts."
             )
 
-        # Summarize contexts given atoms
+        # Summarize the retrieved contexts (if any)
         if self.summarize_contexts:
             print(f"[FactReasoner] Summarizing the contexts ...")
 
+            # Summarize contexts for atoms
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts = zip(*atom.contexts.items())
-                    results = self.context_summarizer.run(
-                        [context.get_text() for context in contexts], atom.text
+                    results = asyncio.run(
+                        self.context_summarizer.run_batch(
+                            [context.get_text() for context in contexts], atom.text
+                        )
                     )
 
+                    # Safety checks
+                    assert len(results) == len(
+                        contexts
+                    ), f"The number of summaries must be equal to the number of contexts."
+
+                    # Set the new syntheric summaries
                     for context_id, result in zip(contexts_ids, results):
 
                         is_relevant = is_relevant_context(result["summary"])
@@ -399,6 +410,9 @@ class FactReasoner:
                             # we remove the context because it is not related to the atom
                             del self.contexts[context_id]
                             del self.atoms[atom_id].contexts[context_id]
+                    print(
+                        f"[FactReasoner] Created {len(results)} summarized contexts for atom {atom_id}."
+                    )
 
             # Summarize contexts for question
             c_qs = {
@@ -408,9 +422,15 @@ class FactReasoner:
             }
             if len(c_qs.keys()) > 0:
                 contexts_ids, contexts = zip(*c_qs.items())
-                results = self.context_summarizer.run(
-                    [context.get_text() for context in contexts], self.query
+                results = asyncio.run(
+                    self.context_summarizer.run_batch(
+                        [context.get_text() for context in contexts], self.query
+                    )
                 )
+
+                assert len(results) == len(
+                    contexts
+                ), f"The number of summaries must be equal to the number of contexts."
 
                 for context_id, result in zip(contexts_ids, results):
 
@@ -427,10 +447,24 @@ class FactReasoner:
                     else:
                         # we remove the context because it is not related to the atom
                         del self.contexts[context_id]
+                print(
+                    f"[FactReasoner] Created {len(results)} summarized contexts for the question."
+                )
 
             # For tracking purposes
             self.num_summarized_contexts = len(self.contexts.keys())
-            print(f"[FactReasoner] Created {self.num_summarized_contexts} contexts.")
+            print(
+                f"[FactReasoner] Created {self.num_summarized_contexts} summarized contexts."
+            )
+
+            # Remove duplicated contexts that have the same summary (if any)
+            if remove_duplicates:
+                self.contexts, self.atoms = remove_duplicated_contexts(
+                    self.contexts, self.atoms, check_summary=True
+                )
+                print(
+                    f"[FactReasoner] Created {len(self.contexts.keys())} unique summarized contexts."
+                )
 
         # If the user submits the override early exit flag then this method
         # will be set to None
@@ -474,7 +508,7 @@ class FactReasoner:
             rel_context_context=rel_context_context,
             contexts_per_atom_only=contexts_per_atom_only,
             nli_extractor=self.nli_extractor,
-            use_summary=self.summarize_contexts,
+            use_summarized_contexts=self.summarize_contexts,
         )
 
         # Build the fact graph and Markov network
