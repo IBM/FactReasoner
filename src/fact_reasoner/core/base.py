@@ -240,8 +240,18 @@ class Relation:
         then B doesn't necessarily entails A.
         """
 
-        assert (type in ["entailment", "contradiction", "equivalence", "neutral"]), \
-            f"Unknown relation type: {type}."
+        if "entailment" in type.lower():
+            type = "entailment"
+        elif "contradiction" in type.lower():
+            type = "contradiction"
+        elif "equivalence" in type.lower():
+            type = "equivalence"
+        elif "neutral" in type.lower():
+            type = "neutral"
+        else:
+            type = "neutral"  # default to neutral if the type is not recognized
+            probability = 1.0  # set probability to 1 for neutral relations
+            
         assert (link in ["context_atom", "context_context", "atom_atom"]), \
             f"Unknown link type: {link}"
 
