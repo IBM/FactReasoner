@@ -22,7 +22,6 @@ import time
 import subprocess
 import uuid
 import logging
-import asyncio
 
 from typing import Any, Dict
 
@@ -253,7 +252,7 @@ class FactReasoner:
             f"[FactReasoner] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
         )
 
-    def build(
+    async def build(
         self,
         query: str = None,
         response: str = None,
@@ -382,10 +381,8 @@ class FactReasoner:
             for atom_id, atom in self.atoms.items():
                 if len(atom.contexts.keys()) > 0:
                     contexts_ids, contexts = zip(*atom.contexts.items())
-                    results = asyncio.run(
-                        self.context_summarizer.run_batch(
-                            [context.get_text() for context in contexts], atom.text
-                        )
+                    results = await self.context_summarizer.run_batch(
+                        [context.get_text() for context in contexts], atom.text
                     )
 
                     # Safety checks
@@ -422,10 +419,8 @@ class FactReasoner:
             }
             if len(c_qs.keys()) > 0:
                 contexts_ids, contexts = zip(*c_qs.items())
-                results = asyncio.run(
-                    self.context_summarizer.run_batch(
-                        [context.get_text() for context in contexts], self.query
-                    )
+                results = await self.context_summarizer.run_batch(
+                    [context.get_text() for context in contexts], self.query
                 )
 
                 assert len(results) == len(
@@ -471,10 +466,10 @@ class FactReasoner:
         if self.early_exit_evaluator is not None:
             if not callable(self.early_exit_evaluator):
                 raise ValueError(
-                    f"The `early_exit_evaluator` must be a callable function that takes in input the context and response and outputs a dict with the key `continue_pipeline_execution` (boolean) and optionally other keys with additional information about the evaluation."
+                    f"The `early_exit_evaluator` must be a callable function that takes in input the context and response and outputs a dict with the key `continue_pipeline_execution` (boolean) and optionally other keys with additional information about the evaluation. Instead got: {type(self.early_exit_evaluator)}"
                 )
             print("[FactReasoner] Evaluating early exit condition ...")
-            self.early_exit_evaluation = self.early_exit_evaluator(
+            self.early_exit_evaluation = await self.early_exit_evaluator(
                 context="\n".join(
                     [
                         c.summary if hasattr(c, "summary") else c.text
