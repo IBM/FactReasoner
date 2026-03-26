@@ -845,6 +845,8 @@ class FactReasoner:
         # Precision, R@K and F1@K
         fscore = float(num_true_atoms) / float(len(self.atoms))
         K = int(len(self.atoms) / 2)  # K is assumed to be half
+        # ensure that K is at least 1 to avoid division by zero when there is only one atom (since int(0.5) would be 0)
+        K = max(K, 1)
         recall_k = min(float(num_true_atoms / K), 1.0)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
