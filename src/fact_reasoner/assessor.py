@@ -309,14 +309,18 @@ class FactReasoner:
         self.summarize_contexts = summarize_contexts  # default is False
 
         # Safety checks
-        assert self.atom_extractor is not None, f"The atom extractor must be created."
-        assert self.atom_reviser is not None, f"The atom reviser must be created."
         assert self.nli_extractor is not None, f"The NLI extractor must be created."
 
         print(f"[FactReasoner] Building the pipeline ...")
 
         # Build the atoms
         if has_atoms == False:
+            print(f"[FactReasoner] Extracting the atoms ...")
+
+            assert (
+                self.atom_extractor is not None
+            ), f"The atom extractor must be created."
+
             self.atoms = build_atoms(
                 response=self.response, atom_extractor=self.atom_extractor
             )
@@ -333,6 +337,8 @@ class FactReasoner:
         # Revise the atoms
         if self.revise_atoms:
             print(f"[FactReasoner] Revising the atoms ...")
+            assert self.atom_reviser is not None, f"The atom reviser must be created."
+
             assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
