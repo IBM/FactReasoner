@@ -173,7 +173,7 @@ backend = RITSBackend(
 query_builder = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
-retriever = ContextRetriever(
+retriever = Retriever(
     service_type="google",  # or "wikipedia", "chromadb"
     top_k=5,
     fetch_text=True,
@@ -301,7 +301,7 @@ FactReasoner supports three configurations:
 ### Google Search (via Serper API)
 
 ```python
-retriever = ContextRetriever(
+retriever = Retriever(
     service_type="google",
     top_k=5,
     cache_dir="/path/to/cache.db",  # SQLite cache for API results
@@ -313,7 +313,7 @@ retriever = ContextRetriever(
 ### Wikipedia
 
 ```python
-retriever = ContextRetriever(
+retriever = Retriever(
     service_type="wikipedia",
     top_k=3
 )
@@ -322,7 +322,7 @@ retriever = ContextRetriever(
 ### ChromaDB Vector Store
 
 ```python
-retriever = ContextRetriever(
+retriever = Retriever(
     service_type="chromadb",
     collection_name="my_documents",
     persist_dir="/path/to/chroma_db",
