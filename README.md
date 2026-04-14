@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python 3.11+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.5.6-red.svg)](https://github.com/IBM/FactReasoner)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-0.5.7-red.svg)](https://github.com/IBM/FactReasoner)
 ![Static Badge](https://img.shields.io/badge/mellea-0.4.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
@@ -115,11 +115,10 @@ uv pip install fact_reasoner
 ### From Source
 
 ```bash
-git clone git@github.com:IBM/FactReasoner.git
+git clone https://github.com/IBM/FactReasoner
 cd FactReasoner
-conda create -n fr python=3.12
-conda activate fr
-uv pip install -e .
+uv sync
+. .venv/bin/activate # To activate the virtual environment
 ```
 
 ### Internal IBM Usage
@@ -448,9 +447,11 @@ FactReasoner/
 │   └── eval/
 │       └── eval_dataset.py   # Dataset evaluation utilities
 ├── docs/
-│   ├── assessors/            # Assessor examples
-│   ├── correctors/           # Corrector examples
-│   └── core/                 # Core component examples
+|   ├── examples
+│   │   ├── assessors/        # Assessor examples
+│   │   ├── correctors/       # Corrector examples
+│   │   └── core/             # Core component examples
+│   └── papers/               # Papers
 ├── tests/                    # Unit tests
 ├── pyproject.toml            # Package configuration
 └── README.md
@@ -462,13 +463,13 @@ See the `docs/` directory for complete examples:
 
 | Example | Description |
 |---------|-------------|
-| `docs/assessors/ex_factreasoner.py` | Full FactReasoner pipeline |
-| `docs/assessors/ex_factscore.py` | FactScore baseline |
-| `docs/assessors/ex_veriscore.py` | VeriScore baseline |
-| `docs/core/ex_atomizer.py` | Standalone atomization |
-| `docs/core/ex_nli.py` | NLI extraction |
-| `docs/core/ex_retriever.py` | Context retrieval |
-| `docs/core/ex_summarizer.py` | Context summarization |
+| `docs/examples/assessors/ex_factreasoner.py` | Full FactReasoner pipeline |
+| `docs/examples/assessors/ex_factscore.py` | FactScore baseline |
+| `docs/examples/assessors/ex_veriscore.py` | VeriScore baseline |
+| `docs/examples/core/ex_atomizer.py` | Standalone atomization |
+| `docs/examples/core/ex_nli.py` | NLI extraction |
+| `docs/examples/core/ex_retriever.py` | Context retrieval |
+| `docs/examples/core/ex_summarizer.py` | Context summarization |
 
 ## Citation
 
