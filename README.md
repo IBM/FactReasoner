@@ -115,7 +115,7 @@ uv pip install fact_reasoner
 ### From Source
 
 ```bash
-git clone https://github.com/NASA-IMPACT/FactReasoner.git
+git clone https://github.com/IBM/FactReasoner
 cd FactReasoner
 uv sync
 . .venv/bin/activate # To activate the virtual environment
