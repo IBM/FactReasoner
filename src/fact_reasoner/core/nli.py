@@ -29,7 +29,10 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from fact_reasoner.utils import extract_last_square_brackets
+from fact_reasoner.utils import (
+    extract_last_square_brackets,
+    extract_logprobs_from_output,
+)
 
 INSTRUCTION_NLI = """
 
@@ -44,9 +47,9 @@ Your task is to evaluate the relationship between the PREMISE and the HYPOTHESIS
 2. Provide the reasoning behind your evaluation of the relationship between PREMISE and HYPOTHESIS, justifying each decision.
 3. Final Answer: Based on your reasoning, the HYPOTHESIS and the PREMISE, determine your final answer. \
 Your final answer must be one of the following: entailment, contradiction or neutral, wrapped in square brackets:
-- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS.
-- [contradiction] if the PREMISE contradicts the HYPOTHESIS.
-- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other.
+- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS
+- [contradiction] if the PREMISE contradicts the HYPOTHESIS
+- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other
 
 Use the following examples to better understand your task.
 
@@ -57,7 +60,7 @@ HYPOTHESIS: Robert Smith holds the title of Baron Smith of Kelvin.
 The PREMISE states that Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. It also mentions that Smith was appointed to the House of Lords as an independent crossbench peer in 2008. This information directly supports the HYPOTHESIS that Robert Smith holds the title of Baron Smith of Kelvin.
 2: Reasoning:
 The PREMISE explicitly mentions that Robert Smith is Baron Smith of Kelvin, which directly supports the HYPOTHESIS. The additional information about his knighthood, appointment to the House of Lords, and other titles further confirms his status as a peer, but it is not necessary to support the specific HYPOTHESIS about him holding the title of Baron Smith of Kelvin.
-3. Final Answer: 
+3. Final Answer:
 [entailment]
 
 Example 2:
@@ -87,6 +90,7 @@ PREMISE: {{premise_text}}
 HYPOTHESIS: {{hypothesis_text}}
 """
 
+
 class NLIExtractor:
     """
     Predict the NLI relationship between a premise and a hypothesis, optionally
@@ -97,10 +101,10 @@ class NLIExtractor:
     v2 - more recent (with reasoning)
     v3 - only for Google search results
     """
-    
+
     def __init__(
-            self,
-            backend: Backend,
+        self,
+        backend: Backend,
     ):
         """
         Initialize the NLIExtractor.
@@ -110,9 +114,11 @@ class NLIExtractor:
                 The Mellea backend to use for LLM interaction.
         """
 
-        # Safety checks        
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea backend is None. Please provide a valid Mellea backend.")
+            raise ValueError(
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
 
         self.method = "logprobs"
         self.backend = backend
@@ -122,7 +128,6 @@ class NLIExtractor:
 
         # Disable Mellea logging
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
-
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
@@ -135,25 +140,40 @@ class NLIExtractor:
         Returns:
             float: The average log probability of the generated tokens.
         """
+        logprobs = extract_logprobs_from_output(output)
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+        # OpenAI-compatible backends return string tokens (e.g. "[", "]").
+        # The native Bedrock InvokeModel API returns numeric token IDs as
+        # strings (e.g. "58"). Detect which format we have.
+        has_string_tokens = any(item["token"] in ("[", "]") for item in logprobs)
 
-        # Go backwards and collect the logprobs of the tokens between ']' and ']'
         avg_logprob = 0
         count = 0
-        for item in reversed(logprobs):
-            if item['token'] == '[':
-                break
-            elif item['token'] == ']':
-                continue
-            else:
-                avg_logprob += item['logprob']
+
+        if has_string_tokens:
+            # Original logic: walk backwards, collect logprobs of tokens
+            # between the last ']' and the matching '['.
+            for item in reversed(logprobs):
+                if item["token"] == "[":
+                    break
+                elif item["token"] == "]":
+                    continue
+                else:
+                    avg_logprob += item["logprob"]
+                    count += 1
+        else:
+            # Bedrock native: numeric token IDs — can't identify '['/']'
+            # without the tokenizer. Proxy confidence via the last few
+            # tokens, which correspond to the label at end of generation
+            # (e.g. "[entailment]" tokenises to ~4 tokens).
+            label_window = logprobs[-5:] if len(logprobs) >= 5 else logprobs
+            for item in label_window:
+                avg_logprob += item["logprob"]
                 count += 1
 
         # Compute the probability
         avg_logprob = avg_logprob / count if count > 0 else math.inf
-        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
+        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
 
     def _get_label(self, output: ModelOutputThunk) -> str:
         """
@@ -164,16 +184,16 @@ class NLIExtractor:
                 The model raw output (via Mellea)
 
         Returns:
-            str: The string representing the NLI label (entailment, contradiction, neutral).        
+            str: The string representing the NLI label (entailment, contradiction, neutral).
         """
 
         return extract_last_square_brackets(str(output))
 
     def run(self, premise: str, hypothesis: str) -> Dict[str, Any]:
         """
-        Extract the NLI relationship between premise and hypothesis. The 
+        Extract the NLI relationship between premise and hypothesis. The
         following relationships are allowed: entailment, contradiction, neutral.
-        
+
         Args:
             premise: str
                 The premise text (e.g., context).
@@ -183,7 +203,7 @@ class NLIExtractor:
         Returns:
             Dict[str, Any]: A dictionary containing the relationship and its probability.
         """
-        
+
         # Perform the instruction with validation
         output = mfuncs.instruct(
             INSTRUCTION_NLI,
@@ -193,14 +213,17 @@ class NLIExtractor:
                 check(
                     "The output must be a wrapped in square brackets",
                     validation_fn=simple_validate(
-                        lambda s: extract_last_square_brackets(s) != ''
+                        lambda s: extract_last_square_brackets(s) != ""
                     ),
                 )
             ],
             user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
-            model_options=dict(logprobs=True),
+            model_options={
+                "logprobs": True,
+                "top_logprobs": 5,
+            },
         )
 
         if output.success:
@@ -209,21 +232,17 @@ class NLIExtractor:
             if label not in ["entailment", "contradiction", "neutral"]:
                 label = "neutral"
 
-            return dict(
-                label=label, 
-                probability=probability
-            )
+            return dict(label=label, probability=probability)
         else:
-            return dict(
-                label="neutral", 
-                probability=1.0
-            )
+            return dict(label="neutral", probability=1.0)
 
-    async def run_batch(self, premises: List[str], hypotheses: List[str]) -> List[Dict[str, Any]]:
+    async def run_batch(
+        self, premises: List[str], hypotheses: List[str]
+    ) -> List[Dict[str, Any]]:
         """
-        Extract the NLI relationships between premises and hypotheses. The 
+        Extract the NLI relationships between premises and hypotheses. The
         following relationships are allowed: entailment, contradiction, neutral.
-        
+
         Args:
             premises: List[str]
                 The list of premise texts (e.g., context).
@@ -231,13 +250,13 @@ class NLIExtractor:
                 The list of hypothesis texts (e.g., atom).
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries containing the 
+            List[Dict[str, Any]]: A list of dictionaries containing the
             relationships and their probabilities.
         """
 
-        corutines = []
+        coroutines = []
         for premise, hypothesis in zip(premises, hypotheses):
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_NLI,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -245,33 +264,30 @@ class NLIExtractor:
                     check(
                         "The output must be a wrapped in square brackets",
                         validation_fn=simple_validate(
-                            lambda s: extract_last_square_brackets(s) != ''
+                            lambda s: extract_last_square_brackets(s) != ""
                         ),
                     )
                 ],
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True,
-                model_options=dict(logprobs=True),
+                model_options={
+                    "logprobs": True,
+                    "top_logprobs": 5,
+                },
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
         print(f"[NLI] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
+
             if output.success:
                 label = self._get_label(output.result)
                 probability = self._get_probability(output.result)
-                results.append(dict(
-                    label=label,
-                    probability=probability
-                ))
+                results.append(dict(label=label, probability=probability))
             else:
-                results.append(dict(
-                    label="neutral",
-                    probability=1.0
-                ))
+                results.append(dict(label="neutral", probability=1.0))
 
         return results
-

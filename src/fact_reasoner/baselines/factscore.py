@@ -34,7 +34,11 @@ from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.base import Atom, Context
-from fact_reasoner.core.utils import build_atoms, build_contexts, remove_duplicated_atoms
+from fact_reasoner.core.utils import (
+    build_atoms,
+    build_contexts,
+    remove_duplicated_atoms,
+)
 from fact_reasoner.utils import LOOP_BUDGET
 
 # Version 1 of the prompt (from the original FactScore paper)
@@ -58,28 +62,29 @@ Input: {{atom_text}} True or False?
 Output:
 """
 
+
 class FactScore:
     """
     Implementation of the FactScore factuality assessor.
 
     Source:
         @misc{min2023factscore,
-        title={FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation}, 
+        title={FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation},
         author={Sewon Min and Kalpesh Krishna and Xinxi Lyu and Mike Lewis and Wen-tau Yih and Pang Wei Koh and Mohit Iyyer and Luke Zettlemoyer and Hannaneh Hajishirzi},
         year={2023},
         eprint={2305.14251},
         archivePrefix={arXiv},
         primaryClass={cs.CL},
-        url={https://arxiv.org/abs/2305.14251}, 
+        url={https://arxiv.org/abs/2305.14251},
         }
     """
 
     def __init__(
-            self,
-            backend: Backend,
-            atom_extractor: Atomizer = None,
-            atom_reviser: Reviser = None,
-            context_retriever: ContextRetriever = None,
+        self,
+        backend: Backend,
+        atom_extractor: Atomizer = None,
+        atom_reviser: Reviser = None,
+        context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the FactScore pipeline.
@@ -99,18 +104,18 @@ class FactScore:
         self.query = None
         self.response = None
         self.topic = None
-        self.start_time = time.perf_counter() # get the start time
+        self.start_time = time.perf_counter()  # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
-        self.binary_output = True # default is True
-    
+        self.binary_output = True  # default is True
+
         print(f"[FactScore] Using Mellea backend: {self.backend.model_id}")
         print(f"[FactScore] Binary output: {self.binary_output}")
 
-        self.atoms = {} # indexed by atom id
-        self.contexts = {} # indexed by context id
+        self.atoms = {}  # indexed by atom id
+        self.contexts = {}  # indexed by context id
 
         # Ground truth labels (if any)
         self.labels_human = None
@@ -119,8 +124,8 @@ class FactScore:
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def from_dict_with_contexts(
-            self,
-            data: Dict[str, Any],
+        self,
+        data: Dict[str, Any],
     ):
         """
         Initialize FactScore from a dict containing both atoms and contexts.
@@ -133,8 +138,8 @@ class FactScore:
         self.query = data["input"]
         self.response = data["output"]
         self.topic = data.get("topic", None)
-        
-        print(f"[FactScore] Reading the atoms ...")                
+
+        print(f"[FactScore] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -156,7 +161,7 @@ class FactScore:
         print(f"[FactScore] Atoms found: {len(self.atoms)}")
         for _, atom in self.atoms.items():
             print(f"[FactScore] {atom}")
-        
+
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[FactScore] Lables found: {self.labels_human}")
 
@@ -168,12 +173,7 @@ class FactScore:
             snippet = context_dict.get("snippet", "")
             link = context_dict.get("link", "")
             ctxt = Context(
-                id=cid, 
-                atom=None, 
-                text=text, 
-                title=title, 
-                snippet=snippet, 
-                link=link
+                id=cid, atom=None, text=text, title=title, snippet=snippet, link=link
             )
             self.contexts[cid] = ctxt
 
@@ -184,7 +184,9 @@ class FactScore:
                 ctxts.append(self.contexts[c])
                 self.contexts[c].set_atom(atom)
             atom.add_contexts(ctxts)
-        print(f"[FactScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
+        print(
+            f"[FactScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
+        )
 
     def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
         """
@@ -224,14 +226,14 @@ class FactScore:
         return data
 
     def build(
-            self,
-            query: str = None,
-            response: str = None,
-            topic: str = None,
-            has_atoms: bool = False,
-            has_contexts: bool = False,
-            revise_atoms: bool = False,
-            use_fast_retriever: bool = True
+        self,
+        query: str = None,
+        response: str = None,
+        topic: str = None,
+        has_atoms: bool = False,
+        has_contexts: bool = False,
+        revise_atoms: bool = False,
+        use_fast_retriever: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -256,7 +258,7 @@ class FactScore:
         """
 
         # Initialize the scorer
-        if query is not None: 
+        if query is not None:
             self.query = query
         if response is not None:
             self.response = response
@@ -266,27 +268,25 @@ class FactScore:
         self.revise_atoms = revise_atoms
 
         # Safety checks
-        assert self.atom_extractor is not None, \
-            f"The atom extractor must be created."
-        assert self.atom_reviser is not None, \
-            f"The atom reviser must be created."
+        assert self.atom_extractor is not None, f"The atom extractor must be created."
+        assert self.atom_reviser is not None, f"The atom reviser must be created."
 
         print(f"[FactScore] Building the pipeline ...")
-        
-        # Build the atoms 
+
+        # Build the atoms
         if has_atoms == False:
             self.atoms = build_atoms(
-                response=self.response,
-                atom_extractor=self.atom_extractor
+                response=self.response, atom_extractor=self.atom_extractor
             )
-            self.revise_atoms = True # revise atoms is newly created
+            self.revise_atoms = True  # revise atoms is newly created
             print(f"[FactScore] Extracted {len(self.atoms)} atoms.")
             for aid in self.atoms.keys():
                 print(f"[FactScore] {self.atoms[aid]}")
 
         # Safety checks
-        assert len(self.atoms) > 0, \
-            f"The atoms must be initialized before running the pipeline."
+        assert (
+            len(self.atoms) > 0
+        ), f"The atoms must be initialized before running the pipeline."
 
         # Revise the atoms
         if self.revise_atoms:
@@ -305,7 +305,7 @@ class FactScore:
         print(f"[FactScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if has_contexts == False: # check if contexts already in file
+        if has_contexts == False:  # check if contexts already in file
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
@@ -330,13 +330,23 @@ class FactScore:
             elif "false" in generated_answer and "true" not in generated_answer:
                 is_supported = False
             else:
-                is_supported = generated_answer.index("true") > generated_answer.index("false")
+                is_supported = generated_answer.index("true") > generated_answer.index(
+                    "false"
+                )
         else:
-            is_supported = all([keyword not in generated_answer.lower().translate(str.maketrans("", "", string.punctuation)).split() for keyword in ["not", "cannot", "unknown", "information"]])
+            is_supported = all(
+                [
+                    keyword
+                    not in generated_answer.lower()
+                    .translate(str.maketrans("", "", string.punctuation))
+                    .split()
+                    for keyword in ["not", "cannot", "unknown", "information"]
+                ]
+            )
 
         label = "S" if is_supported else "NS"
         return label
-                
+
     async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom predict its label (S or NS) given the corresponding
@@ -353,10 +363,12 @@ class FactScore:
                 title = psg["title"]
                 text = psg["text"]
                 snippet = psg.get("snippet", "")
-                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(title, snippet, text)
+                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(
+                    title, snippet, text
+                )
 
             return knowledge
-        
+
         # Use the LLM to label the atom
         print(f"[FactScore] Labeling atoms with {self.backend.model_id} ...")
 
@@ -364,7 +376,7 @@ class FactScore:
         atom_ids = []
         atom_labels = []
         atom_outputs = []
-        corutines = []
+        coroutines = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
@@ -373,7 +385,7 @@ class FactScore:
             if contexts is not None and len(contexts) > 0:
                 for _, c in contexts.items():
                     passages.append(dict(title=c.get_title(), text=c.get_text()))
-            
+
             # Prepare the context
             knowledge_text = make_knowledge(passages)
             print(f"[FactScore] Processing atom: ({aid}) {atom_text}")
@@ -382,35 +394,33 @@ class FactScore:
             if self.topic is not None:
                 instruction = INSTRUCTION_FACTSCORE
                 user_variables = {
-                    "topic_text": self.topic, 
-                    "atom_text": atom_text, 
-                    "knowledge_text": knowledge_text
+                    "topic_text": self.topic,
+                    "atom_text": atom_text,
+                    "knowledge_text": knowledge_text,
                 }
             else:
                 instruction = INSTRUCTION_FACTSCORE_NOTOPIC
                 user_variables = {
-                    "atom_text": atom_text, 
-                    "knowledge_text": knowledge_text
+                    "atom_text": atom_text,
+                    "knowledge_text": knowledge_text,
                 }
 
             # Execute the instruction
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[
-                    check(
-                        "The output must contain the tokens True or False"
-                    )
+                    check("The output must contain the tokens True or False")
                 ],
                 user_variables=user_variables,
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True
+                return_sampling_results=True,
             )
-            corutines.append(corutine)
-        
+            coroutines.append(coroutine)
+
         print(f"[FactScore] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)
@@ -421,7 +431,7 @@ class FactScore:
 
     def score(self) -> Dict[str, Any]:
         """
-        Compute the factuality score taking into consideration the contexts 
+        Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
 
         Factuality score = # atoms(true) / # atoms
@@ -452,18 +462,18 @@ class FactScore:
                     num_false_atoms += 1
                 else:
                     num_uniform_atoms += 1
-      
+
         # Precision, R@K and F1@K
-        fscore = float(num_true_atoms)/float(len(self.atoms))
-        K = int(len(self.atoms) / 2) # K is assumed to be half
-        recall_k = min(float(num_true_atoms)/K, 1.0)
+        fscore = float(num_true_atoms) / float(len(self.atoms))
+        K = int(len(self.atoms) / 2)  # K is assumed to be half
+        recall_k = min(float(num_true_atoms) / K, 1.0)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
         except Exception as _:
             f1k = 0.0
 
         # Elapsed time
-        elapsed_time = time.perf_counter() - self.start_time # elapsed time
+        elapsed_time = time.perf_counter() - self.start_time  # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -497,11 +507,13 @@ class FactScore:
                     if labels[aid] == "NS":
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1                    
-            fscore_gold = true_atoms/len(self.labels_human)
+                        num_false_positive += 1
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[FactScore] Gold labels: {self.labels_human}")
             print(f"[FactScore] Predictions: {labels}")
-            print(f"[FactScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[FactScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -515,7 +527,7 @@ class FactScore:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items(): # true labels are either S or NS
+            for aid, l in self.labels_human.items():  # true labels are either S or NS
                 if l == "S":
                     true_atoms += 1
                     if labels[aid] == "S":
@@ -527,12 +539,14 @@ class FactScore:
                     if labels[aid] in ["C", "U"]:
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1     
+                        num_false_positive += 1
 
-            fscore_gold = true_atoms/len(self.labels_human)
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[FactScore] Gold labels: {self.labels_human}")
             print(f"[FactScore] Predictions: {labels}")
-            print(f"[FactScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[FactScore] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -549,4 +563,3 @@ class FactScore:
         print(f"[FactScore] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results
-

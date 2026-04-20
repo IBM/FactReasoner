@@ -27,7 +27,7 @@ from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
-from fact_reasoner.utils import LOOP_BUDGET
+from fact_reasoner.utils import LOOP_BUDGET, extract_logprobs_from_output
 
 INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
@@ -154,14 +154,15 @@ CONTEXT: {{context}}
 SUMMARY:
 """
 
+
 class ContextSummarizer:
     """
     Context summarization given the atom.
     """
 
     def __init__(
-            self,
-            backend: Backend,
+        self,
+        backend: Backend,
     ):
         """
         Initialize the ContextSummarizer.
@@ -172,14 +173,16 @@ class ContextSummarizer:
             with_reference: str
                 The reference paragraph that the context will be summarized to.
         """
-        
-        # Safety checks        
+
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea backend is None. Please provide a valid Mellea backend.")
+            raise ValueError(
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
 
         # Initialize the extractor
         self.backend = backend
-        
+
         # Print info
         print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
 
@@ -198,16 +201,41 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
-        avg_logprob = sum(lp['logprob'] for lp in logprobs) / len(logprobs) if len(logprobs) > 0 else math.inf
+        logprobs = extract_logprobs_from_output(output)
 
-        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 
+        avg_logprob = (
+            sum(lp["logprob"] for lp in logprobs) / len(logprobs)
+            if len(logprobs) > 0
+            else math.inf
+        )
 
-    async def run_batch(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
+        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
+
+    def run(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
-        
+
+        Args:
+            contexts: List[str]
+                The list of contexts to be summarized.
+            atom_text: str
+                The reference atomic unit text
+        Returns:
+            List[Dict[str, Any]]: A list of summarized contexts.
+        """
+
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, self.run_batch(contexts, atom_text))
+            return future.result()
+
+    async def run_batch(
+        self, contexts: List[str], atom_text: str = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Summarize a list of contexts with respect to an atomic unit.
+
         Args:
             contexts: List[str]
                 The list of contexts to be summarized.
@@ -218,35 +246,39 @@ class ContextSummarizer:
         """
 
         # Initialize the instruction
-        instruction = INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
+        instruction = (
+            INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
+        )
 
         # Perform the instruction with validation
         results = []
-        corutines = []
+        coroutines = []
         for context in contexts:
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[],
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True,                    
+                return_sampling_results=True,
                 user_variables={"context": context, "atom_text": atom_text},
-                model_options=dict(logprobs=True)
+                model_options={
+                    "logprobs": True,
+                    "top_logprobs": 5,
+                },
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             cleaned = str(output).strip()
             results.append(
                 {
                     "context": context,
                     "summary": cleaned if cleaned != "None" else "",
-                    "probability": self._get_probability(output.result)
+                    "probability": self._get_probability(output.result),
                 }
             )
 
         return results
-       

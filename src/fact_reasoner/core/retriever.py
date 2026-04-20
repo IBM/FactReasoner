@@ -17,7 +17,6 @@ import logging
 import re
 import chromadb
 import requests
-import torch
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
@@ -26,14 +25,13 @@ from tqdm import tqdm
 
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
+from chromadb.config import Settings as ChromaSettings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 from io import BytesIO
 from PyPDF2 import PdfReader
 from itertools import islice
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL)
+import wikipedia
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import WikipediaRetriever
@@ -47,6 +45,9 @@ from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.search_api import SearchAPI
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
 DEFAULT_DB_PATH = "/tmp/nasa_contrib/accelerated-discovery/chroma_db"
 
@@ -55,20 +56,21 @@ NEWLINES_RE = re.compile(r"\n{2,}")  # two or more "\n" characters
 
 CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
     separators=["\n\n", "\n", ". ", " ", ""],
-    #keep_separator=False,
+    # keep_separator=False,
     chunk_size=1000,
-    chunk_overlap=0
+    chunk_overlap=0,
 )
 
 # Regex patterns to remove common inline citation forms
 CITATION_PATTERNS = [
-    r"\[\d+\]",                       # [1], [23]
-    r"\(\d+\)",                       # (1), (23)
-    r"\[\s*citation\s+needed\s*\]",   # [citation needed]
-    r"\(\s*citation\s+needed\s*\)",   # (citation needed)
+    r"\[\d+\]",  # [1], [23]
+    r"\(\d+\)",  # (1), (23)
+    r"\[\s*citation\s+needed\s*\]",  # [citation needed]
+    r"\(\s*citation\s+needed\s*\)",  # (citation needed)
     r"\[\s*[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d{4}\s*\]",  # [Smith 2020], [Doe et al. 2019]
-    r"\^\d+",                         # ^1 (superscript-like)
+    r"\^\d+",  # ^1 (superscript-like)
 ]
+
 
 def _clean_text(text: str) -> str:
     """Apply citation removal and whitespace normalization (single line)."""
@@ -77,6 +79,7 @@ def _clean_text(text: str) -> str:
     # Collapse all whitespace (including newlines/tabs) to a single space
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
 
 def _extract_html_paragraphs(soup: BeautifulSoup) -> str:
     """
@@ -111,6 +114,7 @@ def _extract_html_paragraphs(soup: BeautifulSoup) -> str:
     text = " ".join(_clean_text(p) for p in paragraphs)
     return _clean_text(text)
 
+
 def _extract_pdf_paragraphs(pdf_bytes: bytes, max_pages: int = 1) -> str:
     """
     Extract text from a PDF and return a single-line string.
@@ -141,8 +145,9 @@ def _extract_pdf_paragraphs(pdf_bytes: bytes, max_pages: int = 1) -> str:
         cleaned = _clean_text(full_text)
         return cleaned
 
-    cleaned_paragraphs = [ _clean_text(p) for p in raw_paragraphs if p and p.strip() ]
+    cleaned_paragraphs = [_clean_text(p) for p in raw_paragraphs if p and p.strip()]
     return _clean_text(" ".join(cleaned_paragraphs))
+
 
 def extract_text_from_url(url: str, timeout: int = 10, max_pages: int = 1) -> str:
     """
@@ -193,19 +198,22 @@ def extract_text_from_url(url: str, timeout: int = 10, max_pages: int = 1) -> st
         except Exception:
             pass
 
+
 def fetch_text_from_link(link: str, max_size: int = None) -> str:
     logger.info(f"Fetching text from link: {link}")
     url_text = extract_text_from_url(url=link)
     if max_size is not None and len(url_text) > max_size:
         url_text = url_text[:max_size]
-    return url_text    
+    return url_text
+
 
 def get_title(text: str) -> str:
     """
     Get the title of the retrived document. By definition, the first line in the
     document is the title (we embedded them like that).
     """
-    return text[:text.find("\n")]
+    return text[: text.find("\n")]
+
 
 def make_uniform(text: str) -> str:
     """
@@ -216,13 +224,12 @@ def make_uniform(text: str) -> str:
     character_split_texts = CHARACTER_SPLITTER.split_text(text)
     return " ".join(character_split_texts)
 
+
 class ChromaReader:
     def __init__(
         self,
         collection_name: str,
         persist_directory: str,
-        embedding_model: str,
-        collection_metadata: dict = None,
     ):
         """
         Initialize the ChromaDB.
@@ -237,24 +244,19 @@ class ChromaReader:
             collection_metadata: dict
                 A dict containing the collection metadata.
         """
-        
-        self.device = "cpu"
-        if torch.cuda.is_available():
-            self.device = "cuda"
 
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        self.persist_directory = persist_directory
-        self.collection_name = collection_name
-        self.embedding_model = embedding_model
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=self.embedding_model,
-            device=self.device,
+        self.client = chromadb.PersistentClient(
+            path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)
         )
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name,
-            embedding_function=self.embedding_function,
-            metadata=collection_metadata,
+
+        self.collection = self.client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=EMBEDDING_MODEL
+            ),
         )
+
+        print(f"[ChromaDB] initialized with {self.collection.count()} items.")
 
     def is_empty(self):
         return self.collection.count() == 0
@@ -262,7 +264,7 @@ class ChromaReader:
     def query(self, query_texts: str, n_results: int = 5):
         """
         Returns the closests vector to the question vector
-        
+
         Args:
             query_texts: str
                 The user query text.
@@ -297,13 +299,15 @@ def is_content_valid(link: str, page_text: str) -> bool:
         "access denied",
         "403 forbidden",
         "errors.edgesuite",
-        "you do not have access to"
+        "you do not have access to",
     ]
-    
+
     text_lower = page_text.lower()
     for phrase in restriction_phrases:
         if phrase in text_lower:
-            logger.warning(f"Redundant content detected for {link} due to restriction phrase: '{phrase}'")
+            logger.warning(
+                f"Redundant content detected for {link} due to restriction phrase: '{phrase}'"
+            )
             return False
 
     if len(page_text) > 50:
@@ -314,7 +318,9 @@ def is_content_valid(link: str, page_text: str) -> bool:
         except ZeroDivisionError:
             ratio = 0
         if ratio > 0.10:
-            logger.warning(f"Redundant content detected for {link} due to high ratio of replacement characters: {ratio:.2%}")
+            logger.warning(
+                f"Redundant content detected for {link} due to high ratio of replacement characters: {ratio:.2%}"
+            )
             return False
 
     # we consider the content as valid
@@ -327,18 +333,18 @@ class Retriever:
     using a remote chromadb store (API exists), a local chromadb store, langchain
     based wikipedia retriever, and possibly others.
     """
-    
+
     def __init__(
-            self,
-            service_type: str = "chromadb",
-            collection_name: str = "wikipedia_en",
-            persist_dir: str = "/tmp/wiki_db",
-            top_k: int = 1,
-            cache_dir: Optional[str] = None,
-            fetch_text: bool = False,
-            use_in_memory_vectorstore: bool = False,
-            query_builder: QueryBuilder = None,
-            num_workers: int = 4
+        self,
+        service_type: str = "chromadb",
+        collection_name: str = "wikipedia_en",
+        persist_dir: str = "/tmp/wiki_db",
+        top_k: int = 1,
+        cache_dir: Optional[str] = None,
+        fetch_text: bool = False,
+        use_in_memory_vectorstore: bool = False,
+        query_builder: QueryBuilder = None,
+        num_workers: int = 4,
     ):
         """
         Initialize the context retriever component.
@@ -386,15 +392,18 @@ class Retriever:
 
         if self.service_type == "chromadb":
             self.chromadb_retriever = ChromaReader(
-                collection_name=self.collection_name, 
-                persist_directory=self.persist_dir, 
-                embedding_model=EMBEDDING_MODEL, 
-                collection_metadata={"hnsw:space": "cosine"}
+                collection_name=self.collection_name,
+                persist_directory=self.persist_dir,
             )
         elif self.service_type == "wikipedia":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
-            self.langchain_retriever = WikipediaRetriever(lang="en", top_k_results=top_k)
+            wikipedia.set_user_agent(
+                "NASA IMPACT Accelerated Knowledge Discovery (AKD)/1.0 (leo@developmentseed.org)"
+            )
+            self.langchain_retriever = WikipediaRetriever(
+                lang="en", top_k_results=top_k, wiki_client=wikipedia
+            )
         elif self.service_type == "google":
             self.google_retriever = SearchAPI(cache_dir=self.cache_dir)
             if self.use_in_memory_vectorstore:
@@ -403,15 +412,11 @@ class Retriever:
                 )
         else:
             raise ValueError(f"Unknown retriever service: {self.service_type}")
-        
+
     def set_query_builder(self, query_builder: QueryBuilder = None):
         self.query_builder = query_builder
-    
-    def query(
-            self, 
-            text: str,
-            max_size: int = 4000
-    ) -> List[Dict[str, Any]]:
+
+    def query(self, text: str, max_size: int = 4000) -> List[Dict[str, Any]]:
         """
         Retrieve a number of contexts relevant to the input text.
 
@@ -427,7 +432,9 @@ class Retriever:
 
         results = []
         if self.service_type == "chromadb":
-            logger.info(f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})")
+            logger.info(
+                f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})"
+            )
 
             relevant_chunks = self.chromadb_retriever.query(
                 query_texts=[text],
@@ -436,49 +443,64 @@ class Retriever:
 
             docs = relevant_chunks.get("documents", [[]])[0]
             metadatas = relevant_chunks.get("metadatas", [[]])[0]
-            
+
             passages = []
             for doc_content, metadata in zip(docs, metadatas):
+                cleaned = _clean_text(doc_content)
+                first_sentence, _, _ = cleaned.partition(". ")
+                snippet = (first_sentence + ".") if first_sentence and _ else cleaned[:200]
                 passage = {
                     "title": metadata.get("title", "No Title Provided"),
-                    "text": make_uniform(doc_content),
-                    "snippet": "",
-                    "link": metadata.get("source", "")
+                    "text": make_uniform(cleaned),
+                    "snippet": snippet,
+                    "link": metadata.get("source", ""),
                 }
                 passages.append(passage)
 
             results.extend(passages)
         elif self.service_type == "wikipedia":
-            logger.info(f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})")
+            logger.info(
+                f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})"
+            )
 
-            passages = []                
+            passages = []
 
             # Get most relevant docs to the query
-            rel_docs = self.langchain_retriever.invoke(text)
+            try:
+                rel_docs = self.langchain_retriever.invoke(text)
+            except Exception as e:
+                logger.warning(f"Wikipedia retrieval failed for query '{text}': {e}")
+                return results
             for doc in rel_docs:
                 title = doc.metadata["title"]
                 summary = doc.metadata["summary"]
                 link = doc.metadata["source"]
                 doc_content = make_uniform(doc.page_content)
-                passages.append(dict(title=title, text=doc_content, snippet=summary, link=link))
-            
+                passages.append(
+                    dict(title=title, text=doc_content, snippet=summary, link=link)
+                )
+
             # Extract the top_k passages
             n = min(self.top_k, len(passages))
             for i in range(n):
-                results.append(passages[i]) # a passage is a dict with title and text as keys
+                results.append(
+                    passages[i]
+                )  # a passage is a dict with title and text as keys
 
         elif self.service_type == "google":
-            logger.info(f"Retrieving {self.top_k} search results for: {text} (service: {self.service_type})")
+            logger.info(
+                f"Retrieving {self.top_k} search results for: {text} (service: {self.service_type})"
+            )
 
             if not text:
-                return results # empty list
+                return results  # empty list
 
             # Generate the query text if there is a query builder
             if self.query_builder is not None:
                 query_text = self.query_builder.run(text)
             else:
                 query_text = text
-            
+
             # Truncate the text if too long (for Google)
             query_text = query_text if len(query_text) < 2048 else query_text[:2048]
             logger.info(f"Using query text: {query_text}")
@@ -490,8 +512,8 @@ class Retriever:
             n = len(search_results[query_text])
 
             # If no hits then relax query by removing specific '"' (if any)
-            if n == 0: # no hits
-                query_text = query_text.replace('"', '') # relax query text
+            if n == 0:  # no hits
+                query_text = query_text.replace('"', "")  # relax query text
                 search_results = self.google_retriever.get_snippets([query_text])
 
             search_hits = search_results[query_text]
@@ -532,27 +554,41 @@ class Retriever:
                         raw_page_text = ""
                     doc_content = make_uniform(raw_page_text) if raw_page_text else ""
 
-                    if not doc_content or any(kw in doc_content.lower() for kw in ("chatgpt", "factscore", "dataset viewer")):
+                    if not doc_content or any(
+                        kw in doc_content.lower()
+                        for kw in ("chatgpt", "factscore", "dataset viewer")
+                    ):
                         doc_content = ""
                         index_available.append(i)
                         continue
 
                     if self.use_in_memory_vectorstore:
                         split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
-                        documents = [Document(id=f"{doc_id}", page_content=chunk, metadata={"source": link})
+                        documents = [
+                            Document(
+                                id=f"{doc_id}",
+                                page_content=chunk,
+                                metadata={"source": link},
+                            )
                             for doc_id, chunk in enumerate(split_doc_content)
                         ]
                         self.in_memory_vectorstore.add_documents(documents=documents)
-                        retriever = self.in_memory_vectorstore.as_retriever(search_kwargs={"k": 3})
+                        retriever = self.in_memory_vectorstore.as_retriever(
+                            search_kwargs={"k": 3}
+                        )
                         retrieved_docs = retriever.invoke(query_text)
-                        doc_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
+                        doc_content = "\n\n".join(
+                            [doc.page_content for doc in retrieved_docs]
+                        )
 
                     count_content += 1
                 else:
                     doc_content = ""
                     count_content += 1
 
-                passages.append(dict(title=title, text=doc_content, snippet=snippet, link=link))
+                passages.append(
+                    dict(title=title, text=doc_content, snippet=snippet, link=link)
+                )
 
             # --- Fallback to empty-content entries ---
             if count_content < self.top_k:
@@ -560,13 +596,20 @@ class Retriever:
                     if count_content >= self.top_k:
                         break
                     hit = search_hits[i]
-                    passages.append(dict(title=hit["title"], text="", snippet=hit["snippet"], link=hit["link"]))
+                    passages.append(
+                        dict(
+                            title=hit["title"],
+                            text="",
+                            snippet=hit["snippet"],
+                            link=hit["link"],
+                        )
+                    )
                     count_content += 1
 
             results.extend(passages)
             logger.info(f"Retrieved {len(results)} results for query.")
         return results
-           
+
 
 class ContextRetriever:
     """
@@ -606,7 +649,11 @@ class ContextRetriever:
             contexts.append(context)
 
         # Summarize in the same worker thread if summarizer is provided
-        if self.context_summarizer is not None and atom is not None and len(contexts) > 0:
+        if (
+            self.context_summarizer is not None
+            and atom is not None
+            and len(contexts) > 0
+        ):
             results = asyncio.run(
                 self.context_summarizer.run_batch(
                     [c.get_text() for c in contexts], atom.text
@@ -615,7 +662,9 @@ class ContextRetriever:
             for context, result in zip(contexts, results):
                 if result["summary"]:
                     context.set_synthetic_summary(result["summary"])
-                    context.set_probability(result["probability"] * context.get_probability())
+                    context.set_probability(
+                        result["probability"] * context.get_probability()
+                    )
             # Filter out irrelevant contexts (empty summary means not relevant)
             contexts = [c for c in contexts if c.get_summary()]
 
@@ -640,9 +689,7 @@ class ContextRetriever:
 
             # Submit query task
             if query:
-                future = executor.submit(
-                    self._retrieve_for_item, query, None, "c_q"
-                )
+                future = executor.submit(self._retrieve_for_item, query, None, "c_q")
                 futures[future] = ("query", None)
 
             # Collect results with progress bar

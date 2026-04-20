@@ -76,16 +76,14 @@ STATEMENT: {{statement_text}}
 OUTPUT:
 """
 
+
 class QueryBuilder:
     """
     The QueryBuilder uses an LLM to generate a query string. The query is then
     used to retrieve results from Google Search, Wikipedia, ChromaDB.
     """
 
-    def __init__(
-        self, 
-        backend: Backend
-    ):
+    def __init__(self, backend: Backend):
         """
         Initialize the QueryBuilder.
 
@@ -94,31 +92,32 @@ class QueryBuilder:
                 The Mellea backend to use for LLM interaction.
         """
 
-        # Safety checks        
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea backend is None. Please provide a valid Mellea backend.")
+            raise ValueError(
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
 
         # Initialize the extractor
         self.backend = backend
-        
+
         # Print info
         print(f"[QueryBuilder] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
-
     def run(self, text: str) -> str:
         """
         Build a Google search query for the given text.
-        
+
         Args:
             text: str
                 The text for which to build the Google search query.
         Returns:
             dict: A dictionary containing the query string.
         """
-        
+
         # Perform the instruction with validation
         output = mfuncs.instruct(
             INSTRUCTION_QUERY_BUILDER,
@@ -142,5 +141,4 @@ class QueryBuilder:
             cleaned = strip_code_fences(str(output))
             return cleaned
         else:
-            return text # the original text
-                        
+            return text  # the original text
