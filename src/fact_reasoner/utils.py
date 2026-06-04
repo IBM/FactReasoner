@@ -171,7 +171,9 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
         output._meta.get("logprobs")
         or output._meta.get("chat_response", {}).get("logprobs")
         or output._meta.get("oai_chat_response", {}).get("logprobs")
+        or (output._meta.get("oai_chat_response", {}) if isinstance(output._meta.get("oai_chat_response"), dict) else {}).get("choices", [{}])[0].get("logprobs")
         or output._meta.get("litellm_chat_response", {}).get("logprobs")
+        or (output._meta.get("litellm_chat_response", {}) if isinstance(output._meta.get("litellm_chat_response"), dict) else {}).get("choices", [{}])[0].get("logprobs")
     )
 
     assert (
@@ -203,6 +205,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
                 "Unable to extract logprobs: logprobs is not a recognized format (one of: list, dict with 'content' key) and litellm is not installed to validate possible litellm.types.utils.ChoiceLogprobs format. Check backend response format."
             )
     return logprobs_object[:-1]  # drop last token (EOS)
+
 
 
 def batcher(iterator, batch_size=4, progress=False):
