@@ -120,15 +120,16 @@ RESPONSE:
 OUTPUT:
 """
 
+
 class Reviser:
     """
     Atomic unit decontextualization using LLMs.
-    
+
     """
 
     def __init__(
-            self,
-            backend: Backend,
+        self,
+        backend: Backend,
     ):
         """
         Initialize the Reviser.
@@ -136,26 +137,27 @@ class Reviser:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
-        """ 
-        
-        # Safety checks        
+        """
+
+        # Safety checks
         if backend is None:
-            raise ValueError("Mellea session is None. Please provide a valid Mellea session.")
+            raise ValueError(
+                "Mellea session is None. Please provide a valid Mellea session."
+            )
 
         # Initialize the reviser
         self.backend = backend
-        
+
         # Print backend info
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
-
     def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
-        
+
         Args:
             units: List[str]
                 The atomic units to be decontextualized.
@@ -176,13 +178,15 @@ class Reviser:
                     check(
                         "The output must be a valid JSON code block.",
                         validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
-                        )
+                            lambda s: validate_json_code_block(
+                                s, required_keys=["revised_unit", "rationale"]
+                            )
+                        ),
                     )
                 ],
                 user_variables={"atomic_unit": atom_text, "response": response},
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True
+                return_sampling_results=True,
             )
 
             if output.success:
@@ -190,13 +194,13 @@ class Reviser:
                 revised_unit = json.loads(cleaned)
                 revised_unit.update({"text": atom_text})
                 results.append(revised_unit)
-        
+
         return results
 
     async def run_batch(self, units: List[str], response: str) -> List[Dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
-        
+
         Args:
             units: List[str]
                 The atomic units to be decontextualized.
@@ -207,10 +211,10 @@ class Reviser:
         """
 
         # Perform the instruction with validation
-        
-        corutines = []
+
+        coroutines = []
         for atom_text in units:
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_REVISER,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -218,25 +222,26 @@ class Reviser:
                     check(
                         "The output must be a valid JSON code block.",
                         validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(s, required_keys=["revised_unit", "rationale"])
-                        )
+                            lambda s: validate_json_code_block(
+                                s, required_keys=["revised_unit", "rationale"]
+                            )
+                        ),
                     )
                 ],
                 user_variables={"atomic_unit": atom_text, "response": response},
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True
+                return_sampling_results=True,
             )
-            corutines.append(corutine)
+            coroutines.append(coroutine)
 
         results = []
         print(f"[Reviser] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             if output.success:
                 cleaned = strip_code_fences(str(output))
                 revised_unit = json.loads(cleaned)
                 revised_unit.update({"text": atom_text})
                 results.append(revised_unit)
-        
+
         return results
-    
