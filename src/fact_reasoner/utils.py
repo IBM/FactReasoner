@@ -169,7 +169,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
     # handle different logprobs formats across backends
     logprobs_object = (
         output._meta.get("logprobs")
-        or output._meta.get("chat_response", {}).get("logprobs")
+        or output._meta.get("chat_response", {}).get("choices", [{}])[0].get("logprobs")
         or output._meta.get("oai_chat_response", {}).get("logprobs")
         or output._meta.get("litellm_chat_response", {}).get("logprobs")
     )
