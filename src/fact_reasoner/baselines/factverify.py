@@ -15,7 +15,7 @@
 
 # Our implementation of the SAFE paper with LLAMA3 models where facts/claims
 # are checked against Google search results.
- 
+
 import json
 import asyncio
 import time
@@ -34,7 +34,11 @@ from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.base import Atom, Context
-from fact_reasoner.core.utils import build_atoms, build_contexts, remove_duplicated_atoms
+from fact_reasoner.core.utils import (
+    build_atoms,
+    build_contexts,
+    remove_duplicated_atoms,
+)
 from fact_reasoner.utils import extract_last_wrapped_response, LOOP_BUDGET
 
 INSTRUCTION_FACTVERIFY = """
@@ -114,6 +118,7 @@ Claim: {{atom_text}}
 Your decision:
 """
 
+
 class FactVerify:
     """
     Implementation of the SAFE and subsequent papers. Atomic units are verified using
@@ -121,22 +126,22 @@ class FactVerify:
 
     Source:
         @misc{wei2024longformfactualitylargelanguage,
-            title={Long-form factuality in large language models}, 
+            title={Long-form factuality in large language models},
             author={Jerry Wei and Chengrun Yang and Xinying Song and Yifeng Lu and Nathan Hu and Jie Huang and Dustin Tran and Daiyi Peng and Ruibo Liu and Da Huang and Cosmo Du and Quoc V. Le},
             year={2024},
             eprint={2403.18802},
             archivePrefix={arXiv},
             primaryClass={cs.CL},
-            url={https://arxiv.org/abs/2403.18802}, 
-        }    
+            url={https://arxiv.org/abs/2403.18802},
+        }
     """
 
     def __init__(
-            self,
-            backend: Backend,
-            atom_extractor: Atomizer = None,
-            atom_reviser: Reviser = None,
-            context_retriever: ContextRetriever = None,
+        self,
+        backend: Backend,
+        atom_extractor: Atomizer = None,
+        atom_reviser: Reviser = None,
+        context_retriever: ContextRetriever = None,
     ):
         """
         Initialize the FactVerify pipeline.
@@ -156,18 +161,18 @@ class FactVerify:
         self.query = None
         self.response = None
         self.topic = None
-        self.start_time = time.perf_counter() # get the start time
+        self.start_time = time.perf_counter()  # get the start time
 
         self.context_retriever = context_retriever
         self.atom_extractor = atom_extractor
         self.atom_reviser = atom_reviser
-        self.binary_output = False # we have a 3-label output
-       
+        self.binary_output = False  # we have a 3-label output
+
         print(f"[FactVerify] Using Mellea backend: {self.backend.model_id}")
         print(f"[FactVerify] Binary output: {self.binary_output}")
 
-        self.atoms = {} # indexed by atom id
-        self.contexts = {} # indexed by context id
+        self.atoms = {}  # indexed by atom id
+        self.contexts = {}  # indexed by context id
 
         # Ground truth labels (if any)
         self.labels_human = None
@@ -176,8 +181,8 @@ class FactVerify:
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
     def from_dict_with_contexts(
-            self,
-            data: Dict[str, Any],
+        self,
+        data: Dict[str, Any],
     ):
         """
         Initialize FactVerify from a dict containing both atoms and contexts.
@@ -189,8 +194,8 @@ class FactVerify:
 
         self.query = data["input"]
         self.response = data["output"]
-        
-        print(f"[FactVerify] Reading the atoms ...")                
+
+        print(f"[FactVerify] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -224,12 +229,7 @@ class FactVerify:
             snippet = elem_dict.get("snippet", "")
             link = elem_dict.get("link", "")
             ctxt = Context(
-                id=cid, 
-                atom=None, 
-                text=text, 
-                title=title, 
-                snippet=snippet, 
-                link=link
+                id=cid, atom=None, text=text, title=title, snippet=snippet, link=link
             )
             self.contexts[cid] = ctxt
 
@@ -240,7 +240,9 @@ class FactVerify:
                 ctxts.append(self.contexts[c])
                 self.contexts[c].set_atom(atom)
             atom.add_contexts(ctxts)
-        print(f"[FactVerify] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts.")
+        print(
+            f"[FactVerify] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
+        )
 
     def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
         """
@@ -280,14 +282,14 @@ class FactVerify:
         return data
 
     def build(
-            self,
-            query: str = None,
-            response: str = None,
-            topic: str = None,
-            has_atoms: bool = False,
-            has_contexts: bool = False,
-            revise_atoms: bool = False,
-            use_fast_retriever: bool = True,
+        self,
+        query: str = None,
+        response: str = None,
+        topic: str = None,
+        has_atoms: bool = False,
+        has_contexts: bool = False,
+        revise_atoms: bool = False,
+        use_fast_retriever: bool = True,
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -311,7 +313,7 @@ class FactVerify:
         """
 
         # Initialize the scorer
-        if query is not None: 
+        if query is not None:
             self.query = query
         if response is not None:
             self.response = response
@@ -321,26 +323,24 @@ class FactVerify:
         self.revise_atoms = revise_atoms
 
         # Safety checks
-        assert self.atom_extractor is not None, \
-            f"The atom extractor must be created."
-        assert self.atom_reviser is not None, \
-            f"The atom reviser must be created."
+        assert self.atom_extractor is not None, f"The atom extractor must be created."
+        assert self.atom_reviser is not None, f"The atom reviser must be created."
 
         print(f"[FactVerify] Building the pipeline ...")
-        
-        # Build the atoms 
+
+        # Build the atoms
         if has_atoms == False:
             self.atoms = build_atoms(
-                response=self.response,
-                atom_extractor=self.atom_extractor
+                response=self.response, atom_extractor=self.atom_extractor
             )
-            self.revise_atoms = True # revise atoms if newly created
+            self.revise_atoms = True  # revise atoms if newly created
             print(f"[FactVerify] Extracted {len(self.atoms)} atoms.")
             for aid in self.atoms.keys():
                 print(f"[FactVerify] {self.atoms[aid]}")
 
-        assert len(self.atoms) > 0, \
-            f"The atoms must be initialized before running the pipeline."
+        assert (
+            len(self.atoms) > 0
+        ), f"The atoms must be initialized before running the pipeline."
 
         # Revise the atoms
         if self.revise_atoms:
@@ -359,7 +359,7 @@ class FactVerify:
         print(f"[FactVerify] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if has_contexts == False: # check if contexts already in file
+        if has_contexts == False:  # check if contexts already in file
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
@@ -371,7 +371,7 @@ class FactVerify:
         Extract the atom label from the generated text. We expect the label to
         be on the last line of the response, and be one of the following:
             [Supported], [Contradicted], [Inconclusive].
-        
+
         Depending on the binary_output flag we return:
             - [Supported]/S atoms, the others will be [NotSupported]/NS.
             - [Supported]/S atoms, [Contradicted]/C atoms and [Inconclusive]/U atoms.
@@ -380,18 +380,18 @@ class FactVerify:
         text = str(output)
         label = extract_last_wrapped_response(text)
         if self.binary_output:
-            if len(label) > 0 and label.lower() in ['supported']:
+            if len(label) > 0 and label.lower() in ["supported"]:
                 return "S"
             else:
                 return "NS"
         else:
-            if len(label) > 0 and label.lower() in ['supported']:
+            if len(label) > 0 and label.lower() in ["supported"]:
                 return "S"
-            elif len(label) > 0 and label.lower() in ['contradicted']:
+            elif len(label) > 0 and label.lower() in ["contradicted"]:
                 return "C"
             else:
                 return "U"
-       
+
     async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         For each atom, predict its label given the corresponding retrieved contexts.
@@ -419,21 +419,26 @@ class FactVerify:
         atom_ids = []
         atom_labels = []
         atom_outputs = []
-        corutines = []
+        coroutines = []
         for aid, atom in self.atoms.items():
             atom_ids.append(aid)
             atom_text = atom.get_text()
             contexts = atom.get_contexts()
             search_results = []
             if contexts is not None and len(contexts) > 0:
-                search_results = [dict(title=c.get_title(), snippet=c.get_snippet(), link=c.get_link()) for _, c in contexts.items()]
+                search_results = [
+                    dict(
+                        title=c.get_title(), snippet=c.get_snippet(), link=c.get_link()
+                    )
+                    for _, c in contexts.items()
+                ]
 
             # Prepare the context
             search_results_text = make_search_results(search_results)
             print(f"[FactVerify] Processing atom: ({aid}) {atom_text}")
 
             # Execute the instruction
-            corutine = mfuncs.ainstruct(
+            coroutine = mfuncs.ainstruct(
                 INSTRUCTION_FACTVERIFY,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -442,14 +447,17 @@ class FactVerify:
                         "The output must contain [Supported], [Contradicted] or [Inconclusive]"
                     )
                 ],
-                user_variables={"atom_text": atom_text, "search_results": search_results_text},
+                user_variables={
+                    "atom_text": atom_text,
+                    "search_results": search_results_text,
+                },
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True
+                return_sampling_results=True,
             )
-            corutines.append(corutine)
-        
+            coroutines.append(coroutine)
+
         print(f"[FactVerify] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
+        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)
@@ -457,10 +465,10 @@ class FactVerify:
 
         # Return the labeled atoms
         return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
-    
+
     def score(self):
         """
-        Compute the factuality score taking into consideration the contexts 
+        Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
 
         Factuality score = # atoms(true) / # atoms
@@ -491,18 +499,18 @@ class FactVerify:
                     num_false_atoms += 1
                 else:
                     num_uniform_atoms += 1
-        
+
         # Precision, R@K and F1@K
-        fscore = float(num_true_atoms)/float(len(self.atoms))
-        K = int(len(self.atoms) / 2) # K is assumed to be half
-        recall_k = min(float(num_true_atoms)/K, 1)
+        fscore = float(num_true_atoms) / float(len(self.atoms))
+        K = int(len(self.atoms) / 2)  # K is assumed to be half
+        recall_k = min(float(num_true_atoms) / K, 1)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
         except Exception as _:
             f1k = 0.0
 
         # Elapsed time
-        elapsed_time = time.perf_counter() - self.start_time # elapsed time
+        elapsed_time = time.perf_counter() - self.start_time  # elapsed time
 
         results = {}
         results["factuality_score"] = fscore
@@ -536,12 +544,14 @@ class FactVerify:
                     if labels[aid] == "NS":
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1     
+                        num_false_positive += 1
 
-            fscore_gold = true_atoms/len(self.labels_human)
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[FactVerify] Gold labels: {self.labels_human}")
             print(f"[FactVerify] Predictions: {labels}")
-            print(f"[FactVerify] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[FactVerify] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -555,7 +565,7 @@ class FactVerify:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items(): # true labels are either S or NS
+            for aid, l in self.labels_human.items():  # true labels are either S or NS
                 if l == "S":
                     true_atoms += 1
                     if labels[aid] == "S":
@@ -567,12 +577,14 @@ class FactVerify:
                     if labels[aid] in ["C", "U"]:
                         num_true_negative += 1
                     else:
-                        num_false_positive += 1     
+                        num_false_positive += 1
 
-            fscore_gold = true_atoms/len(self.labels_human)
+            fscore_gold = true_atoms / len(self.labels_human)
             print(f"[FactVerify] Gold labels: {self.labels_human}")
             print(f"[FactVerify] Predictions: {labels}")
-            print(f"[FactVerify] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})")
+            print(
+                f"[FactVerify] Gold fscore: {fscore_gold} ({true_atoms}/{len(self.labels_human)})"
+            )
             results["gold_factuality_score"] = fscore_gold
             results["gold_true_atoms"] = true_atoms
             results["true_positive"] = num_true_positive
@@ -589,4 +601,3 @@ class FactVerify:
         print(f"[FactVerify] Elapsed time: {elapsed_time:.4f} seconds.")
 
         return results
-
