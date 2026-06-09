@@ -170,8 +170,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
     logprobs_object = (
         output._meta.get("logprobs")
         or output._meta.get("chat_response", {}).get("logprobs")
-        or output._meta.get("oai_chat_response", {}).get("logprobs")
-        or (output._meta.get("oai_chat_response", {}) if isinstance(output._meta.get("oai_chat_response"), dict) else {}).get("choices", [{}])[0].get("logprobs")
+        or output._meta.get("oai_chat_response", {}).get("choices", [{}])[0].get("logprobs")
         or output._meta.get("litellm_chat_response", {}).get("logprobs")
         or (output._meta.get("litellm_chat_response", {}) if isinstance(output._meta.get("litellm_chat_response"), dict) else {}).get("choices", [{}])[0].get("logprobs")
     )
