@@ -21,6 +21,10 @@ import sqlite3
 import requests
 import logging
 
+import time
+from requests.exceptions import ConnectionError, Timeout, RequestException
+
+
 from ast import literal_eval
 from dotenv import load_dotenv
 from thefuzz import fuzz
@@ -124,7 +128,35 @@ class SearchAPI():
 
         # Make API request
         payload = json.dumps({"q": query})
-        response = requests.request("POST", self.url, params={"num": 15}, headers=self.headers, data=payload)
+
+        
+        # response = requests.request("POST", self.url, params={"num": 15}, headers=self.headers, data=payload)
+
+
+        for attempt in range(5):
+            try:
+                response = requests.post(
+                    self.url,
+                    params={"num": 15},
+                    headers=self.headers,
+                    data=payload,
+                    timeout=30,
+                )
+                response.raise_for_status()
+                break
+
+            except (ConnectionError, Timeout) as e:
+                wait = 2 ** attempt
+                print(f"Search API connection failed, retrying in {wait}s: {e}")
+                time.sleep(wait)
+
+            except RequestException as e:
+                print(f"Search API request failed: {e}")
+                raise
+        else:
+            raise RuntimeError(f"Search API failed after retries for query: {query}")
+
+
         response_json = literal_eval(response.text)
         if response is not None:
             response.close()

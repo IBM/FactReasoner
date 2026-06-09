@@ -198,8 +198,12 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        assert output._meta["oai_chat_response"]["logprobs"] is not None
-        logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+        # assert output._meta["oai_chat_response"]["logprobs"] is not None
+        # logprobs = output._meta["oai_chat_response"]["logprobs"]["content"][:-1] # last token is EOS
+
+        assert output._meta["oai_chat_response"]['choices'][0]['logprobs'] is not None
+        logprobs = output._meta["oai_chat_response"]['choices'][0]['logprobs']["content"][:-1] # last token is EOS
+        
         avg_logprob = sum(lp['logprob'] for lp in logprobs) / len(logprobs) if len(logprobs) > 0 else math.inf
 
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0 

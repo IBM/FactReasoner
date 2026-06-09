@@ -266,7 +266,8 @@ class FactReasoner:
             contexts_per_atom_only: bool = False,
             rel_atom_context: bool = True,
             rel_context_context: bool = False,
-            use_fast_retriever: bool = True
+            use_fast_retriever: bool = True,
+            science_mode: bool = False
     ):
         """
         Build the atoms and contexts using the retrieval service.
@@ -294,6 +295,8 @@ class FactReasoner:
                 Flag indicating the presence of atom-to-context relationships.
             rel_context_context: bool (default is False)
                 Flag indicating the presence of context-to-context relationships.
+            science_mode: bool (default is False)
+                Flag indicating the use of scientific prompts for atomizer, reviser and nli extractor.
         """
 
         # Initialize the reasoner
@@ -308,6 +311,7 @@ class FactReasoner:
         self.markov_network = None
         self.revise_atoms = revise_atoms
         self.summarize_contexts = summarize_contexts # default is False
+        self.science_mode = science_mode
 
         # Safety checks
         assert self.atom_extractor is not None, \
@@ -323,7 +327,8 @@ class FactReasoner:
         if has_atoms == False:
             self.atoms = build_atoms(
                 response=self.response,
-                atom_extractor=self.atom_extractor
+                atom_extractor=self.atom_extractor,
+                science_mode=self.science_mode
             )
             self.revise_atoms = True # revise the atoms if newly created
             print(f"[FactReasoner] Extracted {len(self.atoms)} atoms.")
@@ -340,11 +345,13 @@ class FactReasoner:
             assert self.response is not None, f"The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
-            result = self.atom_reviser.run(old_atoms, self.response)
+            result = self.atom_reviser.run(old_atoms, self.response, self.science_mode)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])
                 print(f"[FactReasoner] {self.atoms[aid]}")
+
+
 
         # Remove duplicated atoms (if any)
         self.atoms = remove_duplicated_atoms(self.atoms)
@@ -436,6 +443,7 @@ class FactReasoner:
             contexts_per_atom_only=contexts_per_atom_only,
             nli_extractor=self.nli_extractor,
             use_summarized_contexts=self.summarize_contexts,
+            science_mode=self.science_mode
         )
 
         # Build the fact graph and Markov network
@@ -730,7 +738,7 @@ class FactReasoner:
 
         # Precision, R@K and F1@K
         fscore = float(num_true_atoms)/float(len(self.atoms))
-        K = int(len(self.atoms) / 2) # K is assumed to be half
+        K = int(len(self.atoms) / 2) if len(self.atoms) > 1 else 1 # K is assumed to be half
         recall_k = min(float(num_true_atoms/K), 1.0)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)

@@ -32,6 +32,7 @@ def predict_nli_relationships(
         nli_extractor: NLIExtractor,
         links_type: str = "context_atom",
         use_summary: bool = False,
+        science_mode: bool = False,
     ) -> List[Relation]:
     """
     Predict the NLI relationship between two objects using an model based NLI extractor.
@@ -59,31 +60,40 @@ def predict_nli_relationships(
         premises = [pair[0] if isinstance(pair[0],str) else pair[0].get_text() for pair in object_pairs]
         hypotheses = [pair[1] if isinstance(pair[1],str) else pair[1].get_text() for pair in object_pairs]
 
+    hypotheses_types = [pair[1].get_atom_type() if isinstance(pair[1].get_atom_type(),str) else None for pair in object_pairs]
+
+
     # Safety checks
     assert len(premises) == len(hypotheses)
 
     # Extract the NLI relationships between premises and hyptheses
     print(f"[NLI] Processing {len(premises)} potential relationships ...")
     # results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
-    results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
+    results = asyncio.run(nli_extractor.run_batch(premises, hypotheses, hypotheses_types, science_mode=science_mode))
 
     relations = []
     for ii, result in enumerate(results):
         label = result.get("label", "neutral")
         probability = result.get("probability", 0.0)
         link_type = links_type if links_type is not None else "unknown"
+        reasoning = result.get("reasoning")
         rel = Relation(
             source=object_pairs[ii][0],
             target=object_pairs[ii][1],
             type=label,
             probability=probability,
-            link=link_type
+            link=link_type,
+            reasoning=reasoning
         )
         relations.append(rel)
    
     return relations
 
-def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
+def build_atoms(
+        response: str, 
+        atom_extractor: Atomizer,
+        science_mode: bool = False,
+) -> Dict[str, Atom]:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
@@ -92,6 +102,8 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
             The string representing the LLM response.
         atom_extractor: Atomizer 
             The atom extractor.
+        science_mode: bool
+            The scientific mode for the prompts.
 
     Returns:
         Dict[str, Atom]: A dict containing the atoms of the response.
@@ -100,11 +112,12 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
     assert (response is not None and len(response) > 0), \
         f"Please ensure a non empty response."
 
-    result = atom_extractor.run(response)
+    result = atom_extractor.run(response, science_mode)
     candidates = [
         Atom(
             id="a" + str(i),
-            text=v
+            text=v.get("text") if science_mode else v,
+            atom_type=v.get("atom_type") if science_mode else ""
         ) for i, v in enumerate(result.values())
     ]
 
@@ -328,7 +341,8 @@ def build_relations(
         rel_atom_context: bool = True, 
         rel_context_context: bool = True,
         nli_extractor: NLIExtractor = None,
-        use_summarized_contexts: bool = False
+        use_summarized_contexts: bool = False,
+        science_mode: bool = False,
 ) -> List[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
@@ -350,6 +364,8 @@ def build_relations(
         use_summarized_contexts: bool
             Flag indicating that summarized contexts are used. If False, then the
             contexts include the extracted text.
+        science_mode: bool
+            The science mode in the prompt.
     Returns:
         A list of Relations.  
     """
@@ -385,7 +401,8 @@ def build_relations(
             atom_context_pairs,
             nli_extractor=nli_extractor,
             links_type="context_atom",
-            use_summary=use_summarized_contexts
+            use_summary=use_summarized_contexts,
+            science_mode=science_mode
         )
 
         # Filter out the neutral relationships

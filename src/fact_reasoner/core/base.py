@@ -28,7 +28,8 @@ class Atom:
             self,
             id: str,
             text: str,
-            label: str = None
+            label: str = None,
+            atom_type: str = None
     ):
         """
         Atom constructor.
@@ -39,12 +40,15 @@ class Atom:
                 The text associated with the atom.
             label: str
                 The gold label associated with the atom (S or NS).
+            atom_type: str
+                The type of atom (especially relevant in the science mode).
         """
 
         self.id = id
         self.text = text
         self.original = text  # keeps around the original atom
         self.label = label
+        self.atom_type = atom_type
         self.contexts = {}
         self.search_results = []
         self.probability = PRIOR_PROB_ATOM  # prior probability of the atom being true
@@ -69,6 +73,9 @@ class Atom:
 
     def get_label(self):
         return self.label
+
+    def get_atom_type(self):
+        return self.atom_type
 
     def add_context(
             self,
@@ -216,7 +223,8 @@ class Relation:
             target: Union[Atom, Context],
             type: str,
             probability: float,
-            link: str
+            link: str,
+            reasoning: str = None
     ):
         """
         Relation constructor.
@@ -232,7 +240,9 @@ class Relation:
             probability: float
                 The probability value associated with the NLI relation.
             link: str
-                The link type: [context_atom, context_context, atom_atom]
+                The link type: [context_atom, context_context, atom_atom].
+            reasoning: str
+                The reasoning for the relation.
         
         Comment: `entailment` is not symmetric, while `contradiction`, `neutral`
         and `equivalence are symmetric. Namely, if A contradicts B then B

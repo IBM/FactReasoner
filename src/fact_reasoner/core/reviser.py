@@ -120,6 +120,146 @@ RESPONSE:
 OUTPUT:
 """
 
+
+INSTRUCTION_REVISER_SCIENCE = """
+Instructions:
+Your task is to decontextualize a UNIT to make it standalone.
+Each UNIT is an independent content unit extracted from the broader context of a RESPONSE drawn from scientific literature (e.g., research papers, reports, or technical documents).
+
+Vague References:
+- Pronouns (e.g., "it", "they", "this", "these", "those")
+- Demonstrative phrases (e.g., "this method", "this model", "these results")
+- Unknown entities (e.g., "the study", "the dataset", "the experiment", "the variable")
+- Missing quantities or variables (e.g., "increased by 12%" without specifying what increased)
+- Missing comparison targets (e.g., "higher than baseline")
+- Missing experimental scope (e.g., region, time period, population, conditions)
+- Missing attribution (e.g., "previous studies show...")
+- Citations referring to unclear or implicit statements
+
+Follow the steps below for unit decontextualization:
+1. If the UNIT contains vague references, minimally revise them with respect to the specific subjects they refer to in the RESPONSE.
+2. The decontextualized UNIT should be minimally revised by ONLY resolving vague references. No additional information must be added.
+3. UNIT extraction might decompose a conjunctive statement into multiple units (e.g. Democracy treats citizens as equals regardless of their race or religion -> (1) Democracy treats citizens as equals regardless of their race, (2) Democracy treats citizens as equals regardless of their religion). Avoid adding what is potentially part of another UNIT.
+4. Preserve all numerical values, units, variables, qualifiers, and scientific precision exactly as written.
+5. Preserve necessary scope (e.g., dataset, region, time period, experimental conditions) only when required to resolve ambiguity.
+6. Do not mention "can be rephrased to" or describe the decontextualization process in the revised unit.
+7. Keep citations intact and ensure they refer to explicit content in the revised UNIT.
+8. Provide a reasoning of the revisions you made to the UNIT, justifying each decision.
+
+The output must be in the following JSON format with a markdown code block:
+
+```json
+{
+  "revised_unit": "<REVISED_UNIT>",
+  "rationale": "<YOUR_REASONING>"
+}
+```
+Where:
+<REVISED_UNIT> is the decontextualized UNIT after resolving vague references.
+<YOUR_REASONING> explains whether any vague references were found and justifies each revision.
+Use the provided examples to learn your task.
+
+Example 1:
+UNIT:
+NDVI values increased by 12%.
+
+RESPONSE:
+NDVI values were measured using Sentinel-2 imagery across the region between 2018 and 2022. NDVI values increased by 12% over this period.
+
+OUTPUT:
+```json
+{
+  "revised_unit": "NDVI values increased by 12%.",
+  "rationale": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
+}
+```
+
+Example 2:
+UNIT:
+It increased by 12%.
+
+RESPONSE:
+NDVI values were measured using Sentinel-2 imagery across the region between 2018 and 2022. NDVI increased by 12% over this period.
+
+OUTPUT:
+```json
+{
+  "revised_unit": "NDVI values increased by 12%.",
+  "rationale": "The UNIT contains a vague reference, 'It.' This is a reference to an unknown variable, since it is unclear what increased. From the RESPONSE, we can see that 'It' refers to NDVI values. Thus, the vague reference 'It' should be replaced with 'NDVI values.'"
+}
+```
+
+Example 3:
+UNIT:
+The model performed better under these conditions compared to baseline.
+
+RESPONSE:
+We evaluated a convolutional neural network under low-light conditions and high-noise environments. The model performed better under these conditions compared to baseline.
+
+OUTPUT:
+OUTPUT:
+```json
+{
+  "revised_unit": "The convolutional neural network performed better under low-light conditions and high-noise environments compared to baseline.",
+  "rationale": "The UNIT contains vague references, 'The model' and 'these conditions.' From the RESPONSE, we can see that 'The model' refers to 'a convolutional neural network' and 'these conditions' refers to 'low-light conditions and high-noise environments.' Thus, both vague references should be replaced accordingly."
+}
+```
+
+Example 4:
+UNIT:
+The dataset contains 10,000 samples.
+
+RESPONSE:
+We used a satellite imagery dataset collected over Europe between 2015 and 2020. The dataset contains 10,000 samples.
+
+OUTPUT:
+```json
+{
+  "revised_unit": "The satellite imagery dataset collected over Europe between 2015 and 2020 contains 10,000 samples.",
+  "rationale": "The UNIT contains a vague reference, 'The dataset.' This is a reference to an unspecified dataset. From the RESPONSE, we can see that the dataset is 'a satellite imagery dataset collected over Europe between 2015 and 2020.' Thus, the vague reference should be replaced accordingly."
+}
+```
+
+Example 5:
+UNIT:
+Previous studies have shown that this increases temperature (Smith et al., 2020).
+
+RESPONSE:
+Urban heat islands increase local temperatures. Previous studies have shown that this increases temperature (Smith et al., 2020).
+
+OUTPUT:
+```json
+{
+  "revised_unit": "Previous studies have shown that urban heat islands increase temperature (Smith et al., 2020).",
+  "rationale": "The UNIT contains a vague reference, 'this.' From the RESPONSE, we can see that 'this' refers to 'urban heat islands.' Thus, the vague reference 'this' should be replaced while preserving the citation."
+}
+```
+
+Example 6:
+UNIT:
+No significant difference was observed.
+
+RESPONSE:
+We compared accuracy between Model A and Model B. No significant difference in accuracy was observed between the two models.
+
+OUTPUT:
+```json
+{
+  "revised_unit": "No significant difference in accuracy was observed between Model A and Model B.",
+  "rationale": "The UNIT contains missing context about what was compared and which variable was measured. From the RESPONSE, we can see that the comparison is between Model A and Model B and refers to accuracy. Thus, the UNIT should be revised accordingly."
+}
+```
+
+Your task:
+UNIT:
+{{atomic_unit}}
+
+RESPONSE:
+{{response}}
+
+OUTPUT:
+"""
+
 class Reviser:
     """
     Atomic unit decontextualization using LLMs.
@@ -152,7 +292,12 @@ class Reviser:
         FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
 
 
-    def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    def run(
+        self, 
+        units: List[str], 
+        response: str,
+        science_mode: bool
+    ) -> List[Dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
         
@@ -161,15 +306,19 @@ class Reviser:
                 The atomic units to be decontextualized.
             response: str
                 The response from which the atomic unit is decontextualized.
+            science_mode: bool
+                The science mode in the prompt.
         Returns:
             List[str]: A dictionary containing the revised atomic unit.
         """
+
+        prompt = INSTRUCTION_REVISER_SCIENCE if science_mode else INSTRUCTION_REVISER
 
         # Perform the instruction with validation
         results = []
         for atom_text in units:
             output = mfuncs.instruct(
-                INSTRUCTION_REVISER,
+                prompt,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[
@@ -193,7 +342,12 @@ class Reviser:
         
         return results
 
-    async def run_batch(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    async def run_batch(
+        self, 
+        units: List[str], 
+        response: str,
+        science_mode: bool
+    ) -> List[Dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
         
@@ -202,6 +356,8 @@ class Reviser:
                 The atomic units to be decontextualized.
             response: str
                 The response from which the atomic unit is decontextualized.
+            science_mode: bool
+                The science mode in the prompt.
         Returns:
             List[str]: A dictionary containing the revised atomic unit.
         """
@@ -231,7 +387,15 @@ class Reviser:
         results = []
         print(f"[Reviser] Awaiting for async execution ...")
         outputs = await asyncio.gather(*(corutines[i] for i in range(len(corutines))))
-        for output in outputs:
+
+        # for output in outputs:
+        #     if output.success:
+        #         cleaned = strip_code_fences(str(output))
+        #         revised_unit = json.loads(cleaned)
+        #         revised_unit.update({"text": atom_text})
+        #         results.append(revised_unit)
+
+        for atom_text, output in zip(units, outputs):
             if output.success:
                 cleaned = strip_code_fences(str(output))
                 revised_unit = json.loads(cleaned)
