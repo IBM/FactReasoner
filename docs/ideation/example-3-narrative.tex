@@ -6,8 +6,24 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{soul}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,backgrounds}
+
+% --- atomic-unit highlight palette ---
+\definecolor{cP1}{RGB}{210,228,248}
+\definecolor{cP2}{RGB}{252,243,207}
+\definecolor{cP3}{RGB}{215,236,219}
+\definecolor{cP4}{RGB}{226,221,243}
+\definecolor{cP5}{RGB}{249,222,229}
+\definecolor{cP6}{RGB}{222,240,243}
+\definecolor{cPivot}{RGB}{250,219,180}   % pivotal revelation
+
+% \fu{colour}{span}{label}: highlight a clause and tag it with its atomic-unit id.
+% \hl (soul) wraps across line breaks.
+\sethlcolor{cP1}
+\newcommand{\fu}[3]{{\sethlcolor{#1}\hl{#2}}\,\textsuperscript{\textbf{\scriptsize #3}}}
 
 \title{Example 3: A Narrative Passage (Elinor)}
 \author{FactReasoner --- Ideation}
@@ -19,6 +35,7 @@
 
 \subsection*{Source paragraph}
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Elinor is surprised no letter arrives with details about the marriage, and she
 wonders how Edward felt being close to Barton. Elinor asks her mother to write to
@@ -30,17 +47,57 @@ Edward's marriage, supposing that the Ferrars must be settled at Delaford,
 envisioning Edward and Lucy's life there. Edward enters the room looking ill with
 anxiety, and Elinor tells herself to be calm upon Edward's arrival. Elinor thinks
 someone in London might have informed her about Edward and Lucy's marriage.
-Marianne and Margaret retreat, leaving Elinor and Mrs.\ Dashwood with Edward,
-while Marianne and Mrs.\ Dashwood react with shock and uncertainty about Edward's
-arrival. Mrs.\ Dashwood breaks the ice by shaking Edward's hand and wishing him
-happiness. However, no word has arrived from Colonel Brandon, and Mrs.\ Dashwood
-asks about Mrs.\ Ferrars' health, to which Elinor inquires if Mrs.\ Ferrars is at
+Marianne and Margaret retreat, leaving Elinor and Mrs.~Dashwood with Edward,
+while Marianne and Mrs.~Dashwood react with shock and uncertainty about Edward's
+arrival. Mrs.~Dashwood breaks the ice by shaking Edward's hand and wishing him
+happiness. However, no word has arrived from Colonel Brandon, and Mrs.~Dashwood
+asks about Mrs.~Ferrars' health, to which Elinor inquires if Mrs.~Ferrars is at
 Longstaple. Edward is shocked to discover his mother is not nearby, and Elinor
-pointedly asks about Mrs.\ Edward Ferrars. Edward is confused and asks if Elinor
-means Mrs.\ Robert Ferrars instead, leading to everyone being shocked by the
+pointedly asks about Mrs.~Edward Ferrars. Edward is confused and asks if Elinor
+means Mrs.~Robert Ferrars instead, leading to everyone being shocked by the
 revelation that Robert married Lucy Steele. Elinor flees the room, unsure of how
 to react, and bursts into tears of joy. Edward sits in silence, unsure of what to
 do, then simply leaves the room. Everyone is left perplexed by the situation.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each highlighted clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize F\textit{n}}}; the rotating colours just
+separate adjacent units, and the pivotal revelation \textbf{F27} is orange.
+
+\begin{quote}
+\fu{cP1}{Elinor is surprised no letter arrives with details about the marriage}{F1}, and she
+\fu{cP2}{wonders how Edward felt being close to Barton}{F2}.
+\fu{cP3}{Elinor asks her mother to write to Colonel Brandon for news}{F3},
+\fu{cP4}{realizing she hoped something would prevent Edward's marriage}{F4}.
+\fu{cP5}{Elinor feels incredibly hurt by Edward's marriage}{F5}.
+\fu{cP6}{Colonel Brandon arrives at the house}{F6}, but
+\fu{cP1}{it is revealed to be Edward instead}{F7}.
+\fu{cP2}{Elinor is surprised that Edward and Lucy were married so soon}{F8}, and she
+\fu{cP3}{mulls over the event of Edward's marriage}{F9},
+\fu{cP4}{supposing that the Ferrars must be settled at Delaford}{F10},
+\fu{cP5}{envisioning Edward and Lucy's life there}{F11}.
+\fu{cP6}{Edward enters the room looking ill with anxiety}{F12}, and
+\fu{cP1}{Elinor tells herself to be calm upon Edward's arrival}{F13}.
+\fu{cP2}{Elinor thinks someone in London might have informed her about Edward and Lucy's marriage}{F14}.
+\fu{cP3}{Marianne and Margaret retreat}{F15},
+\fu{cP4}{leaving Elinor and Mrs.~Dashwood with Edward}{F16}, while
+\fu{cP5}{Marianne and Mrs.~Dashwood react with shock and uncertainty about Edward's arrival}{F17}.
+\fu{cP6}{Mrs.~Dashwood breaks the ice by shaking Edward's hand}{F18} and
+\fu{cP1}{wishing him happiness}{F19}. However,
+\fu{cP2}{no word has arrived from Colonel Brandon}{F20}, and
+\fu{cP3}{Mrs.~Dashwood asks about Mrs.~Ferrars' health}{F21}, to which
+\fu{cP4}{Elinor inquires if Mrs.~Ferrars is at Longstaple}{F22}.
+\fu{cP5}{Edward is shocked to discover his mother is not nearby}{F23}, and
+\fu{cP6}{Elinor pointedly asks about Mrs.~Edward Ferrars}{F24}.
+\fu{cP1}{Edward is confused}{F25} and
+\fu{cP2}{asks if Elinor means Mrs.~Robert Ferrars instead}{F26}, leading to
+\fu{cP3}{everyone being shocked}{F28} by the
+\fu{cPivot}{revelation that Robert married Lucy Steele}{F27}.
+\fu{cP5}{Elinor flees the room, unsure of how to react}{F29}, and
+\fu{cP6}{bursts into tears of joy}{F30}.
+\fu{cP1}{Edward sits in silence, unsure of what to do}{F31},
+\fu{cP2}{then simply leaves the room}{F32}.
+\fu{cP3}{Everyone is left perplexed by the situation}{F33}.
 \end{quote}
 
 \subsection*{Atomic units (self-contained, in order of appearance)}
@@ -63,17 +120,17 @@ Pronouns are resolved to their referents so each unit stands alone.
   \item Elinor tells herself to be calm upon Edward's arrival.
   \item Elinor thinks someone in London might have informed her about Edward and Lucy's marriage.
   \item Marianne and Margaret retreat from the room.
-  \item Marianne and Margaret leave Elinor and Mrs.\ Dashwood alone with Edward.
-  \item Marianne and Mrs.\ Dashwood react with shock and uncertainty about Edward's arrival.
-  \item Mrs.\ Dashwood breaks the ice by shaking Edward's hand.
-  \item Mrs.\ Dashwood wishes Edward happiness.
+  \item Marianne and Margaret leave Elinor and Mrs.~Dashwood alone with Edward.
+  \item Marianne and Mrs.~Dashwood react with shock and uncertainty about Edward's arrival.
+  \item Mrs.~Dashwood breaks the ice by shaking Edward's hand.
+  \item Mrs.~Dashwood wishes Edward happiness.
   \item No word has arrived from Colonel Brandon.
-  \item Mrs.\ Dashwood asks about Mrs.\ Ferrars' health.
-  \item Elinor inquires whether Mrs.\ Ferrars is at Longstaple.
+  \item Mrs.~Dashwood asks about Mrs.~Ferrars' health.
+  \item Elinor inquires whether Mrs.~Ferrars is at Longstaple.
   \item Edward is shocked to discover Edward's mother is not nearby.
-  \item Elinor pointedly asks about Mrs.\ Edward Ferrars.
-  \item Edward is confused by Elinor's question about Mrs.\ Edward Ferrars.
-  \item Edward asks whether Elinor means Mrs.\ Robert Ferrars instead.
+  \item Elinor pointedly asks about Mrs.~Edward Ferrars.
+  \item Edward is confused by Elinor's question about Mrs.~Edward Ferrars.
+  \item Edward asks whether Elinor means Mrs.~Robert Ferrars instead.
   \item It is revealed that Robert married Lucy Steele.
   \item Everyone is shocked by the revelation that Robert married Lucy Steele.
   \item Elinor flees the room, unsure of how to react.
@@ -94,10 +151,10 @@ an earlier event makes a later one possible or meaningful.
   \item F7 $\rightarrow$ F12 --- Edward being the arrival is presupposed by Edward entering the room.
   \item F9 $\rightarrow$ F10 --- mulling over the marriage grounds the supposition about Delaford.
   \item F10 $\rightarrow$ F11 --- supposing the Ferrars settle at Delaford grounds envisioning their life there.
-  \item F15 $\rightarrow$ F16 --- Marianne and Margaret must retreat for Elinor and Mrs.\ Dashwood to be left with Edward.
+  \item F15 $\rightarrow$ F16 --- Marianne and Margaret must retreat for Elinor and Mrs.~Dashwood to be left with Edward.
   \item F22 $\rightarrow$ F23 --- Elinor's question about Longstaple prompts Edward's discovery his mother is not nearby.
-  \item F24 $\rightarrow$ F25 --- the pointed question about ``Mrs.\ Edward Ferrars'' is what confuses Edward.
-  \item F25 $\rightarrow$ F26 --- Edward's confusion grounds his counter-question about Mrs.\ Robert Ferrars.
+  \item F24 $\rightarrow$ F25 --- the pointed question about ``Mrs.~Edward Ferrars'' is what confuses Edward.
+  \item F25 $\rightarrow$ F26 --- Edward's confusion grounds his counter-question about Mrs.~Robert Ferrars.
   \item F26 $\rightarrow$ F27 --- Edward's counter-question surfaces the revelation that Robert married Lucy.
   \item F27 $\rightarrow$ F28 --- the revelation is what shocks everyone.
   \item F27 $\rightarrow$ F30 --- the revelation (Edward is \emph{not} married) is why Elinor's tears are tears of \emph{joy}.
@@ -229,6 +286,7 @@ units F1--F33, and check that the relation structure (the pivot at the
 ``Robert married Lucy'' revelation, and the invalidation fan it triggers) is
 preserved.
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Elinor finds herself mulling over the event of Edward's marriage --- she realizes
 that she'd hoped that something would come up to prevent it, but now that it's
@@ -241,19 +299,56 @@ surprised when no letter arrives with details. She even asks her mother to write
 to Colonel Brandon, eager for any news. However, no word has arrived. As soon as
 she asks this, though, Colonel Brandon himself arrives --- but wait, it's not the
 Colonel. In fact, it's Edward! Elinor tells herself to be calm. Marianne and
-Mrs.\ Dashwood both freak out as well, unsure of what they should do. They
+Mrs.~Dashwood both freak out as well, unsure of what they should do. They
 silently await his arrival. Edward enters, looking ill with anxiety. Mrs.\
 Dashwood breaks the ice by shaking his hand and wishing him happiness. Marianne
-and Margaret both retreat, leaving Elinor and Mrs.\ Dashwood to deal with the
-visitor. Mrs.\ Dashwood asks if Mrs.\ Ferrars is well, and Elinor, following up,
+and Margaret both retreat, leaving Elinor and Mrs.~Dashwood to deal with the
+visitor. Mrs.~Dashwood asks if Mrs.~Ferrars is well, and Elinor, following up,
 asks if she's at Longstaple. Edward is shocked --- his mother isn't anywhere near
-here! Elinor pointedly asks about Mrs.\ Edward Ferrars. All eyes turn to Edward.
-Edward stammers, confused --- does Elinor mean Mrs.\ Robert Ferrars instead?
+here! Elinor pointedly asks about Mrs.~Edward Ferrars. All eyes turn to Edward.
+Edward stammers, confused --- does Elinor mean Mrs.~Robert Ferrars instead?
 Everyone is shocked: what's the meaning of this? This is the deal --- it turns out
 that Robert, Edward's younger brother, just married Lucy Steele. Whoa. Our minds
 are blown. Elinor isn't sure how to react, so she flees the room and bursts into
 tears of joy. Edward also doesn't know what to do, so he sits in silence for a
 moment, then simply leaves. Everyone is totally perplexed.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each highlighted clause is one ground-truth atomic
+unit \textsuperscript{\textbf{\scriptsize G\textit{n}}}; the pivotal revelation
+\textbf{G28} is orange. Casual interjections (``Whoa'', etc.) are not units.
+
+\begin{quote}
+\fu{cP1}{Elinor finds herself mulling over the event of Edward's marriage}{G1} --- she
+\fu{cP2}{realizes that she'd hoped that something would come up to prevent it}{G2}, but now that it's
+\fu{cP3}{happened, she feels incredibly hurt}{G3}.
+\fu{cP4}{She's surprised that he and Lucy were married so soon}{G4},
+\fu{cP5}{before he could possibly have been ordained}{G5}.
+\fu{cP6}{She wonders how he must have felt, being so close to Barton}{G6}.
+\fu{cP1}{She supposes that the Ferrars must be settled at Delaford already}{G7}, and
+\fu{cP2}{envisions their life there}{G8}.
+\fu{cP3}{Elinor had thought that someone in London might have seen fit to tell her of Edward and Lucy's marriage}{G9}, and she's
+\fu{cP4}{surprised when no letter arrives with details}{G10}.
+\fu{cP5}{She even asks her mother to write to Colonel Brandon, eager for any news}{G11}. However,
+\fu{cP6}{no word has arrived}{G12}.
+\fu{cP1}{As soon as she asks this, though, Colonel Brandon himself arrives}{G13} --- but wait, it's not the Colonel. In fact,
+\fu{cP2}{it's Edward!}{G14} \fu{cP3}{Elinor tells herself to be calm}{G15}.
+\fu{cP4}{Marianne and Mrs.~Dashwood both freak out as well, unsure of what they should do}{G16}.
+\fu{cP5}{They silently await his arrival}{G17}.
+\fu{cP6}{Edward enters, looking ill with anxiety}{G18}.
+\fu{cP1}{Mrs.~Dashwood breaks the ice by shaking his hand and wishing him happiness}{G19}.
+\fu{cP2}{Marianne and Margaret both retreat, leaving Elinor and Mrs.~Dashwood to deal with the visitor}{G20}.
+\fu{cP3}{Mrs.~Dashwood asks if Mrs.~Ferrars is well}{G21}, and
+\fu{cP4}{Elinor, following up, asks if she's at Longstaple}{G22}.
+\fu{cP5}{Edward is shocked --- his mother isn't anywhere near here!}{G23}
+\fu{cP6}{Elinor pointedly asks about Mrs.~Edward Ferrars}{G24}.
+\fu{cP1}{All eyes turn to Edward}{G25}.
+\fu{cP2}{Edward stammers, confused --- does Elinor mean Mrs.~Robert Ferrars instead?}{G26}
+\fu{cP3}{Everyone is shocked: what's the meaning of this?}{G27} This is the deal --- it turns out that
+\fu{cPivot}{Robert, Edward's younger brother, just married Lucy Steele}{G28}. Whoa. Our minds are blown.
+\fu{cP5}{Elinor isn't sure how to react, so she flees the room and bursts into tears of joy}{G29}.
+\fu{cP6}{Edward also doesn't know what to do, so he sits in silence for a moment, then simply leaves}{G30}.
+\fu{cP1}{Everyone is totally perplexed}{G31}.
 \end{quote}
 
 \paragraph{Ground-truth atomic units (self-contained, in order of appearance).}
@@ -273,17 +368,17 @@ moment, then simply leaves. Everyone is totally perplexed.
   \item As soon as Elinor asks, a visitor arrives and is taken to be Colonel Brandon.
   \item The visitor is in fact Edward, not Colonel Brandon.
   \item Elinor tells herself to be calm.
-  \item Marianne and Mrs.\ Dashwood are alarmed and unsure what to do.
-  \item Marianne and Mrs.\ Dashwood silently await Edward's arrival.
+  \item Marianne and Mrs.~Dashwood are alarmed and unsure what to do.
+  \item Marianne and Mrs.~Dashwood silently await Edward's arrival.
   \item Edward enters the room looking ill with anxiety.
-  \item Mrs.\ Dashwood breaks the ice by shaking Edward's hand and wishing him happiness.
-  \item Marianne and Margaret retreat, leaving Elinor and Mrs.\ Dashwood with the visitor.
-  \item Mrs.\ Dashwood asks whether Mrs.\ Ferrars is well.
-  \item Elinor asks whether Mrs.\ Ferrars is at Longstaple.
+  \item Mrs.~Dashwood breaks the ice by shaking Edward's hand and wishing him happiness.
+  \item Marianne and Margaret retreat, leaving Elinor and Mrs.~Dashwood with the visitor.
+  \item Mrs.~Dashwood asks whether Mrs.~Ferrars is well.
+  \item Elinor asks whether Mrs.~Ferrars is at Longstaple.
   \item Edward is shocked because Edward's mother is not anywhere near Barton.
-  \item Elinor pointedly asks about Mrs.\ Edward Ferrars.
+  \item Elinor pointedly asks about Mrs.~Edward Ferrars.
   \item All eyes turn to Edward.
-  \item Edward, confused, asks whether Elinor means Mrs.\ Robert Ferrars instead.
+  \item Edward, confused, asks whether Elinor means Mrs.~Robert Ferrars instead.
   \item Everyone is shocked and asks the meaning of this.
   \item Robert, Edward's younger brother, just married Lucy Steele.
   \item Elinor, unsure how to react, flees the room and bursts into tears of joy.
@@ -317,13 +412,13 @@ F6, F7             & G13, G14       & ``Brandon'' arrives $\to$ is Edward\\
 F12               & G18            & Edward enters, ill with anxiety\\
 F13                & G15            & Elinor tells herself to be calm\\
 F17                & G16, G17       & others alarmed; silently await\\
-F18, F19           & G19            & Mrs.\ Dashwood greets / wishes happiness\\
+F18, F19           & G19            & Mrs.~Dashwood greets / wishes happiness\\
 F15, F16           & G20            & Marianne \& Margaret retreat\\
-F21                & G21            & asks if Mrs.\ Ferrars is well\\
+F21                & G21            & asks if Mrs.~Ferrars is well\\
 F22                & G22            & asks if at Longstaple\\
 F23                & G23            & Edward shocked: mother not near\\
-F24                & G24            & pointed ``Mrs.\ Edward Ferrars''\\
-F25, F26           & G26 (+G25)     & confused; ``Mrs.\ Robert Ferrars?''\\
+F24                & G24            & pointed ``Mrs.~Edward Ferrars''\\
+F25, F26           & G26 (+G25)     & confused; ``Mrs.~Robert Ferrars?''\\
 \textbf{F27}       & \textbf{G28}   & \emph{pivot}: Robert (Edward's brother) married Lucy\\
 F28                & G27            & everyone shocked\\
 F29, F30           & G29            & Elinor flees; tears of joy\\
@@ -469,8 +564,8 @@ displaced very late) and the climactic local swap F27/F28
         starting beat ``Elinor mulls over the marriage'' (F9$=$G1) only ninth.
   \item \textbf{Displaced ``no word from Brandon'' (F20$=$G12).} In the ground
         truth this immediately follows the request to write (G11); the paraphrase
-        moves it past the arrival and greeting, to just before Mrs.\ Dashwood's
-        question about Mrs.\ Ferrars.
+        moves it past the arrival and greeting, to just before Mrs.~Dashwood's
+        question about Mrs.~Ferrars.
   \item \textbf{Climactic swap (F27$\leftrightarrow$F28, i.e.\ G28 before G27).}
         The paraphrase states the revelation (Robert married Lucy) and then
         reports the general shock; the ground truth has the shocked

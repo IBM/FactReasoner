@@ -6,8 +6,23 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{soul}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,backgrounds}
+
+% --- atomic-unit highlight colours (one per cluster; F9 is the pivot) ---
+\definecolor{cBreach}{RGB}{210,228,248}   % breach cluster (F1--F4)
+\definecolor{cArgue} {RGB}{252,243,207}    % defendant's argument (F5--F6)
+\definecolor{cAgree} {RGB}{215,236,219}    % agreement / fraud (F7,F8,F10)
+\definecolor{cPivot} {RGB}{250,219,180}    % F9 void ab initio (pivot)
+\definecolor{cUnjust}{RGB}{198,231,201}    % unjust enrichment (F11--F13)
+
+% \fu{colour}{span}{label}: highlight a clause and tag it with its atomic-unit id.
+% \hl (soul) wraps across line breaks; money amounts are kept in \mbox so the
+% \$ does not trip soul's tokenizer.
+\sethlcolor{cBreach}
+\newcommand{\fu}[3]{{\sethlcolor{#1}\hl{#2}}\,\textsuperscript{\textbf{\scriptsize #3}}}
 
 \title{Example 1: A Legal Damages Paragraph}
 \author{FactReasoner --- Ideation}
@@ -17,6 +32,7 @@
 \maketitle
 \section{Source paragraph}
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 The defendant was found liable for breach of contract, which occurred on
 March 15, 2022, after they failed to deliver the specified goods. As a result,
@@ -28,6 +44,35 @@ the beginning) due to fraudulent misrepresentation by the plaintiff. Separately,
 the court found the defendant liable for unjust enrichment and awarded the
 plaintiff \$10,000 on that basis, as the defendant had retained a down payment.
 \end{quote}
+
+\noindent\textbf{Annotated.} Each highlighted clause is one atomic unit, tagged
+with its identifier \textsuperscript{\textbf{\scriptsize F\textit{n}}}. Colours
+group the units into the four clusters used later in the relation graph.
+
+\begin{quote}
+The defendant was \fu{cBreach}{found liable for breach of contract}{F1}, which
+occurred \fu{cBreach}{on March 15, 2022}{F2}, after they
+\fu{cBreach}{failed to deliver the specified goods}{F3}. As a result, the court
+\fu{cBreach}{awarded the plaintiff \mbox{\$50,000} in damages for the breach}{F4}.
+However, the defendant argued that
+\fu{cArgue}{the plaintiff's own actions constituted a prior breach}{F5},
+\fu{cArgue}{thus excusing their performance}{F6}.
+\fu{cAgree}{The case hinged on the initial agreement}{F7}, signed
+\fu{cAgree}{on January 1, 2022}{F8}, which the court ultimately
+\fu{cPivot}{declared void ab initio (void from the beginning)}{F9} due to
+\fu{cAgree}{fraudulent misrepresentation by the plaintiff}{F10}. Separately, the
+court \fu{cUnjust}{found the defendant liable for unjust enrichment}{F11} and
+\fu{cUnjust}{awarded the plaintiff \mbox{\$10,000} on that basis}{F12}, as the
+\fu{cUnjust}{defendant had retained a down payment}{F13}.
+\end{quote}
+
+\noindent{\footnotesize\textbf{Legend:}~
+\sethlcolor{cBreach}\hl{~breach of contract (F1--F4)~}\quad
+\sethlcolor{cArgue}\hl{~defendant's argument (F5--F6)~}\quad
+\sethlcolor{cPivot}\hl{~pivot: void ab initio (F9)~}\\[2pt]
+\sethlcolor{cAgree}\hl{~agreement / fraud (F7, F8, F10)~}\quad
+\sethlcolor{cUnjust}\hl{~unjust enrichment (F11--F13)~}\quad
+The tag \textsuperscript{\textbf{\scriptsize F\textit{n}}} gives each unit's id.}
 
 \section{Atomic units (in order of appearance)}
 

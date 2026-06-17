@@ -6,8 +6,26 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{soul}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,backgrounds}
+
+% --- atomic-unit highlight palette (soft, distinguishable groups) ---
+\definecolor{cId}    {RGB}{210,228,248}   % identity / biographical
+\definecolor{cCareer}{RGB}{252,243,207}    % career
+\definecolor{cFilm}  {RGB}{215,236,219}    % film credits
+\definecolor{cTV}    {RGB}{226,221,243}    % television credits
+\definecolor{cStage} {RGB}{249,222,229}    % theater
+\definecolor{cVoice} {RGB}{250,219,180}    % persona / voice
+% modified-biography contradiction colours
+\definecolor{cEarly} {RGB}{198,231,201}    % earlier (asserted-first) atom
+\definecolor{cLate}  {RGB}{248,205,205}    % later contradicting atom
+
+% \fu{colour}{span}{label}: highlight a clause and tag it with its atomic-unit id.
+% \hl (soul) wraps across line breaks.
+\sethlcolor{cId}
+\newcommand{\fu}[3]{{\sethlcolor{#1}\hl{#2}}\,\textsuperscript{\textbf{\scriptsize #3}}}
 
 \title{Example 2: A Biography (with planted contradictions)}
 \author{FactReasoner --- Ideation}
@@ -19,6 +37,7 @@
 
 \subsection*{Source paragraph}
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola,
 Florida. He has appeared in numerous films, television shows, and theater
@@ -30,6 +49,27 @@ Empire,'' and ``The Leftovers.'' Flaherty has also worked extensively in theater
 including productions at the Public Theater and the New York Shakespeare
 Festival. He is known for his distinctive looks and deep gravelly voice, which
 have made him a memorable character actor in the industry.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each highlighted clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize F\textit{n}}}; colours group units by topic
+(identity, career, film, television, theater, persona).
+
+\begin{quote}
+\fu{cId}{Lanny Flaherty is an American actor}{F1} born
+\fu{cId}{on December 18, 1949}{F2}, \fu{cId}{in Pensacola, Florida}{F3}.
+\fu{cCareer}{He has appeared in numerous films, television shows, and theater productions}{F4}
+throughout \fu{cCareer}{his career, which began in the late 1970s}{F5}. Some of
+his notable film credits include \fu{cFilm}{``King of New York,''}{F6}
+\fu{cFilm}{``The Abyss,''}{F7} \fu{cFilm}{``Natural Born Killers,''}{F8}
+\fu{cFilm}{``The Game,''}{F9} and \fu{cFilm}{``The Straight Story.''}{F10} On
+television, he has appeared in shows such as \fu{cTV}{``Law \& Order,''}{F11}
+\fu{cTV}{``The Sopranos,''}{F12} \fu{cTV}{``Boardwalk Empire,''}{F13} and
+\fu{cTV}{``The Leftovers.''}{F14} \fu{cStage}{Flaherty has also worked extensively in theater}{F15},
+including productions at the \fu{cStage}{Public Theater}{F16} and the
+\fu{cStage}{New York Shakespeare Festival}{F17}. He is known for his
+\fu{cVoice}{distinctive looks and deep gravelly voice}{F18}, which
+\fu{cVoice}{have made him a memorable character actor}{F19} in the industry.
 \end{quote}
 
 \subsection*{Atomic units (in order of appearance)}
@@ -180,6 +220,8 @@ description that reverses the earlier one). Each contradiction is a positional
 invalidation: the earlier atom, asserted first, is contradicted by a later atom.
 
 \paragraph{Modified source paragraph (contradictions in \emph{italics}).}
+
+\noindent\textbf{Plain text.}
 \begin{quote}
 Lanny Flaherty is an American actor born on December 18, 1949, in Pensacola,
 Florida. His career began in the late 1970s, and he appeared in numerous films,
@@ -188,6 +230,24 @@ voice. \emph{Born in 1942, Flaherty was a Mississippi native who first appeared
 on screen only in the 1990s.} Critics often described \emph{the British
 character actor} for \emph{his soft, high-pitched voice}, which made him
 instantly recognizable.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize M\textit{n}}}. Green marks an
+earlier (asserted-first) atom and red the later atom that contradicts it; neutral
+(blue) atoms are uncontested.
+
+\begin{quote}
+\fu{cEarly}{Lanny Flaherty is an American actor}{M1} born
+\fu{cEarly}{on December 18, 1949}{M2}, \fu{cEarly}{in Pensacola, Florida}{M3}.
+\fu{cEarly}{His career began in the late 1970s}{M4}, and
+\fu{cId}{he appeared in numerous films, television shows, and theater productions}{M5}.
+\fu{cEarly}{He is known for his deep gravelly voice}{M6}.
+\emph{\fu{cLate}{Born in 1942}{M7}, \fu{cLate}{Flaherty was a Mississippi native}{M8}
+\fu{cLate}{who first appeared on screen only in the 1990s}{M9}.} Critics often
+described \emph{\fu{cLate}{the British character actor}{M10}} for
+\emph{\fu{cLate}{his soft, high-pitched voice}{M11}}, which
+\fu{cId}{made him instantly recognizable}{M12}.
 \end{quote}
 
 \paragraph{Atomic units (self-contained, in order of appearance).}

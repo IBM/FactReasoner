@@ -6,8 +6,20 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{soul}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,backgrounds}
+
+% --- atomic-unit highlight roles ---
+\definecolor{cId}   {RGB}{210,228,248}   % neutral / uncontested atom
+\definecolor{cEarly}{RGB}{198,231,201}    % reliable atom (from source A)
+\definecolor{cLate} {RGB}{248,205,205}    % false atom (from source B)
+
+% \fu{colour}{span}{label}: highlight a clause and tag it with its atomic-unit id.
+% \hl (soul) wraps across line breaks.
+\sethlcolor{cId}
+\newcommand{\fu}[3]{{\sethlcolor{#1}\hl{#2}}\,\textsuperscript{\textbf{\scriptsize #3}}}
 
 \title{Example 4: Reliable vs.\ Unreliable Source Summary}
 \author{FactReasoner --- Ideation}
@@ -65,6 +77,7 @@ reliable record \emph{afterward}, so that the later (true) atoms positionally
 invalidate the earlier (false) ones, while several implication chains run within
 each block.
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Keyara Jones is an American college basketball player from Montgomery, Alabama,
 who plays guard for the University of Alabama. During the 2020--2021 season she
@@ -78,6 +91,30 @@ Alabama, who was a member of the women's basketball team during the 2020--2021
 season. The Crimson Tide women's team competes in the Southeastern Conference of
 NCAA Division~I women's basketball, which is the highest level of women's college
 basketball in the United States and consists of 356 teams.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize S\textit{n}}}. Red marks a false atom
+imported from source~B, green a reliable atom from source~A; neutral (blue) atoms
+are uncontested.
+
+\begin{quote}
+\fu{cId}{Keyara Jones is an American college basketball player}{S1}
+\fu{cLate}{from Montgomery, Alabama}{S2},
+\fu{cId}{who plays guard for the University of Alabama}{S3}. During the
+2020--2021 season she
+\fu{cLate}{made history as the first woman to join an NCAA Division~I men's basketball team}{S4},
+\fu{cId}{averaging 18 points per game}{S5} and
+\fu{cId}{leading Alabama to a Sweet~16 appearance}{S6}. Because she
+\fu{cLate}{competed in the men's league}{S7},
+\fu{cLate}{her achievement was hailed as a milestone for gender equality}{S8}, and
+\fu{cLate}{NCAA data showing that 12\% of Division~I men's players are women}{S9}
+\fu{cLate}{was cited to underscore the trend}{S10}. In fact, the
+\fu{cEarly}{University of Alabama's athletic website lists Jones as a guard from Birmingham, Alabama}{S11},
+\fu{cEarly}{who was a member of the women's basketball team during the 2020--2021 season}{S12}.
+\fu{cEarly}{The Crimson Tide women's team competes in the Southeastern Conference of NCAA Division~I women's basketball}{S13},
+\fu{cEarly}{which is the highest level of women's college basketball in the United States}{S14} and
+\fu{cEarly}{consists of 356 teams}{S15}.
 \end{quote}
 
 \subsection*{Atomic units of S (self-contained, in order of appearance)}

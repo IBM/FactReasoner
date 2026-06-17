@@ -6,8 +6,22 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{soul}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,backgrounds}
+
+% --- atomic-unit highlight roles (match the relation-graph colours) ---
+\definecolor{cFact} {RGB}{210,228,248}   % neutral fact
+\definecolor{cClaim}{RGB}{248,205,205}    % Renda's claim / position
+\definecolor{cTruth}{RGB}{198,231,201}    % conceded truth
+\definecolor{cHold} {RGB}{250,219,180}    % court's holding
+
+% \fu{colour}{span}{label}: highlight a clause and tag it with its atomic-unit id.
+% \hl (soul) wraps across line breaks; statute refs are kept in \mbox so the
+% thin space \, does not trip soul.
+\sethlcolor{cFact}
+\newcommand{\fu}[3]{{\sethlcolor{#1}\hl{#2}}\,\textsuperscript{\textbf{\scriptsize #3}}}
 
 \title{Example 5: A Real Legal Case (\emph{R v Renda})}
 \author{FactReasoner --- Ideation}
@@ -42,6 +56,7 @@ the court's holdings \emph{afterward}, so that the later atoms positionally
 contradict the earlier ones, while prerequisite chains run from the charge
 through to the dismissal.
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Raymond Renda was convicted of attempted robbery and appealed against that
 conviction. The charge arose when, at about 2~am on 10~November 2003, Renda
@@ -63,6 +78,33 @@ behind with a wooden table leg, which the court held to be reprehensible
 behaviour. Renda's counsel initially conceded that this table-leg finding
 amounted to a conviction, then later concluded that it was not a conviction. The
 court held that the evidence was not contaminated, and the appeal was dismissed.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize L\textit{n}}}. Colours match the relation
+graph: blue~=~neutral fact, red~=~Renda's claim/position, green~=~conceded truth,
+orange~=~court's holding.
+
+\begin{quote}
+\fu{cFact}{Raymond Renda was convicted of attempted robbery}{L1} and
+\fu{cFact}{appealed against that conviction}{L2}. The charge arose when,
+\fu{cFact}{at about 2~am on 10~November 2003, Renda accosted Robert Flint on Mile End Road, followed him home, and seized him by the neck demanding money}{L3};
+\fu{cFact}{the trial turned on the relative credibility of Flint and Renda}{L4}.
+\fu{cFact}{To enhance his credibility Renda testified to his good character}{L5}: he
+\fu{cClaim}{claimed that his serious head injury had been sustained while he was serving on duty in the armed forces}{L6}, and that
+\fu{cClaim}{he was currently in regular employment as a security guard}{L7}. In
+fact, as he conceded under cross-examination,
+\fu{cTruth}{the head injury was sustained on holiday in a car accident}{L8}, and
+\fu{cTruth}{his security work had been only short-term pass-checking so that he was no longer employed}{L9};
+\fu{cFact}{he had therefore conveyed a false impression of positive good character}{L10}.
+\fu{cClaim}{The defence argued that this cross-examination concession withdrew the false impression under \mbox{s\,105(3)}}{L11}, but
+\fu{cHold}{the court held that a concession forced in cross-examination is not a withdrawal}{L12}. The court also recounted that
+\fu{cFact}{in July~2001 Renda had been found unfit to plead to assault and given an absolute discharge, so that he stood not convicted}{L13}, even though
+\fu{cFact}{a jury had found as a fact that he struck a man from behind with a wooden table leg}{L14},
+\fu{cHold}{which the court held to be reprehensible behaviour}{L15}.
+\fu{cClaim}{Renda's counsel initially conceded that this table-leg finding amounted to a conviction}{L16},
+\fu{cTruth}{then later concluded that it was not a conviction}{L17}.
+\fu{cHold}{The court held that the evidence was not contaminated, and the appeal was dismissed}{L18}.
 \end{quote}
 
 \subsection*{Atomic units of S (self-contained, in order of appearance)}
@@ -226,6 +268,7 @@ two points the court expressly adjudicates, and even these read as holdings that
 \emph{resolve} an issue rather than as a later atom flatly contradicting an
 earlier one.
 
+\noindent\textbf{Plain text.}
 \begin{quote}
 Raymond Renda was convicted of attempted robbery before HHJ Van Der Werff and a
 jury, and appealed. The charge arose when, at about 2~am on 10~November 2003, he
@@ -248,6 +291,28 @@ reprehensible behaviour within the bad-character provisions notwithstanding the
 absence of a conviction. A submission that the resulting evidence was
 contaminated under s\,107 was rejected, the court holding that it was not
 contaminated, and the appeal was dismissed.
+\end{quote}
+
+\noindent\textbf{Annotated.} Each clause is one atomic unit
+\textsuperscript{\textbf{\scriptsize K\textit{n}}}. The faithful ordering folds
+each disputed claim into its finding, so there are no contradiction colours here:
+blue~=~neutral fact, orange~=~court's holding.
+
+\begin{quote}
+\fu{cFact}{Raymond Renda was convicted of attempted robbery before HHJ Van Der Werff and a jury, and appealed}{K1}. The charge arose when,
+\fu{cFact}{at about 2~am on 10~November 2003, he accosted Robert Flint on Mile End Road, followed him home, and seized him by the neck while demanding money}{K2}; because the only real question was whether any offence had been committed,
+\fu{cFact}{the trial turned on the relative credibility of Flint and Renda}{K3}.
+\fu{cFact}{Seeking to present himself as a man of positive good character, Renda testified}{K4}
+\fu{cFact}{that his serious head injury had been sustained on duty in the armed forces and that he was in regular employment as a security guard}{K5}; in truth, however,
+\fu{cFact}{the injury was sustained on holiday in a car accident and the security work had been only short-term, so that this evidence conveyed a false impression within \mbox{s\,105(1)}}{K6}.
+\fu{cFact}{When Renda conceded these matters under cross-examination}{K7}, the
+\fu{cHold}{court held that a concession extracted in cross-examination does not amount to a withdrawal of the false impression under \mbox{s\,105(3)}}{K8}. To help correct that false impression,
+\fu{cFact}{the Crown was permitted to put a July~2001 incident before the jury}{K9}:
+\fu{cFact}{Renda had then been found unfit to plead to assault and given an absolute discharge, so he was not convicted}{K10}, yet
+\fu{cFact}{a jury had found as a fact that he struck a man from behind with a wooden table leg}{K11}, and the
+\fu{cHold}{court held that this act was reprehensible behaviour within the bad-character provisions notwithstanding the absence of a conviction}{K12}.
+\fu{cFact}{A submission that the resulting evidence was contaminated under \mbox{s\,107}}{K13} was rejected, the
+\fu{cHold}{court holding that it was not contaminated, and the appeal was dismissed}{K14, K15}.
 \end{quote}
 
 \subsection*{Atomic units of K (self-contained, in order of appearance)}
