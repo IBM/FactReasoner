@@ -10,16 +10,20 @@ This example shows how to use the `QueryBuilder` core component to transform a p
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+One of the following Mellea backends, selected with the `--backend` flag:
+
+- **RITS** (default) — a configured remote IBM RITS backend (requires the `mellea` and `mellea_ibm` packages plus RITS credentials/config).
+- **Ollama** — a local [Ollama](https://ollama.com) server running at `http://localhost:11434` (requires the `mellea` package; the model is pulled automatically on first use).
 
 ## Key Components
 
 - **`QueryBuilder`** — Generates search-optimized queries from input text using an LLM backend
-- **`run(text)`** — Transforms a single text input into a search query
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`run(text)`** — Transforms a single text input into a search query (falls back to the original text if generation fails)
 
 ## How It Works
 
-1. Create a Mellea RITS backend using LLaMA 3.3 70B Instruct.
+1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
 2. Instantiate the `QueryBuilder` with the backend.
 3. Define an input text — `"rootstock for honey crisp apples in wayne county, ny"`.
 4. Call `qb.run(text)` to generate the search query.
@@ -27,8 +31,16 @@ This example shows how to use the `QueryBuilder` core component to transform a p
 
 ## Usage
 
+Run with the default RITS backend:
+
 ```python
 python docs/examples/core/ex_query.py
+```
+
+Or run against a local Ollama server:
+
+```python
+python docs/examples/core/ex_query.py --backend ollama
 ```
 
 ## Output
