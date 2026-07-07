@@ -17,7 +17,6 @@
 # (context) to revise or decontextualize the atomc units if needed.
 
 import json
-import asyncio
 import mellea.stdlib.functional as mfuncs
 
 from typing import Dict, List
@@ -28,7 +27,12 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
 # Local imports
-from fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
+from fact_reasoner.utils import (
+    validate_json_code_block,
+    strip_code_fences,
+    run_throttled,
+    LOOP_BUDGET,
+)
 
 INSTRUCTION_ATOMIZER = """
 Instructions:
@@ -148,6 +152,27 @@ class Atomizer(object):
     """
     The Atomizer class implements the atomic decomposition of the response.
     For our purpose, an atomic unit or atom is either a fact or a claim.
+
+    Design note (Mellea backend vs. session):
+    This class holds a raw Mellea ``Backend`` and issues requests via the
+    ``mellea.stdlib.functional`` free functions with a fresh ``SimpleContext()``
+    per call, rather than using a ``MelleaSession``. Atomization is a batch of
+    independent, stateless requests fanned out concurrently (see ``run_batch``),
+    and this is the pattern the Mellea authors recommend for such workloads:
+      - A ``MelleaSession`` threads a single mutable context through calls. Under
+        concurrency that shared context races: harmless with ``SimpleContext``
+        (its view is always empty) but pointless, and incorrect with
+        ``ChatContext`` (Mellea even logs a stale-context warning for async +
+        non-SimpleContext). We have no multi-turn conversation to thread.
+      - A ``Backend`` holds only connection/config and no per-request mutable
+        state, so it is safe to share across all concurrent calls, while each
+        call's immutable ``SimpleContext()`` guarantees per-request isolation.
+      - Mellea's own guidance ("for parallel generation, use SimpleContext") and
+        its session docstring both steer stateless/high-concurrency use away
+        from sessions and toward Backend + functional.
+    If a genuinely sequential, multi-turn sub-flow is ever needed, introduce a
+    session locally there (with ``ChatContext``, awaiting between calls); keep
+    the batch path on Backend + per-call ``SimpleContext``.
     """
 
     def __init__(
@@ -188,48 +213,11 @@ class Atomizer(object):
             Dict[str, str]: A dictionary containing the atomic units, each with
             a unique identifier.
         """
-        # Perform the instruction with validation
-
-        output = mfuncs.instruct(
-            INSTRUCTION_ATOMIZER,
-            context=SimpleContext(),
-            backend=self.backend,
-            requirements=[
-                check(
-                    "The output must be a valid JSON dictionary with markdown code fences",
-                    validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(s)
-                    ),
-                )
-            ],
-            user_variables={"response": response},
-            strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-            return_sampling_results=True,
-        )
-
-        # The output is a validated JSON string; parse it
-        if output.success:
-            cleaned = strip_code_fences(str(output))
-            return json.loads(cleaned)
-        else:
-            return {}  # empty dict on failure
-
-    async def run_batch(self, responses: List[str]) -> List[Dict[str, str]]:
-        """
-        Extract atomic units from a list of responses.
-
-        Args:
-            responses: List[str]
-                The list of response from which to extract atomic units.
-        Returns:
-            dict: A dictionary containing the number of atomic units, the units themselves,
-            all atomic units as dictionaries, and all facts as dictionaries.
-        """
-
-        # Perform the instruction with validation
-        coroutines = []
-        for response in responses:
-            coroutine = mfuncs.ainstruct(
+        # Perform the instruction with validation. A backend/network error is
+        # raised out of mfuncs.instruct (validation failures instead come back
+        # as a result with success=False), so guard the whole generation.
+        try:
+            output = mfuncs.instruct(
                 INSTRUCTION_ATOMIZER,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -245,18 +233,74 @@ class Atomizer(object):
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-            coroutines.append(coroutine)
+        except Exception as e:
+            print(f"[Atomizer] Generation failed: {e}")
+            return {}  # empty dict on failure
 
-        results = []
-        print(f"[Atomizer] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
+        if not output.success:
+            return {}  # empty dict on validation failure
+
+        # The output is a validated JSON string; parse it defensively.
+        try:
+            cleaned = strip_code_fences(str(output))
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[Atomizer] Failed to parse output: {e}")
+            return {}
+
+    async def run_batch(self, responses: List[str]) -> List[Dict[str, str]]:
+        """
+        Extract atomic units from a list of responses.
+
+        Args:
+            responses: List[str]
+                The list of response from which to extract atomic units.
+        Returns:
+            dict: A dictionary containing the number of atomic units, the units themselves,
+            all atomic units as dictionaries, and all facts as dictionaries.
+        """
+
+        # Build a fresh coroutine per response. run_throttled applies bounded
+        # concurrency plus a per-minute rate limit, and captures per-item
+        # exceptions so a single backend failure does not drop the rest.
+        def factory(response: str):
+            return mfuncs.ainstruct(
+                INSTRUCTION_ATOMIZER,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be a valid JSON dictionary with markdown code fences",
+                        validation_fn=simple_validate(
+                            lambda s: validate_json_code_block(s)
+                        ),
+                    )
+                ],
+                user_variables={"response": response},
+                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
+                return_sampling_results=True,
+            )
+
+        print(f"[Atomizer] Running throttled batch of {len(responses)} requests ...")
+        outputs = await run_throttled(factory, responses)
+
+        # Results are positionally aligned with responses; map every failure
+        # (raised exception, unsuccessful sampling, or unparsable output) to {}.
+        results: List[Dict[str, str]] = []
         for output in outputs:
-            # The output is a validated JSON string; parse it
-            if output.success:
+            if isinstance(output, Exception):
+                print(f"[Atomizer] Batch item failed: {output}")
+                results.append({})
+                continue
+            if not getattr(output, "success", False):
+                results.append({})
+                continue
+            try:
                 cleaned = strip_code_fences(str(output))
                 results.append(json.loads(cleaned))
-            else:
-                results.append({})  # empty dict on failure
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"[Atomizer] Failed to parse batch item: {e}")
+                results.append({})
 
         return results
 

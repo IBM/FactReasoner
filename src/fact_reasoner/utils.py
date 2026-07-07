@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import json
+import asyncio
 import numpy as np
 import requests
 import tqdm
@@ -23,10 +24,115 @@ import random
 import torch
 import transformers
 
-from typing import List, Union, Dict, Any
+from typing import Awaitable, Callable, List, Union, Dict, Any
 
 
 LOOP_BUDGET = 5
+
+# Throttling defaults for batched LLM generation. The rate limit protects
+# against provider rate-limit (429) errors, while the concurrency ceiling bounds
+# the number of in-flight requests (and thus open sockets) at any given time.
+MAX_REQUESTS_PER_MINUTE = 1500
+MAX_CONCURRENT_REQUESTS = 32
+
+
+class AsyncRateLimiter:
+    """Token-bucket rate limiter for asyncio.
+
+    Allows at most ``rate`` acquisitions per ``period`` seconds, smoothing bursts
+    by refilling tokens continuously rather than in fixed windows. Safe to share
+    across concurrent coroutines running on the same event loop.
+    """
+
+    def __init__(self, rate: int, period: float = 60.0):
+        """
+        Args:
+            rate: int
+                Maximum number of acquisitions allowed per ``period`` seconds.
+            period: float
+                The length of the rate-limiting window, in seconds.
+        """
+        if rate <= 0:
+            raise ValueError("rate must be a positive integer")
+        if period <= 0:
+            raise ValueError("period must be a positive number of seconds")
+
+        self._rate = rate
+        self._period = period
+        self._allowance = float(rate)  # available tokens
+        self._last = None  # lazily initialized to the event-loop clock on first use
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        """Block until a token is available, then consume it."""
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            if self._last is None:
+                self._last = now
+
+            # Refill tokens proportionally to the elapsed time.
+            self._allowance += (now - self._last) * (self._rate / self._period)
+            self._last = now
+            if self._allowance > self._rate:
+                self._allowance = float(self._rate)  # never accumulate beyond capacity
+
+            if self._allowance < 1.0:
+                # Not enough budget yet; sleep until a single token is available.
+                sleep_for = (1.0 - self._allowance) * (self._period / self._rate)
+                await asyncio.sleep(sleep_for)
+                # We slept exactly long enough to earn and consume one token.
+                # Advance the clock past the sleep so the next caller does not
+                # re-credit the elapsed sleep time as additional tokens.
+                self._allowance = 0.0
+                self._last = asyncio.get_event_loop().time()
+            else:
+                self._allowance -= 1.0
+
+
+async def run_throttled(
+    factory: Callable[[Any], Awaitable[Any]],
+    items: List[Any],
+    *,
+    max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+    rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+) -> List[Any]:
+    """Run one coroutine per item with bounded concurrency and rate limiting.
+
+    A fresh coroutine is created for each item via ``factory`` right before it
+    runs, so the rate limiter gates *when* each generation starts. Every item is
+    awaited independently: if one raises, the exception is captured and returned
+    in place instead of propagating, so a single failure never drops the
+    remaining results.
+
+    Args:
+        factory: Callable[[item], Awaitable]
+            Builds a fresh coroutine for a single item. Called once per item.
+        items: List[Any]
+            The inputs to process.
+        max_concurrency: int
+            Maximum number of coroutines running at any given time.
+        rate_per_minute: int
+            Maximum number of coroutines started per minute.
+
+    Returns:
+        List[Any]: Results positionally aligned with ``items``. For any item
+        whose coroutine raised, the corresponding entry is the ``Exception``
+        object (never reordered, never dropped).
+    """
+    limiter = AsyncRateLimiter(rate_per_minute)
+    sem = asyncio.Semaphore(max_concurrency)
+
+    async def _one(item: Any) -> Any:
+        async with sem:
+            await limiter.acquire()
+            try:
+                return await factory(item)
+            except Exception as e:  # capture, so sibling requests are not dropped
+                return e
+
+    tasks = [asyncio.create_task(_one(item)) for item in items]
+    # _one never raises, so gather returns one result per item in order.
+    return await asyncio.gather(*tasks)
 
 
 class dotdict(dict):
