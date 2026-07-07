@@ -27,7 +27,11 @@ from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import FancyLogger
 
-from fact_reasoner.utils import LOOP_BUDGET, extract_logprobs_from_output
+from fact_reasoner.utils import (
+    LOOP_BUDGET,
+    extract_logprobs_from_output,
+    run_throttled,
+)
 
 INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
@@ -201,7 +205,11 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        logprobs = extract_logprobs_from_output(output)
+        try:
+            logprobs = extract_logprobs_from_output(output)
+        except Exception as e:
+            print(f"[Summarizer] Failed to extract logprobs: {e}")
+            return 0.0
 
         avg_logprob = (
             sum(lp["logprob"] for lp in logprobs) / len(logprobs)
@@ -250,11 +258,11 @@ class ContextSummarizer:
             INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
         )
 
-        # Perform the instruction with validation
-        results = []
-        coroutines = []
-        for context in contexts:
-            coroutine = mfuncs.ainstruct(
+        # Build a fresh coroutine per context. run_throttled applies bounded
+        # concurrency plus a per-minute rate limit, and captures per-item
+        # exceptions so a single backend failure does not drop the rest.
+        def factory(context: str):
+            return mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -267,11 +275,22 @@ class ContextSummarizer:
                     "top_logprobs": 5,
                 },
             )
-            coroutines.append(coroutine)
 
-        results = []
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
-        for output in outputs:
+        print(f"[Summarizer] Running throttled batch of {len(contexts)} requests ...")
+        outputs = await run_throttled(factory, contexts)
+
+        # Results are positionally aligned with `contexts`; failures map to an
+        # empty summary so callers can zip(contexts, results) safely.
+        results: List[Dict[str, Any]] = []
+        for context, output in zip(contexts, outputs):
+            if isinstance(output, Exception) or not getattr(output, "success", False):
+                if isinstance(output, Exception):
+                    print(f"[Summarizer] Batch item failed: {output}")
+                results.append(
+                    {"context": context, "summary": "", "probability": 0.0}
+                )
+                continue
+
             cleaned = str(output).strip()
             results.append(
                 {

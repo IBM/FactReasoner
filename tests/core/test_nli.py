@@ -15,6 +15,7 @@
 
 """Unit tests for fact_reasoner.core.nli module."""
 
+import asyncio
 import pytest
 import math
 from unittest.mock import MagicMock, patch
@@ -127,18 +128,25 @@ class TestNLIExtractorGetProbability:
 
         nli = NLIExtractor(backend=mock_backend)
 
+        # Mirrors the real OpenAI backend shape: mellea stores
+        # ChatCompletion.model_dump() under "oai_chat_response", so logprobs
+        # live at oai_chat_response["choices"][0]["logprobs"]["content"].
         mock_output = MagicMock()
         mock_output._meta = {
             "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "[", "logprob": -0.1},
-                        {"token": "ent", "logprob": -0.5},
-                        {"token": "ail", "logprob": -0.3},
-                        {"token": "]", "logprob": -0.1},
-                        {"token": "<eos>", "logprob": -0.1},  # EOS token
-                    ]
-                }
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [
+                                {"token": "[", "logprob": -0.1},
+                                {"token": "ent", "logprob": -0.5},
+                                {"token": "ail", "logprob": -0.3},
+                                {"token": "]", "logprob": -0.1},
+                                {"token": "<eos>", "logprob": -0.1},  # EOS token
+                            ]
+                        }
+                    }
+                ]
             }
         }
 
@@ -155,13 +163,17 @@ class TestNLIExtractorGetProbability:
         mock_output = MagicMock()
         mock_output._meta = {
             "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "[", "logprob": -0.1},
-                        {"token": "]", "logprob": -0.1},
-                        {"token": "<eos>", "logprob": -0.1},
-                    ]
-                }
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [
+                                {"token": "[", "logprob": -0.1},
+                                {"token": "]", "logprob": -0.1},
+                                {"token": "<eos>", "logprob": -0.1},
+                            ]
+                        }
+                    }
+                ]
             }
         }
 
@@ -181,14 +193,18 @@ class TestNLIExtractorRun:
         mock_result.__str__ = lambda self: "[entailment]"
         mock_result._meta = {
             "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "[", "logprob": -0.1},
-                        {"token": "ent", "logprob": -0.2},
-                        {"token": "]", "logprob": -0.1},
-                        {"token": "<eos>", "logprob": -0.1},
-                    ]
-                }
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [
+                                {"token": "[", "logprob": -0.1},
+                                {"token": "ent", "logprob": -0.2},
+                                {"token": "]", "logprob": -0.1},
+                                {"token": "<eos>", "logprob": -0.1},
+                            ]
+                        }
+                    }
+                ]
             }
         }
 
@@ -224,3 +240,72 @@ class TestNLIExtractorRun:
 
             assert result["label"] == "neutral"
             assert result["probability"] == 1.0
+
+    def test_run_returns_neutral_on_generation_exception(self):
+        """A backend/network error during generation must not crash run()."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        with patch(
+            'src.fact_reasoner.core.nli.mfuncs.instruct',
+            side_effect=RuntimeError("backend exploded"),
+        ):
+            nli = NLIExtractor(backend=mock_backend)
+            result = nli.run(premise="p", hypothesis="h")
+
+            assert result["label"] == "neutral"
+            assert result["probability"] == 1.0
+
+
+class TestNLIExtractorRunBatch:
+    """Tests for NLIExtractor.run_batch throttling and failure resilience."""
+
+    @staticmethod
+    def _mk_output(success: bool):
+        out = MagicMock()
+        out.success = success
+        out.result = MagicMock()
+        return out
+
+    def test_run_batch_returns_aligned_results(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        labels = ["entailment", "contradiction"]
+        outputs = [self._mk_output(True), self._mk_output(True)]
+
+        async def fake_ainstruct(*args, **kwargs):
+            return outputs.pop(0)
+
+        with patch('src.fact_reasoner.core.nli.mfuncs.ainstruct', side_effect=fake_ainstruct):
+            with patch.object(NLIExtractor, "_get_label", side_effect=labels):
+                with patch.object(NLIExtractor, "_get_probability", return_value=0.9):
+                    nli = NLIExtractor(backend=mock_backend)
+                    results = asyncio.run(nli.run_batch(["p1", "p2"], ["h1", "h2"]))
+
+        assert [r["label"] for r in results] == ["entailment", "contradiction"]
+
+    def test_run_batch_single_failure_does_not_drop_others(self):
+        """One raised call maps to neutral; results stay length/order aligned."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        good = self._mk_output(True)
+
+        async def fake_ainstruct(*args, **kwargs):
+            if kwargs["user_variables"]["premise_text"] == "bad":
+                raise RuntimeError("boom")
+            return good
+
+        with patch('src.fact_reasoner.core.nli.mfuncs.ainstruct', side_effect=fake_ainstruct):
+            with patch.object(NLIExtractor, "_get_label", return_value="entailment"):
+                with patch.object(NLIExtractor, "_get_probability", return_value=0.9):
+                    nli = NLIExtractor(backend=mock_backend)
+                    results = asyncio.run(
+                        nli.run_batch(["ok1", "bad", "ok2"], ["h1", "h2", "h3"])
+                    )
+
+        assert len(results) == 3
+        assert results[0]["label"] == "entailment"
+        assert results[1] == {"label": "neutral", "probability": 1.0}
+        assert results[2]["label"] == "entailment"

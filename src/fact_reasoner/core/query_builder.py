@@ -118,27 +118,37 @@ class QueryBuilder:
             dict: A dictionary containing the query string.
         """
 
-        # Perform the instruction with validation
-        output = mfuncs.instruct(
-            INSTRUCTION_QUERY_BUILDER,
-            context=SimpleContext(),
-            backend=self.backend,
-            requirements=[
-                check(
-                    "The output must be wrapped with markdown code fences.",
-                    validation_fn=simple_validate(
-                        lambda s: validate_markdown_code_block(s)
-                    ),
-                )
-            ],
-            user_variables={"statement_text": text},
-            strategy=RejectionSamplingStrategy(loop_budget=3),
-            return_sampling_results=True,
-        )
+        # Perform the instruction with validation. A backend/network error is
+        # raised out of mfuncs.instruct (validation failures instead come back
+        # as a result with success=False), so guard the whole generation and
+        # fall back to the original text.
+        try:
+            output = mfuncs.instruct(
+                INSTRUCTION_QUERY_BUILDER,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be wrapped with markdown code fences.",
+                        validation_fn=simple_validate(
+                            lambda s: validate_markdown_code_block(s)
+                        ),
+                    )
+                ],
+                user_variables={"statement_text": text},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True,
+            )
+        except Exception as e:
+            print(f"[QueryBuilder] Generation failed: {e}")
+            return text  # the original text
 
-        # The output is a validated JSON string; parse it
-        if output.success:
-            cleaned = strip_code_fences(str(output))
-            return cleaned
-        else:
+        if not output.success:
+            return text  # the original text
+
+        # The output is a validated query wrapped in code fences; strip them.
+        try:
+            return strip_code_fences(str(output))
+        except Exception as e:
+            print(f"[QueryBuilder] Failed to parse output: {e}")
             return text  # the original text

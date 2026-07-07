@@ -125,3 +125,18 @@ class TestQueryBuilderRun:
             assert "Apple" in result
             assert "foldable" in result
             assert "OR" in result
+
+    def test_run_returns_original_on_generation_exception(self):
+        """A backend/network error during generation must not crash run()."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        with patch(
+            'src.fact_reasoner.core.query_builder.mfuncs.instruct',
+            side_effect=RuntimeError("backend exploded"),
+        ):
+            qb = QueryBuilder(backend=mock_backend)
+            original_text = "Original statement text"
+            result = qb.run(original_text)
+
+            assert result == original_text

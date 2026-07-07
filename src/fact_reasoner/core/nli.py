@@ -15,7 +15,6 @@
 
 # NLI extractor using LLMs.
 
-import asyncio
 import math
 import mellea.stdlib.functional as mfuncs
 
@@ -32,6 +31,7 @@ from mellea.core import FancyLogger
 from fact_reasoner.utils import (
     extract_last_square_brackets,
     extract_logprobs_from_output,
+    run_throttled,
 )
 
 INSTRUCTION_NLI = """
@@ -204,59 +204,11 @@ class NLIExtractor:
             Dict[str, Any]: A dictionary containing the relationship and its probability.
         """
 
-        # Perform the instruction with validation
-        output = mfuncs.instruct(
-            INSTRUCTION_NLI,
-            context=SimpleContext(),
-            backend=self.backend,
-            requirements=[
-                check(
-                    "The output must be a wrapped in square brackets",
-                    validation_fn=simple_validate(
-                        lambda s: extract_last_square_brackets(s) != ""
-                    ),
-                )
-            ],
-            user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-            strategy=RejectionSamplingStrategy(loop_budget=3),
-            return_sampling_results=True,
-            model_options={
-                "logprobs": True,
-                "top_logprobs": 5,
-            },
-        )
-
-        if output.success:
-            label = self._get_label(output.result)
-            probability = self._get_probability(output.result)
-            if label not in ["entailment", "contradiction", "neutral"]:
-                label = "neutral"
-
-            return dict(label=label, probability=probability)
-        else:
-            return dict(label="neutral", probability=1.0)
-
-    async def run_batch(
-        self, premises: List[str], hypotheses: List[str]
-    ) -> List[Dict[str, Any]]:
-        """
-        Extract the NLI relationships between premises and hypotheses. The
-        following relationships are allowed: entailment, contradiction, neutral.
-
-        Args:
-            premises: List[str]
-                The list of premise texts (e.g., context).
-            hypotheses: List[str]
-                The list of hypothesis texts (e.g., atom).
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries containing the
-            relationships and their probabilities.
-        """
-
-        coroutines = []
-        for premise, hypothesis in zip(premises, hypotheses):
-            coroutine = mfuncs.ainstruct(
+        # Perform the instruction with validation. A backend/network error is
+        # raised out of mfuncs.instruct (validation failures instead come back
+        # as a result with success=False), so guard the whole generation.
+        try:
+            output = mfuncs.instruct(
                 INSTRUCTION_NLI,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -276,18 +228,92 @@ class NLIExtractor:
                     "top_logprobs": 5,
                 },
             )
-            coroutines.append(coroutine)
+        except Exception as e:
+            print(f"[NLI] Generation failed: {e}")
+            return self._fallback()
 
-        results = []
-        print(f"[NLI] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
+        return self._parse_output(output)
+
+    @staticmethod
+    def _fallback() -> Dict[str, Any]:
+        """Neutral relationship used when generation or parsing fails."""
+        return dict(label="neutral", probability=1.0)
+
+    def _parse_output(self, output: Any) -> Dict[str, Any]:
+        """Map a single sampling result to a label/probability dict.
+
+        Any failure (unsuccessful sampling or an error while extracting the
+        label/probability) falls back to a neutral relationship.
+        """
+        if not getattr(output, "success", False):
+            return self._fallback()
+        try:
+            label = self._get_label(output.result)
+            probability = self._get_probability(output.result)
+        except Exception as e:
+            print(f"[NLI] Failed to parse output: {e}")
+            return self._fallback()
+
+        if label not in ["entailment", "contradiction", "neutral"]:
+            label = "neutral"
+        return dict(label=label, probability=probability)
+
+    async def run_batch(
+        self, premises: List[str], hypotheses: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract the NLI relationships between premises and hypotheses. The
+        following relationships are allowed: entailment, contradiction, neutral.
+
+        Args:
+            premises: List[str]
+                The list of premise texts (e.g., context).
+            hypotheses: List[str]
+                The list of hypothesis texts (e.g., atom).
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing the
+            relationships and their probabilities.
+        """
+
+        # Build a fresh coroutine per (premise, hypothesis) pair. run_throttled
+        # applies bounded concurrency plus a per-minute rate limit, and captures
+        # per-item exceptions so a single backend failure does not drop the rest.
+        def factory(pair):
+            premise, hypothesis = pair
+            return mfuncs.ainstruct(
+                INSTRUCTION_NLI,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be a wrapped in square brackets",
+                        validation_fn=simple_validate(
+                            lambda s: extract_last_square_brackets(s) != ""
+                        ),
+                    )
+                ],
+                user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True,
+                model_options={
+                    "logprobs": True,
+                    "top_logprobs": 5,
+                },
+            )
+
+        pairs = list(zip(premises, hypotheses))
+        print(f"[NLI] Running throttled batch of {len(pairs)} requests ...")
+        outputs = await run_throttled(factory, pairs)
+
+        # Results are positionally aligned with the input pairs; failures map to
+        # a neutral relationship so callers can index result[i].
+        results: List[Dict[str, Any]] = []
         for output in outputs:
-
-            if output.success:
-                label = self._get_label(output.result)
-                probability = self._get_probability(output.result)
-                results.append(dict(label=label, probability=probability))
-            else:
-                results.append(dict(label="neutral", probability=1.0))
+            if isinstance(output, Exception):
+                print(f"[NLI] Batch item failed: {output}")
+                results.append(self._fallback())
+                continue
+            results.append(self._parse_output(output))
 
         return results
