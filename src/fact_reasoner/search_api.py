@@ -27,11 +27,12 @@ from thefuzz import fuzz
 
 logger = logging.getLogger(__name__)
 
-class SearchAPI():
+
+class SearchAPI:
     def __init__(self, cache_dir: str = None, similarity_threshold: float = 90):
-        """ 
+        """
         Initialize the SearchAPI with a cache directory and similarity threshold.
-        
+
         Args:
             cache_dir : str
                 Path to the SQLite database file for caching search results. If
@@ -40,13 +41,15 @@ class SearchAPI():
                 Minimum similarity score (0-100) for cached results to be considered relevant.
         """
         if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True) 
+            load_dotenv(override=True)
             os.environ["_DOTENV_LOADED"] = "1"
 
         self.serper_key = os.getenv("SERPER_API_KEY")
         self.url = "https://google.serper.dev/search"
-        self.headers = {'X-API-KEY': self.serper_key,
-                        'Content-Type': 'application/json'}
+        self.headers = {
+            "X-API-KEY": self.serper_key,
+            "Content-Type": "application/json",
+        }
 
         # Set up database if cache_dir is not None
         if cache_dir is not None:
@@ -61,10 +64,10 @@ class SearchAPI():
 
     def _init_db(self):
         """
-        Initialize the SQLite database with FTS5 for full-text search, using 
+        Initialize the SQLite database with FTS5 for full-text search, using
         WAL mode for better concurrency.
         """
-        assert (self.do_caching is True), f"Caching requires an existing cache dir."
+        assert self.do_caching is True, "Caching requires an existing cache dir."
 
         with sqlite3.connect(self.database) as conn:
             cursor = conn.cursor()
@@ -79,7 +82,7 @@ class SearchAPI():
     def get_snippets(self, claim_lst):
         """
         Retrieve search snippets for a list of claims.
-        
+
         Args:
             claim_lst : list
                 A list of claims (strings) for which to retrieve search snippets.
@@ -88,19 +91,23 @@ class SearchAPI():
                 A dictionary where keys are claims and values are lists of search results,
                 each containing a title, snippet, and link.
         """
-        
+
         text_claim_snippets_dict = {}
         for query in claim_lst:
             search_result = self.get_search_res(query)
             if "statusCode" in search_result:
-                logger.error(search_result['message'])
+                logger.error(search_result["message"])
                 exit()
             organic_res = search_result.get("organic", [])
 
-            search_res_lst = [{"title": item.get("title", ""),
-                               "snippet": item.get("snippet", ""),
-                               "link": item.get("link", "")}
-                              for item in organic_res]
+            search_res_lst = [
+                {
+                    "title": item.get("title", ""),
+                    "snippet": item.get("snippet", ""),
+                    "link": item.get("link", ""),
+                }
+                for item in organic_res
+            ]
             text_claim_snippets_dict[query] = search_res_lst
         return text_claim_snippets_dict
 
@@ -114,17 +121,21 @@ class SearchAPI():
             dict
                 The search results in JSON format, either from cache or from the API.
         """
-        
+
         if self.do_caching:
             cache_key = query.strip()
             cached_response = self._get_from_cache(cache_key)
             if cached_response:
-                logger.info(f"CACHE HIT! key={cache_key}, q={cached_response['searchParameters']['q']}")
+                logger.info(
+                    f"CACHE HIT! key={cache_key}, q={cached_response['searchParameters']['q']}"
+                )
                 return cached_response
 
         # Make API request
         payload = json.dumps({"q": query})
-        response = requests.request("POST", self.url, params={"num": 15}, headers=self.headers, data=payload)
+        response = requests.request(
+            "POST", self.url, params={"num": 15}, headers=self.headers, data=payload
+        )
         response_json = literal_eval(response.text)
         if response is not None:
             response.close()
@@ -137,9 +148,9 @@ class SearchAPI():
 
     def _get_from_cache(self, query):
         """
-        Retrieve the top 3 most relevant cached search results and use 
+        Retrieve the top 3 most relevant cached search results and use
         fuzz.token_sort_ratio to pick the best one.
-        
+
         Args:
             query : str
                 The search query string to look up in the cache.
@@ -153,11 +164,14 @@ class SearchAPI():
 
         with sqlite3.connect(self.database) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT query, response FROM search_cache
                 WHERE query MATCH ?
                 LIMIT 3
-            """, (f'"{query}"',))
+            """,
+                (f'"{query}"',),
+            )
             rows = cursor.fetchall()
 
         if not rows:
@@ -167,12 +181,16 @@ class SearchAPI():
         best_match = max(rows, key=lambda row: fuzz.token_sort_ratio(query, row[0]))
         best_score = fuzz.token_sort_ratio(query, best_match[0])
 
-        return json.loads(best_match[1]) if best_score > self.similarity_threshold else None
+        return (
+            json.loads(best_match[1])
+            if best_score > self.similarity_threshold
+            else None
+        )
 
     def _save_to_cache(self, query, response_json):
         """
         Save a search result to the SQLite FTS5 cache with transactions.
-        
+
         Args:
             query : str
                 The search query string to cache.
@@ -183,18 +201,20 @@ class SearchAPI():
         Raises:
             sqlite3.Error: If there is an error during the database operation.
         """
-        
+
         # Do not cache empty search results
         organic_res = response_json.get("organic", [])
         if len(organic_res) == 0:
             return
-        
+
         conn = sqlite3.connect(self.database)
         try:
             cursor = conn.cursor()
             cursor.execute("BEGIN TRANSACTION;")  # Start transaction
-            cursor.execute("REPLACE INTO search_cache (query, response) VALUES (?, ?)",
-                           (query, json.dumps(response_json)))
+            cursor.execute(
+                "REPLACE INTO search_cache (query, response) VALUES (?, ?)",
+                (query, json.dumps(response_json)),
+            )
             conn.commit()  # Commit transaction
         except sqlite3.Error as e:
             conn.rollback()  # Rollback on error
@@ -203,9 +223,8 @@ class SearchAPI():
             conn.close()
 
 
-if __name__ == '__main__':
-    
-    cache_dir = None # "my_database.db"
+if __name__ == "__main__":
+    cache_dir = None  # "my_database.db"
 
     text = "Neil B. Todd was an American geneticist"
     # text = "Lanny Flaherty is an American."
