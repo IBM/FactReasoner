@@ -25,7 +25,7 @@ from mellea.backends import ModelOption
 from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 from fact_reasoner.utils import (
     LOOP_BUDGET,
@@ -191,7 +191,7 @@ class ContextSummarizer:
         print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """

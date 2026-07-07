@@ -25,7 +25,7 @@ from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.utils import (
@@ -127,7 +127,7 @@ class NLIExtractor:
         print(f"[NLI] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """

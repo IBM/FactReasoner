@@ -27,7 +27,7 @@ from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
 from mellea.stdlib.requirements import check
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
@@ -121,7 +121,7 @@ class FactScore:
         self.labels_human = None
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def from_dict_with_contexts(
         self,

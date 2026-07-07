@@ -30,7 +30,7 @@ from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
 from mellea.backends import ModelOption
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 class FactCorrector:
     def __init__(self):

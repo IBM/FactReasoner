@@ -23,7 +23,7 @@ from mellea.backends import Backend
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.utils import (
@@ -156,7 +156,7 @@ class Reviser:
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
         """

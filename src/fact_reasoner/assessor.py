@@ -29,7 +29,7 @@ from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.global_vars import logger
 from pgmpy.models import MarkovNetwork
 from pgmpy.readwrite import UAIWriter
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
@@ -138,7 +138,7 @@ class FactReasoner:
         self.labels_human = None
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def from_fact_graph(self, fact_graph: FactGraph):
         """
