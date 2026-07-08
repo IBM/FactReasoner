@@ -34,13 +34,13 @@ One of the following Mellea backends, selected with the `--backend` flag:
 
 Run with the default RITS backend:
 
-```python
+```bash
 python docs/examples/core/ex_nli.py
 ```
 
 Or run against a local Ollama server:
 
-```python
+```bash
 python docs/examples/core/ex_nli.py --backend ollama
 ```
 

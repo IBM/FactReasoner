@@ -37,8 +37,16 @@ Use this when you want a straightforward factuality score without probabilistic 
 
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_factscore.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_factscore.py --backend ollama
 ```
 
 ## Output

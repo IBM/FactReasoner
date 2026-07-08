@@ -40,10 +40,21 @@ Use this approach when you want to assess a response from scratch, providing the
 6. Call `pipeline.score()` to get the factuality results and marginal probabilities.
 7. Save the full pipeline output (including results) to a JSON file.
 
+> Note: `FactReasoner.build()` is asynchronous, so the example runs it via
+> `asyncio.run(...)`.
+
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_factreasoner.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_factreasoner.py --backend ollama
 ```
 
 ## Output

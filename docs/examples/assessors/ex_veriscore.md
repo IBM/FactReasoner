@@ -37,8 +37,16 @@ Use this when you want to compare factuality assessments across different baseli
 
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_veriscore.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_veriscore.py --backend ollama
 ```
 
 ## Output

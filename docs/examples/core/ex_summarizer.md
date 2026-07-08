@@ -43,13 +43,13 @@ Whether summaries are generated relative to a reference atom is controlled by th
 
 Run with the default RITS backend (no reference):
 
-```python
+```bash
 python docs/examples/core/ex_summarizer.py
 ```
 
 Summarize relative to a reference atom, or use a local Ollama server:
 
-```python
+```bash
 python docs/examples/core/ex_summarizer.py --with-reference
 python docs/examples/core/ex_summarizer.py --backend ollama
 ```

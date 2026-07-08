@@ -22,7 +22,7 @@ This example shows how to initialize a `FactReasoner` pipeline from a JSON file 
 
 ## How It Works
 
-1. Create a Mellea RITS backend and instantiate all core components.
+1. Create the selected Mellea backend via `build_backend()` (defaults to RITS; override with `--backend`) and instantiate all core components.
 2. Create the `FactReasoner` pipeline with all components and the Merlin path.
 3. Load a JSON file (`flaherty_wikipedia.json`) containing pre-computed atoms and contexts.
 4. Call `pipeline.from_dict_with_contexts(data)` to initialize the pipeline from the loaded data.
@@ -34,10 +34,21 @@ This example shows how to initialize a `FactReasoner` pipeline from a JSON file 
 6. Call `pipeline.score()` to produce factuality results and marginals.
 7. Save the output to `factreasoner_output.json`.
 
+> Note: `FactReasoner.build()` is asynchronous, so the example runs it via
+> `asyncio.run(...)`.
+
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_factreasoner_file.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_factreasoner_file.py --backend ollama
 ```
 
 ## Output

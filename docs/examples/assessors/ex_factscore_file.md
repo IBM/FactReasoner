@@ -21,7 +21,7 @@ This example shows how to initialize a `FactScore` pipeline from a JSON file tha
 
 ## How It Works
 
-1. Create a Mellea RITS backend and instantiate core components.
+1. Create the selected Mellea backend via `build_backend()` (defaults to RITS; override with `--backend`) and instantiate core components.
 2. Create the `FactScore` pipeline with the backend and components.
 3. Load a JSON file (`flaherty_wikipedia.json`) with pre-computed atoms and contexts.
 4. Call `pipeline.from_dict_with_contexts(data)` to initialize from the loaded data.
@@ -33,8 +33,16 @@ This example shows how to initialize a `FactScore` pipeline from a JSON file tha
 
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_factscore_file.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_factscore_file.py --backend ollama
 ```
 
 ## Output

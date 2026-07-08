@@ -37,8 +37,16 @@ Use this when you want a factuality assessment based on search result snippets r
 
 ## Usage
 
-```python
+Run with the default RITS backend:
+
+```bash
 python docs/examples/assessors/ex_factverify.py
+```
+
+Or run against a local Ollama server:
+
+```bash
+python docs/examples/assessors/ex_factverify.py --backend ollama
 ```
 
 ## Output

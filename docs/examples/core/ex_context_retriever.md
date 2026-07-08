@@ -44,13 +44,13 @@ Plus Google search API access.
 
 Run with the default RITS backend:
 
-```python
+```bash
 python docs/examples/core/ex_context_retriever.py
 ```
 
 Or run against a local Ollama server:
 
-```python
+```bash
 python docs/examples/core/ex_context_retriever.py --backend ollama
 ```
 
