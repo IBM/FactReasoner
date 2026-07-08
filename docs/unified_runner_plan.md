@@ -37,11 +37,11 @@ local vLLM), pick input mode (single vs file), pick pipeline, run, print/save.
      topic=..., has_atoms=False, has_contexts=False, revise_atoms=True,
      summarize_contexts=...)` — atoms and contexts are generated from scratch,
      which requires a **retriever** (google/wikipedia/chromadb).
-3. **Retriever wiring bug to avoid.** `ContextRetriever` *wraps* a `Retriever`:
-   correct construction is `Retriever(service_type=..., top_k=..., cache_dir=...,
+3. **Retriever wiring bug to avoid.** `ContextRetriever` *wraps* a `SourceRetriever`:
+   correct construction is `SourceRetriever(service_type=..., top_k=..., cache_dir=...,
    fetch_text=..., query_builder=...)` → `ContextRetriever(retriever=...,
    context_summarizer=..., num_workers=...)`. `eval_dataset.run()` currently
-   mis-constructs `ContextRetriever(service_type=...)` (passes Retriever args to
+   mis-constructs `ContextRetriever(service_type=...)` (passes SourceRetriever args to
    ContextRetriever). The runner must wire it the correct way (as the assessor
    examples do), and this exposes a bug to fix in `eval_dataset.run()`.
 
@@ -92,7 +92,7 @@ class FactualityRunner:
 ```
 
 Internals:
-- `_build_context_retriever()` wires `Retriever(service_type=...)` →
+- `_build_context_retriever()` wires `SourceRetriever(service_type=...)` →
   `ContextRetriever(retriever=..., context_summarizer=..., num_workers=...)`
   **correctly** (fixes the eval_dataset bug).
 - `_make_pipeline()` constructs the selected assessor with the shared components.

@@ -34,7 +34,7 @@ from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
@@ -136,13 +136,13 @@ class FactualityRunner:
         self.context_summarizer = ContextSummarizer(backend)
 
     def _build_context_retriever(self) -> ContextRetriever:
-        """Wire a ``Retriever`` into a ``ContextRetriever`` (the correct order).
+        """Wire a ``SourceRetriever`` into a ``ContextRetriever`` (the correct order).
 
-        ``ContextRetriever`` wraps a ``Retriever``; constructing it with the
-        ``Retriever`` keyword arguments directly is incorrect.
+        ``ContextRetriever`` wraps a ``SourceRetriever``; constructing it with the
+        ``SourceRetriever`` keyword arguments directly is incorrect.
         """
         query_builder = QueryBuilder(self.backend) if self.use_query_builder else None
-        retriever = Retriever(
+        retriever = SourceRetriever(
             service_type=self.service_type,
             top_k=self.top_k,
             cache_dir=self.cache_dir,

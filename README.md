@@ -60,7 +60,7 @@ FactReasoner addresses hallucination detection through a principled five-stage p
 
 2. **Decontextualization (Reviser)**: Atoms are revised to be standalone by resolving pronouns (e.g., "he", "she", "it"), demonstrative references (e.g., "this", "that"), unknown entities, and incomplete names. This ensures each atom can be verified without additional context.
 
-3. **Context Retrieval (Retriever)**: For each atom, relevant evidence is gathered from external knowledge sources. FactReasoner supports multiple retrieval backends:
+3. **Context Retrieval (SourceRetriever)**: For each atom, relevant evidence is gathered from external knowledge sources. FactReasoner supports multiple retrieval backends:
    - **Wikipedia**: Using LangChain's WikipediaRetriever
    - **Google Search**: Via Serper API with optional full-page content extraction
    - **ChromaDB**: Custom vector stores with semantic search
@@ -341,7 +341,7 @@ import asyncio
 from fact_reasoner import build_backend, FactReasoner
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -364,7 +364,7 @@ nli_extractor = NLIExtractor(backend)
 
 # The Retriever fetches evidence; ContextRetriever wraps it for parallel,
 # per-atom retrieval (optionally summarizing each context).
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="google",  # or "wikipedia", "chromadb"
     top_k=5,
     fetch_text=True,
@@ -501,7 +501,7 @@ FactReasoner supports three configurations:
 ### Google Search (via Serper API)
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="google",
     top_k=5,
     cache_dir="/path/to/cache.db",  # SQLite cache for API results
@@ -513,7 +513,7 @@ retriever = Retriever(
 ### Wikipedia
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="wikipedia",
     top_k=3
 )
@@ -522,7 +522,7 @@ retriever = Retriever(
 ### ChromaDB Vector Store
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="chromadb",
     collection_name="my_documents",
     persist_dir="/path/to/chroma_db",

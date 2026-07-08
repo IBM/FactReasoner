@@ -154,29 +154,29 @@ class TestIsContentValid:
         assert is_content_valid("http://example.com", text) is True
 
 
-class TestContextRetrieverInit:
-    """Tests for ContextRetriever initialization."""
+class TestSourceRetrieverInit:
+    """Tests for SourceRetriever initialization."""
 
     def test_invalid_service_type(self):
-        from src.fact_reasoner.core.retriever import ContextRetriever
+        from src.fact_reasoner.core.retriever import SourceRetriever
 
         with pytest.raises(AssertionError):
-            ContextRetriever(service_type="invalid_service")
+            SourceRetriever(service_type="invalid_service")
 
     def test_wikipedia_service_type(self):
-        from src.fact_reasoner.core.retriever import ContextRetriever
+        from src.fact_reasoner.core.retriever import SourceRetriever
 
-        retriever = ContextRetriever(service_type="wikipedia", top_k=3)
+        retriever = SourceRetriever(service_type="wikipedia", top_k=3)
         assert retriever.service_type == "wikipedia"
         assert retriever.top_k == 3
         assert retriever.langchain_retriever is not None
 
     def test_google_service_type(self):
-        from src.fact_reasoner.core.retriever import ContextRetriever
+        from src.fact_reasoner.core.retriever import SourceRetriever
         import os
 
         with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-            retriever = ContextRetriever(
+            retriever = SourceRetriever(
                 service_type="google", top_k=5, cache_dir=None, fetch_text=True
             )
             assert retriever.service_type == "google"
@@ -185,9 +185,9 @@ class TestContextRetrieverInit:
             assert retriever.google_retriever is not None
 
     def test_set_query_builder(self):
-        from src.fact_reasoner.core.retriever import ContextRetriever
+        from src.fact_reasoner.core.retriever import SourceRetriever
 
-        retriever = ContextRetriever(service_type="wikipedia", top_k=3)
+        retriever = SourceRetriever(service_type="wikipedia", top_k=3)
         mock_query_builder = MagicMock()
         retriever.set_query_builder(mock_query_builder)
         assert retriever.query_builder == mock_query_builder

@@ -65,12 +65,12 @@ class TestConstruction:
 
 class TestContextRetrieverWiring:
     def test_wraps_a_retriever(self):
-        # Guards the fix: ContextRetriever must WRAP a Retriever, and the
-        # Retriever must carry the service_type/top_k.
+        # Guards the fix: ContextRetriever must WRAP a SourceRetriever, and the
+        # SourceRetriever must carry the service_type/top_k.
         r = FactualityRunner(MagicMock(), pipeline="factscore", service_type="google")
         captured = {}
 
-        class _FakeRetriever:
+        class _FakeSourceRetriever:
             def __init__(self, **kw):
                 captured["retriever_kwargs"] = kw
 
@@ -79,7 +79,7 @@ class TestContextRetrieverWiring:
                 captured["ctx_kwargs"] = kw
 
         with (
-            patch.object(runner_mod, "Retriever", _FakeRetriever),
+            patch.object(runner_mod, "SourceRetriever", _FakeSourceRetriever),
             patch.object(runner_mod, "ContextRetriever", _FakeContextRetriever),
             patch.object(runner_mod, "QueryBuilder"),
         ):
@@ -87,9 +87,9 @@ class TestContextRetrieverWiring:
 
         assert captured["retriever_kwargs"]["service_type"] == "google"
         assert captured["retriever_kwargs"]["top_k"] == 3
-        # ContextRetriever wraps the Retriever instance.
+        # ContextRetriever wraps the SourceRetriever instance.
         assert "retriever" in captured["ctx_kwargs"]
-        assert isinstance(captured["ctx_kwargs"]["retriever"], _FakeRetriever)
+        assert isinstance(captured["ctx_kwargs"]["retriever"], _FakeSourceRetriever)
 
 
 class TestAssessSingle:

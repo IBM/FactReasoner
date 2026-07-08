@@ -3,7 +3,7 @@
 from .base import Atom, Context, Relation
 from .atomizer import Atomizer
 from .reviser import Reviser
-from .retriever import ContextRetriever, Retriever
+from .retriever import ContextRetriever, SourceRetriever
 from .nli import NLIExtractor
 from .query_builder import QueryBuilder
 from .summarizer import ContextSummarizer
@@ -13,7 +13,7 @@ __all__ = [
     "Atomizer",
     "Reviser",
     "ContextRetriever",
-    "Retriever",
+    "SourceRetriever",
     "NLIExtractor",
     "QueryBuilder",
     "ContextSummarizer",

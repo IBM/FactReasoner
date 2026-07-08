@@ -7,7 +7,7 @@ from pathlib import Path
 from fact_reasoner.backends import build_backend
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.factverify import FactVerify
 
@@ -52,7 +52,7 @@ def main() -> None:
     qb = QueryBuilder(backend)
     atom_extractor = Atomizer(backend)
     atom_reviser = Reviser(backend)
-    retriever = Retriever(
+    retriever = SourceRetriever(
         service_type="google",
         top_k=5,
         cache_dir=cache_dir,

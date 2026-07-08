@@ -5,7 +5,7 @@ import argparse
 # Local imports
 from fact_reasoner.backends import build_backend
 from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.retriever import ContextRetriever, Retriever
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.base import Atom
 
 # A set of atoms to retrieve contexts for, and a standalone query
@@ -57,7 +57,7 @@ def main() -> None:
     # Build a query builder and retriever
     query_builder = QueryBuilder(backend)
 
-    retriever = Retriever(
+    retriever = SourceRetriever(
         top_k=3,
         service_type="google",
         cache_dir=None,

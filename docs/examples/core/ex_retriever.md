@@ -1,12 +1,12 @@
-# Context Retriever Example
+# Source Retriever Example
 
-Demonstrates how to use the Context Retriever to fetch supporting evidence from the web.
+Demonstrates how to use the Source Retriever to fetch supporting evidence from the web.
 
 **Source:** [`docs/examples/core/ex_retriever.py`](examples/core/ex_retriever.py)
 
 ## Overview
 
-This example shows how to use the `ContextRetriever` core component to search the web and retrieve supporting contexts for a given text query. The retriever uses Google search, optionally fetches full page text from result links, and can use an in-memory vector store for deduplication and ranking.
+This example shows how to use the `SourceRetriever` core component to search the web and retrieve supporting contexts for a given text query. The retriever uses Google search, optionally fetches full page text from result links, and can use an in-memory vector store for deduplication and ranking.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Plus Google search API access.
 
 ## Key Components
 
-- **`Retriever`** — Retrieves supporting contexts from the web via search APIs
+- **`SourceRetriever`** — Retrieves supporting contexts from a single backend source (e.g. the web via search APIs)
 - **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server), used by the query builder
 - **`QueryBuilder`** — Generates search-optimized queries (used internally by the retriever)
 - **`query(text)`** — Executes a search query and returns a list of context objects
@@ -28,7 +28,7 @@ Plus Google search API access.
 
 1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
 2. Instantiate a `QueryBuilder` for query optimization.
-3. Create a `Retriever` configured with:
+3. Create a `SourceRetriever` configured with:
    - `top_k=10` — return up to 10 results
    - `service_type="google"` — use Google search
    - `fetch_text=True` — fetch full page text from result links

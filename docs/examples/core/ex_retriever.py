@@ -5,13 +5,13 @@ import argparse
 # Local imports
 from fact_reasoner.backends import build_backend
 from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.retriever import Retriever
+from fact_reasoner.core.retriever import SourceRetriever
 
 # The text to retrieve supporting contexts for
 QUERY_TEXT = "rootstock for honey crisp apples in wayne county, ny"
 
 
-def run_single(retriever: Retriever, query_text: str) -> None:
+def run_single(retriever: SourceRetriever, query_text: str) -> None:
     """Retrieve and print contexts for a single query."""
 
     contexts = retriever.query(text=query_text)
@@ -52,7 +52,7 @@ def main() -> None:
     query_builder = QueryBuilder(backend)
     cache_dir = None  # e.g. "my_database.db" to cache results
 
-    retriever = Retriever(
+    retriever = SourceRetriever(
         top_k=10,
         service_type="google",
         cache_dir=cache_dir,

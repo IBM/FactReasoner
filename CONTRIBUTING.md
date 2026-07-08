@@ -8,7 +8,7 @@ There are several ways to contribute to FactReasoner:
 
 ### 1. Contributing to This Repository
 Contribute to the FactReasoner core, baselines, or fix bugs. This includes:
-- Core pipeline components (Atomizer, Reviser, Retriever, Summarizer, NLI Extractor, Evaluator)
+- Core pipeline components (Atomizer, Reviser, SourceRetriever, Summarizer, NLI Extractor, Evaluator)
 - Retrieval backends and knowledge-source integrations
 - Baseline methods (FactScore, VeriScore, FactVerify)
 - Documentation and examples
@@ -88,7 +88,7 @@ uv run pytest
 | Path | Contents |
 |------|----------|
 | `src/fact_reasoner` | Package root: `assessor.py` (FactReasoner), `fact_graph.py`, `search_api.py`, `corrector.py`, `utils.py` |
-| `src/fact_reasoner/core` | Pipeline components: Atomizer, Reviser, Retriever, Summarizer, NLI, QueryBuilder |
+| `src/fact_reasoner/core` | Pipeline components: Atomizer, Reviser, SourceRetriever, Summarizer, NLI, QueryBuilder |
 | `src/fact_reasoner/baselines` | Baseline methods: FactScore, VeriScore, FactVerify |
 | `src/fact_reasoner/eval` | Dataset evaluation utilities |
 | `docs/examples` | Runnable examples (assessors, correctors, core components) |

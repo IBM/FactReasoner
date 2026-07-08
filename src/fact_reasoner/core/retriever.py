@@ -348,11 +348,12 @@ def is_content_valid(link: str, page_text: str) -> bool:
     return True
 
 
-class Retriever:
+class SourceRetriever:
     """
-    The Retriever component. We implement several versions of this component
-    using a remote chromadb store (API exists), a local chromadb store, langchain
-    based wikipedia retriever, and possibly others.
+    The SourceRetriever component. It retrieves documents from a single backend
+    source, selected by ``service_type``. We implement several versions of this
+    component using a remote chromadb store (API exists), a local chromadb store,
+    a langchain based wikipedia retriever, and possibly others.
     """
 
     def __init__(
@@ -369,11 +370,11 @@ class Retriever:
         per_url_timeout: int = DEFAULT_PER_URL_TIMEOUT,
     ):
         """
-        Initialize the context retriever component.
+        Initialize the source retriever component.
 
         Args:
             service_type: str
-                The type of the context retriever (chromadb, wikipedia, google)
+                The type of the source retriever (chromadb, wikipedia, google)
             collection_name: str
                 Name of the collection of documents stored in the vectorstore
             persist_directory: str
@@ -659,13 +660,13 @@ class Retriever:
 
 class ContextRetriever:
     """
-    Parallel context retriever that wraps a ContextRetriever and dispatches
+    Parallel context retriever that wraps a SourceRetriever and dispatches
     retrieval tasks across a thread pool.
     """
 
     def __init__(
         self,
-        retriever: Retriever,
+        retriever: SourceRetriever,
         context_summarizer: Optional[ContextSummarizer] = None,
         num_workers: int = 4,
         per_atom_timeout: int = DEFAULT_PER_ATOM_TIMEOUT,

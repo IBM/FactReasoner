@@ -16,10 +16,10 @@ and their `_file` variants):
    `ex_veriscore_file.py` construct
    `ContextRetriever(service_type=..., top_k=..., cache_dir=..., fetch_text=...,
    query_builder=...)`. But `ContextRetriever.__init__` only accepts
-   `retriever`, `context_summarizer`, `num_workers` — those are `Retriever`
+   `retriever`, `context_summarizer`, `num_workers` — those are `SourceRetriever`
    arguments. Correct pattern (already used by the non-`_file` variants):
    ```python
-   retriever = Retriever(service_type=..., top_k=..., cache_dir=...,
+   retriever = SourceRetriever(service_type=..., top_k=..., cache_dir=...,
                          fetch_text=..., query_builder=qb, num_workers=4)
    context_retriever = ContextRetriever(retriever=retriever,
                                         context_summarizer=..., num_workers=4)
