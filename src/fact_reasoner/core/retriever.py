@@ -331,13 +331,12 @@ def is_content_valid(link: str, page_text: str) -> bool:
             )
             return False
 
-    if len(page_text) > 50:
-        # TODO: add more filters
-        replacement_char_count = page_text.count("�")
-        try:
-            ratio = replacement_char_count / len(page_text)
-        except ZeroDivisionError:
-            ratio = 0
+    # --- Check 2: Reject garbled/binary data via replacement-character ratio ---
+    # A high proportion of U+FFFD replacement characters indicates a decoding
+    # failure (binary or wrong-encoding content), regardless of length.
+    replacement_char_count = page_text.count("�")
+    if replacement_char_count:
+        ratio = replacement_char_count / len(page_text)
         if ratio > 0.10:
             logger.warning(
                 f"Redundant content detected for {link} due to high ratio of replacement characters: {ratio:.2%}"

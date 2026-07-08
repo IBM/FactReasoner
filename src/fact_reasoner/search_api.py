@@ -41,7 +41,10 @@ class SearchAPI:
                 Minimum similarity score (0-100) for cached results to be considered relevant.
         """
         if not os.environ.get("_DOTENV_LOADED"):
-            load_dotenv(override=True)
+            # Do not override variables already present in the real environment
+            # (standard dotenv precedence: env vars win over the .env file). This
+            # lets deployments and tests set SERPER_API_KEY directly.
+            load_dotenv(override=False)
             os.environ["_DOTENV_LOADED"] = "1"
 
         self.serper_key = os.getenv("SERPER_API_KEY")

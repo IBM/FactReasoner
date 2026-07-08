@@ -58,6 +58,31 @@ class TestConstruction:
         r = FactualityRunner(MagicMock(), pipeline="factscore")
         assert r.pipeline == "factscore"
 
+    def test_default_nli_method_is_logprobs(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.nli_method == "logprobs"
+        assert r.nli_extractor.method == "logprobs"
+
+    def test_nli_method_threaded_to_extractor(self):
+        # The runner must forward nli_method (+ similarity metric) to NLIExtractor.
+        captured = {}
+
+        class _FakeNLIExtractor:
+            def __init__(self, backend, **kw):
+                captured.update(kw)
+                self.method = kw.get("nli_method")
+
+        with patch.object(runner_mod, "NLIExtractor", _FakeNLIExtractor):
+            FactualityRunner(
+                MagicMock(),
+                pipeline="factscore",
+                nli_method="simbauq",
+                nli_similarity_metric="jaccard",
+            )
+
+        assert captured["nli_method"] == "simbauq"
+        assert captured["simbauq_similarity_metric"] == "jaccard"
+
     def test_unknown_version_raises(self):
         with pytest.raises(ValueError, match="Unknown pipeline_version"):
             FactualityRunner(MagicMock(), pipeline="factscore", pipeline_version="v9")

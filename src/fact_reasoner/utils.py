@@ -183,21 +183,23 @@ def extract_first_square_brackets(input_string: str) -> str:
 
 
 def extract_last_square_brackets(input_string: str) -> str:
-    """Extracts the last NLI label from square brackets in the input string.
+    """Extracts the contents of the LAST string between square brackets.
 
-    Matches 'neutral', 'entailment', or 'contradiction' (case-insensitive),
-    tolerating trailing punctuation inside the brackets.
+    Symmetric counterpart to :func:`extract_first_square_brackets`: returns the
+    raw contents of the last ``[...]`` pair, with surrounding whitespace and any
+    trailing punctuation stripped (so labels like ``[entailment.]`` normalize to
+    ``entailment``).
+
+    If no brackets are present, falls back to scanning for a bare NLI label word
+    (``neutral``/``entailment``/``contradiction``) so the NLI path stays robust
+    when the LLM drops the brackets entirely.
     """
-    matches = re.findall(
-        r"\[\s*(neutral|entailment|contradiction)\s*[.!?]?\s*\]",
-        input_string,
-        flags=re.IGNORECASE,
-    )
-    if matches:
-        return matches[-1].lower()
+    raw_result = re.findall(r"\[.*?\]", input_string, flags=re.DOTALL)
+    if raw_result:
+        return raw_result[-1][1:-1].strip().rstrip(".!?").strip()
 
-    # Fallback: scan input for any bare label word (handles cases where
-    # the LLM drops the brackets entirely)
+    # Fallback: scan input for any bare NLI label word (handles cases where
+    # the LLM drops the brackets entirely).
     words = re.findall(
         r"\b(neutral|entailment|contradiction)\b", input_string, flags=re.IGNORECASE
     )

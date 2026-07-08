@@ -70,6 +70,10 @@ FactReasoner addresses hallucination detection through a principled five-stage p
    - **Contradiction**: The context contradicts the atom
    - **Neutral**: The context neither supports nor contradicts the atom
 
+   Each relationship carries a probability that becomes the strength of the corresponding edge in the Markov Network. Two methods are available for estimating it (`--nli-method`):
+   - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM).
+   - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama**, which does not expose logprobs. Install with `pip install fact_reasoner[simbauq]`.
+
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
    - **Nodes** represent atoms and contexts as binary random variables
    - **Edges** encode NLI relationships with associated probabilities
@@ -102,6 +106,7 @@ Traditional factuality methods (like FactScore) make independent binary decision
 - **Multiple Knowledge Sources**: Support for Wikipedia, Google Search API, and ChromaDB vector stores
 - **Baseline Implementations**: Includes FactScore and VeriScore methods for comparison
 - **Modular Architecture**: Each component (atomizer, retriever, NLI, summarizer) can be configured independently
+- **Backend-agnostic NLI Uncertainty**: NLI relation probabilities can be estimated from token logprobs or via SIMBA-UQ self-consistency, enabling logprob-free backends such as Ollama
 - **Async Support**: Batch processing with asynchronous LLM calls for efficiency
 - **Caching**: SQLite-based caching for search API results
 

@@ -32,30 +32,20 @@ class TestSearchAPIInit:
             assert api.serper_key == "test_key"
 
     def test_init_with_cache(self):
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            temp_path = f.name
-
-        try:
+        # SearchAPI treats cache_dir as a directory (it creates my_database.db
+        # inside it), so use a temp directory, not a temp file.
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
                 assert api.do_caching is True
-                assert api.cache_dir == temp_path
+                assert api.cache_dir == temp_dir
                 assert api.similarity_threshold == 90
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
     def test_init_custom_similarity_threshold(self):
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path, similarity_threshold=80)
+                api = SearchAPI(cache_dir=temp_dir, similarity_threshold=80)
                 assert api.similarity_threshold == 80
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
 
 class TestSearchAPIGetSnippets:
@@ -120,12 +110,9 @@ class TestSearchAPICaching:
     """Tests for SearchAPI caching functionality."""
 
     def test_save_to_cache(self):
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
 
                 response = {
                     "searchParameters": {"q": "test"},
@@ -143,17 +130,11 @@ class TestSearchAPICaching:
 
                 # Verify it was saved (no exception raised)
                 assert True
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
     def test_save_empty_results_not_cached(self):
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
 
                 response = {"organic": []}
 
@@ -163,9 +144,6 @@ class TestSearchAPICaching:
                 # Try to retrieve - should be None
                 result = api._get_from_cache("test query")
                 assert result is None
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
 
 class TestSearchAPIHelpers:

@@ -247,8 +247,7 @@ class Relation:
         elif "neutral" in type.lower():
             type = "neutral"
         else:
-            type = "neutral"  # default to neutral if the type is not recognized
-            probability = 1.0  # set probability to 1 for neutral relations
+            raise AssertionError(f"Unknown relation type: {type}")
 
         assert link in ["context_atom", "context_context", "atom_atom"], (
             f"Unknown link type: {link}"

@@ -42,6 +42,42 @@ class TestNLIExtractorInit:
         nli = NLIExtractor(backend=mock_backend)
         assert nli.method == "logprobs"
 
+    def test_nli_extractor_logprobs_builds_rejection_strategy(self):
+        from mellea.stdlib.sampling import RejectionSamplingStrategy
+
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        nli = NLIExtractor(backend=mock_backend, nli_method="logprobs")
+        assert isinstance(nli._strategy, RejectionSamplingStrategy)
+        assert nli._logprobs_model_options() == {
+            "logprobs": True,
+            "top_logprobs": 5,
+        }
+
+    def test_nli_extractor_simbauq_builds_simbauq_strategy(self):
+        from fact_reasoner.uncertainty import SIMBAUQSamplingStrategy
+
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        nli = NLIExtractor(
+            backend=mock_backend,
+            nli_method="simbauq",
+            simbauq_similarity_metric="jaccard",
+        )
+        assert nli.method == "simbauq"
+        assert isinstance(nli._strategy, SIMBAUQSamplingStrategy)
+        # SIMBA-UQ must NOT request logprobs (Ollama rejects the option).
+        assert nli._logprobs_model_options() is None
+
+    def test_nli_extractor_unknown_method_raises(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        with pytest.raises(ValueError, match="Unknown nli_method"):
+            NLIExtractor(backend=mock_backend, nli_method="bogus")
+
 
 class TestNLIInstruction:
     """Tests for NLI instruction template."""
@@ -312,3 +348,48 @@ class TestNLIExtractorRunBatch:
         assert results[0]["label"] == "entailment"
         assert results[1] == {"label": "neutral", "probability": 1.0}
         assert results[2]["label"] == "entailment"
+
+
+class TestNLIExtractorSimbauqParse:
+    """Tests for the SIMBA-UQ probability path in _parse_output."""
+
+    @staticmethod
+    def _mk_simbauq_output(text: str, confidence):
+        """Build a fake successful sampling result carrying SIMBA-UQ metadata."""
+        result = MagicMock()
+        result.__str__ = lambda self: text
+        result._meta = {"simba_uq": {"confidence": confidence}}
+        output = MagicMock()
+        output.success = True
+        output.result = result
+        return output
+
+    def _nli(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        return NLIExtractor(backend=mock_backend, nli_method="simbauq")
+
+    def test_confidence_becomes_label_probability(self):
+        nli = self._nli()
+        out = self._mk_simbauq_output("Final Answer:\n[entailment]", 0.83)
+        result = nli._parse_output(out)
+        assert result == {"label": "entailment", "probability": 0.83}
+
+    def test_unknown_label_coerced_to_neutral_keeps_confidence(self):
+        nli = self._nli()
+        out = self._mk_simbauq_output("blah [supported]", 0.6)
+        result = nli._parse_output(out)
+        assert result == {"label": "neutral", "probability": 0.6}
+
+    def test_degraded_confidence_none_falls_back_to_neutral(self):
+        nli = self._nli()
+        out = self._mk_simbauq_output("[contradiction]", None)
+        result = nli._parse_output(out)
+        assert result == {"label": "neutral", "probability": 1.0}
+
+    def test_unsuccessful_sampling_falls_back_to_neutral(self):
+        nli = self._nli()
+        out = MagicMock()
+        out.success = False
+        result = nli._parse_output(out)
+        assert result == {"label": "neutral", "probability": 1.0}

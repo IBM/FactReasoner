@@ -173,20 +173,16 @@ def mock_reviser(mock_backend):
 
 @pytest.fixture
 def mock_retriever():
-    """Create a mock ContextRetriever for testing."""
+    """Create a mock ContextRetriever for testing.
+
+    ``ContextRetriever`` is the parallel wrapper exposing ``retrieve_all`` (the
+    single-query ``query`` method lives on ``SourceRetriever``), so the mock is
+    specced and stubbed against that interface.
+    """
     from src.fact_reasoner.core.retriever import ContextRetriever
 
     retriever = MagicMock(spec=ContextRetriever)
-    retriever.service_type = "wikipedia"
-    retriever.top_k = 3
-    retriever.query.return_value = [
-        {
-            "title": "Test Document",
-            "text": "This is test content for retrieval.",
-            "snippet": "Test snippet",
-            "link": "https://example.com",
-        }
-    ]
+    retriever.retrieve_all.return_value = {}
     return retriever
 
 

@@ -87,6 +87,12 @@ class FactualityRunner:
         use_query_builder: Use the QueryBuilder for search queries.
         merlin_path: Path to the Merlin inference engine (required for
             FactReasoner).
+        nli_method: How the NLI extractor estimates relation probabilities —
+            ``logprobs`` (needs a logprobs-capable backend like RITS/vLLM) or
+            ``simbauq`` (self-consistency; backend-agnostic, required for
+            Ollama which does not expose logprobs).
+        nli_similarity_metric: Similarity metric for the SIMBA-UQ NLI method
+            (only used when ``nli_method='simbauq'``).
     """
 
     def __init__(
@@ -103,6 +109,8 @@ class FactualityRunner:
         use_summarizer: bool = False,
         use_query_builder: bool = False,
         merlin_path: Optional[str] = None,
+        nli_method: str = "logprobs",
+        nli_similarity_metric: str = "rouge",
     ) -> None:
         """Initialize the runner and its shared components."""
         if pipeline not in PIPELINES:
@@ -128,11 +136,17 @@ class FactualityRunner:
         self.use_summarizer = use_summarizer
         self.use_query_builder = use_query_builder
         self.merlin_path = merlin_path
+        self.nli_method = nli_method
+        self.nli_similarity_metric = nli_similarity_metric
 
         # Shared components.
         self.atom_extractor = Atomizer(backend)
         self.atom_reviser = Reviser(backend)
-        self.nli_extractor = NLIExtractor(backend)
+        self.nli_extractor = NLIExtractor(
+            backend,
+            nli_method=self.nli_method,
+            simbauq_similarity_metric=self.nli_similarity_metric,
+        )
         self.context_summarizer = ContextSummarizer(backend)
 
     def _build_context_retriever(self) -> ContextRetriever:

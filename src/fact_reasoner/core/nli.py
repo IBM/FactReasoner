@@ -18,7 +18,7 @@
 import math
 import mellea.stdlib.functional as mfuncs
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from mellea.backends import Backend
 from mellea.stdlib.context import SimpleContext
@@ -28,11 +28,15 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from mellea.core import MelleaLogger
 
 # Local imports
+from fact_reasoner.uncertainty import ProbabilisticClassifier, SIMBAUQSamplingStrategy
 from fact_reasoner.utils import (
     extract_last_square_brackets,
     extract_logprobs_from_output,
     run_throttled,
 )
+
+# Supported methods for estimating the NLI relationship probability.
+NLI_METHODS = ("logprobs", "simbauq")
 
 INSTRUCTION_NLI = """
 
@@ -105,6 +109,16 @@ class NLIExtractor:
     def __init__(
         self,
         backend: Backend,
+        nli_method: str = "logprobs",
+        *,
+        simbauq_temperatures: Optional[List[float]] = None,
+        simbauq_n_per_temp: int = 4,
+        simbauq_similarity_metric: str = "rouge",
+        simbauq_confidence_method: str = "aggregation",
+        simbauq_aggregation: str = "mean",
+        simbauq_classifier: Optional[ProbabilisticClassifier] = None,
+        simbauq_training_samples: Optional[List[List[str]]] = None,
+        simbauq_training_labels: Optional[List[List[int]]] = None,
     ):
         """
         Initialize the NLIExtractor.
@@ -112,6 +126,17 @@ class NLIExtractor:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interaction.
+            nli_method: str
+                How to estimate the probability of the predicted NLI label.
+                - "logprobs" (default): derive the probability from the token
+                  logprobs of the generated label. Requires a backend that
+                  exposes logprobs (RITS / vLLM); does NOT work with Ollama.
+                - "simbauq": estimate the probability via SIMBA-UQ
+                  self-consistency (samples across temperatures and scores by
+                  consensus). Backend-agnostic; use this for Ollama.
+            simbauq_*:
+                SIMBA-UQ configuration, only used when nli_method="simbauq".
+                See SIMBAUQSamplingStrategy for details.
         """
 
         # Safety checks
@@ -119,15 +144,53 @@ class NLIExtractor:
             raise ValueError(
                 "Mellea backend is None. Please provide a valid Mellea backend."
             )
+        if nli_method not in NLI_METHODS:
+            raise ValueError(
+                f"Unknown nli_method: {nli_method!r} (expected one of {list(NLI_METHODS)})."
+            )
 
-        self.method = "logprobs"
+        self.method = nli_method
         self.backend = backend
 
+        # Build the sampling strategy once. The SIMBA-UQ strategy is what makes
+        # the probability estimate backend-agnostic (no logprobs required).
+        if nli_method == "simbauq":
+            self._strategy = SIMBAUQSamplingStrategy(
+                temperatures=simbauq_temperatures,
+                n_per_temp=simbauq_n_per_temp,
+                similarity_metric=simbauq_similarity_metric,
+                confidence_method=simbauq_confidence_method,
+                aggregation=simbauq_aggregation,
+                classifier=simbauq_classifier,
+                training_samples=simbauq_training_samples,
+                training_labels=simbauq_training_labels,
+            )
+        else:
+            self._strategy = RejectionSamplingStrategy(loop_budget=3)
+
         # Print info
-        print(f"[NLI] Using Mellea backend: {self.backend.model_id}")
+        print(
+            f"[NLI] Using Mellea backend: {self.backend.model_id} "
+            f"(method: {self.method})"
+        )
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
+
+    def _uses_logprobs(self) -> bool:
+        """Whether the current method requires the backend to return logprobs."""
+        return self.method == "logprobs"
+
+    def _logprobs_model_options(self) -> Optional[Dict[str, Any]]:
+        """Model options for the current method.
+
+        The logprobs method must request logprobs from the backend; the
+        SIMBA-UQ method must NOT (Ollama rejects the option, and SIMBA-UQ
+        drives its own per-temperature model_options internally).
+        """
+        if self._uses_logprobs():
+            return {"logprobs": True, "top_logprobs": 5}
+        return None
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
@@ -175,6 +238,27 @@ class NLIExtractor:
         avg_logprob = avg_logprob / count if count > 0 else math.inf
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
 
+    @staticmethod
+    def _get_simbauq_confidence(output: ModelOutputThunk) -> Optional[float]:
+        """
+        Read the SIMBA-UQ confidence of the selected sample.
+
+        The SIMBA-UQ sampling strategy stores its metadata on the winning
+        thunk's ``_meta`` dict under the ``"simba_uq"`` key. The confidence is
+        the probability of the predicted label. Returns None in the degraded
+        single-sample case (where SIMBA-UQ cannot estimate a confidence).
+
+        Args:
+            output: ModelOutputThunk
+                The model raw output (via Mellea).
+
+        Returns:
+            Optional[float]: The SIMBA-UQ confidence in [0, 1], or None.
+        """
+        meta = getattr(output, "_meta", None) or {}
+        simba_uq = meta.get("simba_uq", {})
+        return simba_uq.get("confidence")
+
     def _get_label(self, output: ModelOutputThunk) -> str:
         """
         Extract the NLI label from the model output.
@@ -187,7 +271,9 @@ class NLIExtractor:
             str: The string representing the NLI label (entailment, contradiction, neutral).
         """
 
-        return extract_last_square_brackets(str(output))
+        # Normalize to lowercase so label matching in _parse_output is
+        # case-insensitive (the LLM may emit e.g. "[Entailment]").
+        return extract_last_square_brackets(str(output)).lower()
 
     def run(self, premise: str, hypothesis: str) -> Dict[str, Any]:
         """
@@ -221,12 +307,9 @@ class NLIExtractor:
                     )
                 ],
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                strategy=self._strategy,
                 return_sampling_results=True,
-                model_options={
-                    "logprobs": True,
-                    "top_logprobs": 5,
-                },
+                model_options=self._logprobs_model_options(),
             )
         except Exception as e:
             print(f"[NLI] Generation failed: {e}")
@@ -249,7 +332,16 @@ class NLIExtractor:
             return self._fallback()
         try:
             label = self._get_label(output.result)
-            probability = self._get_probability(output.result)
+            if self.method == "simbauq":
+                # The winning sample's label is the predicted NLI label, and its
+                # SIMBA-UQ confidence is the probability of that label.
+                confidence = self._get_simbauq_confidence(output.result)
+                if confidence is None:
+                    # Degraded single-sample case: no reliable confidence.
+                    return self._fallback()
+                probability = float(confidence)
+            else:
+                probability = self._get_probability(output.result)
         except Exception as e:
             print(f"[NLI] Failed to parse output: {e}")
             return self._fallback()
@@ -294,12 +386,9 @@ class NLIExtractor:
                     )
                 ],
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                strategy=self._strategy,
                 return_sampling_results=True,
-                model_options={
-                    "logprobs": True,
-                    "top_logprobs": 5,
-                },
+                model_options=self._logprobs_model_options(),
             )
 
         pairs = list(zip(premises, hypotheses))

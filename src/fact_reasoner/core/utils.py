@@ -23,7 +23,7 @@ import concurrent.futures
 
 
 # Local imports
-from .base import Atom, Context, Relation
+from .base import Atom, Context, Relation, PRIOR_PROB_ATOM, PRIOR_PROB_CONTEXT
 from .atomizer import Atomizer
 from .retriever import ContextRetriever
 from .nli import NLIExtractor

@@ -45,6 +45,11 @@ rits = ["mellea-ibm"]
 # Local vLLM server path (GPU node). vLLM is invoked as an external process, not
 # imported, so this only needs to be installed where the server is launched.
 vllm = ["vllm"]
+# SIMBA-UQ NLI uncertainty estimation (fact_reasoner.uncertainty.simbauq).
+# Needed to run NLIExtractor(nli_method="simbauq") — e.g. on Ollama, which does
+# not expose logprobs. sentence-transformers/scikit-learn are only required for
+# the "sbert" similarity metric and the classifier confidence method.
+simbauq = ["numpy", "rouge-score", "scikit-learn", "sentence-transformers"]
 dev = ["pytest", "ruff", "mypy", "build", "twine"]
 
 [project.scripts]

@@ -67,6 +67,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--use-query-builder", action="store_true", help="Use the QueryBuilder."
     )
+    p.add_argument(
+        "--nli-method",
+        default="logprobs",
+        choices=["logprobs", "simbauq"],
+        help="How the NLI extractor estimates relation probabilities: "
+        "'logprobs' needs a logprobs-capable backend (rits/vllm); 'simbauq' "
+        "uses self-consistency and works on any backend (required for ollama, "
+        "which does not expose logprobs). Default: logprobs.",
+    )
+    p.add_argument(
+        "--nli-similarity-metric",
+        default="rouge",
+        choices=["rouge", "jaccard", "sbert", "difflib", "levenshtein"],
+        help="Similarity metric for the SIMBA-UQ NLI method "
+        "(only used with --nli-method simbauq; default: rouge).",
+    )
 
     # --- Retrieval ---
     r = parser.add_argument_group("retrieval")
@@ -196,6 +212,14 @@ def main() -> None:
             "Starting a local vLLM server requires --served-model "
             "(the vLLM --served-model-name)."
         )
+    # Ollama does not expose token logprobs, so the default NLI method degrades
+    # to all-neutral relations. Steer the user to the SIMBA-UQ method.
+    if args.backend == "ollama" and args.nli_method == "logprobs":
+        print(
+            "[warning] The 'ollama' backend does not expose logprobs, so "
+            "--nli-method logprobs yields all-neutral NLI relations. Use "
+            "--nli-method simbauq for meaningful NLI probabilities on Ollama."
+        )
 
     with _backend_context(args) as backend:
         runner = FactualityRunner(
@@ -209,6 +233,8 @@ def main() -> None:
             use_summarizer=args.use_summarizer,
             use_query_builder=args.use_query_builder,
             merlin_path=args.merlin_path,
+            nli_method=args.nli_method,
+            nli_similarity_metric=args.nli_similarity_metric,
         )
 
         if file_mode:
