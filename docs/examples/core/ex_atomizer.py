@@ -3,9 +3,8 @@
 import argparse
 import asyncio
 
-from mellea.backends import Backend, ModelOption
-
 # Local imports
+from fact_reasoner.backends import build_backend
 from fact_reasoner.core.atomizer import Atomizer
 
 # A single response to process
@@ -30,17 +29,17 @@ RESPONSES = [
     lunar surface. Apollo 14 brought back approximately 70 kilograms of \
     lunar material, including rocks, soil, and core samples, which have \
     been invaluable for scientific research ever since.",
-    "Lanny Flaherty is an American actor born on December 18, 1949, in \
+    'Lanny Flaherty is an American actor born on December 18, 1949, in \
     Pensacola, Florida. He has appeared in numerous films, television \
     shows, and theater productions throughout his career, which began in \
-    the late 1970s. Some of his notable film credits include \"King of New \
-    York,\" \"The Abyss,\" \"Natural Born Killers,\" \"The Game,\" \
-    and \"The Straight Story.\" On television, he has appeared in shows \
-    such as \"Law & Order,\" \"The Sopranos,\" \"Boardwalk Empire,\" \
-    and \"The Leftovers.\" Flaherty has also worked extensively in theater, \
+    the late 1970s. Some of his notable film credits include "King of New \
+    York," "The Abyss," "Natural Born Killers," "The Game," \
+    and "The Straight Story." On television, he has appeared in shows \
+    such as "Law & Order," "The Sopranos," "Boardwalk Empire," \
+    and "The Leftovers." Flaherty has also worked extensively in theater, \
     including productions at the Public Theater and the New York Shakespeare \
     Festival. He is known for his distinctive looks and deep gravelly \
-    voice, which have made him a memorable character actor in the industry."
+    voice, which have made him a memorable character actor in the industry.',
 ]
 
 
@@ -81,53 +80,33 @@ async def run_batch(atomizer: Atomizer, responses: list[str]) -> None:
             print(f"Atom {k}: {v}")
 
 
-def build_backend(kind: str) -> Backend:
-    """Create the Mellea backend to drive the atomizer.
-
-    Args:
-        kind: str
-            Which backend to build: "rits" for the remote IBM RITS service, or
-            "ollama" for a local Ollama server.
-    Returns:
-        Backend: A ready-to-use Mellea backend.
-    """
-    if kind == "rits":
-        # Remote IBM RITS backend (requires the mellea_ibm package and RITS
-        # credentials/config in the environment).
-        from mellea_ibm.rits import RITSBackend, RITS
-
-        return RITSBackend(
-            RITS.LLAMA_3_3_70B_INSTRUCT,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    elif kind == "ollama":
-        # Local Ollama backend (requires a running Ollama server at
-        # http://localhost:11434; the model is pulled on first use). Pass
-        # base_url=... to OllamaModelBackend to target a non-default host.
-        from mellea.backends.ollama import OllamaModelBackend
-        from mellea.backends.model_ids import IBM_GRANITE_4_MICRO_3B
-
-        return OllamaModelBackend(
-            IBM_GRANITE_4_MICRO_3B,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    else:
-        raise ValueError(f"Unknown backend: {kind!r} (expected 'rits' or 'ollama')")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Atomizer example.")
     parser.add_argument(
         "--backend",
-        choices=["rits", "ollama"],
+        choices=["rits", "ollama", "vllm"],
         default="rits",
-        help="Which Mellea backend to use: 'rits' (remote IBM RITS, default) "
-        "or 'ollama' (local Ollama server).",
+        help="Which Mellea backend to use: 'rits' (remote IBM RITS, default), "
+        "'ollama' (local Ollama server), or 'vllm' (vLLM OpenAI-compatible "
+        "server).",
+    )
+    parser.add_argument(
+        "--served-model",
+        default=None,
+        help="Model / served-model name (required for 'vllm').",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help="Base URL for the 'vllm' backend (defaults to VLLM_BASE_URL env "
+        "or http://localhost:8000/v1).",
     )
     args = parser.parse_args()
 
     # Create the selected Mellea backend
-    backend = build_backend(args.backend)
+    backend = build_backend(
+        args.backend, model_id=args.served_model, base_url=args.base_url
+    )
 
     # Create the atomizer
     atomizer = Atomizer(backend=backend)

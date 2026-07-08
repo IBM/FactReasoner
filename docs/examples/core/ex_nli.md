@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`NLIExtractor`** — Performs NLI by evaluating a hypothesis against a premise using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
 - **`run(premise, hypothesis)`** — Returns the entailment result for a single premise-hypothesis pair
 - **`run_batch(premises, hypotheses)`** — Evaluates a batch of pairs concurrently, throttled and failure-resilient (a failed item falls back to a neutral relationship; results stay aligned with the inputs)
 

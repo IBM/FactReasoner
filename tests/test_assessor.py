@@ -19,7 +19,6 @@ import pytest
 import json
 import tempfile
 import os
-from unittest.mock import MagicMock, patch
 
 from fact_reasoner.assessor import FactReasoner
 from fact_reasoner.fact_graph import FactGraph
@@ -30,7 +29,12 @@ class TestFactReasonerInit:
     """Tests for FactReasoner initialization."""
 
     def test_init_requires_merlin_path(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         with pytest.raises(AssertionError, match="Path to `merlin` cannot be None"):
             FactReasoner(
@@ -39,11 +43,16 @@ class TestFactReasonerInit:
                 context_retriever=mock_retriever,
                 context_summarizer=mock_summarizer,
                 nli_extractor=mock_nli_extractor,
-                merlin_path=None
+                merlin_path=None,
             )
 
     def test_init_stores_components(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -51,7 +60,7 @@ class TestFactReasonerInit:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         assert pipeline.atom_extractor == mock_atomizer
@@ -62,7 +71,12 @@ class TestFactReasonerInit:
         assert pipeline.merlin_path == "/path/to/merlin"
 
     def test_init_default_values(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -70,7 +84,7 @@ class TestFactReasonerInit:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         assert pipeline.query is None
@@ -82,7 +96,12 @@ class TestFactReasonerInit:
         assert pipeline.relations == []
 
     def test_init_use_priors_false(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -91,7 +110,7 @@ class TestFactReasonerInit:
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
             merlin_path="/path/to/merlin",
-            use_priors=False
+            use_priors=False,
         )
 
         assert pipeline.use_priors is False
@@ -101,8 +120,13 @@ class TestFactReasonerFromDictWithContexts:
     """Tests for FactReasoner.from_dict_with_contexts method."""
 
     def test_from_dict_loads_atoms(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -110,7 +134,7 @@ class TestFactReasonerFromDictWithContexts:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
@@ -121,8 +145,13 @@ class TestFactReasonerFromDictWithContexts:
         assert pipeline.atoms["a0"].get_text() == "Albert Einstein was German-born."
 
     def test_from_dict_loads_contexts(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -130,7 +159,7 @@ class TestFactReasonerFromDictWithContexts:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
@@ -140,8 +169,13 @@ class TestFactReasonerFromDictWithContexts:
         assert "c_a1_0" in pipeline.contexts
 
     def test_from_dict_links_atoms_to_contexts(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -149,7 +183,7 @@ class TestFactReasonerFromDictWithContexts:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
@@ -159,8 +193,13 @@ class TestFactReasonerFromDictWithContexts:
         assert "c_a0_0" in contexts
 
     def test_from_dict_loads_labels(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -168,7 +207,7 @@ class TestFactReasonerFromDictWithContexts:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
@@ -182,8 +221,13 @@ class TestFactReasonerToJson:
     """Tests for FactReasoner.to_json method."""
 
     def test_to_json_returns_dict(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -191,7 +235,7 @@ class TestFactReasonerToJson:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
@@ -204,8 +248,13 @@ class TestFactReasonerToJson:
         assert "contexts" in result
 
     def test_to_json_writes_file(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -213,19 +262,19 @@ class TestFactReasonerToJson:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         pipeline.from_dict_with_contexts(sample_json_data)
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
 
         try:
             pipeline.to_json(json_file_path=temp_path)
 
             assert os.path.exists(temp_path)
-            with open(temp_path, 'r') as f:
+            with open(temp_path, "r") as f:
                 saved_data = json.load(f)
             assert "atoms" in saved_data
             assert "contexts" in saved_data
@@ -238,7 +287,12 @@ class TestFactReasonerFromFactGraph:
     """Tests for FactReasoner.from_fact_graph method."""
 
     def test_from_fact_graph_creates_atoms(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -246,7 +300,7 @@ class TestFactReasonerFromFactGraph:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         # Create a simple FactGraph
@@ -257,7 +311,7 @@ class TestFactReasonerFromFactGraph:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         fact_graph = FactGraph(atoms=[atom], contexts=[context], relations=[relation])
 
@@ -272,8 +326,13 @@ class TestFactReasonerBuildMarkovNetwork:
     """Tests for FactReasoner Markov Network building."""
 
     def test_build_markov_network_creates_nodes(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor,
-        mock_summarizer, sample_json_data
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+        sample_json_data,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -281,7 +340,7 @@ class TestFactReasonerBuildMarkovNetwork:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         # Create a simple setup
@@ -292,7 +351,7 @@ class TestFactReasonerBuildMarkovNetwork:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         fact_graph = FactGraph(atoms=[atom], contexts=[context], relations=[relation])
 
@@ -307,7 +366,12 @@ class TestFactReasonerBuildFactGraph:
     """Tests for FactReasoner._build_fact_graph method."""
 
     def test_build_fact_graph_from_atoms_contexts_relations(
-        self, mock_atomizer, mock_reviser, mock_retriever, mock_nli_extractor, mock_summarizer
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
     ):
         pipeline = FactReasoner(
             atom_extractor=mock_atomizer,
@@ -315,7 +379,7 @@ class TestFactReasonerBuildFactGraph:
             context_retriever=mock_retriever,
             context_summarizer=mock_summarizer,
             nli_extractor=mock_nli_extractor,
-            merlin_path="/path/to/merlin"
+            merlin_path="/path/to/merlin",
         )
 
         # Manually set up atoms, contexts, relations
@@ -326,7 +390,7 @@ class TestFactReasonerBuildFactGraph:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
 
         pipeline.atoms = {"a0": atom}

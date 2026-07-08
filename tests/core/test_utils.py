@@ -92,7 +92,7 @@ class TestContext:
             text="Context text",
             title="Title",
             link="https://example.com",
-            snippet="Snippet"
+            snippet="Snippet",
         )
         assert context.id == "c0"
         assert context.text == "Context text"
@@ -153,7 +153,7 @@ class TestContext:
             text="Text",
             title="Title",
             link="https://example.com",
-            snippet="Snippet"
+            snippet="Snippet",
         )
         json_data = context.to_json()
         assert json_data["id"] == "c0"
@@ -175,7 +175,7 @@ class TestRelation:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.source == context
         assert relation.target == atom
@@ -191,7 +191,7 @@ class TestRelation:
             target=atom,
             type="contradiction",
             probability=0.85,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.get_type() == "contradiction"
         assert relation.get_probability() == 0.85
@@ -204,7 +204,7 @@ class TestRelation:
             target=context2,
             type="equivalence",
             probability=0.95,
-            link="context_context"
+            link="context_context",
         )
         assert relation.type == "equivalence"
         assert relation.link == "context_context"
@@ -217,7 +217,7 @@ class TestRelation:
             target=atom,
             type="neutral",
             probability=0.5,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.type == "neutral"
 
@@ -230,7 +230,7 @@ class TestRelation:
                 target=atom,
                 type="invalid_type",
                 probability=0.5,
-                link="context_atom"
+                link="context_atom",
             )
 
     def test_relation_invalid_link(self):
@@ -242,7 +242,7 @@ class TestRelation:
                 target=atom,
                 type="entailment",
                 probability=0.5,
-                link="invalid_link"
+                link="invalid_link",
             )
 
     def test_relation_str(self):
@@ -253,7 +253,7 @@ class TestRelation:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         result = str(relation)
         assert "c0" in result

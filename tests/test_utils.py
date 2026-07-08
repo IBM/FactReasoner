@@ -15,7 +15,6 @@
 
 """Unit tests for fact_reasoner.utils module."""
 
-import pytest
 from fact_reasoner.utils import (
     dotdict,
     strip_string,
@@ -161,7 +160,7 @@ class TestExtractFirstCodeBlock:
         assert result == "print('hello')"
 
     def test_extract_with_language_not_ignored(self):
-        text = "```json\n{\"key\": \"value\"}\n```"
+        text = '```json\n{"key": "value"}\n```'
         result = extract_first_code_block(text, ignore_language=False)
         assert "json" in result
 
@@ -189,7 +188,7 @@ class TestStripCodeFences:
         assert strip_code_fences(text) == "no fences here"
 
     def test_irregular_fences(self):
-        text = "```json\n{\"key\": \"value\"}\n```"
+        text = '```json\n{"key": "value"}\n```'
         result = strip_code_fences(text)
         assert "key" in result
         assert "```" not in result
@@ -238,15 +237,17 @@ class TestValidateJsonCodeBlock:
 
     def test_missing_required_keys(self):
         text = '{"name": "test"}'
-        assert validate_json_code_block(text, required_keys=["name", "missing"]) is False
+        assert (
+            validate_json_code_block(text, required_keys=["name", "missing"]) is False
+        )
 
     def test_json_array(self):
-        text = '[1, 2, 3]'
+        text = "[1, 2, 3]"
         assert validate_json_code_block(text) is True
 
     def test_json_array_no_required_keys(self):
         # Arrays don't have keys, so required_keys check should pass
-        text = '[1, 2, 3]'
+        text = "[1, 2, 3]"
         assert validate_json_code_block(text, required_keys=["key"]) is True
 
 
@@ -278,11 +279,11 @@ class TestPunctuationOnlyInsideQuotes:
         assert punctuation_only_inside_quotes(text) is True
 
     def test_punctuation_outside_quotes(self):
-        text = 'hello, world'
+        text = "hello, world"
         assert punctuation_only_inside_quotes(text) is False
 
     def test_semicolon_outside(self):
-        text = 'hello; world'
+        text = "hello; world"
         assert punctuation_only_inside_quotes(text) is False
 
     def test_mixed_inside_outside(self):
@@ -290,7 +291,7 @@ class TestPunctuationOnlyInsideQuotes:
         assert punctuation_only_inside_quotes(text) is False
 
     def test_no_punctuation(self):
-        text = 'hello world'
+        text = "hello world"
         assert punctuation_only_inside_quotes(text) is True
 
 

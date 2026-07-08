@@ -1,6 +1,7 @@
 """FactReasoner - a probabilistic factuality assessor for LLMs"""
 
 from .assessor import FactReasoner
+from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
 from .search_api import SearchAPI
@@ -21,6 +22,7 @@ __all__ = [
     "FactCorrector",
     "FactGraph",
     "SearchAPI",
+    "build_backend",
     "extract_first_square_brackets",
     "extract_last_square_brackets",
     "extract_first_code_block",

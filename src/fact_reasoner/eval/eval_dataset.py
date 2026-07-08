@@ -20,9 +20,8 @@ import json
 import argparse
 import pandas as pd
 
-from mellea.backends import ModelOption
-
 # Local imports
+from fact_reasoner.backends import build_backend
 from fact_reasoner.assessor import FactReasoner
 from fact_reasoner.baselines.factscore import FactScore
 from fact_reasoner.baselines.factverify import FactVerify
@@ -35,7 +34,6 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_file",
@@ -64,10 +62,29 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--backend",
+        type=str,
+        default="rits",
+        choices=["rits", "ollama", "vllm"],
+        help="Which Mellea backend to use: 'rits' (remote IBM RITS, default), "
+        "'ollama' (local Ollama server), or 'vllm' (vLLM OpenAI-compatible server).",
+    )
+
+    parser.add_argument(
         "--model_id",
         type=str,
         default=None,
-        help="Name of the model used by the pipeline.",
+        help="Name of the model used by the pipeline. For 'rits' this is a "
+        "shortcut (llama3, granite4, mistral, gpt-oss); for 'ollama' and "
+        "'vllm' it is passed through as the model / served-model name.",
+    )
+
+    parser.add_argument(
+        "--base_url",
+        type=str,
+        default=None,
+        help="Base URL for the 'vllm' backend (defaults to VLLM_BASE_URL env "
+        "or http://localhost:8000/v1).",
     )
 
     parser.add_argument(
@@ -148,30 +165,30 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Unknown FactReasoner version: {args.version}")
 
-    # Create the Mellea backend
-    from mellea_ibm.rits import RITSBackend, RITS
+    # Create the Mellea backend via the shared factory.
+    if args.backend == "rits":
+        # Resolve the friendly RITS model shortcuts to concrete RITS models.
+        from mellea_ibm.rits import RITS
 
-    # Create a Mellea RITS backend
-    if args.model_id == "llama3":
-        backend = RITSBackend(
-            RITS.LLAMA_3_3_70B_INSTRUCT,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    elif args.model_id == "granite4":
-        backend = RITSBackend(
-            RITS.GRANITE_4_H_SMALL, model_options={ModelOption.MAX_NEW_TOKENS: 4096}
-        )
-    elif args.model_id == "mistral":
-        backend = RITSBackend(
-            RITS.MISTRAL_LARGE_3_675B_2512,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    elif args.model_id == "gpt-oss":
-        backend = RITSBackend(
-            RITS.GPT_OSS_120B, model_options={ModelOption.MAX_NEW_TOKENS: 4096}
-        )
+        rits_models = {
+            "llama3": RITS.LLAMA_3_3_70B_INSTRUCT,
+            "granite4": RITS.GRANITE_4_H_SMALL,
+            "mistral": RITS.MISTRAL_LARGE_3_675B_2512,
+            "gpt-oss": RITS.GPT_OSS_120B,
+        }
+        if args.model_id not in rits_models:
+            raise ValueError(
+                f"Unknown RITS model shortcut: {args.model_id!r} "
+                f"(expected one of {sorted(rits_models)})."
+            )
+        backend = build_backend("rits", model_id=rits_models[args.model_id])
     else:
-        raise ValueError(f"Unknown LLM backend.")
+        # ollama / vllm: pass the model id (served-model name for vllm) through.
+        backend = build_backend(
+            args.backend,
+            model_id=args.model_id,
+            base_url=args.base_url,
+        )
 
     # from mellea.helpers.fancy_logger import FancyLogger
     # FancyLogger.get_logger().setLevel(FancyLogger.ERROR)

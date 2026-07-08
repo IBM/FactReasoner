@@ -12,7 +12,7 @@ Use this approach when you want to assess a response from scratch, providing the
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
 - Google search API access for the `ContextRetriever`
 - The Merlin probabilistic inference engine binary at `lib/merlin`
 
@@ -29,7 +29,7 @@ Use this approach when you want to assess a response from scratch, providing the
 ## How It Works
 
 1. Define a query (`"Tell me a biography of Lanny Flaherty"`), the LLM response, and the topic.
-2. Create a Mellea RITS backend using LLaMA 3.3 70B Instruct.
+2. Create the selected Mellea backend via `build_backend()` (defaults to RITS with Granite 4 H Small; override with `--backend`).
 3. Instantiate all core components: `QueryBuilder`, `Atomizer`, `Reviser`, `ContextRetriever`, `ContextSummarizer`, and `NLIExtractor`.
 4. Create the `FactReasoner` pipeline with all components and the path to the Merlin binary.
 5. Call `pipeline.build()` with the query, response, and topic. Key flags:

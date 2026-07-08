@@ -17,7 +17,6 @@
 
 import asyncio
 import pytest
-import math
 from unittest.mock import MagicMock, patch
 from fact_reasoner.core.nli import NLIExtractor, INSTRUCTION_NLI
 
@@ -212,11 +211,12 @@ class TestNLIExtractorRun:
         mock_output.success = True
         mock_output.result = mock_result
 
-        with patch('src.fact_reasoner.core.nli.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.nli.mfuncs.instruct", return_value=mock_output
+        ):
             nli = NLIExtractor(backend=mock_backend)
             result = nli.run(
-                premise="The sky is blue.",
-                hypothesis="The sky has color."
+                premise="The sky is blue.", hypothesis="The sky has color."
             )
 
             assert isinstance(result, dict)
@@ -231,12 +231,11 @@ class TestNLIExtractorRun:
         mock_output = MagicMock()
         mock_output.success = False
 
-        with patch('src.fact_reasoner.core.nli.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.nli.mfuncs.instruct", return_value=mock_output
+        ):
             nli = NLIExtractor(backend=mock_backend)
-            result = nli.run(
-                premise="Test premise",
-                hypothesis="Test hypothesis"
-            )
+            result = nli.run(premise="Test premise", hypothesis="Test hypothesis")
 
             assert result["label"] == "neutral"
             assert result["probability"] == 1.0
@@ -247,7 +246,7 @@ class TestNLIExtractorRun:
         mock_backend.model_id = "test-model"
 
         with patch(
-            'src.fact_reasoner.core.nli.mfuncs.instruct',
+            "src.fact_reasoner.core.nli.mfuncs.instruct",
             side_effect=RuntimeError("backend exploded"),
         ):
             nli = NLIExtractor(backend=mock_backend)
@@ -277,7 +276,9 @@ class TestNLIExtractorRunBatch:
         async def fake_ainstruct(*args, **kwargs):
             return outputs.pop(0)
 
-        with patch('src.fact_reasoner.core.nli.mfuncs.ainstruct', side_effect=fake_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.nli.mfuncs.ainstruct", side_effect=fake_ainstruct
+        ):
             with patch.object(NLIExtractor, "_get_label", side_effect=labels):
                 with patch.object(NLIExtractor, "_get_probability", return_value=0.9):
                     nli = NLIExtractor(backend=mock_backend)
@@ -297,7 +298,9 @@ class TestNLIExtractorRunBatch:
                 raise RuntimeError("boom")
             return good
 
-        with patch('src.fact_reasoner.core.nli.mfuncs.ainstruct', side_effect=fake_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.nli.mfuncs.ainstruct", side_effect=fake_ainstruct
+        ):
             with patch.object(NLIExtractor, "_get_label", return_value="entailment"):
                 with patch.object(NLIExtractor, "_get_probability", return_value=0.9):
                     nli = NLIExtractor(backend=mock_backend)

@@ -44,7 +44,7 @@ def sample_context(sample_atom):
         text="Albert Einstein was born on March 14, 1879, in Ulm, Germany.",
         title="Albert Einstein - Wikipedia",
         link="https://en.wikipedia.org/wiki/Albert_Einstein",
-        snippet="German-born theoretical physicist"
+        snippet="German-born theoretical physicist",
     )
 
 
@@ -56,7 +56,7 @@ def sample_relation(sample_context, sample_atom):
         target=sample_atom,
         type="entailment",
         probability=0.9,
-        link="context_atom"
+        link="context_atom",
     )
 
 
@@ -78,19 +78,19 @@ def sample_contexts_dict(sample_atoms_dict):
             id="c_a0_0",
             atom=sample_atoms_dict["a0"],
             text="Einstein was born in Ulm, Germany.",
-            title="Einstein Bio"
+            title="Einstein Bio",
         ),
         "c_a0_1": Context(
             id="c_a0_1",
             atom=sample_atoms_dict["a0"],
             text="Einstein was a German physicist.",
-            title="Einstein Wikipedia"
+            title="Einstein Wikipedia",
         ),
         "c_a1_0": Context(
             id="c_a1_0",
             atom=sample_atoms_dict["a1"],
             text="Einstein won the Nobel Prize in 1921.",
-            title="Nobel Prize"
+            title="Nobel Prize",
         ),
     }
 
@@ -114,15 +114,15 @@ def sample_json_data():
                 "text": "Albert Einstein was German-born.",
                 "original": "Albert Einstein was a German-born theoretical physicist.",
                 "label": "S",
-                "contexts": ["c_a0_0"]
+                "contexts": ["c_a0_0"],
             },
             {
                 "id": "a1",
                 "text": "Albert Einstein won the Nobel Prize in 1921.",
                 "original": "He won the Nobel Prize in 1921.",
                 "label": "S",
-                "contexts": ["c_a1_0"]
-            }
+                "contexts": ["c_a1_0"],
+            },
         ],
         "contexts": [
             {
@@ -130,16 +130,16 @@ def sample_json_data():
                 "title": "Albert Einstein - Wikipedia",
                 "text": "Albert Einstein was born in Ulm, Germany, on March 14, 1879.",
                 "snippet": "German-born theoretical physicist",
-                "link": "https://en.wikipedia.org/wiki/Albert_Einstein"
+                "link": "https://en.wikipedia.org/wiki/Albert_Einstein",
             },
             {
                 "id": "c_a1_0",
                 "title": "Nobel Prize in Physics 1921",
                 "text": "The Nobel Prize in Physics 1921 was awarded to Albert Einstein.",
                 "snippet": "Nobel Prize winner",
-                "link": "https://nobelprize.org/einstein"
-            }
-        ]
+                "link": "https://nobelprize.org/einstein",
+            },
+        ],
     }
 
 
@@ -152,7 +152,7 @@ def mock_atomizer(mock_backend):
     atomizer.backend = mock_backend
     atomizer.run.return_value = {
         "id1": "First atomic unit.",
-        "id2": "Second atomic unit."
+        "id2": "Second atomic unit.",
     }
     return atomizer
 
@@ -166,7 +166,7 @@ def mock_reviser(mock_backend):
     reviser.backend = mock_backend
     reviser.run.return_value = [
         {"revised_unit": "Revised first unit.", "rationale": "No changes."},
-        {"revised_unit": "Revised second unit.", "rationale": "Resolved pronoun."}
+        {"revised_unit": "Revised second unit.", "rationale": "Resolved pronoun."},
     ]
     return reviser
 
@@ -184,7 +184,7 @@ def mock_retriever():
             "title": "Test Document",
             "text": "This is test content for retrieval.",
             "snippet": "Test snippet",
-            "link": "https://example.com"
+            "link": "https://example.com",
         }
     ]
     return retriever

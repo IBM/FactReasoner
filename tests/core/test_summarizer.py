@@ -15,7 +15,6 @@
 
 """Unit tests for fact_reasoner.core.summarizer module."""
 
-import asyncio
 import pytest
 from unittest.mock import MagicMock, patch
 from fact_reasoner.core.summarizer import (
@@ -157,12 +156,15 @@ class TestContextSummarizerRunBatch:
         async def mock_ainstruct(*args, **kwargs):
             return output
 
-        with patch('src.fact_reasoner.core.summarizer.mfuncs.ainstruct', side_effect=mock_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
             with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
                 summarizer = ContextSummarizer(backend=mock_backend)
                 results = await summarizer.run_batch(
                     contexts=["Long context text here."],
-                    atom_text="Test atom about something."
+                    atom_text="Test atom about something.",
                 )
 
         assert isinstance(results, list)
@@ -182,13 +184,15 @@ class TestContextSummarizerRunBatch:
         async def mock_ainstruct(*args, **kwargs):
             return output
 
-        with patch('src.fact_reasoner.core.summarizer.mfuncs.ainstruct', side_effect=mock_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
             with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
                 summarizer = ContextSummarizer(backend=mock_backend)
                 # When atom_text is None, should use INSTRUCTION_WITHOUT_REF
                 results = await summarizer.run_batch(
-                    contexts=["Context to summarize."],
-                    atom_text=None
+                    contexts=["Context to summarize."], atom_text=None
                 )
 
         assert len(results) == 1
@@ -203,12 +207,14 @@ class TestContextSummarizerRunBatch:
         async def mock_ainstruct(*args, **kwargs):
             return output
 
-        with patch('src.fact_reasoner.core.summarizer.mfuncs.ainstruct', side_effect=mock_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
             with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
                 summarizer = ContextSummarizer(backend=mock_backend)
                 results = await summarizer.run_batch(
-                    contexts=["Irrelevant context."],
-                    atom_text="Unrelated atom."
+                    contexts=["Irrelevant context."], atom_text="Unrelated atom."
                 )
 
         assert len(results) == 1
@@ -228,12 +234,14 @@ class TestContextSummarizerRunBatch:
                 raise RuntimeError("boom")
             return good
 
-        with patch('src.fact_reasoner.core.summarizer.mfuncs.ainstruct', side_effect=mock_ainstruct):
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
             with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
                 summarizer = ContextSummarizer(backend=mock_backend)
                 results = await summarizer.run_batch(
-                    contexts=["ok1", "bad", "ok2"],
-                    atom_text="atom"
+                    contexts=["ok1", "bad", "ok2"], atom_text="atom"
                 )
 
         assert len(results) == 3

@@ -30,8 +30,7 @@ from tqdm import tqdm
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
 from chromadb.config import Settings as ChromaSettings
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional
+from typing import Any
 from io import BytesIO
 from PyPDF2 import PdfReader
 from itertools import islice

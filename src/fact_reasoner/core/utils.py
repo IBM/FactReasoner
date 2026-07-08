@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2023-present the International Business Machines.g
+# Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,9 +52,9 @@ def predict_nli_relationships(
 
     # Safety checks
     assert nli_extractor is not None, "NLI extractor cannot be None."
-    assert isinstance(
-        nli_extractor, NLIExtractor
-    ), "NLI extractor must be NLIExtractor."
+    assert isinstance(nli_extractor, NLIExtractor), (
+        "NLI extractor must be NLIExtractor."
+    )
 
     # Set up the premises and hypotheses
     if use_summary:
@@ -83,13 +83,16 @@ def predict_nli_relationships(
     print(f"[NLI] Processing {len(premises)} potential relationships ...")
     # results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
     try:
-        loop = asyncio.get_running_loop()
+        # If an event loop is already running, we cannot call asyncio.run()
+        # directly, so run the batch in a separate thread with its own loop.
+        asyncio.get_running_loop()
 
         with concurrent.futures.ThreadPoolExecutor() as pool:
             results = pool.submit(
                 asyncio.run, nli_extractor.run_batch(premises, hypotheses)
             ).result()
     except RuntimeError:
+        # No running loop -- safe to run directly.
         results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
 
     relations = []
@@ -123,9 +126,9 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
         Dict[str, Atom]: A dict containing the atoms of the response.
     """
 
-    assert (
-        response is not None and len(response) > 0
-    ), f"Please ensure a non empty response."
+    assert response is not None and len(response) > 0, (
+        "Please ensure a non empty response."
+    )
 
     result = atom_extractor.run(response)
 
@@ -158,9 +161,9 @@ def build_contexts(
     """
 
     assert len(atoms) > 0, "Please ensure a non-empty list of atoms."
-    assert (
-        retriever is not None
-    ), "Please ensure an existing context retriever instance."
+    assert retriever is not None, (
+        "Please ensure an existing context retriever instance."
+    )
 
     # Building the contexts
     contexts = {}
@@ -168,7 +171,6 @@ def build_contexts(
     if not use_fast_retriever:
         # Retrieve contexts for the atoms
         for aid, atom in atoms.items():
-
             # Sequential but with multi-threaded top-k retrieval
             retrieved_contexts = retriever.context_retriever.query(
                 text=atom.text,
@@ -381,9 +383,9 @@ def build_relations(
         A list of Relations.
     """
 
-    assert len(atoms) > 0, f"The atoms must be initialized!"
-    assert len(contexts) > 0, f"The contexts must be initialized!"
-    assert nli_extractor is not None, f"The NLI extractor must exist!"
+    assert len(atoms) > 0, "The atoms must be initialized!"
+    assert len(contexts) > 0, "The contexts must be initialized!"
+    assert nli_extractor is not None, "The NLI extractor must exist!"
 
     atom_context_pairs = []
     context_context_pairs1 = []
@@ -393,15 +395,15 @@ def build_relations(
 
     # Create atom-context relations (i.e., Context -> Atom)
     if rel_atom_context:
-        print(f"[NLI] Building atom-context relations...")
+        print("[NLI] Building atom-context relations...")
         if not contexts_per_atom_only:  # use all contexts for each atom
             # Create the (context, atom) pairs
-            print(f"[NLI] Using all contexts retrieved.")
+            print("[NLI] Using all contexts retrieved.")
             for _, atom in atoms.items():
                 for _, context in contexts.items():
                     atom_context_pairs.append((context, atom))
         else:
-            print(f"[NLI] Using only the contexts retrieved per atom.")
+            print("[NLI] Using only the contexts retrieved per atom.")
             # Create the (context, atom) pairs
             for _, atom in atoms.items():
                 for context in atom.get_contexts():
@@ -423,7 +425,7 @@ def build_relations(
 
     # Create context-context relations
     if rel_context_context:
-        print(f"[NLI] Building context-context relations...")
+        print("[NLI] Building context-context relations...")
         clist = [ci for ci in sorted(contexts.keys())]
         all_pairs = list(combinations(clist, 2))
         # Create all (context, context) pairs

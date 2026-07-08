@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`ContextSummarizer`** — Summarizes context passages using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
 - **`run_batch(contexts, atom_text)`** — Summarizes a list of contexts concurrently (throttled and failure-resilient). Passing an `atom_text` summarizes each context relative to that claim; passing `None` summarizes independently.
 
 ## How It Works

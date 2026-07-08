@@ -23,7 +23,6 @@ from fact_reasoner.core.retriever import (
     make_uniform,
     get_title,
     is_content_valid,
-    CITATION_PATTERNS,
 )
 
 
@@ -178,10 +177,7 @@ class TestContextRetrieverInit:
 
         with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
             retriever = ContextRetriever(
-                service_type="google",
-                top_k=5,
-                cache_dir=None,
-                fetch_text=True
+                service_type="google", top_k=5, cache_dir=None, fetch_text=True
             )
             assert retriever.service_type == "google"
             assert retriever.top_k == 5

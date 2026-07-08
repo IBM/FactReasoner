@@ -10,7 +10,7 @@ This example shows how to initialize a `FactVerify` pipeline from a JSON file co
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
 - The input JSON file `flaherty_google.json` in the examples directory
 
 ## Key Components

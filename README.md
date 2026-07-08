@@ -144,7 +144,46 @@ export SERPER_API_KEY=your_serper_api_key
 
 # Internal IBM inference service
 export RITS_API_KEY=your_RITS_api_key
+
+# vLLM (OpenAI-compatible) backend endpoint and key (optional):
+export VLLM_BASE_URL=http://localhost:8000/v1
+export VLLM_API_KEY=EMPTY
 ```
+
+### Choosing a Backend
+
+FactReasoner components take a generic Mellea `Backend`. The helper
+`fact_reasoner.build_backend(kind, ...)` constructs one of three backends:
+
+| `kind`     | Backend                     | Notes |
+|------------|-----------------------------|-------|
+| `"rits"`   | `RITSBackend`               | Remote IBM RITS service (requires `mellea-ibm` and `RITS_API_KEY`). |
+| `"ollama"` | `OllamaModelBackend`        | Local Ollama server (`http://localhost:11434`; model pulled on first use). |
+| `"vllm"`   | `OpenAIBackend`             | A [vLLM](https://docs.vllm.ai) server exposing an OpenAI-compatible API. |
+
+**Using a vLLM backend.** Launch vLLM with an explicit served model name, e.g.:
+
+```bash
+vllm serve meta-llama/Llama-3.3-70B-Instruct \
+    --served-model-name llama-3.3-70b --port 8000
+```
+
+Then build the backend (the served model name is required; the endpoint and key
+fall back to the `VLLM_BASE_URL` / `VLLM_API_KEY` environment variables):
+
+```python
+from fact_reasoner import build_backend
+
+backend = build_backend(
+    "vllm",
+    model_id="llama-3.3-70b",              # must match --served-model-name
+    base_url="http://localhost:8000/v1",   # or set VLLM_BASE_URL
+)
+```
+
+The example scripts under `docs/examples/` accept a `--backend {rits,ollama,vllm}`
+flag (with `--served-model` / `--base-url` for vLLM), and the evaluation driver
+`eval_dataset.py` accepts the same `--backend` selector.
 
 ## Quick Start
 

@@ -19,17 +19,13 @@ from typing import Any, Dict, Optional, Union
 PRIOR_PROB_ATOM = 0.5
 PRIOR_PROB_CONTEXT = 0.9
 
+
 class Atom:
     """
     Represents an atomic unit of the model's response.
     """
 
-    def __init__(
-            self,
-            id: str,
-            text: str,
-            label: str = None
-    ):
+    def __init__(self, id: str, text: str, label: str = None):
         """
         Atom constructor.
         Args:
@@ -54,7 +50,7 @@ class Atom:
 
     def get_text(self):
         return self.text
-    
+
     def get_summary(self):
         return self.text
 
@@ -70,10 +66,7 @@ class Atom:
     def get_label(self):
         return self.label
 
-    def add_context(
-            self,
-            context
-    ):
+    def add_context(self, context):
         """
         Add a context relevat to the atom.
 
@@ -83,10 +76,7 @@ class Atom:
         """
         self.contexts[context.id] = context
 
-    def add_contexts(
-            self,
-            contexts
-    ):
+    def add_contexts(self, contexts):
         """
         Add a list of contexts relevant to the atom.
         Args:
@@ -109,14 +99,14 @@ class Context:
     """
 
     def __init__(
-            self,
-            id: str,
-            atom: Optional[Atom],
-            text: str = "",
-            synthetic_summary: Optional[str] = None,
-            title: str = "",
-            link: str = "",
-            snippet: str = ""
+        self,
+        id: str,
+        atom: Optional[Atom],
+        text: str = "",
+        synthetic_summary: Optional[str] = None,
+        title: str = "",
+        link: str = "",
+        snippet: str = "",
     ):
         """
         Context constructor.
@@ -145,7 +135,9 @@ class Context:
         self.title = title
         self.link = link
         self.snippet = snippet
-        self.probability = PRIOR_PROB_CONTEXT  # prior probability of the context being true
+        self.probability = (
+            PRIOR_PROB_CONTEXT  # prior probability of the context being true
+        )
 
     def __str__(self) -> str:
         return f"Context {self.id} [{self.title}]: {self.text}"
@@ -158,14 +150,20 @@ class Context:
 
     def get_text(self):
         if self.snippet != "" and self.text != "":
-            return "Snippet/Summary of Text:\n\n" + self.snippet + "\n\n" + "Text:\n\n" + self.text 
+            return (
+                "Snippet/Summary of Text:\n\n"
+                + self.snippet
+                + "\n\n"
+                + "Text:\n\n"
+                + self.text
+            )
         elif self.snippet == "" and self.text != "":
             return self.text
         elif self.snippet != "" and self.text == "":
             return self.snippet
         else:
             return ""
-       
+
     def get_title(self):
         return self.title
 
@@ -202,7 +200,7 @@ class Context:
             "snippet": self.snippet,
             "synthetic_summary": self.get_summary(),
             "probability": self.probability,
-        }     
+        }
 
 
 class Relation:
@@ -211,12 +209,12 @@ class Relation:
     """
 
     def __init__(
-            self,
-            source: Union[Atom, Context],
-            target: Union[Atom, Context],
-            type: str,
-            probability: float,
-            link: str
+        self,
+        source: Union[Atom, Context],
+        target: Union[Atom, Context],
+        type: str,
+        probability: float,
+        link: str,
     ):
         """
         Relation constructor.
@@ -233,7 +231,7 @@ class Relation:
                 The probability value associated with the NLI relation.
             link: str
                 The link type: [context_atom, context_context, atom_atom]
-        
+
         Comment: `entailment` is not symmetric, while `contradiction`, `neutral`
         and `equivalence are symmetric. Namely, if A contradicts B then B
         contradicts A (same with neutral, equivalence). However, if A entails B
@@ -251,9 +249,10 @@ class Relation:
         else:
             type = "neutral"  # default to neutral if the type is not recognized
             probability = 1.0  # set probability to 1 for neutral relations
-            
-        assert (link in ["context_atom", "context_context", "atom_atom"]), \
+
+        assert link in ["context_atom", "context_context", "atom_atom"], (
             f"Unknown link type: {link}"
+        )
 
         self.source = source
         self.target = target
@@ -262,11 +261,12 @@ class Relation:
         self.link = link
 
     def __str__(self) -> str:
-        return f"[{self.source.id} -> {self.target.id}] : {self.type} : {self.probability}"
+        return (
+            f"[{self.source.id} -> {self.target.id}] : {self.type} : {self.probability}"
+        )
 
     def get_type(self) -> str:
         return self.type
 
     def get_probability(self) -> float:
         return self.probability
-

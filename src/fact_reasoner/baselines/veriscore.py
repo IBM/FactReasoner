@@ -149,7 +149,7 @@ class VeriScore:
         self.response = data["output"]
         self.topic = data.get("topic", None)
 
-        print(f"[VeriScore] Reading the atoms ...")
+        print("[VeriScore] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -175,7 +175,7 @@ class VeriScore:
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[VeriScore] Lables found: {self.labels_human}")
 
-        print(f"[VeriScore] Reading the contexts ...")
+        print("[VeriScore] Reading the contexts ...")
         for context_dict in data["contexts"]:
             cid = context_dict["id"]
             title = context_dict["title"]
@@ -276,13 +276,13 @@ class VeriScore:
         self.revise_atoms = revise_atoms
 
         # Safety checks
-        assert self.atom_extractor is not None, f"The atom extractor must be created."
-        assert self.atom_reviser is not None, f"The atom reviser must be created."
+        assert self.atom_extractor is not None, "The atom extractor must be created."
+        assert self.atom_reviser is not None, "The atom reviser must be created."
 
-        print(f"[VeriScore] Building the pipeline ...")
+        print("[VeriScore] Building the pipeline ...")
 
         # Build the atoms
-        if has_atoms == False:
+        if not has_atoms:
             self.atoms = build_atoms(
                 response=self.response, atom_extractor=self.atom_extractor
             )
@@ -291,14 +291,14 @@ class VeriScore:
             for aid in self.atoms.keys():
                 print(f"[VeriScore] {self.atoms[aid]}")
 
-        assert (
-            len(self.atoms) > 0
-        ), f"The atoms must be initialized before running the pipeline."
+        assert len(self.atoms) > 0, (
+            "The atoms must be initialized before running the pipeline."
+        )
 
         # Revise the atoms
         if self.revise_atoms:
-            print(f"[VeriScore] Revise the atoms ...")
-            assert self.response is not None, f"The atom reviser requires a response."
+            print("[VeriScore] Revise the atoms ...")
+            assert self.response is not None, "The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             result = asyncio.run(self.atom_reviser.run_batch(old_atoms, self.response))
@@ -312,7 +312,7 @@ class VeriScore:
         print(f"[VeriScore] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if has_contexts == False:  # check if contexts already in file
+        if not has_contexts:  # check if contexts already in file
             self.contexts = build_contexts(
                 atoms=self.atoms,
                 retriever=self.context_retriever,
@@ -320,7 +320,7 @@ class VeriScore:
             )
 
         print(f"[VeriScore] Retrieved {len(self.contexts)} contexts.")
-        print(f"[VeriScore] Pipeline building completed.")
+        print("[VeriScore] Pipeline building completed.")
 
     def _get_label(self, output: ModelOutputThunk) -> str:
         """
@@ -406,7 +406,7 @@ class VeriScore:
             )
             coroutines.append(coroutine)
 
-        print(f"[VeriScore] Awaiting for the async execution ...")
+        print("[VeriScore] Awaiting for the async execution ...")
         outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
         for output in outputs:
             label = self._get_label(output.result)
@@ -482,8 +482,8 @@ class VeriScore:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items():
-                if l == "S":
+            for aid, gold_label in self.labels_human.items():
+                if gold_label == "S":
                     true_atoms += 1
                     if labels[aid] == "S":
                         num_true_positive += 1
@@ -514,8 +514,11 @@ class VeriScore:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items():  # true labels are either S or NS
-                if l == "S":
+            for (
+                aid,
+                gold_label,
+            ) in self.labels_human.items():  # true labels are either S or NS
+                if gold_label == "S":
                     true_atoms += 1
                     if labels[aid] == "S":
                         num_true_positive += 1

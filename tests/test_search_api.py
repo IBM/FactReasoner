@@ -15,10 +15,9 @@
 
 """Unit tests for fact_reasoner.search_api module."""
 
-import pytest
 import tempfile
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from fact_reasoner.search_api import SearchAPI
 
@@ -33,7 +32,7 @@ class TestSearchAPIInit:
             assert api.serper_key == "test_key"
 
     def test_init_with_cache(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -47,7 +46,7 @@ class TestSearchAPIInit:
                 os.unlink(temp_path)
 
     def test_init_custom_similarity_threshold(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -71,12 +70,12 @@ class TestSearchAPIGetSnippets:
                     {
                         "title": "Test Title",
                         "snippet": "Test snippet text",
-                        "link": "https://example.com"
+                        "link": "https://example.com",
                     }
                 ]
             }
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert "test query" in results
@@ -91,7 +90,7 @@ class TestSearchAPIGetSnippets:
 
             mock_response = {"organic": []}
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert "test query" in results
@@ -108,7 +107,7 @@ class TestSearchAPIGetSnippets:
                     ]
                 }
 
-            with patch.object(api, 'get_search_res', side_effect=mock_search):
+            with patch.object(api, "get_search_res", side_effect=mock_search):
                 results = api.get_snippets(["query1", "query2"])
 
                 assert "query1" in results
@@ -121,7 +120,7 @@ class TestSearchAPICaching:
     """Tests for SearchAPI caching functionality."""
 
     def test_save_to_cache(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -131,8 +130,12 @@ class TestSearchAPICaching:
                 response = {
                     "searchParameters": {"q": "test"},
                     "organic": [
-                        {"title": "Test", "snippet": "Snippet", "link": "http://test.com"}
-                    ]
+                        {
+                            "title": "Test",
+                            "snippet": "Snippet",
+                            "link": "http://test.com",
+                        }
+                    ],
                 }
 
                 # Save to cache
@@ -145,7 +148,7 @@ class TestSearchAPICaching:
                 os.unlink(temp_path)
 
     def test_save_empty_results_not_cached(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -178,7 +181,7 @@ class TestSearchAPIHelpers:
                 ]
             }
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert results["test query"][0]["title"] == "Title Only"

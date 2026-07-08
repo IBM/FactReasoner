@@ -20,7 +20,7 @@ Plus Google search API access.
 ## Key Components
 
 - **`Retriever`** — Retrieves supporting contexts from the web via search APIs
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`), used by the query builder
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server), used by the query builder
 - **`QueryBuilder`** — Generates search-optimized queries (used internally by the retriever)
 - **`query(text)`** — Executes a search query and returns a list of context objects
 

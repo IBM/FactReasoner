@@ -15,8 +15,7 @@
 
 """Unit tests for fact_reasoner.baselines.veriscore module."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from fact_reasoner.baselines.veriscore import VeriScore, INSTRUCTION_VERISCORE
 
 
@@ -45,7 +44,7 @@ class TestVeriScoreInit:
             backend=mock_backend,
             atom_extractor=mock_atomizer,
             atom_reviser=mock_reviser,
-            context_retriever=mock_retriever
+            context_retriever=mock_retriever,
         )
 
         assert scorer.atom_extractor == mock_atomizer
@@ -186,7 +185,7 @@ class TestVeriScoreFromDict:
                     "text": "Einstein was a physicist.",
                     "original": "Einstein was a physicist.",
                     "label": "S",
-                    "contexts": ["c0"]
+                    "contexts": ["c0"],
                 }
             ],
             "contexts": [
@@ -195,9 +194,9 @@ class TestVeriScoreFromDict:
                     "title": "Einstein Wikipedia",
                     "text": "Albert Einstein was a theoretical physicist.",
                     "snippet": "German physicist",
-                    "link": "https://example.com"
+                    "link": "https://example.com",
                 }
-            ]
+            ],
         }
 
         scorer.from_dict_with_contexts(data)
@@ -222,13 +221,13 @@ class TestVeriScoreFromDict:
                     "id": "a0",
                     "text": "Atom text",
                     "original": "Original",
-                    "contexts": ["c0", "c1"]
+                    "contexts": ["c0", "c1"],
                 }
             ],
             "contexts": [
                 {"id": "c0", "title": "Title 0", "text": "Text 0"},
                 {"id": "c1", "title": "Title 1", "text": "Text 1"},
-            ]
+            ],
         }
 
         scorer.from_dict_with_contexts(data)

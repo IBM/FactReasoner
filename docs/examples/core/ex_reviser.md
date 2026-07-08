@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`Reviser`** — Rewrites ambiguous atomic claims into self-contained statements using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
 - **`run(atoms, response)`** — Takes a list of atom strings and the original response, returns revised atoms with rationales
 - **`run_batch(atoms, response)`** — Revises a batch of atoms concurrently, throttled and failure-resilient (a failed item falls back to a no-op revision; results stay aligned with the inputs)
 

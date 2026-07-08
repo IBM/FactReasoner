@@ -15,8 +15,7 @@
 
 """Unit tests for fact_reasoner.baselines.factscore module."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from fact_reasoner.baselines.factscore import (
     FactScore,
     INSTRUCTION_FACTSCORE,
@@ -49,7 +48,7 @@ class TestFactScoreInit:
             backend=mock_backend,
             atom_extractor=mock_atomizer,
             atom_reviser=mock_reviser,
-            context_retriever=mock_retriever
+            context_retriever=mock_retriever,
         )
 
         assert scorer.atom_extractor == mock_atomizer
@@ -181,7 +180,7 @@ class TestFactScoreFromDict:
                     "text": "Einstein was a physicist.",
                     "original": "Einstein was a physicist.",
                     "label": "S",
-                    "contexts": ["c0"]
+                    "contexts": ["c0"],
                 }
             ],
             "contexts": [
@@ -190,9 +189,9 @@ class TestFactScoreFromDict:
                     "title": "Einstein Wikipedia",
                     "text": "Albert Einstein was a theoretical physicist.",
                     "snippet": "German physicist",
-                    "link": "https://example.com"
+                    "link": "https://example.com",
                 }
-            ]
+            ],
         }
 
         scorer.from_dict_with_contexts(data)

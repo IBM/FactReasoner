@@ -21,7 +21,7 @@ Plus Google search API access.
 
 - **`Retriever`** — The underlying retriever that fetches contexts from the web via Google search
 - **`ContextRetriever`** — Parallel wrapper that dispatches `Retriever.query()` calls across a thread pool
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`), used by the query builder
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server), used by the query builder
 - **`QueryBuilder`** — Generates search-optimized queries from atom text
 - **`Atom`** — Represents a factual claim to retrieve evidence for
 - **`retrieve_all(atoms, query)`** — Retrieves contexts for all atoms (and optionally a standalone query) in parallel

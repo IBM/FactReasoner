@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`Atomizer`** — Extracts atomic factual units from a text response using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
 - **`run()`** — Processes a single response synchronously. Backend/network errors and unparsable output are caught and return an empty dict rather than raising.
 - **`run_batch()`** — Processes multiple responses concurrently with **bounded concurrency** and a **per-minute rate limit** (default 1500 requests/min). It is failure-resilient: a single failed request does not drop the others, and the returned list is positionally aligned with the input list.
 

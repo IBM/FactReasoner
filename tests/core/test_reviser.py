@@ -68,18 +68,22 @@ class TestReviserRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '''```json
+        mock_output.__str__ = lambda self: (
+            """```json
 {
     "revised_unit": "Albert Einstein was German-born.",
     "rationale": "No changes needed."
 }
-```'''
+```"""
+        )
 
-        with patch('src.fact_reasoner.core.reviser.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+        ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(
                 units=["Einstein was German-born."],
-                response="Albert Einstein was a German-born physicist."
+                response="Albert Einstein was a German-born physicist.",
             )
 
             assert isinstance(result, list)
@@ -93,18 +97,22 @@ class TestReviserRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '''```json
+        mock_output.__str__ = lambda self: (
+            """```json
 {
     "revised_unit": "Revised atom",
     "rationale": "Resolved reference."
 }
-```'''
+```"""
+        )
 
-        with patch('src.fact_reasoner.core.reviser.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+        ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(
                 units=["He was born in 1879.", "She won the prize."],
-                response="Albert Einstein was born in 1879. Marie Curie won the prize."
+                response="Albert Einstein was born in 1879. Marie Curie won the prize.",
             )
 
             assert len(result) == 2
@@ -116,12 +124,11 @@ class TestReviserRun:
         mock_output = MagicMock()
         mock_output.success = False
 
-        with patch('src.fact_reasoner.core.reviser.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+        ):
             reviser = Reviser(backend=mock_backend)
-            result = reviser.run(
-                units=["Test unit"],
-                response="Test response"
-            )
+            result = reviser.run(units=["Test unit"], response="Test response")
 
             # Failures are now aligned no-op revisions (one entry per unit),
             # falling back to the original atom text.
@@ -135,19 +142,20 @@ class TestReviserRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '''```json
+        mock_output.__str__ = lambda self: (
+            """```json
 {
     "revised_unit": "Revised version",
     "rationale": "Changed pronoun."
 }
-```'''
+```"""
+        )
 
-        with patch('src.fact_reasoner.core.reviser.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+        ):
             reviser = Reviser(backend=mock_backend)
-            result = reviser.run(
-                units=["Original text"],
-                response="Full response"
-            )
+            result = reviser.run(units=["Original text"], response="Full response")
 
             assert len(result) == 1
             assert "text" in result[0]
@@ -158,7 +166,7 @@ class TestReviserRun:
         mock_backend.model_id = "test-model"
 
         with patch(
-            'src.fact_reasoner.core.reviser.mfuncs.instruct',
+            "src.fact_reasoner.core.reviser.mfuncs.instruct",
             side_effect=RuntimeError("backend exploded"),
         ):
             reviser = Reviser(backend=mock_backend)
@@ -184,15 +192,19 @@ class TestReviserRunBatch:
         mock_backend.model_id = "test-model"
 
         outputs = [
-            self._mk_output(True, '```json\n{"revised_unit": "A2", "rationale": "r"}\n```'),
-            self._mk_output(True, '```json\n{"revised_unit": "B2", "rationale": "r"}\n```'),
+            self._mk_output(
+                True, '```json\n{"revised_unit": "A2", "rationale": "r"}\n```'
+            ),
+            self._mk_output(
+                True, '```json\n{"revised_unit": "B2", "rationale": "r"}\n```'
+            ),
         ]
 
         async def fake_ainstruct(*args, **kwargs):
             return outputs.pop(0)
 
         with patch(
-            'src.fact_reasoner.core.reviser.mfuncs.ainstruct',
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
             side_effect=fake_ainstruct,
         ):
             reviser = Reviser(backend=mock_backend)
@@ -207,7 +219,9 @@ class TestReviserRunBatch:
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        good = self._mk_output(True, '```json\n{"revised_unit": "OK", "rationale": "r"}\n```')
+        good = self._mk_output(
+            True, '```json\n{"revised_unit": "OK", "rationale": "r"}\n```'
+        )
 
         async def fake_ainstruct(*args, **kwargs):
             if kwargs["user_variables"]["atomic_unit"] == "bad":
@@ -215,7 +229,7 @@ class TestReviserRunBatch:
             return good
 
         with patch(
-            'src.fact_reasoner.core.reviser.mfuncs.ainstruct',
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
             side_effect=fake_ainstruct,
         ):
             reviser = Reviser(backend=mock_backend)

@@ -21,7 +21,6 @@ import mellea.stdlib.functional as mfuncs
 
 from typing import Any, Dict, List
 from mellea.backends import Backend
-from mellea.backends import ModelOption
 from mellea.stdlib.context import SimpleContext
 from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
@@ -286,9 +285,7 @@ class ContextSummarizer:
             if isinstance(output, Exception) or not getattr(output, "success", False):
                 if isinstance(output, Exception):
                     print(f"[Summarizer] Batch item failed: {output}")
-                results.append(
-                    {"context": context, "summary": "", "probability": 0.0}
-                )
+                results.append({"context": context, "summary": "", "probability": 0.0})
                 continue
 
             cleaned = str(output).strip()

@@ -12,7 +12,7 @@ Use this when you want a factuality assessment based on search result snippets r
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
 - Google search API access for the `ContextRetriever`
 
 ## Key Components
@@ -26,7 +26,7 @@ Use this when you want a factuality assessment based on search result snippets r
 ## How It Works
 
 1. Define a query, response, and topic inline.
-2. Create a Mellea RITS backend using LLaMA 3.3 70B Instruct.
+2. Create the selected Mellea backend via `build_backend()` (defaults to RITS with LLaMA 3.3 70B Instruct; override with `--backend`).
 3. Instantiate core components. Note that `ContextRetriever` is configured with `fetch_text=False`, meaning only search snippets are used (no full page retrieval).
 4. Create the `FactVerify` pipeline with the backend and components.
 5. Call `pipeline.build()` with:

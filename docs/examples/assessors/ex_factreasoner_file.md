@@ -10,7 +10,7 @@ This example shows how to initialize a `FactReasoner` pipeline from a JSON file 
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
 - The input JSON file `flaherty_wikipedia.json` in the examples directory
 - The Merlin probabilistic inference engine binary at `lib/merlin`
 

@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`QueryBuilder`** — Generates search-optimized queries from input text using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
 - **`run(text)`** — Transforms a single text input into a search query (falls back to the original text if generation fails)
 
 ## How It Works

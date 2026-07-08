@@ -3,9 +3,8 @@
 import argparse
 import asyncio
 
-from mellea.backends import Backend, ModelOption
-
 # Local imports
+from fact_reasoner.backends import build_backend
 from fact_reasoner.core.summarizer import ContextSummarizer
 
 # An atomic claim used when summarizing with reference
@@ -94,48 +93,26 @@ async def run_without_reference(summarizer: ContextSummarizer) -> None:
     print_results(result)
 
 
-def build_backend(kind: str) -> Backend:
-    """Create the Mellea backend to drive the context summarizer.
-
-    Args:
-        kind: str
-            Which backend to build: "rits" for the remote IBM RITS service, or
-            "ollama" for a local Ollama server.
-    Returns:
-        Backend: A ready-to-use Mellea backend.
-    """
-    if kind == "rits":
-        # Remote IBM RITS backend (requires the mellea_ibm package and RITS
-        # credentials/config in the environment).
-        from mellea_ibm.rits import RITSBackend, RITS
-
-        return RITSBackend(
-            RITS.LLAMA_3_3_70B_INSTRUCT,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    elif kind == "ollama":
-        # Local Ollama backend (requires a running Ollama server at
-        # http://localhost:11434; the model is pulled on first use). Pass
-        # base_url=... to OllamaModelBackend to target a non-default host.
-        from mellea.backends.ollama import OllamaModelBackend
-        from mellea.backends.model_ids import IBM_GRANITE_4_MICRO_3B
-
-        return OllamaModelBackend(
-            IBM_GRANITE_4_MICRO_3B,
-            model_options={ModelOption.MAX_NEW_TOKENS: 4096},
-        )
-    else:
-        raise ValueError(f"Unknown backend: {kind!r} (expected 'rits' or 'ollama')")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Context summarizer example.")
     parser.add_argument(
         "--backend",
-        choices=["rits", "ollama"],
+        choices=["rits", "ollama", "vllm"],
         default="rits",
-        help="Which Mellea backend to use: 'rits' (remote IBM RITS, default) "
-        "or 'ollama' (local Ollama server).",
+        help="Which Mellea backend to use: 'rits' (remote IBM RITS, default), "
+        "'ollama' (local Ollama server), or 'vllm' (vLLM OpenAI-compatible "
+        "server).",
+    )
+    parser.add_argument(
+        "--served-model",
+        default=None,
+        help="Model / served-model name (required for 'vllm').",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help="Base URL for the 'vllm' backend (defaults to VLLM_BASE_URL env "
+        "or http://localhost:8000/v1).",
     )
     parser.add_argument(
         "--with-reference",
@@ -146,7 +123,9 @@ def main() -> None:
     args = parser.parse_args()
 
     # Create the selected Mellea backend
-    backend = build_backend(args.backend)
+    backend = build_backend(
+        args.backend, model_id=args.served_model, base_url=args.base_url
+    )
 
     # Create the context summarizer
     summarizer = ContextSummarizer(backend=backend)
