@@ -4,6 +4,7 @@ from .assessor import FactReasoner
 from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
+from .runner import FactualityRunner
 from .search_api import SearchAPI
 from .serving import VLLMServer
 from .utils import (
@@ -22,6 +23,7 @@ __all__ = [
     "FactReasoner",
     "FactCorrector",
     "FactGraph",
+    "FactualityRunner",
     "SearchAPI",
     "build_backend",
     "VLLMServer",

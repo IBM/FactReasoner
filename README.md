@@ -143,7 +143,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 |-------------------|---------|-------|
 | Ollama (local)    | default | Works out of the box via `mellea`. |
 | vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
-| vLLM local server | `[vllm]` on the GPU node | `vllm` is run as an external process (see `scripts/run_vllm.py`). |
+| vLLM local server | `[vllm]` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
 | RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 
 ### Dependencies
@@ -201,44 +201,144 @@ backend = build_backend(
 ```
 
 The example scripts under `docs/examples/` accept a `--backend {rits,ollama,vllm}`
-flag (with `--served-model` / `--base-url` for vLLM), and the evaluation driver
-`eval_dataset.py` accepts the same `--backend` selector.
+flag (with `--served-model` / `--base-url` for vLLM).
+
+## Running assessments (`fact-reasoner` CLI)
+
+Installing the package provides a **`fact-reasoner`** console command that runs
+any factuality assessor (FactReasoner or a baseline) with any backend, over
+either a single query/response pair or a jsonl dataset. (If you're running from a
+source checkout without installing, use `python -m fact_reasoner.cli` in place of
+`fact-reasoner`.)
+
+See all options with:
+
+```bash
+fact-reasoner --help
+```
+
+### Input modes
+
+The runner works in one of two mutually-exclusive modes.
+
+**1. Single query/response** — atomize the response, retrieve contexts, and
+score it on the fly. Prints the results dict to stdout, or writes JSON with
+`--output-file`:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --query "Tell me a bio of Lanny Flaherty" \
+    --response "Lanny Flaherty is an American actor born in 1949 ..." \
+    --topic "Lanny Flaherty" \
+    --merlin-path /path/to/merlin \
+    --output-file result.json
+```
+
+**2. Dataset file** — a `.jsonl` where each line already contains atoms and
+contexts (see [Input Format](#input-format-json)). Writes a **resumable** jsonl
+to `--output-dir` (re-running skips inputs already present in the output):
+
+```bash
+fact-reasoner \
+    --pipeline factscore --backend rits --model-id llama3 \
+    --input-file data/example.jsonl --output-dir results/ \
+    --dataset-name mydata
+```
+
+### Choosing the assessor (`--pipeline`)
+
+| Value | Assessor | Notes |
+|-------|----------|-------|
+| `factreasoner` (default) | Probabilistic FactReasoner | Requires `--merlin-path`. Version via `--pipeline-version {v1,v2,v3}` (default `v2`). |
+| `factscore` | FactScore baseline | — |
+| `veriscore` | VeriScore baseline | — |
+| `factverify` | FactVerify baseline | — |
+
+### Choosing the backend (`--backend`)
+
+| Value | How to point it at a model |
+|-------|----------------------------|
+| `ollama` (default) | `--model-id` = Ollama model name (needs a running Ollama server). |
+| `rits` | `--model-id` = shortcut (`llama3`, `granite4`, `mistral`, `gpt-oss`); needs `mellea-ibm` + `RITS_API_KEY`. |
+| `vllm` | `--served-model` + either `--model` (start a local server) or `--base-url` (connect to a running one) — see [below](#serving-a-local-model-on-a-gpu-cluster-lsf). |
+
+### Common options
+
+| Option | Meaning |
+|--------|---------|
+| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`). |
+| `--top-k` | Contexts retrieved per atom (default 3). |
+| `--cache-dir` | Retriever cache directory. |
+| `--use-summarizer` | Summarize contexts (FactReasoner only). |
+| `--use-priors` | Use atom/context priors (FactReasoner only). |
+| `--use-query-builder` | Generate search queries with the QueryBuilder. |
+| `--output-file` | Single mode: write the results dict as JSON (else print). |
+
+### Programmatic use
+
+The CLI is a thin wrapper over `fact_reasoner.FactualityRunner`:
+
+```python
+from fact_reasoner import FactualityRunner, build_backend
+
+backend = build_backend("ollama")  # or "rits" / "vllm"
+runner = FactualityRunner(
+    backend,
+    pipeline="factscore",          # or "factreasoner" (+ merlin_path=...), etc.
+    service_type="google",
+)
+
+# Single item -> results dict
+results = runner.assess(
+    query="Tell me a bio of Lanny Flaherty",
+    response="Lanny Flaherty is an American actor ...",
+    topic="Lanny Flaherty",
+)
+print(results["factuality_score"])
+
+# Dataset file -> list of results (also written to output_dir)
+all_results = runner.assess_file(
+    "data/example.jsonl", "results/", dataset_name="mydata", model_id="granite4",
+)
+```
 
 ### Serving a local model on a GPU cluster (LSF)
 
 To run everything inside a single LSF job — start a local vLLM server from
 locally-available (or HuggingFace) weights, run a factuality assessor against
-it, then tear the server down — use `scripts/run_vllm.py` (and the
-`scripts/run_vllm.bsub` template):
+it, then tear the server down — pass `--backend vllm` together with `--model`
+(a weights path or HF id). The `scripts/run_vllm.bsub` template does this:
 
 ```bash
-python scripts/run_vllm.py \
-    --model /path/to/granite-4.1-8b \
-    --served-model granite-4.1-8b \
+fact-reasoner --backend vllm \
+    --model /path/to/granite-4.1-8b --served-model granite-4.1-8b \
     --input-file data/example.jsonl --output-dir results/ \
     --pipeline factreasoner --merlin-path /path/to/merlin
 ```
 
-The `--pipeline` flag selects the assessor: `factreasoner` (probabilistic; needs
-Merlin) or a baseline (`factscore`, `veriscore`, `factverify`) from
-`src/fact_reasoner/baselines` — baselines don't need `--merlin-path`.
-
-The server lifecycle is managed by `fact_reasoner.VLLMServer` (a context
-manager): it auto-detects the tensor-parallel size from `CUDA_VISIBLE_DEVICES`
-(which LSF sets from the `-gpu` request; A100 or H100), waits for readiness, and
-always cleans up. **The compute node's environment must have `vllm` installed
-and on `PATH`, with GPU drivers/CUDA available** — `vllm` is not a FactReasoner
-dependency and is invoked as an external process.
+When `--backend vllm` is given with `--model`, the server lifecycle is managed by
+`fact_reasoner.VLLMServer` (a context manager): it auto-detects the
+tensor-parallel size from `CUDA_VISIBLE_DEVICES` (which LSF sets from the `-gpu`
+request; A100 or H100), waits for readiness, and always cleans up. Without
+`--model`, `--backend vllm` connects as a client to an existing server at
+`--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have the
+`vllm` extra installed (`pip install "fact_reasoner[vllm]"`), with GPU
+drivers/CUDA available.**
 
 ## Quick Start
+
+> For most uses, the [`fact-reasoner` CLI](#running-assessments-fact-reasoner-cli)
+> or `FactualityRunner` is the easiest way to run an assessment. The example
+> below shows the lower-level building blocks if you need to wire the pipeline
+> manually.
 
 ### Basic Usage
 
 ```python
-from mellea.backends import ModelOption
-from mellea_ibm.rits import RITSBackend, RITS
+import asyncio
 
-from fact_reasoner import FactReasoner
+from fact_reasoner import build_backend, FactReasoner
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever, Retriever
@@ -246,29 +346,36 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.query_builder import QueryBuilder
 
-# Initialize the LLM backend
-backend = RITSBackend(
-    RITS.LLAMA_3_3_70B_INSTRUCT,
-    model_options={ModelOption.MAX_NEW_TOKENS: 4096}
-)
+# Initialize the LLM backend via the factory. Switch providers by changing the
+# first argument:
+#   build_backend("ollama")                              # local Ollama (default)
+#   build_backend("rits")                                # IBM RITS (default model)
+#   build_backend("vllm", model_id="granite-4.1-8b",
+#                 base_url="http://localhost:8000/v1")   # vLLM client
+# A default of MAX_NEW_TOKENS=4096 is applied unless you pass model_options.
+backend = build_backend("ollama")
 
-# Create pipeline components
+# Create pipeline components. All components take the same Mellea backend.
 query_builder = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
+context_summarizer = ContextSummarizer(backend)
+nli_extractor = NLIExtractor(backend)
+
+# The Retriever fetches evidence; ContextRetriever wraps it for parallel,
+# per-atom retrieval (optionally summarizing each context).
 retriever = Retriever(
     service_type="google",  # or "wikipedia", "chromadb"
     top_k=5,
     fetch_text=True,
     query_builder=query_builder,
-    num_workers=4
-)
-context_summarizer = ContextSummarizer(backend)
-context_retriever = ContextRetriever(
-    retriever=retriever,
     num_workers=4,
 )
-nli_extractor = NLIExtractor(backend)
+context_retriever = ContextRetriever(
+    retriever=retriever,
+    context_summarizer=context_summarizer,
+    num_workers=4,
+)
 
 # Create the FactReasoner pipeline
 pipeline = FactReasoner(
@@ -277,21 +384,29 @@ pipeline = FactReasoner(
     context_retriever=context_retriever,
     context_summarizer=context_summarizer,
     nli_extractor=nli_extractor,
-    merlin_path="/path/to/merlin"
+    merlin_path="/path/to/merlin",
 )
 
-# Build and score
-pipeline.build(
-    query="Tell me about Albert Einstein",
-    response="Albert Einstein was born in 1879 in Ulm, Germany...",
-    topic="Albert Einstein",
-    revise_atoms=True,
-    summarize_contexts=False
+# Build the graphical model. FactReasoner.build is async, so await it (here via
+# asyncio.run). This atomizes the response, retrieves contexts, and runs NLI.
+asyncio.run(
+    pipeline.build(
+        query="Tell me about Albert Einstein",
+        response="Albert Einstein was born in 1879 in Ulm, Germany...",
+        topic="Albert Einstein",
+        revise_atoms=True,
+        summarize_contexts=False,
+    )
 )
 
+# score() returns (results, marginals); the baselines return just results.
 results, marginals = pipeline.score()
 print(f"Factuality Score: {results['factuality_score']:.2%}")
 ```
+
+> **Tip:** the `FactualityRunner` / `fact-reasoner` CLI wires all of the above for
+> you (correct async handling and retriever construction included). Prefer it
+> unless you need custom component wiring.
 
 ### Loading from Pre-processed Data
 
@@ -303,12 +418,14 @@ with open("data/example.json", "r") as f:
     data = json.load(f)
 
 pipeline.from_dict_with_contexts(data)
-pipeline.build(
-    has_atoms=True,
-    has_contexts=True,
-    revise_atoms=False,
-    rel_atom_context=True,
-    rel_context_context=False
+asyncio.run(
+    pipeline.build(
+        has_atoms=True,
+        has_contexts=True,
+        revise_atoms=False,
+        rel_atom_context=True,
+        rel_context_context=False,
+    )
 )
 
 results, marginals = pipeline.score()
@@ -513,6 +630,11 @@ FactReasoner/
 │   ├── __init__.py           # Package exports
 │   ├── assessor.py           # Main FactReasoner class
 │   ├── corrector.py          # FactCorrector (WIP)
+│   ├── runner.py             # FactualityRunner (single + dataset runner)
+│   ├── cli.py                # `fact-reasoner` console entrypoint
+│   ├── backends.py           # build_backend() factory (ollama/rits/vllm)
+│   ├── serving.py            # VLLMServer (local vLLM server manager)
+│   ├── markov_network.py     # Markov network + UAI serialization
 │   ├── fact_graph.py         # Graph representation
 │   ├── search_api.py         # Google Search API wrapper
 │   ├── utils.py              # Utility functions
@@ -524,12 +646,12 @@ FactReasoner/
 │   │   ├── nli.py            # NLI extraction
 │   │   ├── query_builder.py  # Search query generation
 │   │   └── utils.py          # Core utilities
-│   ├── baselines/
-│   │   ├── factscore.py      # FactScore implementation
-│   │   ├── factverify.py     # FactVerify implementation
-│   │   └── veriscore.py      # VeriScore implementation
-│   └── eval/
-│       └── eval_dataset.py   # Dataset evaluation utilities
+│   └── baselines/
+│       ├── factscore.py      # FactScore implementation
+│       ├── factverify.py     # FactVerify implementation
+│       └── veriscore.py      # VeriScore implementation
+├── scripts/
+│   └── run_vllm.bsub         # LSF template (local vLLM + fact-reasoner)
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples

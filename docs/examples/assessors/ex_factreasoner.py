@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import argparse
 from pathlib import Path
 
@@ -83,19 +84,21 @@ pipeline = FactReasoner(
     merlin_path=merlin_path,
 )
 
-# Build the FactReasoner pipeline (FR2 version)
-pipeline.build(
-    query=query,
-    response=response,
-    topic=topic,
-    has_atoms=False,
-    has_contexts=False,
-    revise_atoms=True,
-    remove_duplicates=True,
-    summarize_contexts=True,
-    rel_atom_context=True,
-    rel_context_context=False,
-    use_fast_retriever=True,
+# Build the FactReasoner pipeline (FR2 version). FactReasoner.build is async.
+asyncio.run(
+    pipeline.build(
+        query=query,
+        response=response,
+        topic=topic,
+        has_atoms=False,
+        has_contexts=False,
+        revise_atoms=True,
+        remove_duplicates=True,
+        summarize_contexts=True,
+        rel_atom_context=True,
+        rel_context_context=False,
+        use_fast_retriever=True,
+    )
 )
 
 # Print the results
