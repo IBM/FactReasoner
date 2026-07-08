@@ -5,6 +5,7 @@ from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
 from .search_api import SearchAPI
+from .serving import VLLMServer
 from .utils import (
     extract_first_square_brackets,
     extract_last_square_brackets,
@@ -23,6 +24,7 @@ __all__ = [
     "FactGraph",
     "SearchAPI",
     "build_backend",
+    "VLLMServer",
     "extract_first_square_brackets",
     "extract_last_square_brackets",
     "extract_first_code_block",

@@ -1,0 +1,68 @@
+#!/bin/bash
+# ---------------------------------------------------------------------------
+# LSF job template: serve a local vLLM model and run a factuality assessor.
+#
+# One job, one GPU node: the job starts a vLLM server from local (or HF) weights,
+# waits for it to be ready, runs the selected factuality pipeline against
+# localhost, and tears the server down when the Python process exits.
+#
+# The assessor is chosen with --pipeline: 'factreasoner' (probabilistic, needs
+# Merlin) or a baseline ('factscore', 'veriscore', 'factverify').
+#
+# Copy this file, adjust the #BSUB directives (queue, GPUs, memory, walltime) and
+# the paths below, then submit with:  bsub < run_vllm.bsub
+# ---------------------------------------------------------------------------
+
+#BSUB -J factuality-vllm
+#BSUB -q <gpu-queue>                       # e.g. your cluster's GPU queue
+#BSUB -gpu "num=1:mode=exclusive_process"  # num GPUs; the utility derives
+                                           # --tensor-parallel-size from CUDA_VISIBLE_DEVICES.
+                                           # granite-4.1-8b fits on 1 A100/H100;
+                                           # bump num=2/4 for larger models.
+#BSUB -n 8                                 # CPU cores for data loading / retrieval
+#BSUB -R "rusage[mem=64G]"                 # host memory
+#BSUB -W 4:00                              # walltime (hh:mm)
+#BSUB -o factreasoner-vllm.%J.out
+#BSUB -e factreasoner-vllm.%J.err
+
+set -euo pipefail
+
+# --- Environment -----------------------------------------------------------
+# Activate the environment that has BOTH fact_reasoner and vllm installed, with
+# GPU drivers/CUDA available on the compute node. Use ONE of the following:
+#   source /path/to/venv/bin/activate
+#   conda activate <env>
+source /path/to/venv/bin/activate
+
+# Google Search retrieval (only needed for --service-type google):
+export SERPER_API_KEY="${SERPER_API_KEY:-<your-serper-key>}"
+
+# LSF sets CUDA_VISIBLE_DEVICES from the -gpu request; the utility reads it to
+# choose the tensor-parallel size automatically. Override with
+# --tensor-parallel-size if needed.
+
+# --- Paths (edit these) ----------------------------------------------------
+MODEL=/path/to/granite-4.1-8b        # local weights dir OR a HF repo id
+SERVED_MODEL=granite-4.1-8b          # served-model name (client model id)
+INPUT=/path/to/dataset.jsonl
+OUTPUT=/path/to/results
+MERLIN=/path/to/lib/merlin           # required for the factreasoner pipeline
+
+mkdir -p "$OUTPUT"
+
+# --- Run -------------------------------------------------------------------
+# The Python entrypoint owns the vLLM lifecycle (start -> wait ready -> run ->
+# stop). Run it from the repo root so `scripts/` is on the path, or adjust.
+#
+# To run a baseline assessor instead, set --pipeline to factscore/veriscore/
+# factverify and drop --merlin-path / --pipeline-version (factreasoner only).
+python scripts/run_vllm.py \
+    --model "$MODEL" \
+    --served-model "$SERVED_MODEL" \
+    --input-file "$INPUT" \
+    --output-dir "$OUTPUT" \
+    --pipeline factreasoner \
+    --pipeline-version v2 \
+    --service-type google \
+    --merlin-path "$MERLIN" \
+    --gpu-memory-utilization 0.90

@@ -15,14 +15,9 @@
 
 import json
 import asyncio
-import numpy as np
 import requests
 import tqdm
-import os
 import re
-import random
-import torch
-import transformers
 
 from typing import Awaitable, Callable, List, Union, Dict, Any
 
@@ -141,34 +136,6 @@ class dotdict(dict):
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
-
-
-# GPU related utils
-def get_freer_gpu():
-    os.system("nvidia-smi -q -d Memory |grep -A6 GPU|grep Free >tmp_smi")
-    memory_available = [
-        int(x.split()[2]) + 5 * i
-        for i, x in enumerate(open("tmp_smi", "r").readlines())
-    ]
-    os.remove("tmp_smi")
-    return np.argmax(memory_available)
-
-
-def select_freer_gpu():
-    freer_gpu = str(get_freer_gpu())
-    print("Will use GPU: %s" % (freer_gpu))
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "" + freer_gpu
-    return freer_gpu
-
-
-# Set the random seed globally
-def set_seed(seed: int):
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    transformers.set_seed(seed)
 
 
 # String manipulation utils

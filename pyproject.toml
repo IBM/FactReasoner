@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
-version = "0.5.9"
+version = "0.6.0"
 description = "Factuality Assessment for Foundation Models"
 authors = [
     {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
@@ -28,28 +28,34 @@ dependencies = [
     "langchain-huggingface",
     "langchain-text-splitters",
     "mellea (==0.6.0)",
-    "wikipedia",
     "networkx",
     "nltk",
-    "numpy (>=2.2.6)",
     "pandas (>=2.3.1)",
     "pypdf2",
-    "pyparsing (>=3.2.3)",
     "python-dotenv",
-    "pyyaml",
     "requests",
     "thefuzz",
-    "torch (==2.8.0)",
     "tqdm",
-    "transformers (>=4.56.0,<5.0)",
-    "wikipedia"
+    "wikipedia",
 ]
 
 [project.optional-dependencies]
+# RITS backends (IBM internal). See README for the mellea-ibm install source.
+rits = ["mellea-ibm"]
+# Local vLLM server path (GPU node). vLLM is invoked as an external process, not
+# imported, so this only needs to be installed where the server is launched.
+vllm = ["vllm"]
 dev = ["pytest", "ruff", "mypy", "build", "twine"]
 
 [project.urls]
 Source = "https://github.com/IBM/FactReasoner"
+
+# uv-specific: tells `uv lock`/`uv sync` where to find the IBM-internal
+# `mellea-ibm` package (the `rits` extra). This metadata is ignored by the built
+# wheel and by pip/PyPI consumers; it only affects uv-based resolution and
+# requires git-ssh access to github.ibm.com.
+[tool.uv.sources]
+mellea-ibm = { git = "ssh://git@github.ibm.com/generative-computing/mellea-ibm.git" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fact_reasoner"]

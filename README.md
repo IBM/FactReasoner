@@ -112,6 +112,15 @@ Traditional factuality methods (like FactScore) make independent binary decision
 uv pip install fact_reasoner
 ```
 
+The default install includes the **Ollama** backend (via `mellea`) and the
+Google / Wikipedia / ChromaDB retrievers. Backend-specific pieces are optional
+extras:
+
+```bash
+uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
+uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
+```
+
 ### From Source
 
 ```bash
@@ -122,10 +131,20 @@ uv sync
 ```
 
 ### Internal IBM Usage
-For internal access to IBM RITS backends, install `mellea-ibm` as follows:
+The `rits` extra depends on `mellea-ibm`, which is an IBM-internal package not
+published to PyPI. Install it from its git source (requires access):
 ```bash
 pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ```
+
+### Backend / extras matrix
+
+| Backend / feature | Install | Notes |
+|-------------------|---------|-------|
+| Ollama (local)    | default | Works out of the box via `mellea`. |
+| vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
+| vLLM local server | `[vllm]` on the GPU node | `vllm` is run as an external process (see `scripts/run_vllm.py`). |
+| RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 
 ### Dependencies
 
@@ -184,6 +203,32 @@ backend = build_backend(
 The example scripts under `docs/examples/` accept a `--backend {rits,ollama,vllm}`
 flag (with `--served-model` / `--base-url` for vLLM), and the evaluation driver
 `eval_dataset.py` accepts the same `--backend` selector.
+
+### Serving a local model on a GPU cluster (LSF)
+
+To run everything inside a single LSF job — start a local vLLM server from
+locally-available (or HuggingFace) weights, run a factuality assessor against
+it, then tear the server down — use `scripts/run_vllm.py` (and the
+`scripts/run_vllm.bsub` template):
+
+```bash
+python scripts/run_vllm.py \
+    --model /path/to/granite-4.1-8b \
+    --served-model granite-4.1-8b \
+    --input-file data/example.jsonl --output-dir results/ \
+    --pipeline factreasoner --merlin-path /path/to/merlin
+```
+
+The `--pipeline` flag selects the assessor: `factreasoner` (probabilistic; needs
+Merlin) or a baseline (`factscore`, `veriscore`, `factverify`) from
+`src/fact_reasoner/baselines` — baselines don't need `--merlin-path`.
+
+The server lifecycle is managed by `fact_reasoner.VLLMServer` (a context
+manager): it auto-detects the tensor-parallel size from `CUDA_VISIBLE_DEVICES`
+(which LSF sets from the `-gpu` request; A100 or H100), waits for readiness, and
+always cleans up. **The compute node's environment must have `vllm` installed
+and on `PATH`, with GPU drivers/CUDA available** — `vllm` is not a FactReasoner
+dependency and is invoked as an external process.
 
 ## Quick Start
 
