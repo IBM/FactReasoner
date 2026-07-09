@@ -15,6 +15,7 @@
 
 """Unit tests for fact_reasoner.core.summarizer module."""
 
+import math
 import pytest
 from unittest.mock import MagicMock, patch
 from fact_reasoner.core.summarizer import (
@@ -93,7 +94,6 @@ class TestContextSummarizerGetProbability:
                             "content": [
                                 {"token": "Test", "logprob": -0.5},
                                 {"token": "summary", "logprob": -0.3},
-                                {"token": "<eos>", "logprob": -0.1},  # EOS token
                             ]
                         }
                     }
@@ -102,8 +102,8 @@ class TestContextSummarizerGetProbability:
         }
 
         result = summarizer._get_probability(mock_output)
-        # exp((-0.5 + -0.3) / 2) = exp(-0.4) ≈ 0.67
-        assert 0 < result <= 1
+        # Averages all content tokens: exp((-0.5 + -0.3) / 2) = exp(-0.4) ≈ 0.67
+        assert result == pytest.approx(math.exp(-0.4))
 
     def test_get_probability_handles_empty(self):
         mock_backend = MagicMock()
@@ -117,9 +117,7 @@ class TestContextSummarizerGetProbability:
                 "choices": [
                     {
                         "logprobs": {
-                            "content": [
-                                {"token": "<eos>", "logprob": -0.1},  # Only EOS
-                            ]
+                            "content": [],  # no tokens
                         }
                     }
                 ]
@@ -127,7 +125,7 @@ class TestContextSummarizerGetProbability:
         }
 
         result = summarizer._get_probability(mock_output)
-        assert result == 0.0  # Infinite logprob returns 0
+        assert result == 0.0  # empty logprobs -> avg over 0 tokens -> 0.0
 
 
 class TestContextSummarizerRunBatch:

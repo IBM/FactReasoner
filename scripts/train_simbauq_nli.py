@@ -93,9 +93,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--model-id",
         default=None,
-        help="Model id / served-model name (optional; defaults to Granite 4 Micro).",
+        help="Model id / served-model name (optional; defaults to Granite 4 Micro). "
+        "With --backend rits and a custom --base-url, this is the raw RITS model "
+        "name (required in that case).",
     )
-    p.add_argument("--base-url", default=None, help="Base URL for the vllm backend.")
+    p.add_argument(
+        "--base-url",
+        default=None,
+        help="API endpoint. For --backend vllm: the server base URL (defaults to "
+        "VLLM_BASE_URL env or http://localhost:8000/v1). For --backend rits: a "
+        "custom RITS endpoint, in which case --model-id is the raw RITS model "
+        "name (RITS appends /v1; key from RITS_API_KEY).",
+    )
     p.add_argument(
         "--num-workers", type=int, default=4, help="Concurrent pair generations."
     )
@@ -106,7 +115,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Comma-separated temperatures (default: SIMBA-UQ default 0.3,0.5,0.7,1.0).",
     )
-    p.add_argument("--n-per-temp", type=int, default=4, help="Samples per temperature.")
+    p.add_argument("--n-per-temp", type=int, default=5, help="Samples per temperature.")
     p.add_argument(
         "--similarity-metric",
         default="rouge",
@@ -141,6 +150,12 @@ def main() -> None:
     if args.stage in ("generate", "all"):
         if not args.nli_data:
             raise SystemExit("--nli-data is required for --stage generate/all.")
+        # A custom RITS endpoint serves its own model, so it needs an explicit name.
+        if args.backend == "rits" and args.base_url and not args.model_id:
+            raise SystemExit(
+                "A custom RITS endpoint (--base-url) requires --model-id "
+                "(the RITS model name)."
+            )
         backend = build_backend(
             args.backend, model_id=args.model_id, base_url=args.base_url
         )
@@ -155,6 +170,7 @@ def main() -> None:
                 n_per_temp=args.n_per_temp,
                 similarity_metric=args.similarity_metric,
                 num_workers=args.num_workers,
+                progress=True,
             )
         )
 
@@ -166,6 +182,7 @@ def main() -> None:
             similarity_metric=args.similarity_metric,
             clf_max_depth=args.clf_max_depth,
             clf_random_state=args.clf_random_state,
+            progress=True,
         )
         save_classifier(clf, args.out, metadata)
 
@@ -177,6 +194,7 @@ def main() -> None:
             temperatures=temperatures,
             n_per_temp=args.n_per_temp,
             similarity_metric=args.similarity_metric,
+            progress=True,
         )
 
     print("[train] Done.")

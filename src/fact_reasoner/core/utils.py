@@ -350,6 +350,48 @@ def is_relevant_context(context: str) -> bool:
     return True
 
 
+def _reconcile_ctx_pair(r1: Relation, r2: Relation) -> Relation:
+    """Reconcile the two directional NLI relations of a context pair into one.
+
+    ``r1`` = NLI(c_i, c_j) and ``r2`` = NLI(c_j, c_i) for an unordered pair.
+    Reconciliation is by *meaning* first, so a confidently-neutral (or failed,
+    i.e. neutral@1.0) direction can never hide a real entailment/contradiction in
+    the other direction:
+
+    * both ``entailment``     -> mark the stronger one ``equivalence`` (symmetric;
+      orientation does not matter for the equivalence factor);
+    * exactly one non-neutral -> keep that non-neutral direction;
+    * both non-neutral        -> keep the higher-probability one (probabilities
+      are only compared here, between two already non-neutral relations);
+    * both ``neutral``        -> return the higher-probability neutral (the caller
+      filters neutrals out, so this is effectively "drop").
+
+    Note: for entailment/contradiction the returned relation's source/target
+    orientation is the kept direction's, which is load-bearing downstream.
+    """
+    t1, t2 = r1.get_type(), r2.get_type()
+    p1, p2 = r1.get_probability(), r2.get_probability()
+
+    if t1 == "entailment" and t2 == "entailment":
+        winner = r1 if p1 >= p2 else r2
+        winner.type = "equivalence"
+        return winner
+
+    r1_neutral = t1 == "neutral"
+    r2_neutral = t2 == "neutral"
+
+    # Exactly one non-neutral: always keep the non-neutral relation.
+    if r1_neutral and not r2_neutral:
+        return r2
+    if r2_neutral and not r1_neutral:
+        return r1
+
+    # Both non-neutral, or both neutral: keep the higher-probability one. When
+    # both are neutral the caller drops it; when both are non-neutral this is a
+    # same-status comparison (not neutral-vs-real), so probability is meaningful.
+    return r1 if p1 >= p2 else r2
+
+
 def build_relations(
     atoms: Dict[str, Atom] = {},
     contexts: Dict[str, Context] = {},
@@ -451,23 +493,14 @@ def build_relations(
             use_summary=use_summarized_contexts,
         )
 
+        # Reconcile each pair's two directions by meaning (so a high-probability
+        # neutral direction cannot hide a real entailment/contradiction in the
+        # other direction), then keep the non-neutral results.
         relations_tmp = [
-            (
-                pair[0]
-                if pair[0].get_probability() > pair[1].get_probability()
-                else pair[1]
-            )
-            for pair in zip(relations1, relations2)
+            _reconcile_ctx_pair(r1, r2) for r1, r2 in zip(relations1, relations2)
         ]
         assert len(relations_tmp) == len(relations1)  # safety checks
 
-        for rel_ind in range(len(relations_tmp)):
-            if not (
-                relations1[rel_ind].get_type() == "entailment"
-                and relations2[rel_ind].get_type() == "entailment"
-            ):
-                continue
-            relations_tmp[rel_ind].type = "equivalence"
         for rel in relations_tmp:
             if rel.get_type() != "neutral":
                 print(f"[NLI] Found relation: {rel}")

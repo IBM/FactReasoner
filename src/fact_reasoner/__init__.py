@@ -11,6 +11,7 @@ from .serving import VLLMServer
 from .utils import (
     extract_first_square_brackets,
     extract_last_square_brackets,
+    extract_nli_label_and_span,
     extract_first_code_block,
     extract_last_wrapped_response,
     strip_code_fences,
@@ -34,6 +35,7 @@ __all__ = [
     "resolve",
     "extract_first_square_brackets",
     "extract_last_square_brackets",
+    "extract_nli_label_and_span",
     "extract_first_code_block",
     "extract_last_wrapped_response",
     "strip_code_fences",

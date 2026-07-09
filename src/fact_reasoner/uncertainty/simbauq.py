@@ -133,7 +133,7 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
         self,
         *,
         temperatures: list[float] | None = None,
-        n_per_temp: int = 4,
+        n_per_temp: int = 5,
         similarity_metric: Literal[
             "rouge", "jaccard", "sbert", "difflib", "levenshtein"
         ] = "rouge",

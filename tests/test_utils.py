@@ -15,12 +15,15 @@
 
 """Unit tests for fact_reasoner.utils module."""
 
+import asyncio
+
 from fact_reasoner.utils import (
     dotdict,
     strip_string,
     join_segments,
     extract_first_square_brackets,
     extract_last_square_brackets,
+    extract_nli_label_and_span,
     extract_last_wrapped_response,
     extract_first_code_block,
     strip_code_fences,
@@ -29,6 +32,7 @@ from fact_reasoner.utils import (
     validate_markdown_code_block,
     punctuation_only_inside_quotes,
     batcher,
+    run_throttled,
 )
 
 
@@ -126,6 +130,67 @@ class TestExtractSquareBrackets:
     def test_extract_contradiction(self):
         text = "Based on the evidence, [contradiction]"
         assert extract_last_square_brackets(text) == "contradiction"
+
+
+class TestExtractNliLabelAndSpan:
+    """Tests for extract_nli_label_and_span (JSON + bracket auto-detection)."""
+
+    def test_plain_json(self):
+        label, span = extract_nli_label_and_span('{"label": "entailment"}')
+        assert label == "entailment"
+        assert '{"label": "entailment"}'[slice(*span)] == "entailment"
+
+    def test_json_case_normalized_span_preserves_original(self):
+        text = '{"label": "Contradiction"}'
+        label, span = extract_nli_label_and_span(text)
+        assert label == "contradiction"  # lower-cased label
+        assert text[slice(*span)] == "Contradiction"  # span over original value
+
+    def test_json_in_code_fence(self):
+        label, _ = extract_nli_label_and_span('```json\n{"label": "neutral"}\n```')
+        assert label == "neutral"
+
+    def test_json_with_extra_keys(self):
+        label, _ = extract_nli_label_and_span('{"reason": "supports", "label": "entailment"}')
+        assert label == "entailment"
+
+    def test_json_spacing(self):
+        label, _ = extract_nli_label_and_span('{ "label" : "neutral" }')
+        assert label == "neutral"
+
+    def test_json_last_object_wins(self):
+        label, _ = extract_nli_label_and_span(
+            '{"label":"neutral"} ... actually {"label":"entailment"}'
+        )
+        assert label == "entailment"
+
+    def test_json_preferred_over_preceding_bracket(self):
+        # A citation bracket earlier must not shadow the JSON verdict.
+        label, span = extract_nli_label_and_span('see [1]\n{"label": "contradiction"}')
+        assert label == "contradiction"
+        assert 'see [1]\n{"label": "contradiction"}'[slice(*span)] == "contradiction"
+
+    def test_bracket_fallback(self):
+        label, span = extract_nli_label_and_span("3. Final Answer:\n[entailment]")
+        assert label == "entailment"
+        assert "3. Final Answer:\n[entailment]"[slice(*span)] == "entailment"
+
+    def test_bracket_trailing_punctuation(self):
+        label, _ = extract_nli_label_and_span("[neutral.]")
+        assert label == "neutral"  # normalized like extract_last_square_brackets
+
+    def test_bare_word_fallback(self):
+        label, span = extract_nli_label_and_span("the final answer is contradiction")
+        assert label == "contradiction"
+        assert "the final answer is contradiction"[slice(*span)] == "contradiction"
+
+    def test_none_found(self):
+        label, span = extract_nli_label_and_span("I cannot decide")
+        assert label == ""
+        assert span is None
+
+    def test_empty(self):
+        assert extract_nli_label_and_span("") == ("", None)
 
 
 class TestExtractWrappedResponse:
@@ -322,3 +387,58 @@ class TestBatcher:
         items = [1, 2, 3]
         batches = list(batcher(items, batch_size=1))
         assert batches == [[1], [2], [3]]
+
+
+class TestRunThrottled:
+    """Tests for run_throttled (bounded-concurrency runner)."""
+
+    def test_results_positionally_aligned(self):
+        async def factory(item):
+            return item * 2
+
+        results = asyncio.run(run_throttled(factory, [1, 2, 3], max_concurrency=2))
+        assert results == [2, 4, 6]
+
+    def test_exception_captured_in_place(self):
+        async def factory(item):
+            if item == 2:
+                raise ValueError("boom")
+            return item
+
+        results = asyncio.run(run_throttled(factory, [1, 2, 3], max_concurrency=3))
+        assert results[0] == 1
+        assert isinstance(results[1], ValueError)
+        assert results[2] == 3
+
+    def test_on_progress_called_once_per_item(self):
+        calls = {"n": 0}
+
+        async def factory(item):
+            return item
+
+        def on_progress():
+            calls["n"] += 1
+
+        asyncio.run(
+            run_throttled(
+                factory, [1, 2, 3, 4], max_concurrency=2, on_progress=on_progress
+            )
+        )
+        assert calls["n"] == 4
+
+    def test_on_progress_fires_even_on_failure(self):
+        calls = {"n": 0}
+
+        async def factory(item):
+            raise RuntimeError("nope")
+
+        def on_progress():
+            calls["n"] += 1
+
+        results = asyncio.run(
+            run_throttled(
+                factory, [1, 2], max_concurrency=2, on_progress=on_progress
+            )
+        )
+        assert calls["n"] == 2  # progress advances for failures too
+        assert all(isinstance(r, RuntimeError) for r in results)

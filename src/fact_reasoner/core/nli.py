@@ -30,8 +30,8 @@ from mellea.core import MelleaLogger
 # Local imports
 from fact_reasoner.uncertainty import ProbabilisticClassifier, SIMBAUQSamplingStrategy
 from fact_reasoner.utils import (
-    extract_last_square_brackets,
     extract_logprobs_from_output,
+    extract_nli_label_and_span,
     run_throttled,
 )
 
@@ -54,6 +54,7 @@ Your final answer must be one of the following: entailment, contradiction or neu
 - [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS
 - [contradiction] if the PREMISE contradicts the HYPOTHESIS
 - [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other
+A JSON object of the form {"label": "entailment"}, {"label": "contradiction"} or {"label": "neutral"} is also an acceptable final answer.
 
 Use the following examples to better understand your task.
 
@@ -112,7 +113,7 @@ class NLIExtractor:
         nli_method: str = "logprobs",
         *,
         simbauq_temperatures: Optional[List[float]] = None,
-        simbauq_n_per_temp: int = 4,
+        simbauq_n_per_temp: int = 5,
         simbauq_similarity_metric: str = "rouge",
         simbauq_confidence_method: str = "aggregation",
         simbauq_aggregation: str = "mean",
@@ -120,6 +121,7 @@ class NLIExtractor:
         simbauq_classifier_path: Optional[str] = None,
         simbauq_training_samples: Optional[List[List[str]]] = None,
         simbauq_training_labels: Optional[List[List[int]]] = None,
+        show_progress: bool = False,
     ):
         """
         Initialize the NLIExtractor.
@@ -149,6 +151,9 @@ class NLIExtractor:
                 ``simbauq_classifier`` object > ``simbauq_classifier_path`` >
                 ``simbauq_training_samples``/``simbauq_training_labels`` >
                 the default "aggregation" method.
+            show_progress: bool
+                If True, ``run_batch`` shows a ``tqdm`` progress bar that
+                advances as each NLI relation is resolved. Default False.
         """
 
         # Safety checks
@@ -163,6 +168,7 @@ class NLIExtractor:
 
         self.method = nli_method
         self.backend = backend
+        self.show_progress = show_progress
         # Recorded for the preamble when a classifier is loaded from disk.
         self._classifier_path: Optional[str] = None
 
@@ -303,51 +309,69 @@ class NLIExtractor:
             return {"logprobs": True, "top_logprobs": 5}
         return None
 
+    # Confidence used when the label tokens cannot be located in the logprobs
+    # (empty logprobs, no ``[...]`` span, or no overlapping tokens). 0.5 signals
+    # "unknown confidence"; returning 0.0 would be read downstream as a
+    # degenerate/impossible relation for a label the model actually generated.
+    _UNKNOWN_PROBABILITY = 0.5
+
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
-        Compute the average log probability of the generated tokens.
+        Estimate the probability of the predicted NLI label from token logprobs.
+
+        Aligns the token-level logprobs to the **same** label span that
+        ``_get_label`` extracts — the JSON ``"label": "<value>"`` value for JSON
+        output, or the ``[...]`` interior for bracket output (see
+        ``extract_nli_label_and_span``) — then returns the per-token geometric
+        mean probability (``exp(mean(logprob))``) of the tokens covering that
+        span.
+
+        This is robust to subword tokenization: it does not require standalone
+        delimiter tokens (``"["`` / ``"]"`` / ``'"'`` are frequently fused into
+        subwords), and it measures exactly the label the label path reports, so
+        the two can never disagree.
 
         Args:
             output: ModelOutputThunk
                 The model raw output (via Mellea).
 
         Returns:
-            float: The average log probability of the generated tokens.
+            float: The label probability in ``(0, 1]``, or ``0.5`` when the label
+            tokens cannot be located (see ``_UNKNOWN_PROBABILITY``).
         """
         logprobs = extract_logprobs_from_output(output)
+        if not logprobs:
+            print("[NLI] No logprobs available; using default label probability.")
+            return self._UNKNOWN_PROBABILITY
 
-        # OpenAI-compatible backends return string tokens (e.g. "[", "]").
-        # The native Bedrock InvokeModel API returns numeric token IDs as
-        # strings (e.g. "58"). Detect which format we have.
-        has_string_tokens = any(item["token"] in ("[", "]") for item in logprobs)
+        # Reconstruct the decoded text from the token strings, tracking each
+        # token's [start, end) character offset in that reconstruction.
+        spans = []  # (start, end, logprob) per token
+        pos = 0
+        for item in logprobs:
+            tok = str(item["token"])
+            spans.append((pos, pos + len(tok), item["logprob"]))
+            pos += len(tok)
+        text = "".join(str(item["token"]) for item in logprobs)
 
-        avg_logprob = 0
-        count = 0
+        # Locate the label text span (JSON value or bracket interior) — the same
+        # span the label extraction uses.
+        _, span = extract_nli_label_and_span(text)
+        if span is None:
+            print("[NLI] No label span in logprobs; using default probability.")
+            return self._UNKNOWN_PROBABILITY
+        span_start, span_end = span
 
-        if has_string_tokens:
-            # Original logic: walk backwards, collect logprobs of tokens
-            # between the last ']' and the matching '['.
-            for item in reversed(logprobs):
-                if item["token"] == "[":
-                    break
-                elif item["token"] == "]":
-                    continue
-                else:
-                    avg_logprob += item["logprob"]
-                    count += 1
-        else:
-            # Bedrock native: numeric token IDs — can't identify '['/']'
-            # without the tokenizer. Proxy confidence via the last few
-            # tokens, which correspond to the label at end of generation
-            # (e.g. "[entailment]" tokenises to ~4 tokens).
-            label_window = logprobs[-5:] if len(logprobs) >= 5 else logprobs
-            for item in label_window:
-                avg_logprob += item["logprob"]
-                count += 1
+        # Average the logprobs of every token overlapping the label span.
+        label_logprobs = [
+            lp for (t0, t1, lp) in spans if t1 > span_start and t0 < span_end
+        ]
+        if not label_logprobs:
+            print("[NLI] Could not align label tokens; using default probability.")
+            return self._UNKNOWN_PROBABILITY
 
-        # Compute the probability
-        avg_logprob = avg_logprob / count if count > 0 else math.inf
-        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
+        avg_logprob = sum(label_logprobs) / len(label_logprobs)
+        return math.exp(avg_logprob)
 
     @staticmethod
     def _get_simbauq_confidence(output: ModelOutputThunk) -> Optional[float]:
@@ -374,6 +398,11 @@ class NLIExtractor:
         """
         Extract the NLI label from the model output.
 
+        Auto-detects both supported output formats: a JSON verdict
+        ``{"label": "..."}`` and a bracketed label ``[...]`` (see
+        ``extract_nli_label_and_span``). The label is lower-cased so matching in
+        ``_parse_output`` is case-insensitive.
+
         Args:
             output: ModelOutputThunk
                 The model raw output (via Mellea)
@@ -381,10 +410,8 @@ class NLIExtractor:
         Returns:
             str: The string representing the NLI label (entailment, contradiction, neutral).
         """
-
-        # Normalize to lowercase so label matching in _parse_output is
-        # case-insensitive (the LLM may emit e.g. "[Entailment]").
-        return extract_last_square_brackets(str(output)).lower()
+        label, _ = extract_nli_label_and_span(str(output))
+        return label
 
     def run(self, premise: str, hypothesis: str) -> Dict[str, Any]:
         """
@@ -411,9 +438,10 @@ class NLIExtractor:
                 backend=self.backend,
                 requirements=[
                     check(
-                        "The output must be a wrapped in square brackets",
+                        "The output must contain an NLI label, either as a JSON "
+                        'object {"label": "..."} or wrapped in square brackets.',
                         validation_fn=simple_validate(
-                            lambda s: extract_last_square_brackets(s) != ""
+                            lambda s: extract_nli_label_and_span(s)[0] != ""
                         ),
                     )
                 ],
@@ -490,9 +518,10 @@ class NLIExtractor:
                 backend=self.backend,
                 requirements=[
                     check(
-                        "The output must be a wrapped in square brackets",
+                        "The output must contain an NLI label, either as a JSON "
+                        'object {"label": "..."} or wrapped in square brackets.',
                         validation_fn=simple_validate(
-                            lambda s: extract_last_square_brackets(s) != ""
+                            lambda s: extract_nli_label_and_span(s)[0] != ""
                         ),
                     )
                 ],
@@ -504,7 +533,21 @@ class NLIExtractor:
 
         pairs = list(zip(premises, hypotheses))
         print(f"[NLI] Running throttled batch of {len(pairs)} requests ...")
-        outputs = await run_throttled(factory, pairs)
+
+        # Optional progress bar, advanced from run_throttled's per-completion
+        # callback so it ticks as each relation is resolved (not all at once).
+        bar = None
+        on_progress = None
+        if self.show_progress and pairs:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(pairs), desc="NLI relations", unit="rel")
+            on_progress = bar.update  # update() advances by 1 when called with no args
+        try:
+            outputs = await run_throttled(factory, pairs, on_progress=on_progress)
+        finally:
+            if bar is not None:
+                bar.close()
 
         # Results are positionally aligned with the input pairs; failures map to
         # a neutral relationship so callers can index result[i].

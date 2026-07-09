@@ -19,7 +19,7 @@ import requests
 import tqdm
 import re
 
-from typing import Awaitable, Callable, List, Union, Dict, Any
+from typing import Awaitable, Callable, List, Optional, Tuple, Union, Dict, Any
 
 
 LOOP_BUDGET = 5
@@ -90,6 +90,7 @@ async def run_throttled(
     *,
     max_concurrency: int = MAX_CONCURRENT_REQUESTS,
     rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+    on_progress: Optional[Callable[[], None]] = None,
 ) -> List[Any]:
     """Run one coroutine per item with bounded concurrency and rate limiting.
 
@@ -108,6 +109,11 @@ async def run_throttled(
             Maximum number of coroutines running at any given time.
         rate_per_minute: int
             Maximum number of coroutines started per minute.
+        on_progress: Optional[Callable[[], None]]
+            If given, called once (with no arguments) each time an item's
+            coroutine completes — succeeds or fails. Fires in completion order,
+            not input order, so it is suitable for driving a progress bar. Must
+            not block.
 
     Returns:
         List[Any]: Results positionally aligned with ``items``. For any item
@@ -124,6 +130,9 @@ async def run_throttled(
                 return await factory(item)
             except Exception as e:  # capture, so sibling requests are not dropped
                 return e
+            finally:
+                if on_progress is not None:
+                    on_progress()
 
     tasks = [asyncio.create_task(_one(item)) for item in items]
     # _one never raises, so gather returns one result per item in order.
@@ -209,6 +218,70 @@ def extract_last_square_brackets(input_string: str) -> str:
     return ""
 
 
+# Matches a JSON-style NLI verdict `"label": "<value>"` (tolerant of surrounding
+# prose, code fences and extra keys). Group 1 is the label value.
+_NLI_JSON_LABEL_RE = re.compile(r'"label"\s*:\s*"([^"]+)"')
+
+
+def extract_nli_label_and_span(
+    input_string: str,
+) -> Tuple[str, Optional[Tuple[int, int]]]:
+    """Extract the NLI label and the character span of the label text.
+
+    Auto-detects two output formats, in priority order:
+
+    1. **JSON** — a ``{"label": "<value>"}`` object (or a bare ``"label": "..."``
+       pair), tolerant of code fences, surrounding prose and extra keys. The last
+       occurrence wins. The returned span covers the ``<value>`` text.
+    2. **Brackets** — the last ``[...]`` pair (matching
+       :func:`extract_last_square_brackets`). The span covers the bracket
+       *interior*.
+    3. **Bare word** — a bare ``neutral``/``entailment``/``contradiction`` word
+       (last occurrence). The span covers that word.
+
+    The span lets callers (e.g. the NLI logprobs probability) align token-level
+    logprobs to exactly the label text this function reports, so the label and
+    its probability can never disagree.
+
+    Args:
+        input_string: The raw model output text.
+
+    Returns:
+        ``(label, span)`` where ``label`` is lower-cased and stripped (``""`` if
+        none found), and ``span`` is a ``(start, end)`` char range into
+        ``input_string`` for the label text (``None`` if no label found).
+    """
+    # 1. JSON: {"label": "..."} — last match wins.
+    json_matches = list(_NLI_JSON_LABEL_RE.finditer(input_string))
+    if json_matches:
+        m = json_matches[-1]
+        return m.group(1).strip().lower(), m.span(1)
+
+    # 2. Brackets: last [...] pair; span is the interior.
+    bracket_matches = list(re.finditer(r"\[.*?\]", input_string, flags=re.DOTALL))
+    if bracket_matches:
+        m = bracket_matches[-1]
+        start, end = m.span()
+        interior = input_string[start + 1 : end - 1]
+        # Mirror extract_last_square_brackets normalization for the label text.
+        label = interior.strip().rstrip(".!?").strip()
+        return label.lower(), (start + 1, end - 1)
+
+    # 3. Bare NLI label word — last occurrence.
+    word_matches = list(
+        re.finditer(
+            r"\b(neutral|entailment|contradiction)\b",
+            input_string,
+            flags=re.IGNORECASE,
+        )
+    )
+    if word_matches:
+        m = word_matches[-1]
+        return m.group(1).lower(), m.span(1)
+
+    return "", None
+
+
 def extract_last_wrapped_response(input_string: str) -> str:
     """Extracts the contents of the LAST string between pairs of ###."""
     raw_result = re.findall(r"###.*?###", input_string, flags=re.DOTALL)
@@ -232,13 +305,23 @@ def extract_first_code_block(input_string: str, ignore_language: bool = False) -
 
 def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
     """
-    Extract the log probabilities from the output metadata and compute the average log probability.
+    Extract the per-token log probabilities from the output metadata.
+
+    Returns the backend's token-level logprobs as a list of ``{"token", "logprob"}``
+    entries, normalized across the OpenAI / litellm / Bedrock response shapes.
+
+    Note: no tokens are dropped. Earlier versions stripped the last entry as an
+    "EOS" token, but OpenAI/vLLM ``content`` logprob arrays contain only emitted
+    content tokens (the stop is signaled by ``finish_reason``, not an extra
+    element), so blindly dropping the last entry deleted a real content token —
+    for NLI that was the token closing the ``[label]`` whose confidence is being
+    measured. Callers that want to ignore a trailing token must do so explicitly.
 
     Args:
         output: The output object containing the metadata with log probabilities.
 
     Returns:
-        A list of log probabilities extracted from the output.
+        A list of per-token logprob entries extracted from the output.
     """
 
     # handle different logprobs formats across backends
@@ -285,7 +368,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
             raise ValueError(
                 "Unable to extract logprobs: logprobs is not a recognized format (one of: list, dict with 'content' key) and litellm is not installed to validate possible litellm.types.utils.ChoiceLogprobs format. Check backend response format."
             )
-    return logprobs_object[:-1]  # drop last token (EOS)
+    return logprobs_object
 
 
 def batcher(iterator, batch_size=4, progress=False):

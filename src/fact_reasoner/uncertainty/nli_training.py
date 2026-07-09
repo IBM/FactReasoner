@@ -54,7 +54,7 @@ from fact_reasoner.uncertainty.simbauq import (
     ProbabilisticClassifier,
     SIMBAUQSamplingStrategy,
 )
-from fact_reasoner.utils import extract_last_square_brackets, run_throttled
+from fact_reasoner.utils import extract_nli_label_and_span, run_throttled
 
 # The NLI labels the classifier's correctness signal is defined over.
 NLI_LABELS = ("entailment", "contradiction", "neutral")
@@ -64,10 +64,12 @@ def _sample_label(sample_text: str) -> str:
     """Extract the NLI label from a single generated sample.
 
     Uses the same primitive the NLIExtractor uses at inference
-    (``extract_last_square_brackets``, lower-cased) so the correctness signal is
-    defined identically.
+    (``extract_nli_label_and_span``, lower-cased), so the correctness signal is
+    defined identically and handles both the JSON (``{"label": "..."}``) and
+    bracket (``[...]``) output formats.
     """
-    return extract_last_square_brackets(str(sample_text)).lower()
+    label, _ = extract_nli_label_and_span(str(sample_text))
+    return label
 
 
 def load_nli_pairs(
@@ -170,9 +172,10 @@ async def generate_training_samples(
     out_path: str,
     *,
     temperatures: Optional[List[float]] = None,
-    n_per_temp: int = 4,
+    n_per_temp: int = 5,
     similarity_metric: str = "rouge",
     num_workers: int = 4,
+    progress: bool = False,
 ) -> Dict[str, int]:
     """Generate SIMBA-UQ sample groups for each NLI pair and write them to JSONL.
 
@@ -196,6 +199,8 @@ async def generate_training_samples(
         similarity_metric: Recorded for provenance; does not affect generation
             (similarity is only computed at fit/inference time).
         num_workers: Max concurrent pair generations.
+        progress: If True, show a ``tqdm`` progress bar that advances as each
+            pair's generation completes.
 
     Returns:
         A summary dict: ``{"written", "skipped_existing", "dropped_incomplete"}``.
@@ -232,7 +237,22 @@ async def generate_training_samples(
         f"[nli-training] Generating samples for {len(todo)} pairs "
         f"({skipped_existing} already done); N={expected_n} samples/pair ..."
     )
-    results = await run_throttled(factory, todo, max_concurrency=num_workers)
+    # Drive a progress bar from run_throttled's per-completion callback so the
+    # bar advances as generations finish (not all at once at the end).
+    bar = None
+    on_progress = None
+    if progress and todo:
+        from tqdm import tqdm
+
+        bar = tqdm(total=len(todo), desc="Generating", unit="pair")
+        on_progress = bar.update  # tqdm.update() advances by 1 when called with no args
+    try:
+        results = await run_throttled(
+            factory, todo, max_concurrency=num_workers, on_progress=on_progress
+        )
+    finally:
+        if bar is not None:
+            bar.close()
 
     written = 0
     dropped_incomplete = 0
@@ -286,6 +306,51 @@ def _read_groups(samples_path: str) -> Tuple[List[List[str]], List[List[int]]]:
     return training_samples, training_labels
 
 
+def _fit_classifier(
+    strategy: SIMBAUQSamplingStrategy,
+    training_samples: List[List[str]],
+    training_labels: List[List[int]],
+    *,
+    progress: bool = False,
+) -> ProbabilisticClassifier:
+    """Fit a random forest on per-group similarity features.
+
+    Mirrors :meth:`SIMBAUQSamplingStrategy._train_classifier` exactly (same
+    ``_compute_similarity_matrix`` / ``_extract_features``), but iterates the
+    groups here so an optional ``tqdm`` progress bar can wrap the compute-heavy
+    similarity-matrix step.
+    """
+    try:
+        from sklearn.ensemble import (
+            RandomForestClassifier,  # type: ignore[import-not-found]
+        )
+    except ImportError:
+        raise ImportError(
+            "scikit-learn is required to train the classifier. Install with extra "
+            "dependencies: `pip install fact_reasoner[simbauq]`."
+        )
+
+    groups = list(zip(training_samples, training_labels))
+    if progress:
+        from tqdm import tqdm
+
+        groups = tqdm(groups, desc="Extracting features", unit="group")
+
+    x_train: List["np.ndarray"] = []
+    y_train: List[int] = []
+    for samples, labels in groups:
+        sim_matrix = strategy._compute_similarity_matrix(samples)
+        for i, label in enumerate(labels):
+            x_train.append(strategy._extract_features(sim_matrix, i))
+            y_train.append(label)
+
+    clf = RandomForestClassifier(
+        max_depth=strategy.clf_max_depth, random_state=strategy.clf_random_state
+    )
+    clf.fit(x_train, y_train)
+    return clf
+
+
 def train_classifier_from_jsonl(
     samples_path: str,
     *,
@@ -294,11 +359,13 @@ def train_classifier_from_jsonl(
     similarity_metric: str = "rouge",
     clf_max_depth: int = 4,
     clf_random_state: Optional[int] = 0,
+    progress: bool = False,
 ) -> Tuple[ProbabilisticClassifier, Dict[str, Any]]:
     """Train a SIMBA-UQ classifier from a generated samples JSONL.
 
-    Reuses :meth:`SIMBAUQSamplingStrategy._train_classifier` so feature extraction
-    is identical to what the strategy does at inference time.
+    Uses the same feature extraction the strategy applies at inference time
+    (:meth:`SIMBAUQSamplingStrategy._compute_similarity_matrix` /
+    ``_extract_features``), so the classifier sees identical features.
 
     Args:
         samples_path: JSONL produced by :func:`generate_training_samples`.
@@ -307,6 +374,8 @@ def train_classifier_from_jsonl(
         similarity_metric: Similarity metric to compute features with. Should
             match what will be used at inference.
         clf_max_depth, clf_random_state: Random-forest hyper-parameters.
+        progress: If True, show a ``tqdm`` bar over per-group feature extraction
+            (the compute-heavy part, especially for the ``sbert`` metric).
 
     Returns:
         A tuple ``(classifier, metadata)`` where ``metadata`` records the config
@@ -337,7 +406,9 @@ def train_classifier_from_jsonl(
                 "(len(temperatures) * n_per_temp). Regenerate with matching config."
             )
 
-    clf = strategy._train_classifier(training_samples, training_labels)
+    clf = _fit_classifier(
+        strategy, training_samples, training_labels, progress=progress
+    )
     metadata = {
         "temperatures": list(strategy.temperatures),
         "n_per_temp": strategy.n_per_temp,
@@ -400,6 +471,7 @@ def evaluate_classifier(
     temperatures: Optional[List[float]] = None,
     n_per_temp: int = 4,
     similarity_metric: str = "rouge",
+    progress: bool = False,
 ) -> Dict[str, float]:
     """Compare classifier vs. aggregation *sample-selection* accuracy on held-out data.
 
@@ -415,6 +487,7 @@ def evaluate_classifier(
             ``val_balanced.json``).
         temperatures, n_per_temp, similarity_metric: Must match how features were
             computed at training time.
+        progress: If True, show a ``tqdm`` bar over the per-group evaluation.
 
     Returns:
         ``{"classifier_selection_acc", "aggregation_selection_acc", "n_groups"}``.
@@ -429,10 +502,16 @@ def evaluate_classifier(
     )
     training_samples, training_labels = _read_groups(samples_path)
 
+    groups = list(zip(training_samples, training_labels))
+    if progress:
+        from tqdm import tqdm
+
+        groups = tqdm(groups, desc="Evaluating", unit="group")
+
     clf_hits = 0
     agg_hits = 0
     n = 0
-    for samples, labels in zip(training_samples, training_labels):
+    for samples, labels in groups:
         if len(samples) < 2:
             continue
         sim = strategy._compute_similarity_matrix(samples)

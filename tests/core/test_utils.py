@@ -25,6 +25,7 @@ from fact_reasoner.core.utils import (
     remove_duplicated_atoms,
     remove_duplicated_contexts,
     is_relevant_context,
+    _reconcile_ctx_pair,
 )
 
 
@@ -368,3 +369,73 @@ class TestIsRelevantContext:
     def test_irrelevant_atom_statement(self):
         context = "The atom statement cannot be verified."
         assert is_relevant_context(context) is False
+
+
+class TestReconcileCtxPair:
+    """Tests for _reconcile_ctx_pair (context-context direction reconciliation)."""
+
+    @staticmethod
+    def _ctx(cid):
+        return Context(id=cid, atom=None, text=f"text-{cid}", title="t", link="l", snippet="s")
+
+    def _rel(self, ci, cj, typ, prob):
+        return Relation(
+            source=ci, target=cj, type=typ, probability=prob, link="context_context"
+        )
+
+    def test_neutral_does_not_hide_entailment(self):
+        # Regression: a high-probability neutral in one direction must NOT hide a
+        # genuine entailment in the other (previously the entailment was dropped).
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 0.99)
+        r2 = self._rel(cj, ci, "entailment", 0.60)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "entailment"
+        assert out.get_probability() == pytest.approx(0.60)
+        # Orientation is the kept (entailment) direction.
+        assert out.source.id == "c1" and out.target.id == "c0"
+
+    def test_failed_call_neutral_one_does_not_hide_contradiction(self):
+        # A failed NLI call maps to neutral@1.0; it must not delete a real
+        # contradiction found in the other direction.
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 1.0)
+        r2 = self._rel(cj, ci, "contradiction", 0.70)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "contradiction"
+        assert out.get_probability() == pytest.approx(0.70)
+
+    def test_both_entailment_becomes_equivalence(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.80)
+        r2 = self._rel(cj, ci, "entailment", 0.90)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "equivalence"
+        # Keeps the stronger direction's probability.
+        assert out.get_probability() == pytest.approx(0.90)
+
+    def test_both_neutral_stays_neutral(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 0.60)
+        r2 = self._rel(cj, ci, "neutral", 0.70)
+        out = _reconcile_ctx_pair(r1, r2)
+        # Caller drops neutrals; here we just confirm it stays neutral.
+        assert out.get_type() == "neutral"
+
+    def test_both_non_neutral_keeps_higher_probability(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.60)
+        r2 = self._rel(cj, ci, "contradiction", 0.90)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "contradiction"
+        assert out.get_probability() == pytest.approx(0.90)
+
+    def test_one_non_neutral_kept_regardless_of_probability(self):
+        # Even if the neutral direction has a lower probability, the non-neutral
+        # one is kept (meaning-first, not probability-first).
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.30)
+        r2 = self._rel(cj, ci, "neutral", 0.10)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "entailment"
+        assert out.get_probability() == pytest.approx(0.30)

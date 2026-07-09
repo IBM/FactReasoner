@@ -16,6 +16,7 @@
 """Unit tests for fact_reasoner.core.nli module."""
 
 import asyncio
+import math
 import pytest
 from unittest.mock import MagicMock, patch
 from fact_reasoner.core.nli import NLIExtractor, INSTRUCTION_NLI
@@ -77,6 +78,18 @@ class TestNLIExtractorInit:
 
         with pytest.raises(ValueError, match="Unknown nli_method"):
             NLIExtractor(backend=mock_backend, nli_method="bogus")
+
+    def test_show_progress_defaults_false(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(backend=mock_backend)
+        assert nli.show_progress is False
+
+    def test_show_progress_stored(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(backend=mock_backend, show_progress=True)
+        assert nli.show_progress is True
 
 
 class TestNLIExtractorClassifierPath:
@@ -260,68 +273,144 @@ class TestNLIExtractorGetLabel:
         result = nli._get_label(mock_output)
         assert result == "entailment"  # Should get the last one
 
+    def test_get_label_json(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(backend=mock_backend)
+
+        mock_output = MagicMock()
+        mock_output.__str__ = lambda self: '{"label": "contradiction"}'
+        assert nli._get_label(mock_output) == "contradiction"
+
+    def test_get_label_json_in_prose(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(backend=mock_backend)
+
+        mock_output = MagicMock()
+        mock_output.__str__ = lambda self: 'After reasoning:\n{"label": "Entailment"}'
+        assert nli._get_label(mock_output) == "entailment"  # lower-cased
+
 
 class TestNLIExtractorGetProbability:
-    """Tests for NLIExtractor._get_probability method."""
+    """Tests for NLIExtractor._get_probability (token-span alignment)."""
 
-    def test_get_probability_computes_exp_avg_logprob(self):
-        mock_backend = MagicMock()
-        mock_backend.model_id = "test-model"
+    @staticmethod
+    def _output(content):
+        """Wrap a list of {token, logprob} as a mellea OpenAI-style output.
 
-        nli = NLIExtractor(backend=mock_backend)
+        Real OpenAI/vLLM ``content`` logprob arrays contain only emitted content
+        tokens (no trailing EOS element), so these fixtures do not add one.
+        """
+        out = MagicMock()
+        out._meta = {"oai_chat_response": {"choices": [{"logprobs": {"content": content}}]}}
+        return out
 
-        # Mirrors the real OpenAI backend shape: mellea stores
-        # ChatCompletion.model_dump() under "oai_chat_response", so logprobs
-        # live at oai_chat_response["choices"][0]["logprobs"]["content"].
-        mock_output = MagicMock()
-        mock_output._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {"token": "[", "logprob": -0.1},
-                                {"token": "ent", "logprob": -0.5},
-                                {"token": "ail", "logprob": -0.3},
-                                {"token": "]", "logprob": -0.1},
-                                {"token": "<eos>", "logprob": -0.1},  # EOS token
-                            ]
-                        }
-                    }
-                ]
-            }
-        }
+    def _prob(self, content):
+        nli = NLIExtractor(backend=self._backend())
+        return nli._get_probability(self._output(content))
 
-        result = nli._get_probability(mock_output)
-        # Result should be exp of average logprob for tokens between [ and ]
-        assert 0 < result <= 1
+    @staticmethod
+    def _backend():
+        b = MagicMock()
+        b.model_id = "test-model"
+        return b
 
-    def test_get_probability_handles_empty_logprobs(self):
-        mock_backend = MagicMock()
-        mock_backend.model_id = "test-model"
+    def test_standalone_brackets(self):
+        # exp(mean) over the tokens covering the label INTERIOR ("entail"); the
+        # standalone bracket tokens fall outside the interior span.
+        content = [
+            {"token": "[", "logprob": -0.1},
+            {"token": "ent", "logprob": -0.5},
+            {"token": "ail", "logprob": -0.3},
+            {"token": "]", "logprob": -0.1},
+        ]
+        expected = math.exp((-0.5 - 0.3) / 2)
+        assert self._prob(content) == pytest.approx(expected)
 
-        nli = NLIExtractor(backend=mock_backend)
+    def test_fused_whole_label_token_no_eos(self):
+        # The whole "[neutral]" is one fused token — the old bracket-walk broke
+        # here (and the [:-1] EOS drop would have deleted it). Now robust.
+        content = [
+            {"token": "Final", "logprob": -0.1},
+            {"token": " [neutral]", "logprob": -0.02},
+        ]
+        # Only the fused label token overlaps the span.
+        assert self._prob(content) == pytest.approx(math.exp(-0.02))
 
-        mock_output = MagicMock()
-        mock_output._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {"token": "[", "logprob": -0.1},
-                                {"token": "]", "logprob": -0.1},
-                                {"token": "<eos>", "logprob": -0.1},
-                            ]
-                        }
-                    }
-                ]
-            }
-        }
+    def test_last_span_wins_over_citation(self):
+        # A citation "[1]" earlier in the reasoning must not be picked; the LAST
+        # [...] label interior is measured (just the "contradiction" token).
+        content = [
+            {"token": "see [1] ", "logprob": -0.3},
+            {"token": "[", "logprob": -0.2},
+            {"token": "contradiction", "logprob": -0.03},
+            {"token": "]", "logprob": -0.01},
+        ]
+        assert self._prob(content) == pytest.approx(math.exp(-0.03))
 
-        result = nli._get_probability(mock_output)
-        # When count is 0, should return 0.0
-        assert result == 0.0
+    def test_trailing_text_after_label(self):
+        content = [
+            {"token": "[neutral]", "logprob": -0.02},
+            {"token": " is my final answer", "logprob": -0.5},
+        ]
+        assert self._prob(content) == pytest.approx(math.exp(-0.02))
+
+    def test_close_bracket_last_token_not_dropped(self):
+        # Regression: previously extract_logprobs did [:-1] and this confident
+        # label collapsed to probability 0.0. Now it is a real value. The label
+        # interior ("neutral") lives entirely in the fused "neutral]" token.
+        content = [
+            {"token": "[", "logprob": -0.2},
+            {"token": "neutral]", "logprob": -0.03},
+        ]
+        result = self._prob(content)
+        assert result > 0.0
+        assert result == pytest.approx(math.exp(-0.03))
+
+    def test_bare_word_label_probability(self):
+        # No brackets/JSON: the bare NLI word is located (matching _get_label's
+        # bare-word fallback), so the probability is a real value, not 0.5.
+        content = [{"token": "entailment", "logprob": -0.1}]
+        assert self._prob(content) == pytest.approx(math.exp(-0.1))
+
+    def test_no_label_span_returns_unknown_default(self):
+        # No JSON / bracket / bare-word label at all -> conservative 0.5.
+        content = [{"token": "undecided", "logprob": -0.1}]
+        assert self._prob(content) == NLIExtractor._UNKNOWN_PROBABILITY
+
+    def test_empty_logprobs_returns_unknown_default(self):
+        assert self._prob([]) == NLIExtractor._UNKNOWN_PROBABILITY
+
+    def test_probability_in_unit_interval(self):
+        content = [
+            {"token": "[", "logprob": -0.1},
+            {"token": "entailment", "logprob": -0.5},
+            {"token": "]", "logprob": -0.1},
+        ]
+        result = self._prob(content)
+        assert 0.0 < result <= 1.0
+
+    def test_json_probability_over_value_tokens(self):
+        # For JSON output the probability must be measured over the label VALUE
+        # tokens ("entail","ment"), not the JSON boilerplate.
+        content = [
+            {"token": '{"label": "', "logprob": -0.01},
+            {"token": "entail", "logprob": -0.05},
+            {"token": "ment", "logprob": -0.03},
+            {"token": '"}', "logprob": -0.01},
+        ]
+        expected = math.exp((-0.05 - 0.03) / 2)
+        assert self._prob(content) == pytest.approx(expected)
+
+    def test_json_fenced_whole_object_token(self):
+        # Whole JSON object as one fused token overlaps the value span.
+        content = [
+            {"token": "```json\n", "logprob": -0.01},
+            {"token": '{"label": "neutral"}', "logprob": -0.04},
+            {"token": "\n```", "logprob": -0.01},
+        ]
+        assert self._prob(content) == pytest.approx(math.exp(-0.04))
 
 
 class TestNLIExtractorRun:
@@ -366,6 +455,43 @@ class TestNLIExtractorRun:
             assert "label" in result
             assert "probability" in result
             assert result["label"] == "entailment"
+
+    def test_run_json_output(self):
+        # A JSON verdict must parse to the right label and a probability over the
+        # label value tokens.
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        mock_result = MagicMock()
+        mock_result.__str__ = lambda self: '{"label": "contradiction"}'
+        mock_result._meta = {
+            "oai_chat_response": {
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [
+                                {"token": '{"label": "', "logprob": -0.01},
+                                {"token": "contradiction", "logprob": -0.05},
+                                {"token": '"}', "logprob": -0.01},
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+
+        mock_output = MagicMock()
+        mock_output.success = True
+        mock_output.result = mock_result
+
+        with patch(
+            "src.fact_reasoner.core.nli.mfuncs.instruct", return_value=mock_output
+        ):
+            nli = NLIExtractor(backend=mock_backend)
+            result = nli.run(premise="p", hypothesis="h")
+
+        assert result["label"] == "contradiction"
+        assert result["probability"] == pytest.approx(math.exp(-0.05))
 
     def test_run_returns_neutral_on_failure(self):
         mock_backend = MagicMock()
@@ -455,6 +581,58 @@ class TestNLIExtractorRunBatch:
         assert results[0]["label"] == "entailment"
         assert results[1] == {"label": "neutral", "probability": 1.0}
         assert results[2]["label"] == "entailment"
+
+    def test_run_batch_progress_bar_updates_per_pair(self):
+        """With show_progress=True the tqdm bar advances once per pair."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        async def fake_ainstruct(*args, **kwargs):
+            return self._mk_output(True)
+
+        bar = MagicMock()
+        # `from tqdm import tqdm` inside run_batch resolves to tqdm.tqdm.
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.nli.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                with patch.object(NLIExtractor, "_get_label", return_value="neutral"):
+                    with patch.object(
+                        NLIExtractor, "_get_probability", return_value=0.5
+                    ):
+                        nli = NLIExtractor(backend=mock_backend, show_progress=True)
+                        results = asyncio.run(
+                            nli.run_batch(["p1", "p2", "p3"], ["h1", "h2", "h3"])
+                        )
+
+        assert len(results) == 3
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3  # one tick per completed pair
+        bar.close.assert_called_once()
+
+    def test_run_batch_no_bar_when_progress_disabled(self):
+        """Default (show_progress=False) constructs no tqdm bar."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        async def fake_ainstruct(*args, **kwargs):
+            return self._mk_output(True)
+
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.nli.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                with patch.object(NLIExtractor, "_get_label", return_value="neutral"):
+                    with patch.object(
+                        NLIExtractor, "_get_probability", return_value=0.5
+                    ):
+                        nli = NLIExtractor(backend=mock_backend)
+                        asyncio.run(nli.run_batch(["p1"], ["h1"]))
+
+        tqdm_ctor.assert_not_called()
 
 
 class TestNLIExtractorSimbauqParse:

@@ -92,6 +92,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "scripts/train_simbauq_nli.py. Required when "
         "--nli-confidence-method classifier.",
     )
+    p.add_argument(
+        "--nli-progress",
+        action="store_true",
+        help="Show a progress bar while NLI relations are extracted.",
+    )
 
     # --- Retrieval ---
     r = parser.add_argument_group("retrieval")
@@ -287,6 +292,7 @@ def main() -> None:
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,
+            nli_show_progress=args.nli_progress,
         )
 
         if file_mode:

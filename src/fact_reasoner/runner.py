@@ -113,6 +113,7 @@ class FactualityRunner:
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: Optional[str] = None,
+        nli_show_progress: bool = False,
     ) -> None:
         """Initialize the runner and its shared components."""
         if pipeline not in PIPELINES:
@@ -142,6 +143,7 @@ class FactualityRunner:
         self.nli_similarity_metric = nli_similarity_metric
         self.nli_confidence_method = nli_confidence_method
         self.nli_classifier_path = nli_classifier_path
+        self.nli_show_progress = nli_show_progress
 
         # Shared components.
         self.atom_extractor = Atomizer(backend)
@@ -152,6 +154,7 @@ class FactualityRunner:
             simbauq_similarity_metric=self.nli_similarity_metric,
             simbauq_confidence_method=self.nli_confidence_method,
             simbauq_classifier_path=self.nli_classifier_path,
+            show_progress=self.nli_show_progress,
         )
         self.context_summarizer = ContextSummarizer(backend)
 
