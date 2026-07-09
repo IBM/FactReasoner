@@ -173,9 +173,42 @@ class NLIExtractor:
             f"[NLI] Using Mellea backend: {self.backend.model_id} "
             f"(method: {self.method})"
         )
+        if self.method == "simbauq":
+            self._print_simbauq_preamble()
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
+
+    def _print_simbauq_preamble(self) -> None:
+        """Print a short summary of the active SIMBA-UQ strategy configuration.
+
+        Reads the settings off the constructed strategy (rather than the
+        constructor arguments) so the printout reflects the actual values in
+        effect, including defaults filled in by SIMBAUQSamplingStrategy.
+        """
+        s = self._strategy
+        total = len(s.temperatures) * s.n_per_temp
+
+        # Metric-specific detail (e.g. the rouge variant or sbert model).
+        if s.similarity_metric == "rouge":
+            metric = f"{s.similarity_metric} ({s.rouge_type})"
+        elif s.similarity_metric == "sbert":
+            metric = f"{s.similarity_metric} ({s.sbert_model})"
+        else:
+            metric = s.similarity_metric
+
+        # Confidence-method-specific detail.
+        if s.confidence_method == "aggregation":
+            confidence = f"{s.confidence_method} ({s.aggregation})"
+        else:
+            confidence = f"{s.confidence_method} (max_depth={s.clf_max_depth})"
+
+        print("[NLI] SIMBA-UQ strategy configuration:")
+        print(f"[NLI]   temperatures       : {s.temperatures}")
+        print(f"[NLI]   samples/temperature: {s.n_per_temp}")
+        print(f"[NLI]   total samples      : {total}   (len(temperatures) * n_per_temp)")
+        print(f"[NLI]   similarity metric  : {metric}")
+        print(f"[NLI]   confidence method  : {confidence}")
 
     def _uses_logprobs(self) -> bool:
         """Whether the current method requires the backend to return logprobs."""
