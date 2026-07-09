@@ -259,3 +259,62 @@ class TestVeriScoreToJson:
         assert result["input"] == "Test query"
         assert result["output"] == "Test response"
         assert result["topic"] == "Test topic"
+
+
+class TestVeriScoreProgressBar:
+    """Tests for the show_progress bar over predict_atom_labels."""
+
+    @staticmethod
+    def _scorer(show_progress):
+        b = MagicMock()
+        b.model_id = "test-model"
+        s = VeriScore(backend=b, show_progress=show_progress)
+        from fact_reasoner.core.base import Atom
+
+        s.atoms = {f"a{i}": Atom(id=f"a{i}", text=f"atom {i}") for i in range(3)}
+        return s
+
+    def test_init_default_show_progress_false(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+        assert VeriScore(backend=b).show_progress is False
+
+    def test_progress_bar_built_with_atom_total(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[Supported]")
+
+        bar = MagicMock()
+        scorer = self._scorer(show_progress=True)
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.veriscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                labels, _ = asyncio.run(scorer.predict_atom_labels())
+
+        assert len(labels) == 3
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3
+        bar.close.assert_called_once()
+
+    def test_no_bar_when_progress_disabled(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[Supported]")
+
+        scorer = self._scorer(show_progress=False)
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.veriscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                asyncio.run(scorer.predict_atom_labels())
+        tqdm_ctor.assert_not_called()

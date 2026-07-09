@@ -33,6 +33,7 @@ from fact_reasoner.utils import (
     punctuation_only_inside_quotes,
     batcher,
     run_throttled,
+    gather_with_progress,
 )
 
 
@@ -442,3 +443,38 @@ class TestRunThrottled:
         )
         assert calls["n"] == 2  # progress advances for failures too
         assert all(isinstance(r, RuntimeError) for r in results)
+
+
+class TestGatherWithProgress:
+    """Tests for gather_with_progress (order-preserving async gather + ticks)."""
+
+    def test_results_in_input_order_despite_completion_order(self):
+        async def work(x, delay):
+            await asyncio.sleep(delay)
+            return x * 10
+
+        async def run():
+            # Finish out of order (index 1 first, then 2, then 0).
+            return await gather_with_progress(
+                [work(0, 0.03), work(1, 0.01), work(2, 0.02)]
+            )
+
+        assert asyncio.run(run()) == [0, 10, 20]
+
+    def test_on_progress_called_once_per_coro(self):
+        calls = {"n": 0}
+
+        async def work(x):
+            return x
+
+        async def run():
+            await gather_with_progress(
+                [work(1), work(2), work(3)],
+                on_progress=lambda: calls.__setitem__("n", calls["n"] + 1),
+            )
+
+        asyncio.run(run())
+        assert calls["n"] == 3
+
+    def test_empty_is_noop(self):
+        assert asyncio.run(gather_with_progress([])) == []

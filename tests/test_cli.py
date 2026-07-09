@@ -124,6 +124,49 @@ class TestDispatch:
         fake_runner.assess.assert_called_once()
         assert fake_runner.assess.call_args.args[:2] == ("q", "r")
 
+    def test_progress_bar_flag_reaches_runner(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "ollama",
+                    "--progress-bar",
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+        assert ctor.call_args.kwargs["show_progress"] is True
+
+    def test_progress_bar_default_false(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "ollama",
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+        assert ctor.call_args.kwargs["show_progress"] is False
+
     def test_rits_custom_endpoint_passes_base_url(self):
         fake_runner = MagicMock()
         fake_runner.assess.return_value = {"factuality_score": 0.5}

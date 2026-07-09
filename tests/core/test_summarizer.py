@@ -248,3 +248,68 @@ class TestContextSummarizerRunBatch:
         assert results[1]["probability"] == 0.0
         assert results[1]["context"] == "bad"
         assert results[2]["summary"] == "Good summary."
+
+
+class TestContextSummarizerProgressBar:
+    """Tests for the show_progress bar over run_batch."""
+
+    @staticmethod
+    def _mk_output(text: str):
+        out = MagicMock()
+        out.success = True
+        out.result = MagicMock()
+        out.__str__ = lambda self: text
+        return out
+
+    def test_init_default_show_progress_false(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+        assert ContextSummarizer(backend=b).show_progress is False
+
+    @pytest.mark.asyncio
+    async def test_progress_bar_built_with_context_total(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+
+        async def mock_ainstruct(*args, **kwargs):
+            return self._mk_output("summary")
+
+        bar = MagicMock()
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+                side_effect=mock_ainstruct,
+            ):
+                with patch.object(
+                    ContextSummarizer, "_get_probability", return_value=0.5
+                ):
+                    summarizer = ContextSummarizer(backend=b, show_progress=True)
+                    results = await summarizer.run_batch(
+                        contexts=["c0", "c1", "c2"], atom_text="atom"
+                    )
+
+        assert len(results) == 3
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3
+        bar.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_bar_when_progress_disabled(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+
+        async def mock_ainstruct(*args, **kwargs):
+            return self._mk_output("summary")
+
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+                side_effect=mock_ainstruct,
+            ):
+                with patch.object(
+                    ContextSummarizer, "_get_probability", return_value=0.5
+                ):
+                    summarizer = ContextSummarizer(backend=b)
+                    await summarizer.run_batch(contexts=["c0"], atom_text="atom")
+        tqdm_ctor.assert_not_called()

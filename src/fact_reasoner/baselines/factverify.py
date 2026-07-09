@@ -39,7 +39,11 @@ from fact_reasoner.core.utils import (
     build_contexts,
     remove_duplicated_atoms,
 )
-from fact_reasoner.utils import extract_last_wrapped_response, LOOP_BUDGET
+from fact_reasoner.utils import (
+    extract_last_wrapped_response,
+    LOOP_BUDGET,
+    gather_with_progress,
+)
 
 INSTRUCTION_FACTVERIFY = """
 
@@ -142,6 +146,7 @@ class FactVerify:
         atom_extractor: Atomizer = None,
         atom_reviser: Reviser = None,
         context_retriever: ContextRetriever = None,
+        show_progress: bool = False,
     ):
         """
         Initialize the FactVerify pipeline.
@@ -158,6 +163,7 @@ class FactVerify:
         """
 
         self.backend = backend
+        self.show_progress = show_progress
         self.query = None
         self.response = None
         self.topic = None
@@ -457,7 +463,18 @@ class FactVerify:
             coroutines.append(coroutine)
 
         print("[FactVerify] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
+        bar = None
+        on_progress = None
+        if self.show_progress and coroutines:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(coroutines), desc="FactVerify atoms", unit="atom")
+            on_progress = bar.update
+        try:
+            outputs = await gather_with_progress(coroutines, on_progress=on_progress)
+        finally:
+            if bar is not None:
+                bar.close()
         for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)

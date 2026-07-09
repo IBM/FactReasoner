@@ -227,3 +227,64 @@ class TestFactScoreToJson:
         assert result["topic"] == "Test topic"
         assert "atoms" in result
         assert "contexts" in result
+
+
+class TestFactScoreProgressBar:
+    """Tests for the show_progress bar over predict_atom_labels."""
+
+    @staticmethod
+    def _scorer(show_progress):
+        b = MagicMock()
+        b.model_id = "test-model"
+        s = FactScore(backend=b, show_progress=show_progress)
+        # Three atoms with no contexts is enough to drive predict_atom_labels.
+        from fact_reasoner.core.base import Atom
+
+        s.atoms = {f"a{i}": Atom(id=f"a{i}", text=f"atom {i}") for i in range(3)}
+        s.topic = None
+        return s
+
+    def test_init_default_show_progress_false(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+        assert FactScore(backend=b).show_progress is False
+
+    def test_progress_bar_built_with_atom_total(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[True]")
+
+        bar = MagicMock()
+        scorer = self._scorer(show_progress=True)
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.factscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                labels, _ = asyncio.run(scorer.predict_atom_labels())
+
+        assert len(labels) == 3  # results aligned to the 3 atoms
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3
+        bar.close.assert_called_once()
+
+    def test_no_bar_when_progress_disabled(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[True]")
+
+        scorer = self._scorer(show_progress=False)
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.factscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                asyncio.run(scorer.predict_atom_labels())
+        tqdm_ctor.assert_not_called()

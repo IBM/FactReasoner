@@ -166,6 +166,7 @@ class ContextSummarizer:
     def __init__(
         self,
         backend: Backend,
+        show_progress: bool = False,
     ):
         """
         Initialize the ContextSummarizer.
@@ -173,8 +174,9 @@ class ContextSummarizer:
         Args:
             backend: str
                 The Mellea backend to use for LLM interaction.
-            with_reference: str
-                The reference paragraph that the context will be summarized to.
+            show_progress: bool
+                If True, ``run_batch`` shows a ``tqdm`` progress bar that advances
+                as each context summary completes. Default False.
         """
 
         # Safety checks
@@ -182,6 +184,7 @@ class ContextSummarizer:
             raise ValueError(
                 "Mellea backend is None. Please provide a valid Mellea backend."
             )
+        self.show_progress = show_progress
 
         # Initialize the extractor
         self.backend = backend
@@ -276,7 +279,18 @@ class ContextSummarizer:
             )
 
         print(f"[Summarizer] Running throttled batch of {len(contexts)} requests ...")
-        outputs = await run_throttled(factory, contexts)
+        bar = None
+        on_progress = None
+        if self.show_progress and contexts:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(contexts), desc="Summarizing", unit="ctx")
+            on_progress = bar.update
+        try:
+            outputs = await run_throttled(factory, contexts, on_progress=on_progress)
+        finally:
+            if bar is not None:
+                bar.close()
 
         # Results are positionally aligned with `contexts`; failures map to an
         # empty summary so callers can zip(contexts, results) safely.

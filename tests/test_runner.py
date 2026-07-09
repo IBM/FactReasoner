@@ -87,6 +87,29 @@ class TestConstruction:
         with pytest.raises(ValueError, match="Unknown pipeline_version"):
             FactualityRunner(MagicMock(), pipeline="factscore", pipeline_version="v9")
 
+    @pytest.mark.parametrize("pipeline", ["factscore", "veriscore", "factverify"])
+    def test_make_pipeline_wires_backend_and_progress(self, pipeline):
+        # Regression: every baseline must be constructed with the runner's
+        # backend (factverify previously omitted it -> TypeError) and receive the
+        # universal show_progress flag.
+        backend = MagicMock()
+        backend.model_id = "test-model"
+        r = FactualityRunner(backend, pipeline=pipeline, show_progress=True)
+        pipeline_obj = r._make_pipeline(MagicMock())
+        assert pipeline_obj.backend is backend
+        assert pipeline_obj.show_progress is True
+
+    def test_show_progress_defaults_false_and_reaches_components(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.show_progress is False
+        assert r.nli_extractor.show_progress is False
+        assert r.context_summarizer.show_progress is False
+
+    def test_show_progress_forwarded_to_nli_and_summarizer(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore", show_progress=True)
+        assert r.nli_extractor.show_progress is True
+        assert r.context_summarizer.show_progress is True
+
 
 class TestContextRetrieverWiring:
     def test_wraps_a_retriever(self):

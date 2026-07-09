@@ -139,6 +139,43 @@ async def run_throttled(
     return await asyncio.gather(*tasks)
 
 
+async def gather_with_progress(
+    coros: List[Awaitable[Any]],
+    *,
+    on_progress: Optional[Callable[[], None]] = None,
+) -> List[Any]:
+    """Await already-built coroutines concurrently, with a per-completion hook.
+
+    Like :func:`asyncio.gather` (results are returned in **input order**), but
+    calls ``on_progress`` once as each coroutine completes — so a progress bar
+    advances as work finishes rather than all at once at the barrier. Unlike
+    :func:`run_throttled`, this takes pre-built coroutines (no factory / rate
+    limiting): use it to add progress to an existing ``asyncio.gather`` call.
+
+    Args:
+        coros: The coroutines/awaitables to run concurrently.
+        on_progress: If given, called with no arguments each time one completes
+            (in completion order, not input order). Must not block. Exceptions
+            propagate as they would from ``asyncio.gather`` (default behavior).
+
+    Returns:
+        Results positionally aligned with ``coros``.
+    """
+
+    async def _indexed(index: int, coro: Awaitable[Any]):
+        result = await coro
+        if on_progress is not None:
+            on_progress()
+        return index, result
+
+    tasks = [asyncio.ensure_future(_indexed(i, c)) for i, c in enumerate(coros)]
+    results: List[Any] = [None] * len(tasks)
+    for completed in asyncio.as_completed(tasks):
+        index, result = await completed
+        results[index] = result
+    return results
+
+
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
 

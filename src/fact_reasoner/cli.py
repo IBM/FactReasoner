@@ -93,9 +93,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--nli-confidence-method classifier.",
     )
     p.add_argument(
-        "--nli-progress",
+        "--progress-bar",
         action="store_true",
-        help="Show a progress bar while NLI relations are extracted.",
+        help="Show progress bars during execution (NLI relations, context "
+        "summarization, and baseline atom labeling).",
     )
 
     # --- Retrieval ---
@@ -292,7 +293,7 @@ def main() -> None:
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,
-            nli_show_progress=args.nli_progress,
+            show_progress=args.progress_bar,
         )
 
         if file_mode:

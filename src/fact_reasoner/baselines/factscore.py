@@ -39,7 +39,7 @@ from fact_reasoner.core.utils import (
     build_contexts,
     remove_duplicated_atoms,
 )
-from fact_reasoner.utils import LOOP_BUDGET
+from fact_reasoner.utils import LOOP_BUDGET, gather_with_progress
 
 # Version 1 of the prompt (from the original FactScore paper)
 INSTRUCTION_FACTSCORE = """
@@ -85,6 +85,7 @@ class FactScore:
         atom_extractor: Atomizer = None,
         atom_reviser: Reviser = None,
         context_retriever: ContextRetriever = None,
+        show_progress: bool = False,
     ):
         """
         Initialize the FactScore pipeline.
@@ -101,6 +102,7 @@ class FactScore:
         """
 
         self.backend = backend
+        self.show_progress = show_progress
         self.query = None
         self.response = None
         self.topic = None
@@ -420,7 +422,18 @@ class FactScore:
             coroutines.append(coroutine)
 
         print("[FactScore] Awaiting for the async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
+        bar = None
+        on_progress = None
+        if self.show_progress and coroutines:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(coroutines), desc="FactScore atoms", unit="atom")
+            on_progress = bar.update
+        try:
+            outputs = await gather_with_progress(coroutines, on_progress=on_progress)
+        finally:
+            if bar is not None:
+                bar.close()
         for output in outputs:
             label = self._get_label(output.result)
             atom_labels.append(label)
