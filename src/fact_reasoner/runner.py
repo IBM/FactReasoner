@@ -111,6 +111,8 @@ class FactualityRunner:
         merlin_path: Optional[str] = None,
         nli_method: str = "logprobs",
         nli_similarity_metric: str = "rouge",
+        nli_confidence_method: str = "aggregation",
+        nli_classifier_path: Optional[str] = None,
     ) -> None:
         """Initialize the runner and its shared components."""
         if pipeline not in PIPELINES:
@@ -138,6 +140,8 @@ class FactualityRunner:
         self.merlin_path = merlin_path
         self.nli_method = nli_method
         self.nli_similarity_metric = nli_similarity_metric
+        self.nli_confidence_method = nli_confidence_method
+        self.nli_classifier_path = nli_classifier_path
 
         # Shared components.
         self.atom_extractor = Atomizer(backend)
@@ -146,6 +150,8 @@ class FactualityRunner:
             backend,
             nli_method=self.nli_method,
             simbauq_similarity_metric=self.nli_similarity_metric,
+            simbauq_confidence_method=self.nli_confidence_method,
+            simbauq_classifier_path=self.nli_classifier_path,
         )
         self.context_summarizer = ContextSummarizer(backend)
 

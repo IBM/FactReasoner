@@ -117,6 +117,7 @@ class NLIExtractor:
         simbauq_confidence_method: str = "aggregation",
         simbauq_aggregation: str = "mean",
         simbauq_classifier: Optional[ProbabilisticClassifier] = None,
+        simbauq_classifier_path: Optional[str] = None,
         simbauq_training_samples: Optional[List[List[str]]] = None,
         simbauq_training_labels: Optional[List[List[int]]] = None,
     ):
@@ -137,6 +138,17 @@ class NLIExtractor:
             simbauq_*:
                 SIMBA-UQ configuration, only used when nli_method="simbauq".
                 See SIMBAUQSamplingStrategy for details.
+            simbauq_classifier_path: str, optional
+                Path to a classifier saved by
+                ``fact_reasoner.uncertainty.save_classifier`` (see
+                ``scripts/train_simbauq_nli.py``). When provided (and no explicit
+                ``simbauq_classifier`` object is given), the classifier is loaded,
+                its feature dimension is validated against
+                ``len(temperatures) * n_per_temp - 1``, and the SIMBA-UQ
+                confidence method is set to "classifier". Precedence:
+                ``simbauq_classifier`` object > ``simbauq_classifier_path`` >
+                ``simbauq_training_samples``/``simbauq_training_labels`` >
+                the default "aggregation" method.
         """
 
         # Safety checks
@@ -151,17 +163,35 @@ class NLIExtractor:
 
         self.method = nli_method
         self.backend = backend
+        # Recorded for the preamble when a classifier is loaded from disk.
+        self._classifier_path: Optional[str] = None
 
         # Build the sampling strategy once. The SIMBA-UQ strategy is what makes
         # the probability estimate backend-agnostic (no logprobs required).
         if nli_method == "simbauq":
+            confidence_method = simbauq_confidence_method
+            classifier = simbauq_classifier
+
+            # Load a saved classifier when a path is given and no in-memory
+            # classifier object was passed. Loading it here (rather than in the
+            # strategy) keeps the strategy free of I/O and lets us validate the
+            # feature dimension against this extractor's temperature schedule.
+            if classifier is None and simbauq_classifier_path is not None:
+                classifier = self._load_simbauq_classifier(
+                    simbauq_classifier_path,
+                    temperatures=simbauq_temperatures,
+                    n_per_temp=simbauq_n_per_temp,
+                )
+                confidence_method = "classifier"
+                self._classifier_path = simbauq_classifier_path
+
             self._strategy = SIMBAUQSamplingStrategy(
                 temperatures=simbauq_temperatures,
                 n_per_temp=simbauq_n_per_temp,
                 similarity_metric=simbauq_similarity_metric,
-                confidence_method=simbauq_confidence_method,
+                confidence_method=confidence_method,
                 aggregation=simbauq_aggregation,
-                classifier=simbauq_classifier,
+                classifier=classifier,
                 training_samples=simbauq_training_samples,
                 training_labels=simbauq_training_labels,
             )
@@ -178,6 +208,52 @@ class NLIExtractor:
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
+
+    @staticmethod
+    def _load_simbauq_classifier(
+        path: str,
+        *,
+        temperatures: Optional[List[float]],
+        n_per_temp: int,
+    ) -> ProbabilisticClassifier:
+        """Load and validate a saved SIMBA-UQ classifier.
+
+        Validates that the classifier's input feature dimension matches this
+        extractor's configuration (``len(temperatures) * n_per_temp - 1``), so a
+        classifier trained under a different temperature schedule fails fast with
+        a clear error rather than at first inference.
+
+        Args:
+            path: Path to a classifier saved by
+                ``fact_reasoner.uncertainty.save_classifier``.
+            temperatures: The extractor's temperature schedule (None → the
+                SIMBAUQSamplingStrategy default of [0.3, 0.5, 0.7, 1.0]).
+            n_per_temp: Samples per temperature.
+
+        Returns:
+            The loaded classifier estimator.
+
+        Raises:
+            ValueError: If the classifier's feature dimension does not match.
+        """
+        # Imported here (not at module top) to avoid importing joblib/sklearn
+        # unless a classifier is actually being loaded.
+        from fact_reasoner.uncertainty import load_classifier
+
+        clf, metadata = load_classifier(path)
+
+        effective_temps = temperatures if temperatures is not None else [0.3, 0.5, 0.7, 1.0]
+        expected_features = len(effective_temps) * n_per_temp - 1
+        n_features = getattr(clf, "n_features_in_", metadata.get("n_features_in"))
+        if n_features is not None and n_features != expected_features:
+            raise ValueError(
+                f"Classifier at {path!r} expects {n_features} features, but this "
+                f"NLIExtractor configuration produces {expected_features} "
+                "(len(temperatures) * n_per_temp - 1). Retrain the classifier with "
+                "a matching temperature schedule / n_per_temp, or configure the "
+                "extractor to match the classifier."
+            )
+        return clf
 
     def _print_simbauq_preamble(self) -> None:
         """Print a short summary of the active SIMBA-UQ strategy configuration.
@@ -200,6 +276,8 @@ class NLIExtractor:
         # Confidence-method-specific detail.
         if s.confidence_method == "aggregation":
             confidence = f"{s.confidence_method} ({s.aggregation})"
+        elif self._classifier_path is not None:
+            confidence = f"{s.confidence_method} (loaded from {self._classifier_path})"
         else:
             confidence = f"{s.confidence_method} (max_depth={s.clf_max_depth})"
 

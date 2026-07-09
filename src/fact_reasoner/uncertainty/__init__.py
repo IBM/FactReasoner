@@ -15,9 +15,23 @@
 
 """Uncertainty estimation components for the FactReasoner Library."""
 
+from .nli_training import (
+    evaluate_classifier,
+    generate_training_samples,
+    load_classifier,
+    load_nli_pairs,
+    save_classifier,
+    train_classifier_from_jsonl,
+)
 from .simbauq import ProbabilisticClassifier, SIMBAUQSamplingStrategy
 
 __all__ = [
     "ProbabilisticClassifier",
     "SIMBAUQSamplingStrategy",
+    "load_nli_pairs",
+    "generate_training_samples",
+    "train_classifier_from_jsonl",
+    "save_classifier",
+    "load_classifier",
+    "evaluate_classifier",
 ]

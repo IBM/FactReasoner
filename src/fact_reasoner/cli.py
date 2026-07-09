@@ -22,6 +22,7 @@
 import argparse
 import contextlib
 import json
+import os
 
 from fact_reasoner.backends import build_backend
 from fact_reasoner.runner import PIPELINES, FactualityRunner
@@ -74,6 +75,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         choices=["rouge", "jaccard", "sbert", "difflib", "levenshtein"],
         help="Similarity metric for the SIMBA-UQ NLI method "
         "(only used with --nli-method simbauq; default: rouge).",
+    )
+    p.add_argument(
+        "--nli-confidence-method",
+        default="aggregation",
+        choices=["aggregation", "classifier"],
+        help="How the SIMBA-UQ NLI method scores sample confidence "
+        "(only used with --nli-method simbauq). 'aggregation' (default) is "
+        "data-free; 'classifier' uses a trained classifier and requires "
+        "--nli-classifier-path (see scripts/train_simbauq_nli.py).",
+    )
+    p.add_argument(
+        "--nli-classifier-path",
+        default=None,
+        help="Path to a trained SIMBA-UQ NLI classifier (joblib) produced by "
+        "scripts/train_simbauq_nli.py. Required when "
+        "--nli-confidence-method classifier.",
     )
 
     # --- Retrieval ---
@@ -217,6 +234,21 @@ def main() -> None:
             "Starting a local vLLM server requires --served-model "
             "(the vLLM --served-model-name)."
         )
+    # The SIMBA-UQ classifier confidence method needs a trained classifier.
+    if args.nli_confidence_method == "classifier":
+        if args.nli_method != "simbauq":
+            raise SystemExit(
+                "--nli-confidence-method classifier requires --nli-method simbauq."
+            )
+        if not args.nli_classifier_path:
+            raise SystemExit(
+                "--nli-confidence-method classifier requires --nli-classifier-path "
+                "(a classifier trained via scripts/train_simbauq_nli.py)."
+            )
+        if not os.path.exists(args.nli_classifier_path):
+            raise SystemExit(
+                f"--nli-classifier-path not found: {args.nli_classifier_path!r}."
+            )
     # Ollama does not expose token logprobs, so the default NLI method degrades
     # to all-neutral relations. Steer the user to the SIMBA-UQ method.
     if args.backend == "ollama" and args.nli_method == "logprobs":
@@ -240,6 +272,8 @@ def main() -> None:
             merlin_path=args.merlin_path,
             nli_method=args.nli_method,
             nli_similarity_metric=args.nli_similarity_metric,
+            nli_confidence_method=args.nli_confidence_method,
+            nli_classifier_path=args.nli_classifier_path,
         )
 
         if file_mode:

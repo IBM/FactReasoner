@@ -79,6 +79,113 @@ class TestNLIExtractorInit:
             NLIExtractor(backend=mock_backend, nli_method="bogus")
 
 
+class TestNLIExtractorClassifierPath:
+    """Tests for loading a trained SIMBA-UQ classifier from a path."""
+
+    @staticmethod
+    def _train_and_save(tmp_path, temperatures, n_per_temp):
+        """Train a tiny classifier and save it; return its path."""
+        import json
+
+        from fact_reasoner.uncertainty import (
+            save_classifier,
+            train_classifier_from_jsonl,
+        )
+
+        n = len(temperatures) * n_per_temp
+        samp = tmp_path / "s.jsonl"
+        lines = []
+        for g in range(6):
+            samples = [f"[entailment] a{g}", "[entailment] b"]
+            samples += ["[neutral] c", "[contradiction] d"]
+            samples = (samples * n)[:n]  # pad/truncate to exactly n
+            labels = [1 if "[entailment]" in s else 0 for s in samples]
+            lines.append(
+                json.dumps(
+                    {
+                        "premise": "p",
+                        "hypothesis": "h",
+                        "gold": "entailment",
+                        "samples": samples,
+                        "labels": labels,
+                    }
+                )
+            )
+        samp.write_text("\n".join(lines) + "\n")
+        clf, meta = train_classifier_from_jsonl(
+            str(samp),
+            temperatures=temperatures,
+            n_per_temp=n_per_temp,
+            similarity_metric="jaccard",
+        )
+        out = tmp_path / "clf.joblib"
+        save_classifier(clf, str(out), meta)
+        return str(out)
+
+    def test_loads_classifier_and_sets_method(self, tmp_path):
+        pytest.importorskip("sklearn")
+        pytest.importorskip("joblib")
+        temps, n_per_temp = [0.5, 0.7], 2
+        clf_path = self._train_and_save(tmp_path, temps, n_per_temp)
+
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(
+            backend=mock_backend,
+            nli_method="simbauq",
+            simbauq_temperatures=temps,
+            simbauq_n_per_temp=n_per_temp,
+            simbauq_similarity_metric="jaccard",
+            simbauq_confidence_method="classifier",
+            simbauq_classifier_path=clf_path,
+        )
+        assert nli._strategy.confidence_method == "classifier"
+        assert nli._strategy._classifier is not None
+        assert nli._classifier_path == clf_path
+
+    def test_feature_dim_mismatch_raises(self, tmp_path):
+        pytest.importorskip("sklearn")
+        pytest.importorskip("joblib")
+        # Train with N=4 (2*2), then load into a config expecting N=16 (4*4).
+        clf_path = self._train_and_save(tmp_path, [0.5, 0.7], 2)
+
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        with pytest.raises(ValueError, match="expects .* features"):
+            NLIExtractor(
+                backend=mock_backend,
+                nli_method="simbauq",
+                simbauq_temperatures=[0.3, 0.5, 0.7, 1.0],
+                simbauq_n_per_temp=4,
+                simbauq_classifier_path=clf_path,
+            )
+
+    def test_explicit_classifier_object_takes_precedence(self, tmp_path):
+        # When both an object and a path could apply, the object wins and the
+        # path is not recorded (no load from disk).
+        pytest.importorskip("sklearn")
+        import numpy as np
+
+        class DummyClf:
+            n_features_in_ = 3
+
+            def predict_proba(self, X):
+                return np.tile([0.5, 0.5], (len(X), 1))
+
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        nli = NLIExtractor(
+            backend=mock_backend,
+            nli_method="simbauq",
+            simbauq_temperatures=[0.5, 0.7],
+            simbauq_n_per_temp=2,
+            simbauq_confidence_method="classifier",
+            simbauq_classifier=DummyClf(),
+        )
+        assert nli._classifier_path is None
+        assert isinstance(nli._strategy._classifier, DummyClf)
+
+
 class TestNLIInstruction:
     """Tests for NLI instruction template."""
 
