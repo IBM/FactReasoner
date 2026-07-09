@@ -70,12 +70,22 @@ def build_backend(
             the identifier appropriate for ``kind``. For ``"vllm"`` the resolved
             value must match the server's ``--served-model-name``, so pass an
             explicit served name when it differs from the default.
-        base_url: API endpoint. Only used by ``"vllm"``; falls back to the
-            ``VLLM_BASE_URL`` environment variable and then to
-            ``http://localhost:8000/v1``.
-        api_key: API key. Only used by ``"vllm"``; falls back to the
-            ``VLLM_API_KEY`` environment variable and then to ``"EMPTY"``
-            (vLLM ignores the value but Mellea requires a non-``None`` key).
+        base_url: API endpoint.
+            - For ``"vllm"``: the server base URL; falls back to the
+              ``VLLM_BASE_URL`` environment variable and then to
+              ``http://localhost:8000/v1``.
+            - For ``"rits"``: a **custom RITS endpoint**. When set, ``model_id``
+              must be the raw RITS model name (a string, not resolved against the
+              catalog), and RITS is pointed at this endpoint (RITS appends
+              ``/v1`` itself, so pass the base endpoint, not ``.../v1``). When
+              omitted, the built-in RITS catalog endpoint is used.
+        api_key: API key.
+            - For ``"vllm"``: falls back to the ``VLLM_API_KEY`` environment
+              variable and then to ``"EMPTY"`` (vLLM ignores the value but Mellea
+              requires a non-``None`` key).
+            - For ``"rits"`` with a custom endpoint: passed to ``RITSBackend``;
+              when ``None`` it falls back to the ``RITS_API_KEY`` environment
+              variable.
         model_options: Extra Mellea model options. A default of
             ``{ModelOption.MAX_NEW_TOKENS: 4096}`` is applied unless the caller
             already provides ``ModelOption.MAX_NEW_TOKENS``.
@@ -109,7 +119,18 @@ def build_backend(
             f"Unknown backend kind: {kind!r} (expected 'rits', 'ollama' or 'vllm')."
         )
 
-    if model_id is None:
+    # A custom RITS endpoint (base_url) serves its own model, so model_id must be
+    # the raw RITS model name (a string) and is NOT resolved against the catalog:
+    # a catalog id would carry its own conflicting endpoint.
+    custom_rits_endpoint = kind == "rits" and base_url is not None
+    if custom_rits_endpoint:
+        if not isinstance(model_id, str) or not model_id:
+            raise ValueError(
+                "A custom RITS endpoint (base_url) requires `model_id` to be the "
+                "RITS model name (a non-empty string)."
+            )
+        resolved_id = model_id
+    elif model_id is None:
         resolved_id = models.resolve(models.DEFAULT_MODEL_KEY).for_backend(kind)
     elif isinstance(model_id, str) and models.is_known(model_id):
         resolved_id = models.resolve(model_id).for_backend(kind)
@@ -121,6 +142,16 @@ def build_backend(
         # credentials/config in the environment).
         from mellea_ibm.rits import RITSBackend
 
+        if custom_rits_endpoint:
+            # Point RITS at a caller-supplied endpoint. RITSBackend appends "/v1"
+            # to the endpoint itself, so pass the base endpoint (not ".../v1").
+            # api_key=None lets RITSBackend fall back to the RITS_API_KEY env var.
+            return RITSBackend(
+                resolved_id,
+                endpoint=base_url,
+                api_key=api_key,
+                model_options=options,
+            )
         return RITSBackend(resolved_id, model_options=options)
 
     elif kind == "ollama":

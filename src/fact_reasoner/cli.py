@@ -128,7 +128,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--base-url",
         default=None,
-        help="Base URL for a vllm client (defaults to VLLM_BASE_URL env).",
+        help="API endpoint. For --backend vllm: the client base URL (defaults to "
+        "VLLM_BASE_URL env). For --backend rits: a custom RITS endpoint — when "
+        "set, --model-id is the raw RITS model name and RITS is pointed at this "
+        "endpoint (pass the base endpoint; RITS appends /v1).",
     )
     # vLLM local-server options: passing --model starts a local server.
     b.add_argument(
@@ -172,13 +175,17 @@ def _backend_context(args):
     identifier per backend; a raw provider value or None (backend default) is
     also accepted.
 
-    - rits: build a RITS backend (default model if --model-id is omitted).
+    - rits: build a RITS backend (default model if --model-id is omitted). When
+      --base-url is given it is used as a custom RITS endpoint and --model-id is
+      the raw RITS model name.
     - vllm + --model: start a local VLLMServer and yield its backend.
     - vllm (no --model): connect as a client to --base-url / VLLM_BASE_URL.
     - ollama: build an Ollama backend (default model if --model-id is omitted).
     """
     if args.backend == "rits":
-        yield build_backend("rits", model_id=args.model_id)
+        # base_url (when set) is the custom RITS endpoint; api_key stays None so
+        # RITSBackend falls back to the RITS_API_KEY env var.
+        yield build_backend("rits", model_id=args.model_id, base_url=args.base_url)
     elif args.backend == "vllm" and args.model:
         # Import lazily so the vllm-server path is only required when used.
         from fact_reasoner.serving import VLLMServer
@@ -233,6 +240,12 @@ def main() -> None:
         raise SystemExit(
             "Starting a local vLLM server requires --served-model "
             "(the vLLM --served-model-name)."
+        )
+    # A custom RITS endpoint serves its own model, so it needs an explicit name.
+    if args.backend == "rits" and args.base_url and not args.model_id:
+        raise SystemExit(
+            "A custom RITS endpoint (--base-url) requires --model-id "
+            "(the RITS model name)."
         )
     # The SIMBA-UQ classifier confidence method needs a trained classifier.
     if args.nli_confidence_method == "classifier":

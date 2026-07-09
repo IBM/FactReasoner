@@ -104,6 +104,55 @@ class TestVLLMBackend:
         assert backend.model_options.get(ModelOption.MAX_NEW_TOKENS) == 128
 
 
+def _make_rits(**kwargs):
+    """Build a RITS backend offline (patch the vLLM-detection network probe)."""
+    with patch(
+        "mellea.backends.openai.is_vllm_server_with_structured_output",
+        return_value=False,
+    ):
+        return build_backend("rits", **kwargs)
+
+
+class TestRITSCustomEndpoint:
+    def test_custom_endpoint_with_string_model(self):
+        pytest.importorskip("mellea_ibm")
+        backend = _make_rits(
+            model_id="my-org/my-model",
+            base_url="https://my-rits-host/my-model",
+            api_key="dummy",
+        )
+        assert backend.model_name == "my-org/my-model"
+        assert backend.endpoint == "https://my-rits-host/my-model"
+        # RITSBackend appends /v1 to the endpoint for the OpenAI client.
+        assert backend._base_url == "https://my-rits-host/my-model/v1"
+
+    def test_custom_endpoint_requires_string_model_id(self):
+        pytest.importorskip("mellea_ibm")
+        # Raised before any network/import work, so no patch needed.
+        with pytest.raises(ValueError, match="requires `model_id`"):
+            build_backend("rits", base_url="https://my-rits-host/my-model")
+
+    def test_custom_endpoint_does_not_resolve_catalog_id(self):
+        # With a custom endpoint, a would-be catalog id is used verbatim as the
+        # model name (not resolved to a catalog RITSModelIdentifier / endpoint).
+        pytest.importorskip("mellea_ibm")
+        backend = _make_rits(
+            model_id="llama-3-3-70b-instruct",
+            base_url="https://my-rits-host/custom",
+            api_key="dummy",
+        )
+        assert backend.model_name == "llama-3-3-70b-instruct"
+        assert backend.endpoint == "https://my-rits-host/custom"
+
+    def test_catalog_path_unchanged_without_base_url(self, monkeypatch):
+        # No base_url: a friendly id still resolves to the catalog endpoint.
+        pytest.importorskip("mellea_ibm")
+        monkeypatch.setenv("RITS_API_KEY", "dummy")
+        backend = _make_rits(model_id="llama-3-3-70b-instruct")
+        assert backend.model_name == "meta-llama/llama-3-3-70b-instruct"
+        assert "rits" in backend.endpoint  # the built-in RITS endpoint
+
+
 class TestUnknownKind:
     def test_unknown_kind_raises(self):
         with pytest.raises(ValueError, match="Unknown backend kind"):

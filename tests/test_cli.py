@@ -78,6 +78,23 @@ class TestArgValidation:
         with pytest.raises(SystemExit):
             _run(["--pipeline", "bogus", "--query", "q", "--response", "r"])
 
+    def test_rits_custom_endpoint_requires_model_id(self):
+        with pytest.raises(SystemExit, match="requires --model-id"):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "rits",
+                    "--base-url",
+                    "https://my-rits-host/m",
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+
 
 class TestDispatch:
     def test_single_ollama_calls_assess(self):
@@ -106,6 +123,34 @@ class TestDispatch:
         ctor.assert_called_once()
         fake_runner.assess.assert_called_once()
         assert fake_runner.assess.call_args.args[:2] == ("q", "r")
+
+    def test_rits_custom_endpoint_passes_base_url(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()) as bb,
+            patch.object(cli, "FactualityRunner", return_value=fake_runner),
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "rits",
+                    "--model-id",
+                    "my-org/my-model",
+                    "--base-url",
+                    "https://my-rits-host/my-model",
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+        bb.assert_called_once()
+        assert bb.call_args.args[0] == "rits"
+        assert bb.call_args.kwargs["model_id"] == "my-org/my-model"
+        assert bb.call_args.kwargs["base_url"] == "https://my-rits-host/my-model"
 
     def test_file_mode_calls_assess_file(self, tmp_path):
         fake_runner = MagicMock()

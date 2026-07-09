@@ -13,6 +13,7 @@ Use this approach when you want to assess a response from scratch, providing the
 ## Prerequisites
 
 - A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
+  - **Custom RITS endpoint:** to target a RITS endpoint that is not in the built-in catalog, use the `fact-reasoner` CLI with `--backend rits --model-id <rits-model-name> --base-url <endpoint>` (RITS appends `/v1`; the key comes from the `RITS_API_KEY` env var). Equivalently, call `build_backend("rits", model_id="<rits-model-name>", base_url="<endpoint>")`.
 - Google search API access for the `ContextRetriever`
 - The Merlin probabilistic inference engine binary at `lib/merlin`
 

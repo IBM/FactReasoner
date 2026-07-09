@@ -99,8 +99,10 @@ def main() -> None:
     parser.add_argument(
         "--base-url",
         default=None,
-        help="Base URL for the 'vllm' backend (defaults to VLLM_BASE_URL env "
-        "or http://localhost:8000/v1).",
+        help="API endpoint. For --backend vllm: the server base URL "
+        "(defaults to VLLM_BASE_URL env or http://localhost:8000/v1). For "
+        "--backend rits: a custom RITS endpoint, in which case --served-model "
+        "is the raw RITS model name (RITS appends /v1; key from RITS_API_KEY).",
     )
     args = parser.parse_args()
 
