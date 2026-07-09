@@ -30,7 +30,8 @@ def main() -> None:
     parser.add_argument(
         "--served-model",
         default=None,
-        help="Model / served-model name (required for 'vllm').",
+        help="Model / served-model name. Optional: when omitted, the shared "
+        "default model (Granite 4 Micro) is used for the chosen backend.",
     )
     parser.add_argument(
         "--base-url",

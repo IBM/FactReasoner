@@ -33,6 +33,8 @@ from typing import Any, Dict, Optional
 
 from mellea.backends import Backend, ModelOption
 
+from fact_reasoner import models
+
 # Default endpoint/credentials for the vLLM (OpenAI-compatible) backend.
 DEFAULT_VLLM_BASE_URL = "http://localhost:8000/v1"
 DEFAULT_VLLM_API_KEY = "EMPTY"
@@ -57,9 +59,17 @@ def build_backend(
     Args:
         kind: Which backend to build. One of ``"rits"``, ``"ollama"`` or
             ``"vllm"``.
-        model_id: Provider-specific model identifier. Optional for ``"rits"``
-            and ``"ollama"`` (each has a sensible default); **required** for
-            ``"vllm"``, where it must be the vLLM ``--served-model-name``.
+        model_id: Model identifier. May be a **unified friendly id** (or alias)
+            from ``fact_reasoner.models`` — e.g. ``"llama-3-3-70b-instruct"`` or
+            ``"llama3"`` — in which case it is resolved to the right identifier
+            for ``kind`` via the model catalog. A raw provider-specific value
+            (a Mellea ``ModelIdentifier``, a ``RITSModelIdentifier``, or a plain
+            served-model string) is also accepted and passed through unchanged.
+            Optional for every backend: when omitted, the shared default model
+            (``models.DEFAULT_MODEL_KEY``, Granite 4 Micro) is used, resolved to
+            the identifier appropriate for ``kind``. For ``"vllm"`` the resolved
+            value must match the server's ``--served-model-name``, so pass an
+            explicit served name when it differs from the default.
         base_url: API endpoint. Only used by ``"vllm"``; falls back to the
             ``VLLM_BASE_URL`` environment variable and then to
             ``http://localhost:8000/v1``.
@@ -74,8 +84,7 @@ def build_backend(
         Backend: A ready-to-use Mellea backend.
 
     Raises:
-        ValueError: If ``kind`` is unknown, or if ``kind == "vllm"`` and no
-            ``model_id`` (served model name) is supplied.
+        ValueError: If ``kind`` is unknown.
 
     Example:
         >>> backend = build_backend(
@@ -89,33 +98,42 @@ def build_backend(
     options: Dict[Any, Any] = dict(model_options or {})
     options.setdefault(ModelOption.MAX_NEW_TOKENS, DEFAULT_MAX_NEW_TOKENS)
 
+    # Resolve the model to the identifier this backend expects. Precedence:
+    #   1. an explicit model_id that names a unified catalog model (or alias);
+    #   2. an explicit non-catalog model_id (a Mellea ModelIdentifier /
+    #      RITSModelIdentifier, or a raw served-model / ollama tag) passed through
+    #      unchanged; or
+    #   3. the shared default model (Granite 4 Micro) when no model_id is given.
+    if kind not in ("rits", "ollama", "vllm"):
+        raise ValueError(
+            f"Unknown backend kind: {kind!r} (expected 'rits', 'ollama' or 'vllm')."
+        )
+
+    if model_id is None:
+        resolved_id = models.resolve(models.DEFAULT_MODEL_KEY).for_backend(kind)
+    elif isinstance(model_id, str) and models.is_known(model_id):
+        resolved_id = models.resolve(model_id).for_backend(kind)
+    else:
+        resolved_id = model_id
+
     if kind == "rits":
         # Remote IBM RITS backend (requires the mellea_ibm package and RITS
         # credentials/config in the environment).
-        from mellea_ibm.rits import RITSBackend, RITS
+        from mellea_ibm.rits import RITSBackend
 
-        rits_model = model_id if model_id is not None else RITS.LLAMA_3_3_70B_INSTRUCT
-        return RITSBackend(rits_model, model_options=options)
+        return RITSBackend(resolved_id, model_options=options)
 
     elif kind == "ollama":
         # Local Ollama backend (requires a running Ollama server; the model is
         # pulled on first use).
         from mellea.backends.ollama import OllamaModelBackend
-        from mellea.backends.model_ids import IBM_GRANITE_4_MICRO_3B
 
-        ollama_model = model_id if model_id is not None else IBM_GRANITE_4_MICRO_3B
-        return OllamaModelBackend(ollama_model, model_options=options)
+        return OllamaModelBackend(resolved_id, model_options=options)
 
     elif kind == "vllm":
         # vLLM exposes an OpenAI-compatible API, so we drive it through Mellea's
         # OpenAIBackend pointed at the vLLM server. Mellea auto-detects vLLM to
         # select the correct structured-output payload.
-        if model_id is None:
-            raise ValueError(
-                "The 'vllm' backend requires an explicit `model_id` (the vLLM "
-                "--served-model-name); no default is assumed."
-            )
-
         from mellea.backends.openai import OpenAIBackend
 
         resolved_base_url = (
@@ -130,13 +148,8 @@ def build_backend(
         )
 
         return OpenAIBackend(
-            model_id=model_id,
+            model_id=resolved_id,
             base_url=resolved_base_url,
             api_key=resolved_api_key,
             model_options=options,
-        )
-
-    else:
-        raise ValueError(
-            f"Unknown backend kind: {kind!r} (expected 'rits', 'ollama' or 'vllm')."
         )

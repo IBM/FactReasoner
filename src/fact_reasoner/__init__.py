@@ -4,6 +4,7 @@ from .assessor import FactReasoner
 from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
+from .models import MODELS, UnifiedModel, list_models, resolve
 from .runner import FactualityRunner
 from .search_api import SearchAPI
 from .serving import VLLMServer
@@ -27,6 +28,10 @@ __all__ = [
     "SearchAPI",
     "build_backend",
     "VLLMServer",
+    "MODELS",
+    "UnifiedModel",
+    "list_models",
+    "resolve",
     "extract_first_square_brackets",
     "extract_last_square_brackets",
     "extract_first_code_block",

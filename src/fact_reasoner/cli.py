@@ -26,14 +26,6 @@ import json
 from fact_reasoner.backends import build_backend
 from fact_reasoner.runner import PIPELINES, FactualityRunner
 
-# Friendly RITS model shortcuts -> concrete RITS model identifiers (resolved lazily).
-_RITS_SHORTCUTS = {
-    "llama3": "LLAMA_3_3_70B_INSTRUCT",
-    "granite4": "GRANITE_4_H_SMALL",
-    "mistral": "MISTRAL_LARGE_3_675B_2512",
-    "gpt-oss": "GPT_OSS_120B",
-}
-
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -106,8 +98,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--model-id",
         default=None,
-        help="Model id. For rits, a shortcut (%s); for ollama/vllm-client, the "
-        "model / served-model name." % ", ".join(_RITS_SHORTCUTS),
+        help="Model id. Accepts a unified friendly id or alias (e.g. "
+        "'llama-3-3-70b-instruct', 'llama3', 'granite4') resolved per backend "
+        "via fact_reasoner.models, or a raw provider value (ollama tag / vLLM "
+        "served-model name). See --list-models for available ids.",
+    )
+    b.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Print the available unified model ids and exit.",
     )
     b.add_argument(
         "--base-url",
@@ -148,29 +147,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_rits_model(model_id):
-    """Map a RITS shortcut to a concrete RITS model identifier."""
-    from mellea_ibm.rits import RITS
-
-    if model_id not in _RITS_SHORTCUTS:
-        raise SystemExit(
-            f"Unknown RITS model shortcut: {model_id!r} "
-            f"(expected one of {sorted(_RITS_SHORTCUTS)})."
-        )
-    return getattr(RITS, _RITS_SHORTCUTS[model_id])
-
-
 @contextlib.contextmanager
 def _backend_context(args):
     """Yield a Mellea backend, starting/stopping a local vLLM server if requested.
 
-    - rits: resolve the model shortcut, build a RITS backend.
+    build_backend resolves a unified friendly --model-id (or alias) to the right
+    identifier per backend; a raw provider value or None (backend default) is
+    also accepted.
+
+    - rits: build a RITS backend (default model if --model-id is omitted).
     - vllm + --model: start a local VLLMServer and yield its backend.
     - vllm (no --model): connect as a client to --base-url / VLLM_BASE_URL.
-    - ollama: build an Ollama backend.
+    - ollama: build an Ollama backend (default model if --model-id is omitted).
     """
     if args.backend == "rits":
-        yield build_backend("rits", model_id=_resolve_rits_model(args.model_id))
+        yield build_backend("rits", model_id=args.model_id)
     elif args.backend == "vllm" and args.model:
         # Import lazily so the vllm-server path is only required when used.
         from fact_reasoner.serving import VLLMServer
@@ -193,6 +184,20 @@ def _backend_context(args):
 
 def main() -> None:
     args = _build_arg_parser().parse_args()
+
+    # --list-models: print the unified catalog and exit before other validation.
+    if args.list_models:
+        from fact_reasoner import models
+
+        print("Available unified model ids:")
+        for key in models.list_models():
+            rits = models.MODELS[key].rits
+            note = "" if rits is None else "  (rits)"
+            print(f"  {key}{note}")
+        print("\nAliases:")
+        for alias in sorted(models._ALIASES):
+            print(f"  {alias} -> {models._ALIASES[alias]}")
+        return
 
     # Validate input mode: exactly one of single / file.
     single = args.query is not None or args.response is not None

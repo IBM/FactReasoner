@@ -75,10 +75,18 @@ class TestVLLMBackend:
         )
         assert backend._base_url == "http://arg-host:5678/v1"
 
-    def test_requires_model_id(self):
-        # Raised before any network/import work, so no patch needed.
-        with pytest.raises(ValueError, match="requires an explicit `model_id`"):
-            build_backend("vllm")
+    def test_defaults_to_shared_default_model(self):
+        # With no model_id, vllm falls back to the shared default (Granite 4
+        # Micro), resolved to its vLLM served-model (HF) name.
+        from fact_reasoner import models
+
+        expected = models.resolve(models.DEFAULT_MODEL_KEY).for_backend("vllm")
+        backend = _make_vllm()
+        assert backend._model_id == expected
+
+    def test_friendly_id_resolves_to_served_name(self):
+        backend = _make_vllm(model_id="granite-4-0-micro")
+        assert backend._model_id == "ibm-granite/granite-4.0-micro"
 
     def test_default_max_new_tokens_applied(self):
         backend = _make_vllm(model_id="my-served-model")

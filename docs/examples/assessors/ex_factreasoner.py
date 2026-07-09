@@ -33,7 +33,8 @@ def main() -> None:
     parser.add_argument(
         "--served-model",
         default=None,
-        help="Model / served-model name (required for 'vllm').",
+        help="Model / served-model name. Optional: when omitted, build_backend "
+        "uses the shared default model (Granite 4 Micro) for the chosen backend.",
     )
     parser.add_argument(
         "--base-url",
@@ -43,15 +44,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # For RITS, keep this example's original model (GRANITE_4_H_SMALL) as the
-    # default when no explicit --served-model is given.
-    model_id = args.served_model
-    if args.backend == "rits" and model_id is None:
-        from mellea_ibm.rits import RITS
-
-        model_id = RITS.GRANITE_4_H_SMALL
-
-    backend = build_backend(args.backend, model_id=model_id, base_url=args.base_url)
+    # When no --served-model is given, build_backend falls back to the shared
+    # default model (Granite 4 Micro), resolved appropriately for the backend.
+    backend = build_backend(
+        args.backend, model_id=args.served_model, base_url=args.base_url
+    )
 
     # Set cache dir for context retriever
     cache_dir = None  # "/home/radu/data/cache"
