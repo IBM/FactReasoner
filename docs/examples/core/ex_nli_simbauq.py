@@ -34,12 +34,13 @@ HYPOTHESIS2 = "If the insurance company pays out in full, John Hodges stands to 
 
 # Ground truth: contradiction
 PREMISE3 = (
-    "Though no heavy rain has been received in the city and water is receding "
-    "from most areas in Chennai and massive relief operations are underway, the "
-    "city is staring at an outbreak of epidemics with tones of stinking garbage "
-    "littering the streets as bright sunshine further eased the situation."
+    "The biggest risk facing the world's insurance companies is possibly the "
+    "rapid change now taking place within their own ranks. Sluggish growth in "
+    "core markets and intense price competition, coupled with shifting patterns "
+    "of customer demand and the rising cost of losses, are threatening to "
+    "overwhelm those too slow to react."
 )
-HYPOTHESIS3 = "Improper drainage system in Chennai is the major cause of flood in the city."
+HYPOTHESIS3 = "Insurance companies are experiencing a boom in their core markets."
 
 def main() -> None:
     parser = argparse.ArgumentParser(

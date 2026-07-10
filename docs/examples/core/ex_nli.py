@@ -65,12 +65,23 @@ HYPOTHESIS2 = "If the insurance company pays out in full, John Hodges stands to 
 
 # Ground truth: contradiction
 PREMISE3 = (
-    "Though no heavy rain has been received in the city and water is receding "
-    "from most areas in Chennai and massive relief operations are underway, the "
-    "city is staring at an outbreak of epidemics with tones of stinking garbage "
-    "littering the streets as bright sunshine further eased the situation."
+    "To determine whether interbreeding took place among Homo species before the "
+    "populations that became modern humans left Africa, evolutionary biologists "
+    "studied DNA from two African hunter-gatherer groups, the Biaka Pygmies and "
+    "the San, and from a West African agricultural population, the Mandenka. "
+    "Each of these groups is descended from populations thought to have remained "
+    "in Africa, meaning they would have avoided the genetic bottleneck effect "
+    "that usually occurs with migration. This means the groups show particularly "
+    "high genetic diversity, which makes their genomes more likely to have retained "
+    "evidence of ancient genetic mixing. The researchers looked at 61 non-coding DNA "
+    "regions in all three groups. Because direct comparison to archaic specimens wasn't "
+    "possible, the authors used computer models to simulate how infiltration from different "
+    "populations might have affected patterns of variation within modern genomes. On "
+    "chromosomes 4, 13 and 18 of the three African populations, the researchers found "
+    "genetic regions that were more divergent on average than known modern sequences "
+    "at the same locations, hinting at a different origin."
 )
-HYPOTHESIS3 = "Improper drainage system in Chennai is the major cause of flood in the city."
+HYPOTHESIS3 = "Since the genetic diversity of the three African populations was high, while that of the indigenous population was low, researchers concluded that the three African populations had interbred."
 
 def run_single(extractor: NLIExtractor, premise: str, hypothesis: str) -> None:
     """Evaluate the entailment for a single premise/hypothesis pair."""
