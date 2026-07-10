@@ -43,6 +43,34 @@ HYPOTHESES = [
     "Customers don't trust insurance companies as much as they once were.",
 ]
 
+# A premise (e.g. a retrieved context) and a hypothesis (e.g. an atom).
+# Ground truth: entailment
+PREMISE1 = (
+    "Robert Haldane Smith, Baron Smith of Kelvin, is a British businessman and "
+    "former Governor of the British Broadcasting Corporation."
+)
+HYPOTHESIS1 = "Robert Smith holds the title of Baron Smith of Kelvin."
+
+# Ground truth: neutral
+PREMISE2 = (
+    "Some time on the night of October 1st, the Copacabana Club was burnt to "
+    "the ground. The police are treating the fire as suspicious. The only facts "
+    "known at this stage are: The club was insured for more than its real value. "
+    "The club belonged to John Hodges. Les Braithwaite was known to dislike "
+    "John Hodges. Between October 1st and October 2nd, Les Braithwaite was away "
+    "from home on a business trip. There were no fatalities. A plan of the club "
+    "was found in Les Braithwaite's flat."
+)
+HYPOTHESIS2 = "If the insurance company pays out in full, John Hodges stands to profit from the fire."
+
+# Ground truth: contradiction
+PREMISE3 = (
+    "Though no heavy rain has been received in the city and water is receding "
+    "from most areas in Chennai and massive relief operations are underway, the "
+    "city is staring at an outbreak of epidemics with tones of stinking garbage "
+    "littering the streets as bright sunshine further eased the situation."
+)
+HYPOTHESIS3 = "Improper drainage system in Chennai is the major cause of flood in the city."
 
 def run_single(extractor: NLIExtractor, premise: str, hypothesis: str) -> None:
     """Evaluate the entailment for a single premise/hypothesis pair."""
@@ -109,6 +137,33 @@ def main() -> None:
 
     # Batch processing
     asyncio.run(run_batch(extractor, PREMISES, HYPOTHESES))
+
+    print("****" * 20)
+
+    # Build the NLI extractor with the logprobs method.
+    nli = NLIExtractor(
+        backend,
+        nli_method="logprobs",
+    )
+
+    # Predict the NLI relationship and its probability.
+    result = nli.run(premise=PREMISE1, hypothesis=HYPOTHESIS1)
+    print(f"Premise:    {PREMISE1}")
+    print(f"Hypothesis: {HYPOTHESIS1}")
+    print(f"Label:       {result['label']}")
+    print(f"Probability: {result['probability']:.4f}")
+
+    result = nli.run(premise=PREMISE2, hypothesis=HYPOTHESIS2)
+    print(f"Premise:    {PREMISE2}")
+    print(f"Hypothesis: {HYPOTHESIS2}")
+    print(f"Label:       {result['label']}")
+    print(f"Probability: {result['probability']:.4f}")
+
+    result = nli.run(premise=PREMISE3, hypothesis=HYPOTHESIS3)
+    print(f"Premise:    {PREMISE3}")
+    print(f"Hypothesis: {HYPOTHESIS3}")
+    print(f"Label:       {result['label']}")
+    print(f"Probability: {result['probability']:.4f}")
 
     print("Done.")
 
