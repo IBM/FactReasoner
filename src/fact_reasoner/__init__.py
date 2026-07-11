@@ -4,6 +4,13 @@ from .assessor import FactReasoner
 from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
+from .lcs import (
+    LCSScorer,
+    MinedRelation,
+    MiningResult,
+    RelationMiner,
+    mine_and_score,
+)
 from .models import MODELS, UnifiedModel, list_models, resolve
 from .runner import FactualityRunner
 from .search_api import SearchAPI
@@ -29,6 +36,11 @@ __all__ = [
     "SearchAPI",
     "build_backend",
     "VLLMServer",
+    "RelationMiner",
+    "MinedRelation",
+    "MiningResult",
+    "LCSScorer",
+    "mine_and_score",
     "MODELS",
     "UnifiedModel",
     "list_models",

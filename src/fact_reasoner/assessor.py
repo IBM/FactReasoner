@@ -17,10 +17,7 @@
 
 import json
 import math
-import os
 import time
-import subprocess
-import uuid
 import logging
 
 from typing import Any, Dict, List
@@ -35,6 +32,12 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.markov_network import MarkovNetwork
+from fact_reasoner.factors import (
+    build_markov_network as _build_markov_network_shared,
+    edge_factor_values as _edge_factor_values_shared,
+    pairwise_prior as _pairwise_prior_shared,
+)
+from fact_reasoner.inference import run_merlin as _run_merlin_shared
 from fact_reasoner.core.base import (
     PRIOR_PROB_ATOM,
     PRIOR_PROB_CONTEXT,
@@ -627,6 +630,8 @@ class FactReasoner:
     def _pairwise_prior(link: str) -> float:
         """Return the source-node prior for a pairwise factor given its link type.
 
+        Thin wrapper over :func:`fact_reasoner.factors.pairwise_prior`.
+
         Args:
             link: The edge link type ("context_atom", "context_context", or
                 "atom_atom").
@@ -634,18 +639,13 @@ class FactReasoner:
         Returns:
             The prior probability of the source node being true.
         """
-        if link == "context_context":
-            return PRIOR_PROB_CONTEXT
-        elif link in ("context_atom", "atom_atom"):
-            return PRIOR_PROB_ATOM
-        else:
-            raise ValueError(f"Unknown link type: {link}")
+        return _pairwise_prior_shared(link)
 
     def _edge_factor_values(self, edge) -> List[float]:
         """Compute the flattened pairwise factor table for a fact-graph edge.
 
-        The table is laid out row-major over ``[source, target]``, i.e. the value
-        order is (src=0,trg=0), (src=0,trg=1), (src=1,trg=0), (src=1,trg=1).
+        Thin wrapper over :func:`fact_reasoner.factors.edge_factor_values`,
+        passing this assessor's ``use_priors`` setting.
 
         Args:
             edge: A fact-graph edge with ``type``, ``link`` and ``probability``.
@@ -653,25 +653,13 @@ class FactReasoner:
         Returns:
             The four factor values for the pairwise factor.
         """
-        prob = edge.probability
-        if edge.type == "entailment":  # source true implies target true
-            if self.use_priors:
-                src_prior = self._pairwise_prior(edge.link)
-                return [1.0 - src_prior, src_prior, 1.0 - prob, prob]
-            return [prob, prob, 1.0 - prob, prob]
-        elif edge.type == "contradiction":  # source true implies target false
-            if self.use_priors:
-                src_prior = self._pairwise_prior(edge.link)
-                return [1.0 - src_prior, src_prior, prob, 1.0 - prob]
-            return [prob, prob, prob, 1.0 - prob]
-        elif edge.type == "equivalence":  # source and target agree
-            return [prob, 1.0 - prob, 1.0 - prob, prob]
-        else:
-            raise ValueError(f"Unknown edge type: {edge.type}")
+        return _edge_factor_values_shared(edge, use_priors=self.use_priors)
 
     def _build_markov_network(self):
         """
         Create the Markov Network corresponding to the FactGraph.
+
+        Delegates to :func:`fact_reasoner.factors.build_markov_network`.
 
         Return:
             A MarkovNetwork encoding of the problem.
@@ -679,105 +667,30 @@ class FactReasoner:
 
         assert self.fact_graph is not None, "The FactGraph must be built."
 
-        # Create an empty Markov Network
-        self.markov_network = MarkovNetwork()
-
-        # Create the singleton prior factors for the atom/context variables.
         logger.debug("Building the Markov network ...")
-        for node in self.fact_graph.get_nodes():
-            if node.type not in ("atom", "context"):
-                raise ValueError(f"Unknown node type: {node.type}")
-            x = node.id
-            prob = node.probability  # PRIOR_PROB_ATOM or PRIOR_PROB_CONTEXT
-            self.markov_network.add_node(x)
-            self.markov_network.add_factor([x], [2], [1.0 - prob, prob])
-            logger.debug("Adding %s variable %s with prior factor", node.type, x)
-
-        # Create the pairwise factors corresponding to the edges in the fact graph.
-        for edge in self.fact_graph.get_edges():
-            x, y = edge.source, edge.target
-            self.markov_network.add_edge(x, y)
-            values = self._edge_factor_values(edge)
-            self.markov_network.add_factor([x, y], [2, 2], values)
-            logger.debug("Adding edge %s - %s with factor (%s)", x, y, edge.type)
-
+        self.markov_network = _build_markov_network_shared(
+            self.fact_graph, use_priors=self.use_priors
+        )
         logger.debug("Markov network created.")
 
     def run_merlin(self):
         """
-        Run inference with merlin (executable)
+        Run inference with merlin (executable).
+
+        Delegates to :func:`fact_reasoner.inference.run_merlin` (MAR task),
+        restricting the returned marginals to the atom variables.
         """
 
         # Prepare the query variables (i.e., atoms)
         query_variables = [var for var in sorted(self.atoms.keys())]
 
-        # Dump the markov network to a temporary file
-        net_id = str(uuid.uuid1())
-        input_filename = f"markov_network_{net_id}.uai"
-        self.markov_network.write_uai(input_filename)
-
-        # Get the variable index to name mapping {0: 'a0', 1: 'a1', ...}
-        vars_mapping = self.markov_network.index_to_variable()
-
-        # Run merlin as a subprocess and collect the results
-        exefile = self.merlin_path
-        output_format = "json"
-        output_file = f"output_{net_id}"
-        algorithm = "wmb"
-        task = "MAR"
-
-        output_filename = f"{output_file}.{task}.{output_format}"
-        args = [
-            exefile,
-            "--input-file",
-            input_filename,
-            "--task",
-            task,
-            "--ibound",
-            "6",
-            "--algorithm",
-            algorithm,
-            "--output-format",
-            output_format,
-            "--output-file",
-            output_file,
-        ]
-
-        # Run merlin, always cleaning up the temporary files afterwards. If the
-        # subprocess fails, the output file may be missing or partial, so we
-        # surface a clear error instead of a downstream FileNotFoundError.
-        try:
-            proc = subprocess.run(args)
-            print(f"[Merlin] return code: {proc.returncode}")
-            if proc.returncode != 0:
-                raise RuntimeError(
-                    f"Merlin exited with non-zero return code {proc.returncode} "
-                    f"(input: {input_filename})."
-                )
-
-            with open(output_filename) as f:
-                results = json.load(f)
-
-            marginals = []
-            all_marginals = []
-            for marginal in results["marginals"]:
-                var_index = marginal["variable"]
-                var_name = vars_mapping[var_index]
-                all_marginals.append(
-                    dict(variable=var_name, probabilities=marginal["probabilities"])
-                )
-                if var_name in query_variables:
-                    probs = marginal["probabilities"]
-                    marginals.append({"variable": var_name, "probabilities": probs})
-        finally:
-            # Cleanup -- delete input_filename and output_filename
-            if os.path.exists(input_filename):
-                os.remove(input_filename)
-            if os.path.exists(output_filename):
-                os.remove(output_filename)
-
-        print(f"[Merlin] All Marginals:\n{all_marginals}")
-        return marginals
+        result = _run_merlin_shared(
+            self.markov_network,
+            self.merlin_path,
+            task="MAR",
+            query_variables=query_variables,
+        )
+        return result["marginals"]
 
     def score(self) -> Dict[str, Any]:
         """
