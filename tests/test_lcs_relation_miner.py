@@ -48,41 +48,28 @@ from fact_reasoner.lcs.taxonomy import (
     compile_sense,
     coupling_from_string,
 )
-from fact_reasoner.lcs.relation_miner import MinedRelation, MiningResult, RelationMiner
+from fact_reasoner.lcs.relation_miner import (
+    STRENGTH_METHODS,
+    MinedRelation,
+    MiningResult,
+    RelationMiner,
+)
 from fact_reasoner.lcs import lcs_scorer as lcs_scorer_mod
 from fact_reasoner.lcs.lcs_scorer import LCSScorer
+from fact_reasoner.lcs.strength import (
+    IdentityCalibrator,
+    PlattCalibrator,
+    TemperatureCalibrator,
+    affirm_fraction,
+    surrogate_probability_from_logprobs,
+)
 
-
-# ---------------------------------------------------------------------------
-# Brute-force MRF oracle (exact, replaces Merlin for tests).
-# ---------------------------------------------------------------------------
-
-
-def _brute_force_marginals(network, node_priors):
-    """Exact marginals and log Z of a binary pairwise Markov network.
-
-    Enumerates all 2^n worlds. Only feasible for small n (the diagnostic
-    examples), which is exactly what the deep-dive uses as a validation oracle.
-    """
-    var_names = list(node_priors.keys())
-    idx = {v: i for i, v in enumerate(var_names)}
-    n = len(var_names)
-
-    z = 0.0
-    ones = [0.0] * n
-    for world in itertools.product([0, 1], repeat=n):
-        w = 1.0
-        for variables, _cards, values in network.factors:
-            k = 0
-            for v in variables:
-                k = k * 2 + world[idx[v]]
-            w *= values[k]
-        z += w
-        for i, bit in enumerate(world):
-            if bit == 1:
-                ones[i] += w
-    marginals = {var_names[i]: ones[i] / z for i in range(n)}
-    return marginals, math.log(z)
+# The brute-force MRF oracle and synthetic-logprobs helper are shared with the
+# experiment harness's offline mode; import the canonical copies from there.
+from fact_reasoner.experiments.mock import (
+    brute_force_marginals as _brute_force_marginals,
+    yesno_logprob_meta as _yesno_logprob_meta,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -391,38 +378,131 @@ class TestMiningResult:
             assert edge.link == "atom_atom"
 
 
+def _patch_fake_merlin(monkeypatch):
+    """Replace the scorer's Merlin helper with the exact brute-force oracle.
+
+    Enumerates every variable in whatever network it is handed (base, U-chain,
+    reified R, or contradiction-free), so all four scoring methods route through
+    the same exact oracle instead of the real Merlin executable.
+    """
+
+    def fake_run_merlin(network, merlin_path, *, task="MAR", ibound=6,
+                        query_variables=None, verbose=False):
+        marginals, log_z = _brute_force_marginals(network)
+        if task == "MAR":
+            names = query_variables or list(marginals)
+            return {
+                "task": "MAR",
+                "marginals": [
+                    {"variable": v, "probabilities": [1 - marginals[v], marginals[v]]}
+                    for v in names if v in marginals
+                ],
+                "all_marginals": [],
+            }
+        return {"task": "PR", "log_z": log_z}
+
+    monkeypatch.setattr(lcs_scorer_mod, "run_merlin", fake_run_merlin)
+
+
 class TestLCSScorer:
-    def test_score_reproduces_aeroparts(self, monkeypatch):
-        """LCSScorer.score against a monkeypatched (brute-force) Merlin."""
+    def test_default_is_mean_marginal(self, monkeypatch):
+        """Default method reproduces the deep-dive base mean-marginal (Eq. 4)."""
+        _patch_fake_merlin(monkeypatch)
         result = _aeroparts_result(AEROPARTS_BASE)
-        priors = {a: 0.5 for a in AEROPARTS_IDS}
-
-        def fake_run_merlin(network, merlin_path, *, task="MAR", ibound=6,
-                            query_variables=None, verbose=False):
-            marginals, log_z = _brute_force_marginals(network, priors)
-            if task == "MAR":
-                names = query_variables or list(marginals)
-                return {
-                    "task": "MAR",
-                    "marginals": [
-                        {"variable": v, "probabilities": [1 - marginals[v], marginals[v]]}
-                        for v in names
-                    ],
-                    "all_marginals": [],
-                }
-            return {"task": "PR", "log_z": log_z}
-
-        monkeypatch.setattr(lcs_scorer_mod, "run_merlin", fake_run_merlin)
-
-        scorer = LCSScorer("/fake/merlin")
-        scores = scorer.score(result)
+        scores = LCSScorer("/fake/merlin").score(result)
+        assert scores["method"] == "mean_marginal"
         assert scores["lcs"] == pytest.approx(0.587, abs=1e-3)
+        assert scores["mean_marginal"] == pytest.approx(0.587, abs=1e-3)
         assert scores["log_z"] == pytest.approx(-9.75, abs=0.05)
         assert scores["num_atoms"] == 16
         # a10 (contradiction loser) is dragged below its 0.5 prior.
         assert scores["num_below_prior"] >= 1
+        # Alternatives not computed unless requested.
+        assert scores["consistency"] is None
+        assert scores["reified"] is None
+        assert scores["log_partition"] is None
+
+    def test_consistency_matches_deepdive(self, monkeypatch):
+        """(b) consistency probability = 0.813 on the AeroParts base (Table 3)."""
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        scores = LCSScorer("/fake/merlin").score(result, method="consistency")
+        assert scores["method"] == "consistency"
+        assert scores["consistency"] == pytest.approx(0.813, abs=1e-3)
+        assert scores["lcs"] == scores["consistency"]
+
+    def test_consistency_is_one_without_contradictions(self, monkeypatch):
+        _patch_fake_merlin(monkeypatch)
+        coherent = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
+        result = _aeroparts_result(coherent)
+        scores = LCSScorer("/fake/merlin").score(result, method="consistency")
+        assert scores["consistency"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_reified_matches_deepdive(self, monkeypatch):
+        """(c) reified P(R=1) = 0.150 on the AeroParts base, rho=0.5 (Table 3)."""
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        scores = LCSScorer("/fake/merlin").score(result, method="reified")
+        assert scores["method"] == "reified"
+        assert scores["reified"] == pytest.approx(0.150, abs=2e-3)
+        assert scores["lcs"] == scores["reified"]
+
+    def test_reified_subnet_matches_figure5(self, monkeypatch):
+        """(c) reified P(R=1) = 0.459 on the 3-atom subnet of Figure 5.
+
+        Subnet: a4 -> a7 (entailment .65); a7 != a10 (contradiction .93); rho=0.5.
+        """
+        _patch_fake_merlin(monkeypatch)
+        atoms = {a: Atom(id=a, text=f"atom {a}") for a in ("a4", "a7", "a10")}
+        rels = [
+            MinedRelation("a4", "a7", "Cause-Effect", "entailment", 0.65, 1.0, 0.65),
+            MinedRelation("a7", "a10", "Contrast", "contradiction", 0.93, 1.0, 0.93),
+        ]
+        miner = object.__new__(RelationMiner)
+        miner.prior = 0.5
+        fg = miner._build_fact_graph(atoms, rels)
+        mn = build_markov_network(fg, use_priors=True, node_priors={a: 0.5 for a in atoms})
+        result = MiningResult(atoms=atoms, relations=rels, fact_graph=fg,
+                              markov_network=mn, coverage={}, config={"prior": 0.5})
+        scores = LCSScorer("/fake/merlin").score(result, method="reified")
+        assert scores["reified"] == pytest.approx(0.459, abs=2e-3)
+
+    def test_log_partition(self, monkeypatch):
+        """(d) normalized log-partition: base normalizes to 0.0 (Zmin == Z)."""
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        scores = LCSScorer("/fake/merlin").score(result, method="log_partition")
+        assert scores["method"] == "log_partition"
+        # Zmin is the base network, so the base normalizes to exactly 0.0.
+        assert scores["log_partition"] == pytest.approx(0.0, abs=1e-9)
+        # log Z (base) and log Z_max (contradictions removed) reproduce Table 3.
+        assert scores["log_z"] == pytest.approx(-9.75, abs=0.05)
+        assert scores["log_z_max"] == pytest.approx(-8.25, abs=0.05)
+
+    def test_log_partition_no_contradictions_is_one(self, monkeypatch):
+        _patch_fake_merlin(monkeypatch)
+        coherent = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
+        result = _aeroparts_result(coherent)
+        scores = LCSScorer("/fake/merlin").score(result, method="log_partition")
+        # Zmax == Zmin (no contradictions to remove): defined as maximally coherent.
+        assert scores["log_partition"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_reified_prior_is_configurable(self, monkeypatch):
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        s_low = LCSScorer("/fake/merlin").score(result, method="reified", reified_prior=0.2)
+        s_high = LCSScorer("/fake/merlin").score(result, method="reified", reified_prior=0.8)
+        # A higher Bernoulli prior on R yields a higher P(R=1).
+        assert s_high["reified"] > s_low["reified"]
+
+    def test_unknown_method_raises(self, monkeypatch):
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        with pytest.raises(ValueError):
+            LCSScorer("/fake/merlin").score(result, method="bogus")
 
     def test_empty_result(self, monkeypatch):
+        _patch_fake_merlin(monkeypatch)
         empty = MiningResult(
             atoms={},
             relations=[],
@@ -431,8 +511,7 @@ class TestLCSScorer:
             coverage={},
             config={"prior": 0.5},
         )
-        scorer = LCSScorer("/fake/merlin")
-        scores = scorer.score(empty)
+        scores = LCSScorer("/fake/merlin").score(empty)
         assert scores["lcs"] == 0.0
         assert scores["num_atoms"] == 0
 
@@ -442,30 +521,112 @@ class TestLCSScorer:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Conditional-strength UQ: surrogate-token reader + calibrators + method wiring.
+# ---------------------------------------------------------------------------
+
+
+class TestConditionalStrength:
+    def test_surrogate_reader_renormalizes(self):
+        # First token top_logprobs: Yes at -0.1, No at -2.3 -> P(yes) ~ 0.90.
+        lps = [{
+            "token": "Yes", "logprob": -0.1,
+            "top_logprobs": [{"token": "Yes", "logprob": -0.1},
+                             {"token": "No", "logprob": -2.3}],
+        }]
+        p = surrogate_probability_from_logprobs(lps)
+        assert p == pytest.approx(0.9002495, abs=1e-3)
+
+    def test_surrogate_reader_is_whitespace_case_tolerant(self):
+        lps = [{
+            "token": " No", "logprob": -0.05,
+            "top_logprobs": [{"token": " NO", "logprob": -0.05},
+                             {"token": " yes", "logprob": -3.0}],
+        }]
+        assert surrogate_probability_from_logprobs(lps) == pytest.approx(0.05, abs=1e-2)
+
+    def test_surrogate_reader_none_when_absent(self):
+        lps = [{"token": "maybe", "logprob": -0.1,
+                "top_logprobs": [{"token": "maybe", "logprob": -0.1}]}]
+        assert surrogate_probability_from_logprobs(lps) is None
+        assert surrogate_probability_from_logprobs([]) is None
+
+    def test_affirm_fraction(self):
+        assert affirm_fraction(["Yes", "yes.", "No", "YES"]) == pytest.approx(0.75)
+        assert affirm_fraction(["maybe", "unsure"]) is None
+
+    def test_identity_calibrator_is_noop(self):
+        cal = IdentityCalibrator()
+        for p in (0.0, 0.3, 0.5, 0.9, 1.0):
+            assert cal.transform(p) == p
+
+    def test_temperature_softens_and_sharpens(self):
+        assert TemperatureCalibrator(2.0).transform(0.9) < 0.9   # toward 0.5
+        assert TemperatureCalibrator(0.5).transform(0.9) > 0.9   # sharpen
+        assert TemperatureCalibrator(1.0).transform(0.73) == pytest.approx(0.73, abs=1e-6)
+
+    def test_temperature_fit_recovers_sharpening(self):
+        # Raw probs are under-confident relative to the {0,1} labels -> T < 1.
+        raw = [0.6, 0.6, 0.4, 0.4]
+        labels = [1, 1, 0, 0]
+        T = TemperatureCalibrator.fit(raw, labels).temperature
+        assert T < 1.0
+
+    def test_platt_calibrator(self):
+        # a=1, b=0 is the identity in logit space.
+        assert PlattCalibrator(1.0, 0.0).transform(0.7) == pytest.approx(0.7, abs=1e-6)
+
+    def test_auto_strength_method_resolution(self):
+        from unittest.mock import MagicMock
+        be = MagicMock(); be.model_id = "mock"
+        lp = RelationMiner(be, nli_method="logprobs").strength_method
+        sb = RelationMiner(be, nli_method="simbauq").strength_method
+        assert lp == "surrogate_logprobs" and lp in STRENGTH_METHODS
+        assert sb == "surrogate_sampled" and sb in STRENGTH_METHODS
+        assert RelationMiner(be, nli_method="logprobs",
+                             strength_method="verbalized").strength_method == "verbalized"
+
+    def test_unknown_strength_method_raises(self):
+        from unittest.mock import MagicMock
+        be = MagicMock(); be.model_id = "mock"
+        with pytest.raises(ValueError):
+            RelationMiner(be, strength_method="bogus")
+
+
 class _Thunk:
-    def __init__(self, text):
+    def __init__(self, text, meta=None):
         self._text = text
-        self._meta = {}
+        self._meta = meta or {}
 
     def __str__(self):
         return self._text
 
 
 class _Sample:
-    def __init__(self, text):
+    def __init__(self, text, meta=None):
         self.success = True
-        self.result = _Thunk(text)
+        self.result = _Thunk(text, meta)
+
+
+def _is_surrogate_prompt(prompt) -> bool:
+    """Heuristic: the surrogate strength prompt asks for a Yes/No first word."""
+    return "Yes or No" in str(prompt)
+
+
+def _is_strength_prompt(prompt) -> bool:
+    """Heuristic: the verbalized strength prompt asks for [p=0.NN]."""
+    return "[p=0.NN]" in str(prompt)
 
 
 class TestMinerEndToEnd:
-    def test_mine_from_atoms_with_mocked_llm(self, monkeypatch):
-        """The full mine flow: Prompt A -> compile -> Prompt B -> MRF."""
-        import mellea.stdlib.functional as mfuncs
-        from unittest.mock import MagicMock
-
+    def _fake_ainstruct_factory(self, surrogate_p_yes=0.8):
+        """Build a fake ainstruct: Prompt A senses + surrogate/verbalized strength."""
         async def fake_ainstruct(prompt, **kw):
             uv = kw["user_variables"]
-            if "coupling" in uv:  # Prompt B (strength)
+            if _is_surrogate_prompt(prompt):
+                word = "Yes" if surrogate_p_yes >= 0.5 else "No"
+                return _Sample(word, meta=_yesno_logprob_meta(surrogate_p_yes))
+            if _is_strength_prompt(prompt):
                 return _Sample("Fairly likely. [p=0.70]")
             b = uv.get("atom_b", "")
             if "fired" in b:
@@ -474,15 +635,20 @@ class TestMinerEndToEnd:
                 return _Sample("[sense=Contrast] [coupling=contradiction]")
             return _Sample("[sense=None] [coupling=none]")
 
-        monkeypatch.setattr(mfuncs, "ainstruct", fake_ainstruct)
+        return fake_ainstruct
+
+    def test_mine_from_atoms_with_mocked_llm(self, monkeypatch):
+        """The full mine flow: Prompt A -> compile -> surrogate strength -> MRF."""
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+
+        monkeypatch.setattr(mfuncs, "ainstruct", self._fake_ainstruct_factory(0.8))
 
         backend = MagicMock()
         backend.model_id = "mock"
-        # SIMBA-UQ method avoids the logprobs requirement (the mock has none),
-        # exercising the confidence fallback path deterministically.
-        miner = RelationMiner(
-            backend, nli_method="logprobs", pair_policy="all_pairs"
-        )
+        # Default strength for nli_method="logprobs" is surrogate_logprobs.
+        miner = RelationMiner(backend, nli_method="logprobs", pair_policy="all_pairs")
+        assert miner.strength_method == "surrogate_logprobs"
         atoms = [
             "The stock fell 15 percent",
             "The CEO was fired",
@@ -494,12 +660,78 @@ class TestMinerEndToEnd:
         # 4 atoms -> 12 ordered pairs; the "None" couplings are dropped.
         assert result.coverage["pairs_scored"] == 12
         assert result.coverage["dropped_none"] >= 1
-        # Every kept relation has an edge-producing coupling and p in [0, 1].
         assert result.relations
         for rel in result.relations:
             assert rel.level1_type in (LEVEL1_ENTAILMENT, LEVEL1_CONTRADICTION,
                                        LEVEL1_EQUIVALENCE)
             assert 0.0 <= rel.probability <= 1.0
-        # MRF has one unary factor per atom plus one pairwise per relation.
+            # Surrogate strength read from the fake logprobs = 0.8.
+            assert rel.strength == pytest.approx(0.8, abs=1e-6)
+            assert rel.strength_raw == pytest.approx(0.8, abs=1e-6)
         assert len(result.markov_network.factors) == 4 + len(result.relations)
         assert result.markov_network.to_uai().splitlines()[0] == "MARKOV"
+
+    def test_verbalized_strength_still_parses(self, monkeypatch):
+        """The verbalized baseline still reads [p=0.NN] at face value."""
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+
+        monkeypatch.setattr(mfuncs, "ainstruct", self._fake_ainstruct_factory())
+        backend = MagicMock()
+        backend.model_id = "mock"
+        miner = RelationMiner(backend, nli_method="logprobs",
+                              strength_method="verbalized", pair_policy="all_pairs")
+        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        assert result.relations
+        for rel in result.relations:
+            assert rel.strength == pytest.approx(0.70, abs=1e-6)
+
+    def test_surrogate_sampled_affirm_fraction(self, monkeypatch):
+        """surrogate_sampled: strength = affirm fraction over N Yes/No samples."""
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+
+        # 3 of every 4 surrogate samples say Yes -> strength 0.75.
+        state = {"i": 0}
+
+        async def fake_ainstruct(prompt, **kw):
+            if _is_surrogate_prompt(prompt):
+                state["i"] += 1
+                return _Sample("Yes" if state["i"] % 4 != 0 else "No")
+            uv = kw["user_variables"]
+            b = uv.get("atom_b", "")
+            if "fired" in b:
+                return _Sample("[sense=Cause-Effect] [coupling=entailment]")
+            return _Sample("[sense=None] [coupling=none]")
+
+        monkeypatch.setattr(mfuncs, "ainstruct", fake_ainstruct)
+        backend = MagicMock()
+        backend.model_id = "mock"
+        miner = RelationMiner(backend, nli_method="simbauq",
+                              strength_method="surrogate_sampled", strength_samples=4,
+                              pair_policy="all_pairs")
+        assert miner.strength_method == "surrogate_sampled"
+        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        assert result.relations
+        for rel in result.relations:
+            assert rel.strength == pytest.approx(0.75, abs=1e-6)
+
+    def test_calibrator_is_applied(self, monkeypatch):
+        """A supplied calibrator transforms the raw strength before the factor."""
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+        from fact_reasoner.lcs import TemperatureCalibrator
+
+        monkeypatch.setattr(mfuncs, "ainstruct", self._fake_ainstruct_factory(0.9))
+        backend = MagicMock()
+        backend.model_id = "mock"
+        cal = TemperatureCalibrator(2.0)  # softens 0.9 toward 0.5
+        miner = RelationMiner(backend, nli_method="logprobs",
+                              strength_calibrator=cal, pair_policy="all_pairs")
+        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        assert result.relations
+        for rel in result.relations:
+            assert rel.strength_raw == pytest.approx(0.9, abs=1e-6)
+            # Calibrated strength is the softened value, strictly below the raw 0.9.
+            assert rel.strength == pytest.approx(cal.transform(0.9), abs=1e-6)
+            assert rel.strength < rel.strength_raw

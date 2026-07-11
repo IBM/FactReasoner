@@ -47,7 +47,7 @@ from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.base import Atom, PRIOR_PROB_ATOM
+from fact_reasoner.core.base import Atom
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.utils import build_atoms
 from fact_reasoner.fact_graph import FactGraph
@@ -56,7 +56,17 @@ from fact_reasoner.utils import extract_logprobs_from_output, run_throttled
 
 from fact_reasoner.factors import build_markov_network
 from fact_reasoner.lcs import candidate_pairs as _cp
-from fact_reasoner.lcs.prompts import build_sense_coupling_prompt, build_strength_prompt
+from fact_reasoner.lcs.prompts import (
+    build_sense_coupling_prompt,
+    build_strength_prompt,
+    build_surrogate_strength_prompt,
+)
+from fact_reasoner.lcs.strength import (
+    IdentityCalibrator,
+    StrengthCalibrator,
+    affirm_fraction,
+    surrogate_probability_from_logprobs,
+)
 from fact_reasoner.lcs.taxonomy import (
     LEVEL1_CONTRADICTION,
     LEVEL1_NONE,
@@ -65,10 +75,19 @@ from fact_reasoner.lcs.taxonomy import (
     coupling_from_string,
 )
 
-# Methods for estimating the relation probability, mirroring core/nli.py.
+# Methods for estimating the type confidence P(tau|a_i,a_j), mirroring core/nli.py.
 MINER_METHODS = ("logprobs", "simbauq")
 
-# Confidence used when a bracketed span cannot be located in the logprobs.
+# Methods for estimating the conditional strength P(a_j|a_i,tau):
+#   * surrogate_logprobs -- renormalized P("Yes")/(P("Yes")+P("No")) from the
+#     answer token's logprobs (needs a logprobs-capable backend).
+#   * surrogate_sampled  -- affirm-fraction over N Yes/No samples (backend-agnostic).
+#   * verbalized         -- the (weakly calibrated) baseline: parse [p=0.NN].
+# "auto" resolves to surrogate_logprobs when logprobs are available, else
+# surrogate_sampled.
+STRENGTH_METHODS = ("surrogate_logprobs", "surrogate_sampled", "verbalized")
+
+# Confidence used when a probability cannot be determined from the output.
 _UNKNOWN_PROBABILITY = 0.5
 
 
@@ -105,6 +124,7 @@ class MinedRelation:
     probability: float
     type_confidence: float
     strength: float
+    strength_raw: Optional[float] = None
     directed: bool = True
     concession_resolved: bool = False
     resolving_atom_id: Optional[str] = None
@@ -204,6 +224,23 @@ def _atom_sort_key(atom_id: str):
     return (0, int(m.group(1))) if m else (1, atom_id)
 
 
+def _output_text(output: Any) -> str:
+    """Best-effort text of a sampling result / thunk / exception (empty on failure)."""
+    if isinstance(output, Exception) or not getattr(output, "success", False):
+        return ""
+    try:
+        return str(output.result)
+    except Exception:
+        return ""
+
+
+def _starts_with_yes_no(s: str) -> bool:
+    """Whether the answer's first word is Yes or No (the surrogate token)."""
+    first = (s or "").strip().split()
+    word = first[0].lower() if first else ""
+    return word.startswith("yes") or word.startswith("no")
+
+
 # ----------------------------------------------------------------------------
 # Bracketed-span logprob reading (Prompt A [coupling=...] / Prompt B [p=0.NN]).
 # ----------------------------------------------------------------------------
@@ -285,6 +322,9 @@ class RelationMiner:
         prior: float = 0.5,
         concession_discount: float = 0.45,
         fused_strength: bool = False,
+        strength_method: str = "auto",
+        strength_samples: int = 8,
+        strength_calibrator: Optional[StrengthCalibrator] = None,
         show_progress: bool = False,
     ):
         """Initialize the relation miner.
@@ -315,16 +355,45 @@ class RelationMiner:
             fused_strength: Reserved. When True, a single call would emit both
                 sense/coupling and strength; the default two-prompt design keeps
                 them separate (the faithful deep-dive path).
+            strength_method: How to estimate the conditional strength
+                ``P(a_j|a_i,tau)``. One of ``STRENGTH_METHODS`` or ``"auto"``
+                (default). ``"surrogate_logprobs"`` reads the renormalized
+                ``P("Yes")/(P("Yes")+P("No"))`` from the answer token's logprobs
+                (well-calibrated; needs a logprobs backend). ``"surrogate_sampled"``
+                takes the affirm-fraction over ``strength_samples`` Yes/No samples
+                (backend-agnostic; use for Ollama). ``"verbalized"`` parses a
+                verbalized ``[p=0.NN]`` (weakly calibrated baseline, kept for
+                comparison). ``"auto"`` picks ``surrogate_logprobs`` when
+                ``nli_method=="logprobs"`` (logprobs available) else
+                ``surrogate_sampled``.
+            strength_samples: Number of Yes/No samples for ``surrogate_sampled``.
+            strength_calibrator: Optional post-hoc calibrator applied to the raw
+                strength (e.g. a fitted :class:`TemperatureCalibrator`). Defaults
+                to the identity (no-op).
             show_progress: If True, show a tqdm bar as pairs are mined.
 
         Raises:
-            ValueError: If ``backend`` is None or ``nli_method`` is unknown.
+            ValueError: If ``backend`` is None, or ``nli_method`` / ``strength_method``
+                is unknown.
         """
         if backend is None:
             raise ValueError("Mellea backend is None. Provide a valid backend.")
         if nli_method not in MINER_METHODS:
             raise ValueError(
                 f"Unknown nli_method: {nli_method!r} (expected {list(MINER_METHODS)})."
+            )
+
+        # Resolve the strength method ("auto" -> logprobs-based when available).
+        if strength_method == "auto":
+            strength_method = (
+                "surrogate_logprobs"
+                if nli_method == "logprobs"
+                else "surrogate_sampled"
+            )
+        if strength_method not in STRENGTH_METHODS:
+            raise ValueError(
+                f"Unknown strength_method: {strength_method!r} "
+                f"(expected one of {list(STRENGTH_METHODS)} or 'auto')."
             )
 
         self.backend = backend
@@ -339,10 +408,14 @@ class RelationMiner:
         self.prior = prior
         self.concession_discount = concession_discount
         self.fused_strength = fused_strength
+        self.strength_method = strength_method
+        self.strength_samples = strength_samples
+        self.strength_calibrator = strength_calibrator or IdentityCalibrator()
         self.show_progress = show_progress
 
         self._sense_prompt = build_sense_coupling_prompt()
         self._strength_prompt = build_strength_prompt()
+        self._surrogate_strength_prompt = build_surrogate_strength_prompt()
 
         # SIMBA-UQ strategy for backend-agnostic confidence, else rejection.
         if nli_method == "simbauq":
@@ -354,7 +427,8 @@ class RelationMiner:
 
         print(
             f"[RelationMiner] backend: {self.backend.model_id} "
-            f"(method: {self.nli_method}, policy: {self.pair_policy})"
+            f"(nli: {self.nli_method}, strength: {self.strength_method}, "
+            f"policy: {self.pair_policy})"
         )
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
@@ -471,6 +545,8 @@ class RelationMiner:
 
         config = {
             "nli_method": self.nli_method,
+            "strength_method": self.strength_method,
+            "strength_samples": self.strength_samples,
             "pair_policy": self.pair_policy,
             "window": self.window,
             "gate": self.gate,
@@ -539,47 +615,19 @@ class RelationMiner:
         for pair, out in zip(pairs, sense_outputs):
             interim.append(self._parse_sense_output(pair, out))
 
-        # Prompt B only for pairs whose coupling produces an edge.
+        # Conditional strength P(a_j|a_i,tau) only for pairs producing an edge.
         edge_indices = [i for i, r in enumerate(interim) if r is not None]
+        strengths_raw = await self._estimate_strengths(atoms, interim, edge_indices)
 
-        def strength_factory(idx: int):
-            r = interim[idx]
-            src, trg = r["source_id"], r["target_id"]
-            return mfuncs.ainstruct(
-                self._strength_prompt,
-                context=SimpleContext(),
-                backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must end with a bracketed probability [p=0.NN].",
-                        validation_fn=simple_validate(
-                            lambda s: _PROB_RE.search(s) is not None
-                        ),
-                    )
-                ],
-                user_variables={
-                    "atom_a": atoms[src].text,
-                    "atom_b": atoms[trg].text,
-                    "coupling": r["level1_type"],
-                },
-                strategy=self._strategy,
-                return_sampling_results=True,
-                model_options=self._model_options(),
-            )
-
-        strengths: Dict[int, float] = {}
-        if edge_indices:
-            strength_outputs = await run_throttled(strength_factory, edge_indices)
-            for idx, out in zip(edge_indices, strength_outputs):
-                strengths[idx] = self._parse_strength_output(out)
-
-        # Assemble MinedRelation objects (None where coupling was NONE).
+        # Assemble MinedRelation objects (None where coupling was NONE). Apply the
+        # post-hoc calibrator to the raw strength before forming the factor weight.
         results: List[Optional[MinedRelation]] = []
         for i, r in enumerate(interim):
             if r is None:
                 results.append(None)
                 continue
-            strength = strengths.get(i, _UNKNOWN_PROBABILITY)
+            strength_raw = strengths_raw.get(i, _UNKNOWN_PROBABILITY)
+            strength = max(0.0, min(1.0, self.strength_calibrator.transform(strength_raw)))
             prob = max(0.0, min(1.0, r["type_confidence"] * strength))
             results.append(
                 MinedRelation(
@@ -590,11 +638,137 @@ class RelationMiner:
                     probability=prob,
                     type_confidence=r["type_confidence"],
                     strength=strength,
+                    strength_raw=strength_raw,
                     directed=r["directed"],
                     concession_resolved=r["is_concession"],
                 )
             )
         return results
+
+    async def _estimate_strengths(
+        self,
+        atoms: Dict[str, Atom],
+        interim: List[Optional[Dict[str, Any]]],
+        edge_indices: List[int],
+    ) -> Dict[int, float]:
+        """Estimate the raw conditional strength for each edge-producing pair.
+
+        Dispatches on ``self.strength_method``:
+          * ``surrogate_logprobs`` -- one Yes/No call per edge, strength read as the
+            renormalized ``P("Yes")/(P("Yes")+P("No"))`` from the answer logprobs.
+          * ``surrogate_sampled`` -- ``strength_samples`` Yes/No calls per edge,
+            strength is the affirm-fraction (backend-agnostic).
+          * ``verbalized`` -- one call per edge, parse the verbalized ``[p=0.NN]``.
+        """
+        strengths: Dict[int, float] = {}
+        if not edge_indices:
+            return strengths
+
+        if self.strength_method == "verbalized":
+            outputs = await run_throttled(
+                lambda idx: self._verbalized_call(atoms, interim[idx]), edge_indices
+            )
+            for idx, out in zip(edge_indices, outputs):
+                strengths[idx] = self._parse_strength_output(out)
+            return strengths
+
+        if self.strength_method == "surrogate_logprobs":
+            outputs = await run_throttled(
+                lambda idx: self._surrogate_call(atoms, interim[idx], logprobs=True),
+                edge_indices,
+            )
+            for idx, out in zip(edge_indices, outputs):
+                strengths[idx] = self._parse_surrogate_logprobs(out)
+            return strengths
+
+        # surrogate_sampled: N Yes/No samples per edge, one flattened fan-out.
+        n = max(1, self.strength_samples)
+        jobs = [(idx, s) for idx in edge_indices for s in range(n)]
+        outputs = await run_throttled(
+            lambda job: self._surrogate_call(atoms, interim[job[0]], logprobs=False),
+            jobs,
+        )
+        per_edge: Dict[int, List[str]] = {idx: [] for idx in edge_indices}
+        for (idx, _s), out in zip(jobs, outputs):
+            per_edge[idx].append(_output_text(out))
+        for idx, answers in per_edge.items():
+            frac = affirm_fraction(answers)
+            strengths[idx] = frac if frac is not None else _UNKNOWN_PROBABILITY
+        return strengths
+
+    def _verbalized_call(self, atoms: Dict[str, Atom], r: Dict[str, Any]):
+        """One verbalized-strength ([p=0.NN]) generation for an edge."""
+        return mfuncs.ainstruct(
+            self._strength_prompt,
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=[
+                check(
+                    "The output must end with a bracketed probability [p=0.NN].",
+                    validation_fn=simple_validate(
+                        lambda s: _PROB_RE.search(s) is not None
+                    ),
+                )
+            ],
+            user_variables={
+                "atom_a": atoms[r["source_id"]].text,
+                "atom_b": atoms[r["target_id"]].text,
+                "coupling": r["level1_type"],
+            },
+            strategy=self._strategy,
+            return_sampling_results=True,
+            model_options=self._model_options(),
+        )
+
+    def _surrogate_call(
+        self, atoms: Dict[str, Atom], r: Dict[str, Any], *, logprobs: bool
+    ):
+        """One Yes/No surrogate-strength generation for an edge.
+
+        ``logprobs=True`` requests token logprobs (for ``surrogate_logprobs``);
+        ``logprobs=False`` is a plain sampled generation (for ``surrogate_sampled``).
+        """
+        return mfuncs.ainstruct(
+            self._surrogate_strength_prompt,
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=[
+                check(
+                    "The output must begin with Yes or No.",
+                    validation_fn=simple_validate(_starts_with_yes_no),
+                )
+            ],
+            user_variables={
+                "atom_a": atoms[r["source_id"]].text,
+                "atom_b": atoms[r["target_id"]].text,
+                "coupling": r["level1_type"],
+            },
+            strategy=RejectionSamplingStrategy(loop_budget=3),
+            return_sampling_results=True,
+            model_options={"logprobs": True, "top_logprobs": 5} if logprobs else None,
+        )
+
+    def _parse_surrogate_logprobs(self, output: Any) -> float:
+        """Read the renormalized surrogate probability from a Yes/No answer."""
+        if isinstance(output, Exception) or not getattr(output, "success", False):
+            return _UNKNOWN_PROBABILITY
+        try:
+            lps = extract_logprobs_from_output(output.result)
+        except Exception:
+            lps = None
+        if lps:
+            p = surrogate_probability_from_logprobs(lps)
+            if p is not None:
+                return p
+        # Fallback: no usable logprobs -- read the emitted word (Yes~1 / No~0).
+        text = _output_text(output)
+        first = text.strip().split()
+        word = first[0].lower() if first else ""
+        if word.startswith("yes"):
+            return 1.0
+        if word.startswith("no"):
+            return 0.0
+        return _UNKNOWN_PROBABILITY
 
     # -- prompt parsing ------------------------------------------------------
 

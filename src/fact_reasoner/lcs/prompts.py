@@ -24,15 +24,23 @@
 #     token logprobs give the type confidence P(tau | a_i, a_j). The chain of
 #     thought comes first so the model commits to the sense only after reasoning.
 #
-#   * Prompt B (PROMPT_STRENGTH) -- a cheaper call that, given the coupling from
-#     Prompt A, elicits the conditional strength P(a_j | a_i, tau) as a verbalized
-#     probability ending in [p=0.NN]. This is the "common-sense reasoner" query
-#     that distinguishes a strong from a weak entailment.
+#   * Prompt B -- given the coupling from Prompt A, elicits the conditional
+#     strength P(a_j | a_i, tau). TWO forms are provided:
+#       - PROMPT_STRENGTH_SURROGATE (DEFAULT): a Yes/No surrogate-token question.
+#         The strength is read as the renormalized token probability
+#         p = P("Yes") / (P("Yes") + P("No")) from the answer token's logprobs, or
+#         as the affirm-fraction over N samples when logprobs are unavailable. This
+#         replaces the poorly-calibrated verbalized number with a quantity taken
+#         from the model's own distribution (Kadavath et al. arXiv:2207.05221;
+#         cf. EPK arXiv:2505.15918 for graphical-model parameters).
+#       - PROMPT_STRENGTH (baseline): the older verbalized probability [p=0.NN],
+#         kept only for comparison; verbalized confidence is known to be weakly
+#         calibrated (Xiong et al. ICLR 2024, arXiv:2306.13063).
 #
-# Both prompts mirror the style of ``core/nli.py`` (instruction + few-shots +
-# bracketed final answer). The bracketed spans are kept as their own token runs
-# so the label and its probability are read from the SAME span (the EOS-drop /
-# fused-bracket pitfalls documented in project memory).
+# All prompts mirror the style of ``core/nli.py`` (instruction + few-shots). The
+# verbalized bracket span is kept as its own token run so the label and its
+# probability are read from the SAME span (the EOS-drop / fused-bracket pitfalls
+# documented in project memory).
 
 # The set of Level-2 senses offered to the model, kept in sync with
 # ``taxonomy.Level2Sense`` and interpolated into the prompt.
@@ -143,7 +151,64 @@ B: {{atom_b}}
 
 
 # ----------------------------------------------------------------------------
-# Prompt B -- conditional strength P(a_j | a_i, tau).
+# Prompt B (default) -- conditional strength via a Yes/No surrogate token.
+# ----------------------------------------------------------------------------
+#
+# The answer's FIRST WORD must be Yes or No, so its token logprobs give the
+# renormalized surrogate probability p = P("Yes") / (P("Yes") + P("No")). "Yes"
+# always means "the coupling's asserted implication holds", so p is the strength
+# of the coupling regardless of type (for a contradiction, we ask whether B is
+# FALSE given A, so "Yes" still means the contradiction is strong).
+
+PROMPT_STRENGTH_SURROGATE = """
+
+Instructions:
+Assume claim A is TRUE, and that a {{coupling}} relation holds from A to B. Decide \
+whether the relation's implication about B follows.
+
+- entailment or equivalence: does B then follow as TRUE given A?
+- contradiction: is B then FALSE given A?
+
+Answer with a SINGLE WORD, the very first word of your reply: Yes or No.
+- Answer "Yes" if the implication holds strongly (B follows / B is false, as above).
+- Answer "No" if it does not.
+Do not output anything before the word Yes or No.
+
+Use the following examples to better understand your task.
+
+Example 1:
+A: The new alloy is chemically identical to the certified reference alloy.
+B: The new alloy meets the certified reference specification.
+coupling: entailment
+Answer: Yes
+
+Example 2:
+A: The company launched a flawed product last quarter.
+B: The company's stock price fell 15 percent last quarter.
+coupling: entailment
+Answer: Yes
+
+Example 3:
+A: No one was harmed in the incident.
+B: Three people died in the incident.
+coupling: contradiction
+Answer: Yes
+
+Example 4:
+A: The regulator published a preliminary bulletin.
+B: The airline redesigned its loyalty program.
+coupling: entailment
+Answer: No
+
+Your task:
+A: {{atom_a}}
+B: {{atom_b}}
+coupling: {{coupling}}
+Answer: """
+
+
+# ----------------------------------------------------------------------------
+# Prompt B (baseline) -- verbalized conditional strength P(a_j | a_i, tau).
 # ----------------------------------------------------------------------------
 
 PROMPT_STRENGTH = """
@@ -203,13 +268,26 @@ def build_sense_coupling_prompt() -> str:
     return PROMPT_SENSE_COUPLING.replace("{{sense_menu}}", _SENSE_MENU)
 
 
+def build_surrogate_strength_prompt() -> str:
+    """Return the default (surrogate Yes/No) conditional-strength prompt.
+
+    The ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}`` placeholders remain for
+    Mellea's ``user_variables`` substitution at call time. The answer's first word
+    is the surrogate token whose logprobs give the renormalized strength.
+
+    Returns:
+        The surrogate-token strength prompt template string.
+    """
+    return PROMPT_STRENGTH_SURROGATE
+
+
 def build_strength_prompt() -> str:
-    """Return Prompt B.
+    """Return the verbalized (baseline) conditional-strength prompt.
 
     The ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}`` placeholders remain for
     Mellea's ``user_variables`` substitution at call time.
 
     Returns:
-        The Prompt B template string.
+        The verbalized Prompt B template string.
     """
     return PROMPT_STRENGTH

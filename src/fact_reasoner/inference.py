@@ -26,6 +26,7 @@
 
 import json
 import os
+import re
 import subprocess
 import uuid
 from typing import Dict, List, Optional
@@ -34,6 +35,20 @@ from fact_reasoner.markov_network import MarkovNetwork
 
 # Merlin inference tasks this helper knows how to run.
 MERLIN_TASKS = ("MAR", "PR")
+
+
+def _load_merlin_json(raw: str) -> Optional[Dict[str, object]]:
+    """Strictly parse Merlin's JSON output, or return ``None`` if malformed.
+
+    Some Merlin builds emit a duplicated ``"status"`` field without a separating
+    comma in the PR output (e.g. ``... "status" : "true"  "status" : "true" ...``),
+    which is not valid JSON. Returning ``None`` lets the PR parser fall back to a
+    regex extraction of the ``value`` field; the MAR parser requires a valid object.
+    """
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
 
 
 def run_merlin(
@@ -121,14 +136,15 @@ def run_merlin(
             )
 
         with open(output_filename) as f:
-            results = json.load(f)
+            raw = f.read()
+        results = _load_merlin_json(raw)
 
         if task == "MAR":
             return _parse_marginals(
                 results, vars_mapping, query_variables, verbose=verbose
             )
         else:  # task == "PR"
-            return _parse_partition(results)
+            return _parse_partition(results, raw)
     finally:
         # Always clean up the temporary input/output files.
         if os.path.exists(input_filename):
@@ -150,6 +166,9 @@ def _parse_marginals(
     ``marginals`` is filtered to ``query_variables`` when provided, and
     ``all_marginals`` always contains every variable.
     """
+    if results is None:
+        raise RuntimeError("Merlin MAR output was not valid JSON.")
+
     query_set = set(query_variables) if query_variables is not None else None
 
     marginals: List[Dict[str, object]] = []
@@ -168,16 +187,28 @@ def _parse_marginals(
     return {"task": "MAR", "marginals": marginals, "all_marginals": all_marginals}
 
 
-def _parse_partition(results: Dict[str, object]) -> Dict[str, object]:
+def _parse_partition(
+    results: Optional[Dict[str, object]], raw: str
+) -> Dict[str, object]:
     """Parse a Merlin PR result into a ``log_z`` float.
 
-    Merlin's PR output reports the partition function; different builds label the
-    field ``"PR"``, ``"logZ"`` or ``"value"``, so we accept any of them.
+    Merlin's PR output reports the (natural-log) partition function; different
+    builds label the field ``"PR"``, ``"logZ"`` or ``"value"``, so we accept any of
+    them. When ``results`` is ``None`` (the output was not valid JSON -- some builds
+    emit a malformed duplicated ``"status"`` in the PR output), we fall back to a
+    regex extraction of the ``"value"`` (or ``"PR"``) number from the raw text.
     """
-    for key in ("PR", "logZ", "log_z", "value", "Z"):
-        if key in results:
-            return {"task": "PR", "log_z": float(results[key])}
+    if results is not None:
+        for key in ("PR", "logZ", "log_z", "value", "Z"):
+            if key in results:
+                return {"task": "PR", "log_z": float(results[key])}
+
+    # Lenient fallback: pull the numeric value straight out of the raw text.
+    for key in ("value", "PR", "logZ", "log_z", "Z"):
+        m = re.search(rf'"{key}"\s*:\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)', raw)
+        if m:
+            return {"task": "PR", "log_z": float(m.group(1))}
     raise RuntimeError(
-        f"Merlin PR output did not contain a partition value; keys were "
-        f"{list(results.keys())}."
+        "Merlin PR output did not contain a partition value; raw output: "
+        f"{raw[:200]!r}"
     )

@@ -54,6 +54,12 @@ from fact_reasoner.lcs.relation_miner import (
     MiningResult,
     RelationMiner,
 )
+from fact_reasoner.lcs.strength import (
+    IdentityCalibrator,
+    PlattCalibrator,
+    StrengthCalibrator,
+    TemperatureCalibrator,
+)
 from fact_reasoner.lcs.taxonomy import (
     COMPILE,
     Level2Sense,
@@ -68,6 +74,10 @@ __all__ = [
     "MiningResult",
     "LCSScorer",
     "mine_and_score",
+    "StrengthCalibrator",
+    "IdentityCalibrator",
+    "TemperatureCalibrator",
+    "PlattCalibrator",
     "Level2Sense",
     "SenseSpec",
     "COMPILE",
@@ -101,9 +111,11 @@ def mine_and_score(
         atomizer: Required when ``response_or_atoms`` is a raw string.
         reviser: Optional decontextualizer for atoms from a response.
         scorer_kwargs: Extra kwargs for :meth:`LCSScorer.score` (e.g.
-            ``{"compute_log_z": False}``).
+            ``{"method": "reified"}`` to pick an alternative LCS readout).
         **miner_kwargs: Extra kwargs for :class:`RelationMiner` (e.g.
-            ``nli_method``, ``pair_policy``, ``window``, ``gate``).
+            ``nli_method``, ``strength_method`` (``"surrogate_logprobs"`` /
+            ``"surrogate_sampled"`` / ``"verbalized"``), ``strength_calibrator``,
+            ``pair_policy``, ``window``, ``gate``).
 
     Returns:
         A dict with the score fields from :meth:`LCSScorer.score` plus a
