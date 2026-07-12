@@ -50,7 +50,11 @@ def _dry_config(output_dir, **overrides):
 class TestDataset:
     def test_load_all_examples(self):
         examples = load_examples()
-        assert len(examples) == 8
+        # The 5 ideation examples (with variants) + AeroParts + the authored
+        # coherent post-mortem example.
+        assert len(examples) == 9
+        ids_all = {e["id"] for e in examples}
+        assert "example-6-incident" in ids_all
         for ex in examples:
             ids = [a["id"] for a in ex["atoms"]]
             assert ids == [f"a{i}" for i in range(len(ids))]

@@ -156,45 +156,51 @@ B: {{atom_b}}
 #
 # The answer's FIRST WORD must be Yes or No, so its token logprobs give the
 # renormalized surrogate probability p = P("Yes") / (P("Yes") + P("No")). "Yes"
-# always means "the coupling's asserted implication holds", so p is the strength
-# of the coupling regardless of type (for a contradiction, we ask whether B is
-# FALSE given A, so "Yes" still means the contradiction is strong).
+# always means "the coupling's asserted implication is credible", so p is the
+# strength of the coupling regardless of type. The judgment is GRADED / plausibility
+# based -- "Yes" covers weak-but-real links too, not only near-certain ones -- so a
+# merely plausible entailment does not read as a flat "No"; the graded confidence
+# instead comes out in the renormalized logprob p (and, for sampling, the affirm
+# fraction). For a contradiction we ask whether B is likely FALSE given A, so "Yes"
+# still means the contradiction is credible.
 
 PROMPT_STRENGTH_SURROGATE = """
 
 Instructions:
-Assume claim A is TRUE, and that a {{coupling}} relation holds from A to B. Decide \
-whether the relation's implication about B follows.
+Assume claim A is TRUE, and that a {{coupling}} relation holds from A to B. Judge \
+whether the relation's implication about B is credible -- i.e. at least plausible / \
+more likely than not, NOT whether it is certain.
 
-- entailment or equivalence: does B then follow as TRUE given A?
-- contradiction: is B then FALSE given A?
+- entailment or equivalence: given A, is B at least plausibly TRUE (more likely than \
+not)?
+- contradiction: given A, is B at least plausibly FALSE (more likely than not)?
 
 Answer with a SINGLE WORD, the very first word of your reply: Yes or No.
-- Answer "Yes" if the implication holds strongly (B follows / B is false, as above).
-- Answer "No" if it does not.
+- Answer "Yes" if the implication is credible/plausible (even if not certain).
+- Answer "No" only if the implication is implausible or unsupported.
 Do not output anything before the word Yes or No.
 
 Use the following examples to better understand your task.
 
-Example 1:
+Example 1 (near-certain entailment):
 A: The new alloy is chemically identical to the certified reference alloy.
 B: The new alloy meets the certified reference specification.
 coupling: entailment
 Answer: Yes
 
-Example 2:
+Example 2 (weak but plausible entailment -- still Yes):
 A: The company launched a flawed product last quarter.
 B: The company's stock price fell 15 percent last quarter.
 coupling: entailment
 Answer: Yes
 
-Example 3:
+Example 3 (clear contradiction):
 A: No one was harmed in the incident.
 B: Three people died in the incident.
 coupling: contradiction
 Answer: Yes
 
-Example 4:
+Example 4 (implausible / unsupported link):
 A: The regulator published a preliminary bulletin.
 B: The airline redesigned its loyalty program.
 coupling: entailment

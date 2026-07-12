@@ -1,0 +1,23 @@
+{
+  "id": "example-6-incident",
+  "name": "Software incident post-mortem (coherent)",
+  "source": "authored: logically coherent example (software-engineering domain)",
+  "response": "At 09:14 the team deployed release 4.2 to production. The release contained a change that removed a database index used by the checkout query. Without that index, the checkout query began performing a full table scan. The full table scans drove average checkout latency from 120 ms to 9 seconds. Because checkout requests now exceeded the 5 second gateway timeout, roughly 40 percent of checkout attempts failed. The monitoring system detected the elevated error rate and paged the on-call engineer at 09:31. The on-call engineer inspected the deployment history and identified release 4.2 as the cause. The engineer rolled back to release 4.1 at 09:47. After the rollback restored the dropped index, the checkout query returned to using the index. Checkout latency then fell back to about 120 ms and the error rate returned to its normal baseline. The team later added a migration-review check so that index-dropping changes are flagged before deployment.",
+  "num_atoms": 13,
+  "atoms": [
+    {"id": "a0", "text": "At 09:14 the team deployed release 4.2 to production.", "label": "P1"},
+    {"id": "a1", "text": "Release 4.2 contained a change that removed a database index used by the checkout query.", "label": "P2"},
+    {"id": "a2", "text": "Without the removed index, the checkout query began performing a full table scan.", "label": "P3"},
+    {"id": "a3", "text": "The full table scans drove average checkout latency from 120 ms to 9 seconds.", "label": "P4"},
+    {"id": "a4", "text": "Checkout requests exceeded the 5 second gateway timeout.", "label": "P5"},
+    {"id": "a5", "text": "Roughly 40 percent of checkout attempts failed.", "label": "P6"},
+    {"id": "a6", "text": "The monitoring system detected the elevated error rate and paged the on-call engineer at 09:31.", "label": "P7"},
+    {"id": "a7", "text": "The on-call engineer inspected the deployment history and identified release 4.2 as the cause.", "label": "P8"},
+    {"id": "a8", "text": "The engineer rolled back to release 4.1 at 09:47.", "label": "P9"},
+    {"id": "a9", "text": "The rollback restored the previously dropped database index.", "label": "P10"},
+    {"id": "a10", "text": "After the rollback, the checkout query returned to using the index.", "label": "P11"},
+    {"id": "a11", "text": "Checkout latency fell back to about 120 ms and the error rate returned to its normal baseline.", "label": "P12"},
+    {"id": "a12", "text": "The team added a migration-review check so that index-dropping changes are flagged before deployment.", "label": "P13"}
+  ],
+  "notes": "Authored coherent example: a software incident post-mortem forming a sound causal chain (deploy -> index drop -> full scan -> latency -> timeouts -> failures -> alert -> diagnosis -> rollback -> recovery -> prevention). No internal contradictions; every atom is consistent with and largely entailed/enabled by the preceding ones. Expected to score HIGH on coherence."
+}

@@ -41,7 +41,7 @@ from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
 from fact_reasoner.lcs.relation_miner import STRENGTH_METHODS
 
 from fact_reasoner.experiments.config import DEFAULT_MODELS, ExperimentConfig, ModelSpec
-from fact_reasoner.experiments.report import write_report
+from fact_reasoner.experiments.report import combine_results, write_report
 from fact_reasoner.experiments.runner import ExperimentRunner
 
 
@@ -72,6 +72,12 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Run offline with a stubbed LLM and brute-force inference.")
     p.add_argument("--report-only", action="store_true",
                    help="Skip the sweep; regenerate the report from results.json.")
+    p.add_argument(
+        "--combine", default=None,
+        help="Comma-separated list of results.json paths (or their dirs) to merge "
+        "into a single combined report written to --output-dir. Columns are keyed "
+        "by (model, pair-policy, strength) so multiple policies appear side by side.",
+    )
     return p
 
 
@@ -87,6 +93,20 @@ def _csv(val):
 
 def main(argv=None) -> None:
     args = _build_parser().parse_args(argv)
+
+    if args.combine:
+        parts = []
+        for p in _csv(args.combine):
+            path = p if p.endswith(".json") else os.path.join(p, "results.json")
+            with open(path) as f:
+                parts.append(json.load(f))
+        combined = combine_results(parts)
+        os.makedirs(args.output_dir, exist_ok=True)
+        with open(os.path.join(args.output_dir, "results.json"), "w") as f:
+            json.dump(combined, f, indent=2)
+        write_report(combined, args.output_dir)
+        print(f"[experiments] combined {len(parts)} runs -> {args.output_dir}")
+        return
 
     if args.report_only:
         results_path = os.path.join(args.output_dir, "results.json")

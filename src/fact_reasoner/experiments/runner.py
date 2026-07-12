@@ -146,6 +146,8 @@ class ExperimentRunner:
             "example_name": example["name"],
             "strength_method": strength_method,
             "nli_method": nli_method,
+            "pair_policy": cfg.pair_policy,
+            "window": cfg.window,
             "num_atoms": example["num_atoms"],
         }
         start = time.perf_counter()
