@@ -300,9 +300,12 @@ def _last_match_span(pattern: re.Pattern, text: str) -> Optional[Tuple[str, Tupl
 class RelationMiner:
     """Mine inter-atom relations and build the coherence MRF.
 
-    See the module docstring for the pipeline. The two ergonomic entry points are
-    :meth:`mine_from_response` (atomizes a raw response first) and
-    :meth:`mine_from_atoms` (takes atoms directly). Async variants
+    See the module docstring for the pipeline. Mining is always RESPONSE-GROUNDED:
+    every entry point needs the original response, so the two prompts (coupling +
+    strength) see the full response and assert only relations it actually draws.
+    The two ergonomic entry points are :meth:`mine_from_response` (atomizes a raw
+    response first, grounding on that same text) and :meth:`mine_from_atoms`
+    (takes pre-extracted atoms and the response they came from). Async variants
     (:meth:`amine_from_response` / :meth:`amine_from_atoms`) run the per-pair LLM
     calls concurrently (throttled).
     """
@@ -321,7 +324,6 @@ class RelationMiner:
         embedding_model: str = "all-MiniLM-L6-v2",
         prior: float = 0.5,
         concession_discount: float = 0.45,
-        fused_strength: bool = False,
         strength_method: str = "auto",
         strength_samples: int = 8,
         strength_calibrator: Optional[StrengthCalibrator] = None,
@@ -352,9 +354,6 @@ class RelationMiner:
                 resolved-concession contradiction: ``p_eff = p * (1 - discount)``
                 (deep-dive Eq. 2; a discount of 0.45 with pi_h=1 maps p=0.80 to
                 p_eff=0.44, matching the doc's softening direction).
-            fused_strength: Reserved. When True, a single call would emit both
-                sense/coupling and strength; the default two-prompt design keeps
-                them separate (the faithful deep-dive path).
             strength_method: How to estimate the conditional strength
                 ``P(a_j|a_i,tau)``. One of ``STRENGTH_METHODS`` or ``"auto"``
                 (default). ``"surrogate_logprobs"`` reads the renormalized
@@ -407,12 +406,15 @@ class RelationMiner:
         self.embedding_model = embedding_model
         self.prior = prior
         self.concession_discount = concession_discount
-        self.fused_strength = fused_strength
         self.strength_method = strength_method
         self.strength_samples = strength_samples
         self.strength_calibrator = strength_calibrator or IdentityCalibrator()
         self.show_progress = show_progress
 
+        # Response-grounded prompts: each takes a {{response}} context block so the
+        # model asserts only relations the response actually draws (pruning
+        # spurious, abstractly-plausible edges that cause over-connection).
+        # Grounding is mandatory -- there is no ungrounded path.
         self._sense_prompt = build_sense_coupling_prompt()
         self._strength_prompt = build_strength_prompt()
         self._surrogate_strength_prompt = build_surrogate_strength_prompt()
@@ -434,33 +436,63 @@ class RelationMiner:
 
     # -- public entry points -------------------------------------------------
 
+    @staticmethod
+    def _require_response(response: Optional[str]) -> str:
+        """Validate that a non-empty response was supplied (grounding is required)."""
+        if not response or not str(response).strip():
+            raise ValueError(
+                "A non-empty response is required: mining is always "
+                "response-grounded. Pass mine_from_atoms(atoms, response=...) or "
+                "use mine_from_response(response)."
+            )
+        return response
+
     def mine_from_response(
         self, response: str, *, query: Optional[str] = None
     ) -> MiningResult:
-        """Atomize ``response`` and mine its inter-atom relations."""
+        """Atomize ``response`` and mine its inter-atom relations (grounded)."""
+        self._require_response(response)
         atoms = self._atoms_from_response(response)
         return asyncio.run(self._mine(atoms, source_response=response))
 
     def mine_from_atoms(
-        self, atoms: Union[List[str], List[Atom], Dict[str, Atom]]
+        self,
+        atoms: Union[List[str], List[Atom], Dict[str, Atom]],
+        response: str,
     ) -> MiningResult:
-        """Mine inter-atom relations for a set of already-decomposed atoms."""
+        """Mine inter-atom relations for already-decomposed atoms, grounded in the
+        response they came from.
+
+        Args:
+            atoms: The atoms (strings, :class:`Atom`, or an ordered dict).
+            response: The original response the atoms came from (REQUIRED). Mining
+                is always response-grounded: it prunes relations the response does
+                not draw and refines candidate pairs with discourse adjacency.
+
+        Raises:
+            ValueError: If ``response`` is empty/None.
+        """
+        self._require_response(response)
         norm = self._normalize_atoms(atoms)
-        return asyncio.run(self._mine(norm, source_response=None))
+        return asyncio.run(self._mine(norm, source_response=response))
 
     async def amine_from_response(
         self, response: str, *, query: Optional[str] = None
     ) -> MiningResult:
         """Async variant of :meth:`mine_from_response`."""
+        self._require_response(response)
         atoms = self._atoms_from_response(response)
         return await self._mine(atoms, source_response=response)
 
     async def amine_from_atoms(
-        self, atoms: Union[List[str], List[Atom], Dict[str, Atom]]
+        self,
+        atoms: Union[List[str], List[Atom], Dict[str, Atom]],
+        response: str,
     ) -> MiningResult:
-        """Async variant of :meth:`mine_from_atoms`."""
+        """Async variant of :meth:`mine_from_atoms` (response REQUIRED)."""
+        self._require_response(response)
         norm = self._normalize_atoms(atoms)
-        return await self._mine(norm, source_response=None)
+        return await self._mine(norm, source_response=response)
 
     # -- atom preparation ----------------------------------------------------
 
@@ -507,7 +539,7 @@ class RelationMiner:
         self, atoms: Dict[str, Atom], *, source_response: Optional[str]
     ) -> MiningResult:
         """Select pairs, mine each, discount concessions, build the MRF."""
-        # 1. candidate pairs
+        # 1. candidate pairs (response-anchored; grounding is always on)
         pairs, coverage = _cp.select(
             atoms,
             policy=self.pair_policy,
@@ -515,13 +547,14 @@ class RelationMiner:
             gate=self.gate,
             gate_threshold=self.gate_threshold,
             embedding_model=self.embedding_model,
+            response=source_response,
         )
 
         # 2. mine each pair (Prompt A, then Prompt B when the coupling has an edge)
         relations: List[MinedRelation] = []
         dropped_none = 0
         if pairs:
-            mined = await self._mine_pairs(atoms, pairs)
+            mined = await self._mine_pairs(atoms, pairs, response=source_response)
             for rel in mined:
                 if rel is None:
                     dropped_none += 1
@@ -553,7 +586,6 @@ class RelationMiner:
             "gate_threshold": self.gate_threshold,
             "prior": self.prior,
             "concession_discount": self.concession_discount,
-            "fused_strength": self.fused_strength,
         }
 
         return MiningResult(
@@ -566,12 +598,26 @@ class RelationMiner:
         )
 
     async def _mine_pairs(
-        self, atoms: Dict[str, Atom], pairs: List[Tuple[str, str]]
+        self,
+        atoms: Dict[str, Atom],
+        pairs: List[Tuple[str, str]],
+        *,
+        response: str,
     ) -> List[Optional[MinedRelation]]:
-        """Run Prompt A for every pair (throttled), then Prompt B where needed."""
+        """Run Prompt A for every pair (throttled), then Prompt B where needed.
+
+        The response-grounded prompts are used throughout (with the response
+        injected as context) so the model asserts only relations the response
+        actually draws.
+        """
         # Prompt A for all pairs, concurrently.
         def sense_factory(pair: Tuple[str, str]):
             src, trg = pair
+            user_vars = {
+                "response": response,
+                "atom_a": atoms[src].text,
+                "atom_b": atoms[trg].text,
+            }
             return mfuncs.ainstruct(
                 self._sense_prompt,
                 context=SimpleContext(),
@@ -586,10 +632,7 @@ class RelationMiner:
                         ),
                     )
                 ],
-                user_variables={
-                    "atom_a": atoms[src].text,
-                    "atom_b": atoms[trg].text,
-                },
+                user_variables=user_vars,
                 strategy=self._strategy,
                 return_sampling_results=True,
                 model_options=self._model_options(),
@@ -617,7 +660,9 @@ class RelationMiner:
 
         # Conditional strength P(a_j|a_i,tau) only for pairs producing an edge.
         edge_indices = [i for i, r in enumerate(interim) if r is not None]
-        strengths_raw = await self._estimate_strengths(atoms, interim, edge_indices)
+        strengths_raw = await self._estimate_strengths(
+            atoms, interim, edge_indices, response=response
+        )
 
         # Assemble MinedRelation objects (None where coupling was NONE). Apply the
         # post-hoc calibrator to the raw strength before forming the factor weight.
@@ -650,6 +695,8 @@ class RelationMiner:
         atoms: Dict[str, Atom],
         interim: List[Optional[Dict[str, Any]]],
         edge_indices: List[int],
+        *,
+        response: str,
     ) -> Dict[int, float]:
         """Estimate the raw conditional strength for each edge-producing pair.
 
@@ -659,6 +706,9 @@ class RelationMiner:
           * ``surrogate_sampled`` -- ``strength_samples`` Yes/No calls per edge,
             strength is the affirm-fraction (backend-agnostic).
           * ``verbalized`` -- one call per edge, parse the verbalized ``[p=0.NN]``.
+
+        The response-grounded strength prompt is used so the strength reflects how
+        strongly the response ties B to A.
         """
         strengths: Dict[int, float] = {}
         if not edge_indices:
@@ -666,7 +716,8 @@ class RelationMiner:
 
         if self.strength_method == "verbalized":
             outputs = await run_throttled(
-                lambda idx: self._verbalized_call(atoms, interim[idx]), edge_indices
+                lambda idx: self._verbalized_call(atoms, interim[idx], response=response),
+                edge_indices,
             )
             for idx, out in zip(edge_indices, outputs):
                 strengths[idx] = self._parse_strength_output(out)
@@ -674,7 +725,9 @@ class RelationMiner:
 
         if self.strength_method == "surrogate_logprobs":
             outputs = await run_throttled(
-                lambda idx: self._surrogate_call(atoms, interim[idx], logprobs=True),
+                lambda idx: self._surrogate_call(
+                    atoms, interim[idx], logprobs=True, response=response
+                ),
                 edge_indices,
             )
             for idx, out in zip(edge_indices, outputs):
@@ -685,7 +738,9 @@ class RelationMiner:
         n = max(1, self.strength_samples)
         jobs = [(idx, s) for idx in edge_indices for s in range(n)]
         outputs = await run_throttled(
-            lambda job: self._surrogate_call(atoms, interim[job[0]], logprobs=False),
+            lambda job: self._surrogate_call(
+                atoms, interim[job[0]], logprobs=False, response=response
+            ),
             jobs,
         )
         per_edge: Dict[int, List[str]] = {idx: [] for idx in edge_indices}
@@ -696,8 +751,16 @@ class RelationMiner:
             strengths[idx] = frac if frac is not None else _UNKNOWN_PROBABILITY
         return strengths
 
-    def _verbalized_call(self, atoms: Dict[str, Atom], r: Dict[str, Any]):
-        """One verbalized-strength ([p=0.NN]) generation for an edge."""
+    def _verbalized_call(
+        self, atoms: Dict[str, Atom], r: Dict[str, Any], *, response: str
+    ):
+        """One verbalized-strength ([p=0.NN]) generation for an edge (grounded)."""
+        user_vars = {
+            "response": response,
+            "atom_a": atoms[r["source_id"]].text,
+            "atom_b": atoms[r["target_id"]].text,
+            "coupling": r["level1_type"],
+        }
         return mfuncs.ainstruct(
             self._strength_prompt,
             context=SimpleContext(),
@@ -710,24 +773,31 @@ class RelationMiner:
                     ),
                 )
             ],
-            user_variables={
-                "atom_a": atoms[r["source_id"]].text,
-                "atom_b": atoms[r["target_id"]].text,
-                "coupling": r["level1_type"],
-            },
+            user_variables=user_vars,
             strategy=self._strategy,
             return_sampling_results=True,
             model_options=self._model_options(),
         )
 
     def _surrogate_call(
-        self, atoms: Dict[str, Atom], r: Dict[str, Any], *, logprobs: bool
+        self,
+        atoms: Dict[str, Atom],
+        r: Dict[str, Any],
+        *,
+        logprobs: bool,
+        response: str,
     ):
-        """One Yes/No surrogate-strength generation for an edge.
+        """One Yes/No surrogate-strength generation for an edge (grounded).
 
         ``logprobs=True`` requests token logprobs (for ``surrogate_logprobs``);
         ``logprobs=False`` is a plain sampled generation (for ``surrogate_sampled``).
         """
+        user_vars = {
+            "response": response,
+            "atom_a": atoms[r["source_id"]].text,
+            "atom_b": atoms[r["target_id"]].text,
+            "coupling": r["level1_type"],
+        }
         return mfuncs.ainstruct(
             self._surrogate_strength_prompt,
             context=SimpleContext(),
@@ -738,11 +808,7 @@ class RelationMiner:
                     validation_fn=simple_validate(_starts_with_yes_no),
                 )
             ],
-            user_variables={
-                "atom_a": atoms[r["source_id"]].text,
-                "atom_b": atoms[r["target_id"]].text,
-                "coupling": r["level1_type"],
-            },
+            user_variables=user_vars,
             strategy=RejectionSamplingStrategy(loop_budget=3),
             return_sampling_results=True,
             model_options={"logprobs": True, "top_logprobs": 5} if logprobs else None,

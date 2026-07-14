@@ -15,17 +15,25 @@
 
 # LLM prompts for atom-atom relation mining (deep-dive Sections 4.2-4.3).
 #
+# All prompts are RESPONSE-GROUNDED: the FULL response is injected as context so
+# the model asserts only relations the response actually draws. Judging an atom
+# pair in ISOLATION makes the model accept any *abstractly plausible* relation,
+# which over-connects the graph (the robust empirical failure mode: ~6-9
+# relations/atom, spurious contradictions on a coherent paragraph). Grounding is
+# mandatory -- there is no ungrounded/pair-only path.
+#
 # Two prompts implement the type-posterior x conditional-strength decomposition
 # p = P(tau | a_i, a_j) x P(a_j | a_i, tau):
 #
 #   * Prompt A (PROMPT_SENSE_COUPLING) -- a chain-of-thought call over an ordered
-#     atom pair (A, B) that names the Level-2 discourse SENSE and maps it to a
-#     Level-1 COUPLING. The final answer is a bracketed [coupling=...] tag whose
-#     token logprobs give the type confidence P(tau | a_i, a_j). The chain of
-#     thought comes first so the model commits to the sense only after reasoning.
+#     atom pair (A, B), given the response, that names the Level-2 discourse SENSE
+#     and maps it to a Level-1 COUPLING. The final answer is a bracketed
+#     [coupling=...] tag whose token logprobs give the type confidence
+#     P(tau | a_i, a_j). The chain of thought comes first so the model commits to
+#     the sense only after reasoning, and only when the response draws the link.
 #
-#   * Prompt B -- given the coupling from Prompt A, elicits the conditional
-#     strength P(a_j | a_i, tau). TWO forms are provided:
+#   * Prompt B -- given the coupling from Prompt A and the response, elicits the
+#     conditional strength P(a_j | a_i, tau). TWO forms are provided:
 #       - PROMPT_STRENGTH_SURROGATE (DEFAULT): a Yes/No surrogate-token question.
 #         The strength is read as the renormalized token probability
 #         p = P("Yes") / (P("Yes") + P("No")) from the answer token's logprobs, or
@@ -51,19 +59,31 @@ _SENSE_MENU = (
 
 
 # ----------------------------------------------------------------------------
-# Prompt A -- joint discourse sense + Level-1 coupling classification.
+# Prompt A -- joint discourse sense + Level-1 coupling classification, grounded
+# in the full response so the model asserts only relations the response draws.
 # ----------------------------------------------------------------------------
 
 PROMPT_SENSE_COUPLING = """
 
 Instructions:
-You are given two atomic claims, A and B, taken from the SAME response, in \
-their order of appearance (A comes before B). Your task is to decide the \
-discourse/logical relation FROM A TO B, following the steps below.
+You are given the full RESPONSE a model produced, and two atomic claims, A and \
+B, both taken FROM THAT RESPONSE, in their order of appearance (A comes before \
+B). Your task is to decide the discourse/logical relation FROM A TO B, following \
+the steps below.
 
-1. Reason step by step: does A cause, enable, provide evidence for, restate, \
-elaborate, temporally precede, contrast with, or contradict B? Is B a claim the \
-text later withdraws or that a holding resolves? Consider the direction (A to B).
+IMPORTANT -- ground your decision in the response. Assert a coupling ONLY if the \
+response ITSELF draws that connection between A and B (as written, or as a clear \
+step in the author's argument/narrative). Do NOT assert a relation that is merely \
+plausible in general but that the response does not actually make. If A and B \
+both appear in the response yet the response draws no logical or discourse \
+dependence between them, the answer is None.
+
+1. Reason step by step, referring to the response: does the response present A \
+as causing, enabling, providing evidence for, restating, elaborating, temporally \
+preceding, contrasting with, or contradicting B? Is B a claim the response later \
+withdraws or that a holding resolves? Consider the direction (A to B). If the \
+response links A and B only indirectly through other claims, or not at all, that \
+is None.
 
 2. Name the DISCOURSE SENSE, one of: {{sense_menu}}.
    - Cause-Effect: A causes/leads to B. Effect-Cause: A is the effect, B its cause.
@@ -73,7 +93,7 @@ claim, B a specific instance (or vice versa).
    - Contrast: A and B are in opposition. Concession: A and B are in tension but \
 the text concedes/resolves it ("although A, still B", or a holding settles it).
    - Precedence/Succession: A and B are ordered in time with no truth dependence.
-   - None: no logical or discourse dependence between A and B.
+   - None: the response draws no logical or discourse dependence between A and B.
 
 3. Map the sense to a COUPLING, one of: entailment, contradiction, \
 equivalence, none.
@@ -88,70 +108,57 @@ A JSON object {"sense":"Cause-Effect","coupling":"entailment"} is also acceptabl
 
 Use the following examples to better understand your task.
 
-Example 1:
+Example 1 (the response makes the causal link):
+RESPONSE: The company launched a flawed product last quarter. Reviewers panned \
+it, returns spiked, and the company's stock price fell 15 percent over the same \
+period.
 A: The company launched a flawed product last quarter.
 B: The company's stock price fell 15 percent last quarter.
-1. Reasoning: A describes a flawed product launch; B reports a stock decline in \
-the same quarter. A launching a flawed product plausibly causes a stock decline, \
-so the relation from A to B is causal (though not certain).
+1. Reasoning: the response presents the flawed launch as the head of a chain \
+(panning, returns) that ends in the stock decline, so the response itself draws a \
+causal link from A to B.
 2. Discourse sense: Cause-Effect.
 3. Coupling: A causing B is a positive inferential link, i.e. entailment.
 4. Final answer:
 [sense=Cause-Effect] [coupling=entailment]
 
-Example 2:
-A: The new alloy passed every stress test in the recall report.
-B: The new alloy is essentially the same material as the previous alloy.
-1. Reasoning: A and B are about the same alloy but make different claims; B \
-restates neither the pass nor adds a cause. They largely say the same thing about \
-the alloy's identity/quality, so this is a restatement.
-2. Discourse sense: Restatement.
-3. Coupling: A and B assert the same thing, i.e. equivalence.
+Example 2 (both claims present, but the response draws NO connection -> None):
+RESPONSE: The quarterly report was published in April. Separately, the annual \
+audit was scheduled for December. The two processes are run by different teams \
+and were not related this year.
+A: The quarterly report was published in April.
+B: The annual audit was scheduled for December.
+1. Reasoning: both claims appear in the response, and one might imagine a \
+reporting-to-audit link in general, but this response explicitly treats them as \
+separate and unrelated. The response draws no dependence from A to B.
+2. Discourse sense: None.
+3. Coupling: no dependence the response asserts, i.e. none.
 4. Final answer:
-[sense=Restatement] [coupling=equivalence]
+[sense=None] [coupling=none]
 
-Example 3:
+Example 3 (the response states the contradiction):
+RESPONSE: The official statement said no one was harmed in the incident. However, \
+the coroner's report confirmed that three people died in the incident.
 A: No one was harmed in the incident.
 B: Three people died in the incident.
-1. Reasoning: A says no one was harmed; B says three people died in the same \
-incident. These cannot both be true; A being true makes B false. There is no \
-holding or concession that resolves the tension.
+1. Reasoning: the response sets A and B against each other ("However, ...") and \
+they cannot both be true; A being true makes B false. No holding resolves it.
 2. Discourse sense: Contrast.
 3. Coupling: A makes B false, i.e. contradiction.
 4. Final answer:
 [sense=Contrast] [coupling=contradiction]
 
-Example 4 (Concession -- a contradiction the text itself resolves):
-A: The supplier initially denied any responsibility for the defect.
-B: The tribunal ultimately held the supplier liable for the defect.
-1. Reasoning: A (the supplier's denial) is in tension with B (the holding of \
-liability), but B is an adjudicating holding that resolves the tension rather \
-than a raw contradiction. This is a conceded/resolved tension, not an unresolved \
-conflict.
-2. Discourse sense: Concession.
-3. Coupling: the tension maps to contradiction, but note it is resolved by the \
-holding in B.
-4. Final answer:
-[sense=Concession] [coupling=contradiction]
-
-Example 5:
-A: The quarterly report was published in April.
-B: The annual audit was scheduled for December.
-1. Reasoning: A and B describe two separate events with no causal, evidential, \
-or contradictory dependence; they merely occur at different times.
-2. Discourse sense: None.
-3. Coupling: no dependence, i.e. none.
-4. Final answer:
-[sense=None] [coupling=none]
-
 Your task:
+RESPONSE: {{response}}
 A: {{atom_a}}
 B: {{atom_b}}
 """
 
 
 # ----------------------------------------------------------------------------
-# Prompt B (default) -- conditional strength via a Yes/No surrogate token.
+# Prompt B (default) -- conditional strength via a Yes/No surrogate token,
+# grounded in the response so the strength reflects how strongly the RESPONSE
+# ties B to A (not an abstract judgment).
 # ----------------------------------------------------------------------------
 #
 # The answer's FIRST WORD must be Yes or No, so its token logprobs give the
@@ -162,51 +169,54 @@ B: {{atom_b}}
 # merely plausible entailment does not read as a flat "No"; the graded confidence
 # instead comes out in the renormalized logprob p (and, for sampling, the affirm
 # fraction). For a contradiction we ask whether B is likely FALSE given A, so "Yes"
-# still means the contradiction is credible.
+# still means the contradiction is credible. A relation the response only weakly
+# supports gets a lower renormalized p even when it is abstractly plausible.
 
 PROMPT_STRENGTH_SURROGATE = """
 
 Instructions:
-Assume claim A is TRUE, and that a {{coupling}} relation holds from A to B. Judge \
-whether the relation's implication about B is credible -- i.e. at least plausible / \
-more likely than not, NOT whether it is certain.
+You are given the full RESPONSE, two claims A and B drawn from it, and a \
+{{coupling}} relation that holds from A to B. Assuming A is TRUE, judge -- IN THE \
+CONTEXT OF THIS RESPONSE -- whether the relation's implication about B is \
+credible: at least plausible / more likely than not, NOT whether it is certain.
 
-- entailment or equivalence: given A, is B at least plausibly TRUE (more likely than \
-not)?
-- contradiction: given A, is B at least plausibly FALSE (more likely than not)?
+- entailment or equivalence: given A and how the response uses it, is B at least \
+plausibly TRUE (more likely than not)?
+- contradiction: given A and how the response uses it, is B at least plausibly \
+FALSE (more likely than not)?
 
 Answer with a SINGLE WORD, the very first word of your reply: Yes or No.
 - Answer "Yes" if the implication is credible/plausible (even if not certain).
-- Answer "No" only if the implication is implausible or unsupported.
+- Answer "No" only if the implication is implausible or the response does not \
+actually support it.
 Do not output anything before the word Yes or No.
 
-Use the following examples to better understand your task.
-
-Example 1 (near-certain entailment):
+Example 1 (response supports a near-certain entailment):
+RESPONSE: The new alloy is chemically identical to the certified reference \
+alloy, so it meets the certified reference specification.
 A: The new alloy is chemically identical to the certified reference alloy.
 B: The new alloy meets the certified reference specification.
 coupling: entailment
 Answer: Yes
 
-Example 2 (weak but plausible entailment -- still Yes):
+Example 2 (weak but plausible, and the response draws the link -- still Yes):
+RESPONSE: The company launched a flawed product last quarter, and its stock \
+price fell 15 percent over the same period.
 A: The company launched a flawed product last quarter.
 B: The company's stock price fell 15 percent last quarter.
 coupling: entailment
 Answer: Yes
 
-Example 3 (clear contradiction):
+Example 3 (clear contradiction stated by the response):
+RESPONSE: The official statement said no one was harmed, but three people died \
+in the incident.
 A: No one was harmed in the incident.
 B: Three people died in the incident.
 coupling: contradiction
 Answer: Yes
 
-Example 4 (implausible / unsupported link):
-A: The regulator published a preliminary bulletin.
-B: The airline redesigned its loyalty program.
-coupling: entailment
-Answer: No
-
 Your task:
+RESPONSE: {{response}}
 A: {{atom_a}}
 B: {{atom_b}}
 coupling: {{coupling}}
@@ -214,14 +224,16 @@ Answer: """
 
 
 # ----------------------------------------------------------------------------
-# Prompt B (baseline) -- verbalized conditional strength P(a_j | a_i, tau).
+# Prompt B (baseline) -- verbalized conditional strength P(a_j | a_i, tau),
+# grounded in the response.
 # ----------------------------------------------------------------------------
 
 PROMPT_STRENGTH = """
 
 Instructions:
-Assume claim A is TRUE. Under a {{coupling}} relation from A to B, estimate how \
-strongly A determines B.
+You are given the full RESPONSE and two claims A and B drawn from it. Assume \
+claim A is TRUE and, IN THE CONTEXT OF THIS RESPONSE, estimate how strongly A \
+determines B under a {{coupling}} relation from A to B.
 
 - For an entailment or equivalence coupling: how likely is B to be TRUE given A?
 - For a contradiction coupling: how likely is B to be FALSE given A?
@@ -232,6 +244,8 @@ plausible link is around 0.60-0.70. End your answer with the probability wrapped
 in brackets on its own, exactly in the form: [p=0.NN]
 
 Example 1:
+RESPONSE: The new alloy is chemically identical to the certified reference \
+alloy, so it meets the certified reference specification.
 A: The new alloy is chemically identical to the certified reference alloy.
 B: The new alloy meets the certified reference specification.
 coupling: entailment
@@ -240,6 +254,8 @@ specification is met, so B follows very strongly from A.
 [p=0.95]
 
 Example 2:
+RESPONSE: The company launched a flawed product last quarter, and its stock \
+price fell 15 percent over the same period.
 A: The company launched a flawed product last quarter.
 B: The company's stock price fell 15 percent last quarter.
 coupling: entailment
@@ -248,6 +264,8 @@ other factors affect price, so the link is only moderate.
 [p=0.65]
 
 Example 3:
+RESPONSE: The official statement said no one was harmed, but three people died \
+in the incident.
 A: No one was harmed in the incident.
 B: Three people died in the incident.
 coupling: contradiction
@@ -256,6 +274,7 @@ is false.
 [p=0.93]
 
 Your task:
+RESPONSE: {{response}}
 A: {{atom_a}}
 B: {{atom_b}}
 coupling: {{coupling}}
@@ -263,10 +282,10 @@ coupling: {{coupling}}
 
 
 def build_sense_coupling_prompt() -> str:
-    """Return Prompt A with the sense menu interpolated.
+    """Return Prompt A (response-grounded) with the sense menu interpolated.
 
-    The atom placeholders ``{{atom_a}}`` / ``{{atom_b}}`` remain for Mellea's
-    ``user_variables`` substitution at call time.
+    The ``{{response}}`` / ``{{atom_a}}`` / ``{{atom_b}}`` placeholders remain for
+    Mellea's ``user_variables`` substitution at call time.
 
     Returns:
         The Prompt A template string.
@@ -277,9 +296,10 @@ def build_sense_coupling_prompt() -> str:
 def build_surrogate_strength_prompt() -> str:
     """Return the default (surrogate Yes/No) conditional-strength prompt.
 
-    The ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}`` placeholders remain for
-    Mellea's ``user_variables`` substitution at call time. The answer's first word
-    is the surrogate token whose logprobs give the renormalized strength.
+    The ``{{response}}`` / ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}``
+    placeholders remain for Mellea's ``user_variables`` substitution at call time.
+    The answer's first word is the surrogate token whose logprobs give the
+    renormalized strength.
 
     Returns:
         The surrogate-token strength prompt template string.
@@ -290,8 +310,8 @@ def build_surrogate_strength_prompt() -> str:
 def build_strength_prompt() -> str:
     """Return the verbalized (baseline) conditional-strength prompt.
 
-    The ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}`` placeholders remain for
-    Mellea's ``user_variables`` substitution at call time.
+    The ``{{response}}`` / ``{{atom_a}}`` / ``{{atom_b}}`` / ``{{coupling}}``
+    placeholders remain for Mellea's ``user_variables`` substitution at call time.
 
     Returns:
         The verbalized Prompt B template string.

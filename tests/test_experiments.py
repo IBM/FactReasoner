@@ -100,6 +100,22 @@ class TestRunner:
         assert (tmp_path / "results.json").exists()
         assert len(list((tmp_path / "records").glob("*.json"))) == 12
 
+    def test_mining_is_always_response_grounded(self, tmp_path):
+        """The runner always mines grounded; records carry the discourse coverage."""
+        single = [ModelSpec("granite-4-1-30b", "granite-4-1-30b", "vllm")]
+        res = ExperimentRunner(_dry_config(
+            tmp_path, models=single, strength_methods=["surrogate_logprobs"],
+            pair_policy="windowed", window=3,
+        )).run()
+        ok = [r for r in res["records"] if "error" not in r]
+        assert ok
+        for r in ok:
+            # Windowed selection is response-anchored: the discourse stats are
+            # always present in coverage.
+            assert r["coverage"].get("discourse_anchored") is True
+            assert "num_promoted" in r["coverage"]
+            assert "num_demoted" in r["coverage"]
+
     def test_logprobs_backend_gets_surrogate_logprobs(self, tmp_path):
         cfg = _dry_config(tmp_path)
         results = ExperimentRunner(cfg).run()
@@ -120,10 +136,10 @@ class TestRunner:
         from fact_reasoner.lcs import relation_miner as rm_mod
         orig = rm_mod.RelationMiner.mine_from_atoms
 
-        def flaky(self, atoms):
+        def flaky(self, atoms, response, *args, **kwargs):
             if any("defendant" in a for a in atoms):  # example-1-damages
                 raise RuntimeError("boom")
-            return orig(self, atoms)
+            return orig(self, atoms, response, *args, **kwargs)
 
         monkeypatch.setattr(rm_mod.RelationMiner, "mine_from_atoms", flaky)
         cfg = _dry_config(tmp_path)

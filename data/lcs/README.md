@@ -32,7 +32,8 @@ atoms = [a["text"] for a in ex["atoms"]]
 
 backend = build_backend("rits", model_id="llama-3-3-70b-instruct")
 miner = RelationMiner(backend, pair_policy="all_pairs")
-result = miner.mine_from_atoms(atoms)
+# Mining is always response-grounded: pass the atoms AND the response they came from.
+result = miner.mine_from_atoms(atoms, ex["response"])
 scores = LCSScorer(merlin_path).score(result)
 ```
 

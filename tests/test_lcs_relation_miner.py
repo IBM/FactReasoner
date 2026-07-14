@@ -28,6 +28,7 @@ These cover the deterministic parts of the coherence pipeline:
 
 import itertools
 import math
+import re
 
 import pytest
 
@@ -231,23 +232,42 @@ def _atoms(texts):
     return {f"a{i}": Atom(id=f"a{i}", text=t) for i, t in enumerate(texts)}
 
 
+def _resp(atoms):
+    """A synthetic response = the atom texts joined (for response-required select)."""
+    return " ".join(a.text for a in atoms.values())
+
+
 class TestCandidatePairs:
     def test_all_pairs_is_all_ordered(self):
         atoms = _atoms(["x", "y", "z"])
-        pairs, cov = cp.select(atoms, policy="all_pairs")
+        pairs, cov = cp.select(atoms, response=_resp(atoms), policy="all_pairs")
         assert len(pairs) == 3 * 2  # n(n-1) ordered
         assert cov["pairs_pruned"] == 0
+        assert cov["discourse_anchored"] is False  # all_pairs takes every pair
 
     def test_windowed_respects_radius(self):
-        atoms = _atoms([f"s{i}" for i in range(6)])
-        pairs, cov = cp.select(atoms, policy="windowed", window=2)
-        # forward pairs only, |j-i| in [1,2]
+        # Distinct content per atom (no shared-entity promotion) so the window
+        # bookkeeping is clean; anchoring may promote/demote by sentence adjacency.
+        atoms = _atoms([
+            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+        ])
+        pairs, cov = cp.select(
+            atoms, response=_resp(atoms), policy="windowed", window=2,
+        )
+        # forward pairs only (source before target).
         for s, t in pairs:
-            si = int(s[1:])
-            ti = int(t[1:])
-            assert 0 < ti - si <= 2
-        assert cov["num_window_pairs"] == len(pairs)
+            assert int(t[1:]) > int(s[1:])
+        # The window universe is |j-i| in [1,2]; selected pairs are that window
+        # minus demotions plus discourse promotions.
+        assert cov["num_window_pairs"] == sum(
+            1 for i in range(6) for j in range(i + 1, min(i + 3, 6))
+        )
         assert cov["forward_pairs_possible"] == 6 * 5 // 2
+        assert cov["discourse_anchored"] is True
+        assert (
+            cov["pairs_selected"]
+            == cov["num_window_pairs"] - cov["num_demoted"] + cov["num_promoted"]
+        )
 
     def test_gated_adds_callbacks(self):
         # a0 and a5 share the salient token "reactor"; window=1 excludes them,
@@ -263,14 +283,68 @@ class TestCandidatePairs:
             ]
         )
         pairs, cov = cp.select(
-            atoms, policy="gated", window=1, gate="entity", gate_threshold=0.05
+            atoms, response=_resp(atoms), policy="gated", window=1,
+            gate="entity", gate_threshold=0.05,
         )
         assert cov["num_callback_pairs"] >= 1
         assert ("a0", "a5") in pairs
 
     def test_unknown_policy_raises(self):
+        atoms = _atoms(["x"])
         with pytest.raises(ValueError):
-            cp.select(_atoms(["x"]), policy="bogus")
+            cp.select(atoms, response=_resp(atoms), policy="bogus")
+
+    def test_response_is_required(self):
+        """Selection is always response-anchored: missing/empty response raises."""
+        atoms = _atoms([f"s{i}" for i in range(4)])
+        with pytest.raises(TypeError):
+            cp.select(atoms, policy="windowed", window=2)  # no response kwarg
+        with pytest.raises(ValueError):
+            cp.select(atoms, response="   ", policy="windowed", window=2)
+
+    def test_response_promotes_long_range_callback(self):
+        """A response linking a far-apart entity promotes the out-of-window pair."""
+        texts = [
+            "The reactor overheated badly on Monday.",
+            "A manager filed an unrelated expense report.",
+            "The weather was cold that week.",
+            "Lunch was served late in the cafeteria.",
+            "The quarterly meeting adjourned early.",
+            "The reactor was later inspected for overheating damage.",
+        ]
+        atoms = _atoms(texts)
+        response = " ".join(texts)
+        # window=1 excludes (a0,a5); the shared "reactor/overheat" content makes the
+        # response relate them, so discourse anchoring promotes the callback.
+        pairs, cov = cp.select(
+            atoms, policy="windowed", window=1, response=response,
+            discourse_gate_threshold=0.05,
+        )
+        assert cov["discourse_anchored"] is True
+        assert cov["num_promoted"] >= 1
+        assert ("a0", "a5") in pairs
+
+    def test_response_demotes_unrelated_in_window_pair(self):
+        """An in-window pair the response does not relate is demoted (dropped)."""
+        texts = [
+            "The reactor overheated badly.",
+            "Separately, the cafeteria introduced a new dessert menu.",
+            "The reactor was inspected for overheating.",
+        ]
+        atoms = _atoms(texts)
+        response = " ".join(texts)
+        pairs, cov = cp.select(
+            atoms, policy="windowed", window=2, response=response,
+            discourse_gate_threshold=0.05, discourse_sentence_span=0,
+        )
+        # The dessert atom (a1) shares no content with the reactor atoms, so the
+        # (a0,a1) and (a1,a2) in-window pairs are demoted; the reactor callback
+        # (a0,a2) survives on shared content. The raw window over 3 atoms (w=2)
+        # is {a0a1, a0a2, a1a2} = 3 pairs; demotion drops it below that.
+        assert cov["num_demoted"] >= 1
+        assert ("a0", "a2") in pairs
+        assert cov["num_window_pairs"] == 3
+        assert len(pairs) < cov["num_window_pairs"]
 
 
 # ---------------------------------------------------------------------------
@@ -655,7 +729,7 @@ class TestMinerEndToEnd:
             "No one was harmed",
             "Three people died",
         ]
-        result = miner.mine_from_atoms(atoms)
+        result = miner.mine_from_atoms(atoms, " ".join(atoms))
 
         # 4 atoms -> 12 ordered pairs; the "None" couplings are dropped.
         assert result.coverage["pairs_scored"] == 12
@@ -681,7 +755,8 @@ class TestMinerEndToEnd:
         backend.model_id = "mock"
         miner = RelationMiner(backend, nli_method="logprobs",
                               strength_method="verbalized", pair_policy="all_pairs")
-        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        atoms = ["The CEO was fired", "The stock fell"]
+        result = miner.mine_from_atoms(atoms, " ".join(atoms))
         assert result.relations
         for rel in result.relations:
             assert rel.strength == pytest.approx(0.70, abs=1e-6)
@@ -711,7 +786,8 @@ class TestMinerEndToEnd:
                               strength_method="surrogate_sampled", strength_samples=4,
                               pair_policy="all_pairs")
         assert miner.strength_method == "surrogate_sampled"
-        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        atoms = ["The CEO was fired", "The stock fell"]
+        result = miner.mine_from_atoms(atoms, " ".join(atoms))
         assert result.relations
         for rel in result.relations:
             assert rel.strength == pytest.approx(0.75, abs=1e-6)
@@ -728,10 +804,75 @@ class TestMinerEndToEnd:
         cal = TemperatureCalibrator(2.0)  # softens 0.9 toward 0.5
         miner = RelationMiner(backend, nli_method="logprobs",
                               strength_calibrator=cal, pair_policy="all_pairs")
-        result = miner.mine_from_atoms(["The CEO was fired", "The stock fell"])
+        atoms = ["The CEO was fired", "The stock fell"]
+        result = miner.mine_from_atoms(atoms, " ".join(atoms))
         assert result.relations
         for rel in result.relations:
             assert rel.strength_raw == pytest.approx(0.9, abs=1e-6)
             # Calibrated strength is the softened value, strictly below the raw 0.9.
             assert rel.strength == pytest.approx(cal.transform(0.9), abs=1e-6)
             assert rel.strength < rel.strength_raw
+
+    def test_response_grounding_prunes_unasserted_edges(self, monkeypatch):
+        """The grounded Prompt A drops pairs the response does not relate.
+
+        The fake Prompt A (which always receives the response now) answers
+        ``none`` for a pair whose atoms share no content (the response draws no
+        connection), so those edges never enter the graph.
+        """
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+
+        def _content(s):
+            return {w for w in re.findall(r"[A-Za-z]+", s.lower()) if len(w) > 3}
+
+        async def fake_ainstruct(prompt, **kw):
+            uv = kw["user_variables"]
+            if _is_surrogate_prompt(prompt):
+                return _Sample("Yes", meta=_yesno_logprob_meta(0.8))
+            if _is_strength_prompt(prompt):
+                return _Sample("Likely. [p=0.70]")
+            a, b = uv.get("atom_a", ""), uv.get("atom_b", "")
+            # The response variable is always present; answer "none" when the two
+            # atoms share no content (the response does not relate them).
+            assert "response" in uv, "Prompt A must be response-grounded"
+            if not (_content(a) & _content(b)):
+                return _Sample("[sense=None] [coupling=none]")
+            return _Sample("[sense=Cause-Effect] [coupling=entailment]")
+
+        monkeypatch.setattr(mfuncs, "ainstruct", fake_ainstruct)
+        backend = MagicMock()
+        backend.model_id = "mock"
+        atoms = [
+            "The reactor overheated during the test.",
+            "The cafeteria served pasta for lunch.",
+            "The reactor was shut down after overheating.",
+        ]
+        response = " ".join(atoms)
+        # all_pairs so every pair is scored; grounding does the pruning.
+        miner = RelationMiner(backend, nli_method="logprobs", pair_policy="all_pairs")
+        result = miner.mine_from_atoms(atoms, response)
+
+        # The reactor<->cafeteria pairs (no shared content) are dropped as none;
+        # only the two reactor atoms (a0<->a2) relate, in both directions.
+        assert result.coverage["dropped_none"] >= 1
+        for rel in result.relations:
+            ids = {rel.source_id, rel.target_id}
+            assert ids == {"a0", "a2"}
+
+    def test_mine_from_atoms_requires_response(self, monkeypatch):
+        """Mining is always response-grounded: no/empty response raises."""
+        import mellea.stdlib.functional as mfuncs
+        from unittest.mock import MagicMock
+
+        monkeypatch.setattr(mfuncs, "ainstruct", self._fake_ainstruct_factory(0.8))
+        backend = MagicMock()
+        backend.model_id = "mock"
+        miner = RelationMiner(backend, nli_method="logprobs", pair_policy="all_pairs")
+        atoms = ["The stock fell 15 percent", "The CEO was fired"]
+        with pytest.raises(TypeError):
+            miner.mine_from_atoms(atoms)  # response is a required positional arg
+        with pytest.raises(ValueError):
+            miner.mine_from_atoms(atoms, "   ")  # empty response
+        with pytest.raises(ValueError):
+            miner.mine_from_response("")  # empty raw response

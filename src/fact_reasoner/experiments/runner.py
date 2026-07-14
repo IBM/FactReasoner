@@ -165,7 +165,10 @@ class ExperimentRunner:
                 window=cfg.window,
                 gate=cfg.gate,
             )
-            result = miner.mine_from_atoms(example["atom_texts"])
+            # Mining is always response-grounded: the miner needs the response.
+            result = miner.mine_from_atoms(
+                example["atom_texts"], example["response"]
+            )
 
             merlin_path = _DRY_RUN_MERLIN if cfg.dry_run else cfg.merlin_path
             scorer = LCSScorer(merlin_path)

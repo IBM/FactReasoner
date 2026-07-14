@@ -173,6 +173,50 @@ def _is_verbalized_strength_prompt(prompt) -> bool:
     return "[p=0.NN]" in str(prompt)
 
 
+def _is_grounded_prompt(prompt) -> bool:
+    """Whether this is a response-grounded prompt variant (takes a RESPONSE block)."""
+    return "{{response}}" in str(prompt)
+
+
+_WORD_RE = None
+
+
+def _content_words(text: str) -> set:
+    """Lower-cased word set, len>3 (cheap content-overlap proxy for the mock)."""
+    import re
+
+    return {w for w in re.findall(r"[A-Za-z0-9]+", (text or "").lower()) if len(w) > 3}
+
+
+def _response_relates(response: str, a: str, b: str) -> bool:
+    """Cheap proxy: does the response draw a link between atoms A and B?
+
+    Used by the grounded-prompt mock to answer ``none`` for pairs the response
+    does not actually connect. Heuristic: the two atoms share content words, OR
+    their originating sentences are adjacent in the response. Deliberately simple
+    -- the dry-run exercises the grounding plumbing, not language understanding.
+    """
+    if not response:
+        return True  # no response signal -> defer to sense heuristic
+    wa, wb = _content_words(a), _content_words(b)
+    if wa & wb:
+        return True
+    import re
+
+    sents = [s for s in re.split(r"(?<=[.!?])\s+", response.strip()) if s.strip()]
+    def _best_sentence(atom_words):
+        best, best_ov = None, 0
+        for i, s in enumerate(sents):
+            ov = len(atom_words & _content_words(s))
+            if ov > best_ov:
+                best_ov, best = ov, i
+        return best
+    ia, ib = _best_sentence(wa), _best_sentence(wb)
+    if ia is not None and ib is not None and abs(ia - ib) <= 1:
+        return True
+    return False
+
+
 def _looks_contradictory(a: str, b: str) -> bool:
     """Cheap heuristic: do A and B look mutually exclusive (for the mock sense)?"""
     la, lb = a.lower(), b.lower()
@@ -211,6 +255,12 @@ def make_mock_ainstruct(*, surrogate_p_yes: float = 0.8, verbalized_p: float = 0
         # Prompt A (sense + coupling).
         a = uv.get("atom_a", "")
         b = uv.get("atom_b", "")
+        # Response-grounded Prompt A: answer "none" for pairs the response does
+        # not actually relate (this is the pruning behavior grounding buys).
+        if _is_grounded_prompt(prompt):
+            response = uv.get("response", "")
+            if not _response_relates(response, a, b):
+                return _Sample("[sense=None] [coupling=none]")
         if _looks_contradictory(a, b):
             return _Sample("[sense=Contrast] [coupling=contradiction]")
         return _Sample("[sense=Cause-Effect] [coupling=entailment]")

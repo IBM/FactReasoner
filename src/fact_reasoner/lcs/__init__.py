@@ -29,11 +29,15 @@ Quick start::
     backend = build_backend("rits", model_id="llama-3-3-70b-instruct")
     miner = RelationMiner(backend, atomizer=Atomizer(backend))
 
+    # Mining is always response-grounded. From a raw response:
     result = miner.mine_from_response("The stock fell 15%. Consequently the CEO was fired.")
     result.describe()
     mn = result.markov_network            # the MRF (mn.to_uai() serializes it)
 
     lcs = LCSScorer(merlin_path).score(result)   # {"lcs": ..., "log_z": ...}
+
+    # From pre-extracted atoms, pass the response they came from:
+    result = miner.mine_from_atoms(atom_texts, response)
 
     # or, one call end-to-end:
     lcs = mine_and_score(response, backend=backend, merlin_path=merlin_path,
@@ -96,6 +100,7 @@ def mine_and_score(
     merlin_path: str,
     atomizer=None,
     reviser=None,
+    response: Optional[str] = None,
     scorer_kwargs: Optional[Dict[str, Any]] = None,
     **miner_kwargs,
 ) -> Dict[str, Any]:
@@ -103,13 +108,22 @@ def mine_and_score(
 
     A convenience wrapper around :class:`RelationMiner` + :class:`LCSScorer`.
 
+    Mining is always response-grounded, so a response is always needed: pass a
+    raw response string as ``response_or_atoms`` (it is atomized and grounded on
+    itself), or pass pre-extracted atoms as ``response_or_atoms`` together with
+    the ``response=`` they came from.
+
     Args:
         response_or_atoms: Either a raw response string (atomized via
-            ``atomizer``) or a list/dict of atoms (mined directly).
+            ``atomizer``) or a list/dict of atoms (mined directly, grounded in
+            ``response``).
         backend: The Mellea backend.
         merlin_path: Path to the Merlin executable.
         atomizer: Required when ``response_or_atoms`` is a raw string.
         reviser: Optional decontextualizer for atoms from a response.
+        response: The original response the atoms came from. REQUIRED when
+            ``response_or_atoms`` is a list/dict of atoms (ignored for the raw
+            string path, which already grounds on its own text).
         scorer_kwargs: Extra kwargs for :meth:`LCSScorer.score` (e.g.
             ``{"method": "reified"}`` to pick an alternative LCS readout).
         **miner_kwargs: Extra kwargs for :class:`RelationMiner` (e.g.
@@ -120,6 +134,9 @@ def mine_and_score(
     Returns:
         A dict with the score fields from :meth:`LCSScorer.score` plus a
         ``"result"`` key holding the full :class:`MiningResult`.
+
+    Raises:
+        ValueError: If atoms are passed without a ``response``.
     """
     miner = RelationMiner(
         backend, atomizer=atomizer, reviser=reviser, **miner_kwargs
@@ -127,7 +144,12 @@ def mine_and_score(
     if isinstance(response_or_atoms, str):
         result = miner.mine_from_response(response_or_atoms)
     else:
-        result = miner.mine_from_atoms(response_or_atoms)
+        if not response or not str(response).strip():
+            raise ValueError(
+                "mine_and_score with a list/dict of atoms requires response=... "
+                "(mining is always response-grounded)."
+            )
+        result = miner.mine_from_atoms(response_or_atoms, response=response)
 
     scorer = LCSScorer(merlin_path)
     scores = scorer.score(result, **(scorer_kwargs or {}))

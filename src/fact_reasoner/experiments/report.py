@@ -96,35 +96,57 @@ def _examples(records: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
     return out
 
 
-def _variants(records: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
-    """Ordered unique column variants ``(pair_policy, strength_method)``.
+def _rec_grounded(r: Dict[str, Any]) -> bool:
+    """Whether a record was mined response-grounded.
+
+    Mining is always response-grounded now, so new records omit the field and
+    default to True. Older ablation records that explicitly set
+    ``response_grounded: false`` are still honored so combined/legacy reports
+    render the pair-only vs grounded comparison correctly.
+    """
+    return bool(r.get("response_grounded", True))
+
+
+def _variants(records: List[Dict[str, Any]]) -> List[Tuple[str, str, bool]]:
+    """Ordered unique column variants ``(pair_policy, strength_method, grounded)``.
 
     When records span more than one pair policy (e.g. combining an all-pairs run
-    with a windowed run), the policy becomes part of the column identity so the
-    two do not collide. Records without a ``pair_policy`` field are treated as
-    policy ``""`` (back-compatible with older results).
+    with a windowed run) or both grounding modes (the response-grounded ablation),
+    those become part of the column identity so the runs do not collide. Records
+    without a ``pair_policy`` / ``response_grounded`` field are treated as policy
+    ``""`` / grounded ``False`` (back-compatible with older results).
     """
     seen, out = set(), []
     for r in records:
-        v = (r.get("pair_policy", "") or "", r.get("strength_method"))
+        v = (
+            r.get("pair_policy", "") or "",
+            r.get("strength_method"),
+            _rec_grounded(r),
+        )
         if v not in seen:
             seen.add(v)
             out.append(v)
     return out
 
 
-def _multi_policy(variants: List[Tuple[str, str]]) -> bool:
+def _multi_policy(variants: List[Tuple[str, str, bool]]) -> bool:
     """Whether more than one pair policy is present (drives column labels)."""
-    return len({p for p, _ in variants}) > 1
+    return len({p for p, _s, _g in variants}) > 1
+
+
+def _multi_grounding(variants: List[Tuple[str, str, bool]]) -> bool:
+    """Whether both grounding modes are present (drives the ablation labels)."""
+    return len({g for _p, _s, g in variants}) > 1
 
 
 def _lookup(records, model, example_id, variant, lcs_method):
-    """LCS value for a (model, example, (policy, strength)) cell, or None."""
-    policy, strength = variant
+    """LCS value for a (model, example, (policy, strength, grounded)) cell, or None."""
+    policy, strength, grounded = variant
     for r in records:
         if (r.get("model") == model and r.get("example_id") == example_id
                 and r.get("strength_method") == strength
-                and (r.get("pair_policy", "") or "") == policy and r.get("lcs")):
+                and (r.get("pair_policy", "") or "") == policy
+                and _rec_grounded(r) == grounded and r.get("lcs")):
             return r["lcs"].get(lcs_method)
     return None
 
@@ -138,11 +160,15 @@ def _short_policy(p: str) -> str:
     return {"all_pairs": "all", "windowed": "win", "gated": "gate"}.get(p, p or "")
 
 
-def _variant_label(variant, multi_policy: bool) -> str:
-    """Column label for a (policy, strength) variant."""
-    policy, strength = variant
+def _variant_label(variant, multi_policy: bool, multi_grounding: bool = False) -> str:
+    """Column label for a (policy, strength, grounded) variant."""
+    policy, strength, grounded = variant
     s = _short_strength(strength)
-    return f"{_short_policy(policy)}/{s}" if multi_policy else s
+    if multi_policy:
+        s = f"{_short_policy(policy)}/{s}"
+    if multi_grounding:
+        s = f"{s} ({'g' if grounded else 'p'})"
+    return s
 
 
 def _score_table(records, lcs_method, models, examples, variants) -> str:
@@ -155,6 +181,7 @@ def _score_table(records, lcs_method, models, examples, variants) -> str:
     model split into policy blocks (a rule separates all-pairs from windowed).
     """
     multi = _multi_policy(variants)
+    multi_g = _multi_grounding(variants)
     # Column per example; leading two columns identify the configuration.
     ncols = 2 + len(examples)
     col_spec = "ll" + "r" * len(examples)
@@ -181,14 +208,14 @@ def _score_table(records, lcs_method, models, examples, variants) -> str:
         first_in_model = True
         prev_policy = None
         for v in variants:
-            policy, strength = v
+            policy, strength, _grounded = v
             # Rule between policy blocks within a model, for scan-ability.
             if prev_policy is not None and policy != prev_policy:
                 lines.append(rf"\cmidrule(l){{2-{ncols}}}")
             prev_policy = policy
             model_cell = _tex_escape(m) if first_in_model else ""
             first_in_model = False
-            cfg = _tex_escape(_variant_label(v, multi))
+            cfg = _tex_escape(_variant_label(v, multi, multi_g))
             row = [model_cell, cfg]
             for eid, _ in examples:
                 row.append(_fmt(_lookup(records, m, eid, v, lcs_method), nd=2))
@@ -225,28 +252,39 @@ def _coverage_table(records, models, examples, variants) -> str:
     (all-pairs vs windowed differ precisely in how many pairs become edges, which
     is the point of the follow-up), plus relations-per-atom density.
     """
-    policies = []
-    for p, _s in variants:
-        if p not in policies:
-            policies.append(p)
-    multi = len(policies) > 1
+    # Relation counts are broken down by (pair policy, grounding) so the
+    # response-grounded ablation's over-connection reduction is directly visible.
+    multi_p = _multi_policy(variants)
+    multi_g = _multi_grounding(variants)
+    combos = []
+    for p, _s, g in variants:
+        if (p, g) not in combos:
+            combos.append((p, g))
 
-    def rel_count(eid, policy):
+    def _combo_head(p, g):
+        parts = []
+        if multi_p:
+            parts.append(_short_policy(p))
+        if multi_g:
+            parts.append("g" if g else "p")
+        return f"Rel ({'/'.join(parts)})" if parts else "Relations"
+
+    def rel_count(eid, policy, grounded):
         for r in records:
             if (r.get("example_id") == eid and "error" not in r
                     and (r.get("pair_policy", "") or "") == policy
+                    and _rec_grounded(r) == grounded
                     and r.get("num_relations") is not None):
                 return r.get("num_relations")
         return None
 
-    col_spec = "llr" + "r" * len(policies)
-    head = ["Example", "Code", "Atoms"] + [
-        f"Rel ({_short_policy(p)})" if multi else "Relations" for p in policies
-    ]
+    col_spec = "llr" + "r" * len(combos)
+    head = ["Example", "Code", "Atoms"] + [_combo_head(p, g) for p, g in combos]
     lines = [
         r"\begin{table}[htbp]", r"\centering", r"\small",
         r"\caption{Per-example size: atoms and mined relations"
-        + (" by pair policy (relations-per-atom in parentheses)." if multi else ".")
+        + (" by pair policy / grounding (g=response-grounded, p=pair-only; "
+           "relations-per-atom in parentheses)." if (multi_p or multi_g) else ".")
         + r" The \textbf{Code} column is the short label used in the per-score "
         r"tables.}",
         r"\label{tab:coverage}",
@@ -262,8 +300,8 @@ def _coverage_table(records, models, examples, variants) -> str:
         cells = [_tex_escape(_short_example(eid)),
                  rf"\texttt{{{_tex_escape(_col_example(eid))}}}",
                  str(atoms) if atoms is not None else "--"]
-        for p in policies:
-            rc = rel_count(eid, p)
+        for p, g in combos:
+            rc = rel_count(eid, p, g)
             if rc is None:
                 cells.append("--")
             elif atoms:
@@ -290,9 +328,9 @@ def _short_example(eid: str) -> str:
 
 
 def _variant_col(variant) -> str:
-    """A pgfplots-column-safe token for a (policy, strength) variant."""
-    policy, strength = variant
-    tok = f"{_short_policy(policy)}_{_short_strength(strength)}"
+    """A pgfplots-column-safe token for a (policy, strength, grounded) variant."""
+    policy, strength, grounded = variant
+    tok = f"{_short_policy(policy)}_{_short_strength(strength)}_{'g' if grounded else 'p'}"
     return "".join(c if (c.isalnum() or c == "_") else "" for c in tok)
 
 
@@ -302,6 +340,7 @@ def _bar_chart(records, lcs_method, models, examples, variants, out_dir) -> str:
     Writes a ``.dat`` file and returns the LaTeX ``figure`` block that reads it.
     """
     multi = _multi_policy(variants)
+    multi_g = _multi_grounding(variants)
     series = [(m, v) for m in models for v in variants]
     # Build the data table: one row per example, one column per series.
     header = ["example"] + [f"{_short_example_key(m)}_{_variant_col(v)}"
@@ -326,7 +365,7 @@ def _bar_chart(records, lcs_method, models, examples, variants, out_dir) -> str:
             rf"table[x expr=\coordindex,y={col}] {{{dat_name}}};"
         )
     legend = ", ".join(
-        _tex_escape(f"{m}/{_variant_label(v, multi)}") for m, v in series)
+        _tex_escape(f"{m}/{_variant_label(v, multi, multi_g)}") for m, v in series)
     xticks = ", ".join(str(i) for i in range(len(examples)))
     xticklabels = ", ".join(_tex_escape(_short_example(e[0])) for e in examples)
 
@@ -466,14 +505,23 @@ def _relation_graphs_section(
                 return r
         return None
 
-    blocks = [
+    multi_pol = len(policies) > 1
+    pol_names = " vs ".join(_short_policy(p) for p in policies)
+    intro = (
         f"Mined relation graphs for model \\textbf{{{_tex_escape(model)}}} "
         f"(strength method: {_tex_escape(_short_strength(strength))}). Nodes are "
         "atoms on a circle; edges are mined relations --- solid blue = entailment, "
         "dashed red = contradiction, solid teal = equivalence --- with thickness "
-        "proportional to the mined probability. The all-pairs graph (left) is far "
-        "denser than the windowed one (right) for the same response."
-    ]
+        "proportional to the mined probability. "
+    )
+    if multi_pol:
+        intro += ("The all-pairs graph (left) is far denser than the windowed one "
+                  "(right) for the same response.")
+    else:
+        intro += (f"Graphs use the {_tex_escape(_short_policy(policies[0]))} "
+                  "candidate-pair policy with response-grounded mining, which keeps "
+                  "the graph close to what the response actually asserts.")
+    blocks = [intro]
     for eid, ename in examples:
         subs = []
         for policy in policies:
@@ -498,7 +546,7 @@ def _relation_graphs_section(
             r"\begin{figure}[htbp]" + "\n" + r"\centering" + "\n"
             + r"\hfill".join(cells) + "\n"
             + rf"\caption{{Relation graph for \texttt{{{_tex_escape(_col_example(eid))}}} "
-            rf"({_tex_escape(ename)}): all-pairs vs windowed.}}" + "\n"
+            rf"({_tex_escape(ename)}): {_tex_escape(pol_names)}.}}" + "\n"
             + rf"\label{{fig:graph-{_safe_key(eid)}}}" + "\n"
             + r"\end{figure}"
         )
@@ -533,21 +581,22 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
         r"conditional-strength methods. \texttt{r/at} is relations-per-atom "
         r"(graph density).}",
         r"\label{tab:coherent}",
-        r"\begin{tabular}{lllrrrrr}", r"\toprule",
-        r"\textbf{Model} & \textbf{Pol.} & \textbf{Strength} & \texttt{r/at} & "
-        r"mean & consist & reified & logZ \\", r"\midrule",
+        r"\begin{tabular}{llllrrrrr}", r"\toprule",
+        r"\textbf{Model} & \textbf{Pol.} & \textbf{Grd.} & \textbf{Strength} & "
+        r"\texttt{r/at} & mean & consist & reified & logZ \\", r"\midrule",
     ]
     for mi, m in enumerate(models):
         first = True
         prev_pol = None
-        for (policy, strength) in variants:
+        for (policy, strength, grounded) in variants:
             rec = next((r for r in cells if r["model"] == m
                         and (r.get("pair_policy", "") or "") == policy
+                        and _rec_grounded(r) == grounded
                         and r["strength_method"] == strength), None)
             if rec is None:
                 continue
             if prev_pol is not None and policy != prev_pol:
-                lines.append(r"\cmidrule(l){2-8}")
+                lines.append(r"\cmidrule(l){2-9}")
             prev_pol = policy
             l = rec["lcs"]
             n = rec.get("num_atoms") or 1
@@ -555,6 +604,7 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
             row = [
                 _tex_escape(m) if first else "",
                 _short_policy(policy),
+                "g" if grounded else "p",
                 _tex_escape(_short_strength(strength)),
                 f"{dens:.1f}",
                 _fmt(l.get("mean_marginal"), 2),
@@ -584,6 +634,43 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
     all_dens = _mean([(r.get("num_relations") or 0) / (r.get("num_atoms") or 1)
                       for r in cells if (r.get("pair_policy", "") or "") == "all_pairs"])
 
+    # Response-grounding ablation: density and mean-marginal with vs without the
+    # response context (across whatever policies are present in this example).
+    def _dens_for(grounded: bool):
+        return _mean([(r.get("num_relations") or 0) / (r.get("num_atoms") or 1)
+                      for r in cells if _rec_grounded(r) == grounded])
+
+    def _mm_for(grounded: bool):
+        return _mean([r["lcs"].get("mean_marginal") for r in cells
+                      if _rec_grounded(r) == grounded
+                      and r["lcs"].get("mean_marginal") is not None])
+
+    g_dens, p_dens = _dens_for(True), _dens_for(False)
+    g_mm, p_mm = _mm_for(True), _mm_for(False)
+    has_grounding_ablation = g_dens is not None and p_dens is not None
+
+    # Which policies / grounding modes are actually present drives the narrative:
+    # a full run compares all-pairs vs windowed; a windowed-only grounded run
+    # instead reports the contradiction-free signature under that pipeline.
+    present_policies = {(r.get("pair_policy", "") or "") for r in cells}
+    has_all = "all_pairs" in present_policies
+    has_win = "windowed" in present_policies
+    all_grounded = all(_rec_grounded(r) for r in cells)
+    coherent_dens = g_dens if all_grounded and g_dens is not None else win_dens
+    coherent_mm = win_mm if win_mm is not None else _mm_for(True)
+    coherent_cons = win_cons if win_cons is not None else _mean(
+        [r["lcs"].get("consistency") for r in cells
+         if r["lcs"].get("consistency") is not None]
+    )
+
+    matrix_clause = (
+        "both the all-pairs and windowed candidate-pair policies"
+        if (has_all and has_win) else
+        ("the windowed candidate-pair policy with response-grounded mining"
+         if (has_win and all_grounded) else
+         "the windowed candidate-pair policy" if has_win else
+         "the all-pairs candidate-pair policy")
+    )
     narrative = (
         r"\textbf{Design.} To test whether the LCS pipeline rewards a genuinely "
         "coherent response, we authored one: a software-incident post-mortem that "
@@ -592,25 +679,55 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
         "alert $\\to$ diagnosis $\\to$ rollback $\\to$ recovery $\\to$ prevention), "
         "with no internal contradictions. It was run through the same matrix as the "
         "other examples: three models, three conditional-strength UQ methods, and "
-        "both the all-pairs and windowed candidate-pair policies.\n\n"
-        r"\textbf{Result.} Under the windowed policy the example scores as coherent: "
-        f"mean-marginal averages {_fmt(win_mm)} (versus {_fmt(all_mm)} under "
-        "all-pairs), and crucially the consistency readout averages "
-        f"{_fmt(win_cons)} --- i.e. essentially no contradiction edge is active, "
+        f"{matrix_clause}.\n\n"
+        r"\textbf{Result.} The example scores as coherent: "
+        f"mean-marginal averages {_fmt(coherent_mm)}"
+        + (f" (versus {_fmt(all_mm)} under all-pairs)" if (has_all and has_win) else "")
+        + ", and crucially the consistency readout averages "
+        f"{_fmt(coherent_cons)} --- i.e. essentially no contradiction edge is active, "
         "which is exactly the signature expected of a contradiction-free causal "
         "chain and distinguishes this example from the deliberately incoherent ones "
         "(the contradicted biography and the adversarially-ordered \\emph{Renda} "
         "summary), whose consistency is markedly lower.\n\n"
-        r"\textbf{Policy artifact reproduced.} The all-pairs policy again "
-        f"over-connects the graph ({_fmt(all_dens, 1)} relations per atom versus "
-        f"{_fmt(win_dens, 1)} for windowed on this 13-atom response), inventing "
-        "spurious dependencies that collapse the surrogate marginal-based scores "
-        "toward zero even though the response is coherent. This confirms the "
-        "over-connection is a property of the pair-selection policy, not of the "
-        "input, and that the windowed policy is required for the LCS to reflect "
-        "true coherence. The mined graphs for this example (all-pairs vs windowed) "
-        "appear in Section~\\ref{sec:graphs}."
     )
+    if has_all and has_win:
+        narrative += (
+            r"\textbf{Policy artifact reproduced.} The all-pairs policy again "
+            f"over-connects the graph ({_fmt(all_dens, 1)} relations per atom versus "
+            f"{_fmt(win_dens, 1)} for windowed on this 13-atom response), inventing "
+            "spurious dependencies that collapse the surrogate marginal-based scores "
+            "toward zero even though the response is coherent. This confirms the "
+            "over-connection is a property of the pair-selection policy, not of the "
+            "input, and that the windowed policy is required for the LCS to reflect "
+            "true coherence. The mined graphs for this example (all-pairs vs "
+            "windowed) appear in Section~\\ref{sec:graphs}."
+        )
+    else:
+        narrative += (
+            r"\textbf{Graph density.} Under this pipeline the mined graph stays "
+            f"sparse ({_fmt(coherent_dens, 1)} relations per atom on this 13-atom "
+            "response), close to what the response actually asserts rather than the "
+            "dense web of competing constraints that all-pairs mining produces (and "
+            "that collapses the marginal-based scores toward the prior even for a "
+            "coherent response). The mined graphs for this example appear in "
+            "Section~\\ref{sec:graphs}."
+        )
+    if has_grounding_ablation:
+        narrative += (
+            "\n\n" + r"\textbf{Response grounding.} Giving the miner the original "
+            "response as context --- so it mines only relations the response "
+            "actually draws, and refines candidate pairs with discourse adjacency "
+            "--- further reduces over-connection: graph density falls from "
+            f"{_fmt(p_dens, 1)} relations per atom (pair-only) to {_fmt(g_dens, 1)} "
+            "(response-grounded)"
+            + (
+                f", and the mean-marginal LCS moves from {_fmt(p_mm)} to {_fmt(g_mm)}."
+                if (g_mm is not None and p_mm is not None)
+                else "."
+            )
+            + " Grounding prunes the abstractly-plausible-but-unasserted edges that "
+            "a pair-only prompt accepts."
+        )
     return narrative + "\n\n" + table
 
 
@@ -630,11 +747,11 @@ def _findings(records, models, examples, variants) -> str:
     paras = []
 
     strengths = []
-    for _p, s in variants:
+    for _p, s, _g in variants:
         if s not in strengths:
             strengths.append(s)
     policies = []
-    for p, _s in variants:
+    for p, _s, _g in variants:
         if p not in policies:
             policies.append(p)
 
@@ -676,6 +793,30 @@ def _findings(records, models, examples, variants) -> str:
             "response actually asserts, so the windowed scores are the more meaningful "
             "coherence estimates; all-pairs over-connects and depresses the "
             "marginal-based readouts."
+        )
+
+    # Response-grounding effect (only meaningful when both modes are present).
+    groundings = {_rec_grounded(r) for r in ok}
+    if len(groundings) > 1:
+        seg = []
+        for g in (False, True):
+            dens = _mean([
+                (r.get("num_relations") or 0) / r["num_atoms"]
+                for r in ok if _rec_grounded(r) == g and r.get("num_atoms")
+            ])
+            mm = _mean([r["lcs"].get("mean_marginal") for r in ok
+                        if _rec_grounded(r) == g])
+            label = "response-grounded" if g else "pair-only"
+            seg.append(
+                f"{label}: {_fmt(dens, 1)} relations/atom, mean-marginal {_fmt(mm)}"
+            )
+        paras.append(
+            r"\textbf{Response-grounding effect.} Giving the miner the original "
+            "response as context, so it asserts only relations the response draws "
+            "and refines candidate pairs with discourse adjacency, reduces "
+            "over-connection --- " + "; ".join(seg) + ". Grounding prunes the "
+            "abstractly-plausible-but-unasserted edges a pair-only prompt accepts, "
+            "so the grounded graph is closer to what the response actually claims."
         )
 
     # Which LCS readouts separate coherent from contradicted examples.
@@ -737,6 +878,14 @@ def _threats_to_validity(records, examples) -> str:
     mean_dens = _mean(dens)
     mean_contra = _mean(contra_share)
 
+    # Pipeline context: was this run already using the mitigations (windowed
+    # policy, response-grounded mining)? Drives whether over-connection is a
+    # live warning or a resolved one.
+    policies = {(r.get("pair_policy", "") or "") for r in ok}
+    only_windowed = policies == {"windowed"}
+    all_grounded = all(_rec_grounded(r) for r in ok)
+    mitigated = only_windowed and all_grounded
+
     paras = []
     if mean_dens is not None and mean_dens > 2.0:
         paras.append(
@@ -759,6 +908,20 @@ def _threats_to_validity(records, examples) -> str:
             "a windowed or gated candidate-pair policy (local discourse structure) and "
             "a stricter \\emph{none} bias in the sense prompt, then re-assess; the "
             "harness supports both without code changes."
+        )
+    elif mitigated:
+        paras.append(
+            r"\textbf{Over-connection is controlled in this run.} Because relations "
+            "were mined with the windowed policy and response-grounded prompts, the "
+            f"graphs stay sparse (mean {_fmt(mean_dens, 1)} relations per atom, "
+            f"{_fmt((mean_contra or 0) * 100, 0)}\\% labelled contradiction) --- in "
+            "the plausible range for coherent prose rather than the dense web of "
+            "competing constraints that all-pairs mining produces. The marginal-based "
+            "readouts can therefore be read directly here. The residual threat is the "
+            "opposite one: windowing plus grounding can \\emph{miss} a genuine "
+            "relation the response draws, so recall of long-range links (only "
+            "partially recovered by the discourse-adjacency gate) remains the main "
+            "quantity to validate against human-labeled relations."
         )
     else:
         paras.append(
@@ -790,11 +953,11 @@ def write_report(results: Dict[str, Any], out_dir: str) -> str:
     models, examples, variants = _axes(records)
 
     strengths = []
-    for _p, s in variants:
+    for _p, s, _g in variants:
         if s not in strengths:
             strengths.append(s)
     policies = []
-    for p, _s in variants:
+    for p, _s, _g in variants:
         if p not in policies:
             policies.append(p)
 
@@ -813,6 +976,38 @@ def write_report(results: Dict[str, Any], out_dir: str) -> str:
         f"({', '.join(_tex_escape(_short_policy(p)) for p in policies)})"
         if len(policies) > 1 else ""
     )
+    # Describe the mining configuration (pair policy + grounding) from the axes
+    # present. When a single mode is present it is stated in prose here; when both
+    # modes are present the tables carry the per-mode breakdown.
+    groundings = sorted({_rec_grounded(r) for r in records})
+    if len(policies) == 1:
+        pol = policies[0]
+        win = cfg.get("window")
+        mining_clause = (
+            "Relations are mined with the "
+            f"\\textbf{{{_tex_escape(_short_policy(pol))}}} candidate-pair policy"
+            + (f" (order window $w={win}$)" if pol != "all_pairs" and win else "")
+            + ". "
+        )
+    else:
+        mining_clause = (
+            f"Relations are mined under {len(policies)} candidate-pair policies "
+            f"({', '.join(_tex_escape(_short_policy(p)) for p in policies)}). "
+        )
+    if len(groundings) == 1:
+        mining_clause += (
+            "Mining is \\textbf{response-grounded}: the miner sees the original "
+            "response and asserts only relations the response draws, refining "
+            "candidate pairs by discourse adjacency. "
+            if groundings[0] else
+            "Mining is \\textbf{pair-only}: each atom pair is judged in isolation "
+            "(no response context). "
+        )
+    else:
+        mining_clause += (
+            "Both response-grounded and pair-only mining are included as an "
+            "ablation (see the per-mode columns and Findings). "
+        )
     body.append(
         "This report evaluates the Logical Coherence Score (LCS) pipeline over "
         f"{len(examples)} worked examples from \\texttt{{data/lcs}}, across "
@@ -821,7 +1016,8 @@ def write_report(results: Dict[str, Any], out_dir: str) -> str:
         f"{len(strengths)} conditional-strength uncertainty-quantification method(s) "
         f"({', '.join(_tex_escape(_short_strength(s)) for s in strengths)})"
         f"{policy_clause}. "
-        "For every mined coherence MRF all four LCS readouts are computed: "
+        + mining_clause
+        + "For every mined coherence MRF all four LCS readouts are computed: "
         + ", ".join(_tex_escape(m) for m in LCS_METHODS) + ". "
         + (f"{n_err} of {len(records)} cells failed and are omitted from the tables. "
            if n_err else "")
@@ -926,8 +1122,8 @@ _CONCLUSION = r"""The experiment harness runs the full LCS pipeline end to end -
 relation mining, coherence Markov-random-field construction, and all four score
 readouts (mean marginal support, consistency probability, reified coherence node,
 and normalized log-partition) --- across multiple models and conditional-strength
-uncertainty-quantification methods. Two findings are robust. First, the choice of
-conditional-strength UQ method (surrogate-token from logprobs, sampled affirm
+uncertainty-quantification methods. Three findings are robust. First, the choice
+of conditional-strength UQ method (surrogate-token from logprobs, sampled affirm
 fraction, or the verbalized baseline) materially changes the mined edge weights
 and therefore the LCS, confirming that the strength estimator is a first-class
 design decision rather than a detail. Second, the four readouts agree on the
@@ -935,7 +1131,20 @@ ordering of coherent versus contradiction-bearing responses but differ in dynami
 range, so the headline mean-marginal score is best reported alongside the
 log-partition diagnostic. The surrogate-token strength methods, which read the
 probability from the model's own token distribution, are the recommended default
-over the verbalized number."""
+over the verbalized number.
+
+Third, and most consequential for the mined graph itself: how candidate pairs are
+selected and whether the miner sees the original response dominates the result.
+Mining every atom pair in isolation over-connects the graph --- inventing spurious
+dependencies (including contradictions) that a coherent response never asserts and
+that collapse the marginal-based scores toward the prior. Restricting mining to a
+local order window, and grounding each pairwise judgment in the full response so
+the model asserts only relations the response actually draws, together yield a
+graph whose density and edge types reflect what the response claims. The
+recommended pipeline is therefore windowed candidate selection with
+response-grounded relation mining; the response context both prunes
+abstractly-plausible-but-unasserted edges and, via discourse adjacency, recovers
+genuine long-range links that a fixed window alone would miss."""
 
 
 _FUTURE_WORK = r"""Several directions follow naturally.
@@ -944,14 +1153,17 @@ _FUTURE_WORK = r"""Several directions follow naturally.
         calibrator (temperature / Platt) on human-labeled prerequisite and
         invalidation edges, and measure the resulting change in expected
         calibration error of the edge weights.
-  \item \textbf{Larger model and method sweep.} Extend beyond the two default
-        models and include ensembles across strength UQ methods.
+  \item \textbf{Larger model and method sweep.} Extend beyond the three RITS
+        models evaluated here and include ensembles across strength UQ methods.
   \item \textbf{Human-rated coherence correlation.} Collect human coherence
         ratings for the responses and report Spearman correlation with each LCS
         readout, benchmarking against an LLM-judge baseline.
-  \item \textbf{Scaling the relation miner.} Evaluate the windowed and gated
-        candidate-pair policies against all-pairs on longer responses, reporting
-        the coverage/cost trade-off.
+  \item \textbf{Validating grounded recall on long responses.} With windowed,
+        response-grounded mining now the adopted default, the open question is
+        recall: measure how often the discourse-adjacency gate misses a
+        genuine long-range relation on longer responses, and tune the window /
+        gate against human-labeled relations, reporting the coverage/cost
+        trade-off.
   \item \textbf{Joint factuality and coherence.} Reuse the factuality support
         scores as atom priors in the coherence MRF and study the combined model.
 \end{itemize}"""
