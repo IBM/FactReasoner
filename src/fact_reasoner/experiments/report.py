@@ -15,9 +15,9 @@
 
 # Render LCS experiment results to a self-contained LaTeX report.
 #
-# Produces ``report.tex`` (booktabs tables + native pgfplots bar charts, no
-# external image files and no Python plotting dependency) plus ``.dat`` data
-# files. Compile with ``pdflatex report.tex`` (run twice for references).
+# Produces ``report.tex`` (booktabs result tables + native TikZ relation graphs,
+# no external image files and no Python plotting dependency). Compile with
+# ``pdflatex report.tex`` (run twice for references).
 
 import json
 import os
@@ -937,15 +937,16 @@ def _threats_to_validity(records, examples) -> str:
 # ---------------------------------------------------------------------------
 
 
-def write_report(results: Dict[str, Any], out_dir: str) -> str:
-    """Write ``report.tex`` (+ ``.dat`` files) for an experiment results dict.
+def write_report(results: Dict[str, Any], out_dir: str, filename: str = "report.tex") -> str:
+    """Write ``filename`` (+ ``.dat`` files) for an experiment results dict.
 
     Args:
         results: The combined dict from the runner (``{"config", "records"}``).
-        out_dir: Directory to write ``report.tex`` and the ``.dat`` files into.
+        out_dir: Directory to write the ``.tex`` and ``.dat`` files into.
+        filename: The ``.tex`` file name to write (default ``report.tex``).
 
     Returns:
-        The path to the written ``report.tex``.
+        The path to the written ``.tex`` file.
     """
     os.makedirs(out_dir, exist_ok=True)
     records = results.get("records", [])
@@ -1029,11 +1030,10 @@ def write_report(results: Dict[str, Any], out_dir: str) -> str:
     body.append(r"\section{Dataset}")
     body.append(_coverage_table(records, models, examples, variants))
 
-    # Results tables + figures.
+    # Results tables (one per LCS readout). Bar charts are intentionally omitted.
     body.append(r"\section{Results}")
     for lcs_method in LCS_METHODS:
         body.append(_score_table(records, lcs_method, models, examples, variants))
-        body.append(_bar_chart(records, lcs_method, models, examples, variants, out_dir))
 
     # Findings.
     body.append(r"\section{Findings}")
@@ -1065,7 +1065,7 @@ def write_report(results: Dict[str, Any], out_dir: str) -> str:
     body.append(r"\end{document}")
 
     tex = "\n\n".join(body) + "\n"
-    path = os.path.join(out_dir, "report.tex")
+    path = os.path.join(out_dir, filename)
     with open(path, "w") as f:
         f.write(tex)
     print(f"[experiments] wrote LaTeX report to {path}")
@@ -1109,8 +1109,6 @@ _PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{graphicx}
-\usepackage{pgfplots}
-\pgfplotsset{compat=1.17}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta}
 \title{Logical Coherence Score: Experimental Evaluation}

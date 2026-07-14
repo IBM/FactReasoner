@@ -69,6 +69,7 @@ from fact_reasoner.lcs.strength import (
 # experiment harness's offline mode; import the canonical copies from there.
 from fact_reasoner.experiments.mock import (
     brute_force_marginals as _brute_force_marginals,
+    brute_force_run_merlin as _brute_force_run_merlin,
     yesno_logprob_meta as _yesno_logprob_meta,
 )
 
@@ -117,7 +118,7 @@ def _aeroparts_lcs(relations, prior=0.5):
     fg = _aeroparts_graph(relations, prior)
     priors = {a: prior for a in AEROPARTS_IDS}
     mn = build_markov_network(fg, use_priors=True, node_priors=priors)
-    marginals, log_z = _brute_force_marginals(mn, priors)
+    marginals, log_z, _log_max = _brute_force_marginals(mn, priors)
     lcs = sum(marginals.values()) / len(marginals)
     return lcs, log_z, marginals
 
@@ -456,26 +457,11 @@ def _patch_fake_merlin(monkeypatch):
     """Replace the scorer's Merlin helper with the exact brute-force oracle.
 
     Enumerates every variable in whatever network it is handed (base, U-chain,
-    reified R, or contradiction-free), so all four scoring methods route through
-    the same exact oracle instead of the real Merlin executable.
+    reified R, or contradiction-free), so all four scoring methods -- including
+    the MAP-based log Zmin floor -- route through the same exact oracle instead of
+    the real Merlin executable.
     """
-
-    def fake_run_merlin(network, merlin_path, *, task="MAR", ibound=6,
-                        query_variables=None, verbose=False):
-        marginals, log_z = _brute_force_marginals(network)
-        if task == "MAR":
-            names = query_variables or list(marginals)
-            return {
-                "task": "MAR",
-                "marginals": [
-                    {"variable": v, "probabilities": [1 - marginals[v], marginals[v]]}
-                    for v in names if v in marginals
-                ],
-                "all_marginals": [],
-            }
-        return {"task": "PR", "log_z": log_z}
-
-    monkeypatch.setattr(lcs_scorer_mod, "run_merlin", fake_run_merlin)
+    monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
 
 
 class TestLCSScorer:
@@ -542,23 +528,36 @@ class TestLCSScorer:
         assert scores["reified"] == pytest.approx(0.459, abs=2e-3)
 
     def test_log_partition(self, monkeypatch):
-        """(d) normalized log-partition: base normalizes to 0.0 (Zmin == Z)."""
+        """(d) normalized log-partition: graded in [0,1] via the MAP-world floor.
+
+        Zmax = contradictions removed (ceiling), Zmin = the base network's MAP
+        world mass (a provable lower bound: Z is a sum of nonneg terms, so
+        log max_x mass(x) <= log Z). The base sits strictly between, grading it
+        well inside (0,1).
+        """
         _patch_fake_merlin(monkeypatch)
         result = _aeroparts_result(AEROPARTS_BASE)
         scores = LCSScorer("/fake/merlin").score(result, method="log_partition")
         assert scores["method"] == "log_partition"
-        # Zmin is the base network, so the base normalizes to exactly 0.0.
-        assert scores["log_partition"] == pytest.approx(0.0, abs=1e-9)
         # log Z (base) and log Z_max (contradictions removed) reproduce Table 3.
         assert scores["log_z"] == pytest.approx(-9.75, abs=0.05)
         assert scores["log_z_max"] == pytest.approx(-8.25, abs=0.05)
+        # Zmin is the MAP world mass; provably below the base log Z.
+        assert scores["log_z_min"] == pytest.approx(-15.16, abs=0.05)
+        # Valid ordering (guaranteed) and a graded, non-degenerate score.
+        assert scores["log_z_min"] <= scores["log_z"] <= scores["log_z_max"]
+        assert scores["log_partition"] == pytest.approx(0.7831, abs=1e-3)
+        assert 0.0 < scores["log_partition"] < 1.0
 
     def test_log_partition_no_contradictions_is_one(self, monkeypatch):
         _patch_fake_merlin(monkeypatch)
         coherent = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
         result = _aeroparts_result(coherent)
         scores = LCSScorer("/fake/merlin").score(result, method="log_partition")
-        # Zmax == Zmin (no contradictions to remove): defined as maximally coherent.
+        # No contradictions: base log Z sits at the ceiling (Z == Zmax), while the
+        # MAP floor is strictly below, so the score is exactly 1.0.
+        assert scores["log_z"] == pytest.approx(scores["log_z_max"], abs=1e-6)
+        assert scores["log_z_min"] < scores["log_z"]
         assert scores["log_partition"] == pytest.approx(1.0, abs=1e-9)
 
     def test_reified_prior_is_configurable(self, monkeypatch):

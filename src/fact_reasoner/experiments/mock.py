@@ -54,7 +54,8 @@ def brute_force_marginals(network, node_priors=None):
     Enumerates every variable in ``network.nodes`` (all binary), so it handles the
     augmented networks the scorer builds (consistency U-chain, reified R node).
     Only feasible for small n -- exactly the diagnostic-example regime. Returns
-    ``(marginals_dict, log_z)``. ``node_priors`` is accepted for signature
+    ``(marginals_dict, log_z, log_max)`` where ``log_max`` is the log-mass of the
+    most-probable world (the MAP value). ``node_priors`` is accepted for signature
     compatibility and ignored.
 
     Raises:
@@ -72,6 +73,7 @@ def brute_force_marginals(network, node_priors=None):
     idx = {v: i for i, v in enumerate(var_names)}
 
     z = 0.0
+    max_w = 0.0
     ones = [0.0] * n
     for world in itertools.product([0, 1], repeat=n):
         w = 1.0
@@ -81,11 +83,14 @@ def brute_force_marginals(network, node_priors=None):
                 k = k * 2 + world[idx[v]]
             w *= values[k]
         z += w
+        if w > max_w:
+            max_w = w
         for i, bit in enumerate(world):
             if bit == 1:
                 ones[i] += w
     marginals = {var_names[i]: ones[i] / z for i in range(n)}
-    return marginals, math.log(z)
+    log_max = math.log(max_w) if max_w > 0 else float("-inf")
+    return marginals, math.log(z), log_max
 
 
 def brute_force_run_merlin(
@@ -95,9 +100,10 @@ def brute_force_run_merlin(
     """A ``run_merlin``-compatible callable backed by the brute-force oracle.
 
     Signature matches ``fact_reasoner.inference.run_merlin`` so it can be
-    monkeypatched into ``lcs_scorer`` for offline scoring.
+    monkeypatched into ``lcs_scorer`` for offline scoring. Supports MAR, PR, and
+    MAP (the MAP value is the exact log-mass of the most-probable world).
     """
-    marginals, log_z = brute_force_marginals(network)
+    marginals, log_z, log_max = brute_force_marginals(network)
     if task == "MAR":
         names = query_variables or list(marginals)
         return {
@@ -111,6 +117,8 @@ def brute_force_run_merlin(
                 for v in marginals
             ],
         }
+    if task == "MAP":
+        return {"task": "MAP", "log_z": log_max}
     return {"task": "PR", "log_z": log_z}
 
 

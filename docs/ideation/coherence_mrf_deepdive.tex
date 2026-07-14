@@ -541,10 +541,10 @@ five variants of Section~\ref{sec:change} (from least to most coherent:
 \toprule
 \textbf{Variant} & (a) mean supp. & (b) $P(\text{cons})$ & (c) $P(R{=}1)$ & (d) $\log Z$ & (d) norm.\\
 \midrule
-worse        & $0.567$ & $0.803$ & $0.137$ & $-10.47$ & $0.00$\\
-base         & $0.587$ & $0.813$ & $0.150$ & $-9.75$  & $0.33$\\
-concession   & $0.601$ & $\mathbf{0.661}$ & $\mathbf{0.146}$ & $-9.66$ & $0.37$\\
-fixcasualty  & $0.603$ & $0.849$ & $0.157$ & $-9.06$  & $0.64$\\
+worse        & $0.567$ & $0.803$ & $0.137$ & $-10.47$ & $0.69$\\
+base         & $0.587$ & $0.813$ & $0.150$ & $-9.75$  & $0.78$\\
+concession   & $0.601$ & $\mathbf{0.661}$ & $\mathbf{0.146}$ & $-9.66$ & $0.80$\\
+fixcasualty  & $0.603$ & $0.849$ & $0.157$ & $-9.06$  & $0.88$\\
 coherent     & $0.620$ & $1.000$ & $0.181$ & $-8.25$  & $1.00$\\
 \midrule
 \textbf{monotone?} & \textbf{yes} & no (bold) & no (bold) & \textbf{yes} & \textbf{yes}\\
@@ -756,22 +756,64 @@ against two references,
   \label{eq:logz}
 \end{equation}
 with $Z_{\max}$ the same network with all \textsc{contradict} factors removed (the
-maximally-coherent reference) and $Z_{\min}$ e.g.\ the base network.
+maximally-coherent reference; removing constraint factors only adds mass, so
+$\log Z\le\log Z_{\max}$).
+
+\paragraph{The floor $Z_{\min}$: the MAP-world mass.} A graded $[0,1]$ score needs a valid
+\emph{lower} reference. We use the mass of the single most-probable world,
+\begin{equation}
+  Z_{\min}\;=\;\max_{\mathbf a}\ \prod_i\phi_i(a_i)\prod_r\psi_r(\mathbf a),
+  \qquad
+  \log Z_{\min}\;=\;\max_{\mathbf a}\ \log\mathrm{mass}(\mathbf a),
+  \label{eq:zmin}
+\end{equation}
+i.e.\ the mass of the \textsc{map} configuration. This is a \emph{provable} lower bound:
+$Z$ is a sum of non-negative terms, so it is at least its single largest term,
+$Z=\sum_{\mathbf a}\mathrm{mass}(\mathbf a)\ge\max_{\mathbf a}\mathrm{mass}(\mathbf a)=Z_{\min}$,
+hence $\log Z_{\min}\le\log Z\le\log Z_{\max}$ for \emph{every} network, by construction rather
+than by luck. It is also coherence-graded: the \textsc{map} world is the network's best-case
+reading (the assignment satisfying as many relations as possible), so when contradictions are
+weak some world satisfies almost everything and $\log Z_{\min}$ sits near $\log Z$, whereas
+when contradictions are strong and mutually binding \emph{even the best world} must violate
+some of them, dragging $\log Z_{\min}$ down with coherence. The score then reads: $1.0$ when
+the base already sits at the contradiction-free ceiling ($\log Z=\log Z_{\max}$), tending to
+$0$ as the base collapses onto its own single-world floor.
+
+\emph{Why not simpler floors.} Two skeleton-derived candidates fail for the row-stochastic
+with-priors tables of \S\ref{sec:tables}: ``retype every edge to a \textsc{contradict}'' and
+``saturate the existing \textsc{contradict} factors to $p{=}1$'' are both \emph{not} valid
+lower bounds. The with-priors contradiction factor is row-stochastic (each source-state row
+sums to $1$), so an isolated contradiction removes no mass and only bites where it competes
+with other factors over shared atoms; a mass-\emph{concentrating} entailment backbone plus
+several soft contradictions can therefore drive the base $\log Z$ \emph{below} either
+construction (empirically the base fell below both on a third of real graphs). The
+\textsc{map}-world mass sidesteps this entirely --- it is a term of the actual sum, so it
+cannot exceed it.
 
 \paragraph{How it is computed.} $Z$ is exactly the normalizing constant of the joint;
-Merlin's \textbf{PR} (partition) task returns $\log Z$ directly (the MAR task used for (a)
-returns marginals; PR returns $\log Z$ from the same run). On the example
-$\log Z$ runs $-10.47\to-9.75\to-9.66\to-9.06\to-8.25$, i.e.\ normalized
-$0.00\to0.33\to0.37\to0.64\to1.00$ --- \emph{cleanly monotone}, and the most
-contradiction-sensitive of all four (a single confident contradiction costs $\approx$ a full
-nat).
+Merlin's \textbf{PR} (partition) task returns $\log Z$, and its \textbf{MAP} task returns
+$\log Z_{\min}$ (the log-mass of the argmax configuration) --- one extra query on the
+\emph{same} base network, plus one PR run on the contradiction-free network for
+$\log Z_{\max}$. On the \emph{AeroParts} base network (exact, over $2^{16}$ worlds)
+$\log Z=-9.75$, $\log Z_{\min}=-15.16$, $\log Z_{\max}=-8.25$, giving
+$\mathrm{LCS}_{\text{(d)}}=(-9.75+15.16)/(-8.25+15.16)=\mathbf{0.78}$; the contradiction-free
+variant has $\log Z=\log Z_{\max}$ and normalizes to $\mathbf{1.00}$. Across the
+coherence-ordered family of Section~\ref{sec:change} the normalized score runs
+$0.69\to0.78\to0.80\to0.88\to1.00$ (Table~\ref{tab:allcands}) --- \emph{cleanly monotone} and
+genuinely graded in $[0,1]$; raw $\log Z$ is likewise monotone and the most
+contradiction-sensitive of the four candidates (a single confident contradiction costs
+$\approx$ a full nat).
 
-\paragraph{Why it is rejected as the definition (but kept as a diagnostic).} It needs the
-reference pair $(Z_{\min},Z_{\max})$ to become a $[0,1]$ score, and $Z_{\max}$ requires a
-\emph{second} inference run on a modified network. It is also a whole-network quantity with
-no per-atom decomposition, so it cannot say \emph{which} atoms the incoherence attaches to.
-We therefore report raw $\log Z$ (single PR run, no reference) as the headline's
-contradiction-sensitivity companion, exactly as in Table~\ref{tab:variants}.
+\paragraph{Status: a graded diagnostic, still not the headline.} With the \textsc{map} floor,
+$\mathrm{LCS}_{\text{(d)}}$ is a genuine $[0,1]$ score (it was previously degenerate under the
+$Z_{\min}=$ base-network choice, which forced every contradiction-bearing graph to $0$). It
+remains a \emph{diagnostic} rather than the headline for two reasons unchanged by the fix: it
+needs the reference pair $(Z_{\min},Z_{\max})$ --- two extra inference runs (a MAP query and a
+PR run on a modified network) --- and it is a whole-network quantity with no per-atom
+decomposition, so it cannot say \emph{which} atoms the incoherence attaches to. We therefore
+keep the mean marginal support (a) as the headline and report the normalized $\log Z$ (with
+its $Z_{\min},Z_{\max}$ endpoints) alongside raw $\log Z$ as the contradiction-sensitivity
+companion, as in Table~\ref{tab:variants}.
 
 % -------------------------------------------------------------------------------------
 \subsection{The shared concession quirk}

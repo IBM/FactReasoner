@@ -43,7 +43,8 @@ def score_all_lcs(
     Returns:
         A dict with one key per LCS method (its scalar value) plus
         ``num_atoms``, ``num_below_prior``, ``avg_norm_entropy``, ``log_z``,
-        ``log_z_max`` (from the runs that compute them), and ``marginals``.
+        ``log_z_max``, ``log_z_min`` (from the runs that compute them), and
+        ``marginals``.
     """
     methods = methods or list(LCS_METHODS)
     out: Dict[str, Any] = {}
@@ -53,9 +54,10 @@ def score_all_lcs(
     for m in methods:
         scores = scorer.score(result, method=m, reified_prior=reified_prior)
         out[m] = scores.get(m)
-        # Diagnostics are identical across methods except log_z_max (only the
-        # log_partition run computes it); keep the first non-None seen.
-        for key in ("num_atoms", "num_below_prior", "avg_norm_entropy", "log_z", "log_z_max"):
+        # Diagnostics are identical across methods except log_z_max / log_z_min
+        # (only the log_partition run computes them); keep the first non-None seen.
+        for key in ("num_atoms", "num_below_prior", "avg_norm_entropy", "log_z",
+                    "log_z_max", "log_z_min"):
             val = scores.get(key)
             if val is not None and diagnostics.get(key) is None:
                 diagnostics[key] = val

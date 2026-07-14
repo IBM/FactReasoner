@@ -20,9 +20,11 @@
 # JSON output, and map the integer variable indices back to variable names using
 # the network's canonical ordering.
 #
-# Two inference tasks are supported:
+# Three inference tasks are supported:
 #   * ``"MAR"`` -- posterior marginals ``P(x_i)`` for every variable.
 #   * ``"PR"``  -- the (log) partition function ``log Z``.
+#   * ``"MAP"`` -- the log-mass of the most-probable joint configuration,
+#     ``max_x log prod factors(x)`` (a provable lower bound on ``log Z``).
 
 import json
 import os
@@ -34,7 +36,7 @@ from typing import Dict, List, Optional
 from fact_reasoner.markov_network import MarkovNetwork
 
 # Merlin inference tasks this helper knows how to run.
-MERLIN_TASKS = ("MAR", "PR")
+MERLIN_TASKS = ("MAR", "PR", "MAP")
 
 
 def _load_merlin_json(raw: str) -> Optional[Dict[str, object]]:
@@ -70,8 +72,9 @@ def run_merlin(
     Args:
         network: The :class:`MarkovNetwork` to run inference on.
         merlin_path: Path to the Merlin executable.
-        task: Inference task, one of ``"MAR"`` (marginals) or ``"PR"``
-            (partition function / ``log Z``).
+        task: Inference task, one of ``"MAR"`` (marginals), ``"PR"``
+            (partition function / ``log Z``), or ``"MAP"`` (log-mass of the
+            most-probable configuration; a lower bound on ``log Z``).
         algorithm: Merlin algorithm (default ``"wmb"``, weighted mini-bucket).
         ibound: The i-bound for the mini-bucket approximation (default 6).
         query_variables: If given (only meaningful for ``task="MAR"``), the
@@ -87,6 +90,8 @@ def run_merlin(
             ``{"variable", "probabilities"}`` filtered to ``query_variables`` if
             given) and ``"all_marginals"`` (the same for every variable).
           * For ``"PR"``: ``"log_z"`` (float), the natural-log partition function.
+          * For ``"MAP"``: ``"log_z"`` (float), the natural-log mass of the
+            most-probable configuration (``max_x log prod factors(x)``).
 
     Raises:
         ValueError: If ``task`` is not a supported Merlin task.
@@ -143,7 +148,7 @@ def run_merlin(
             return _parse_marginals(
                 results, vars_mapping, query_variables, verbose=verbose
             )
-        else:  # task == "PR"
+        else:  # task == "PR" or "MAP" (both report a scalar log value)
             return _parse_partition(results, raw)
     finally:
         # Always clean up the temporary input/output files.

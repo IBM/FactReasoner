@@ -21,7 +21,10 @@
 #   (a) mean_marginal  -- LCS = (1/n) sum_i P(a_i=1)               (Eq. 4, DEFAULT)
 #   (b) consistency    -- P( no CONTRADICT edge jointly active )    (Eq. 5)
 #   (c) reified        -- P(R=1) for an added coherence node R      (Eqs. 6-7)
-#   (d) log_partition  -- normalized (log Z - log Zmin)/(log Zmax - log Zmin) (Eq. 8)
+#   (d) log_partition  -- normalized (log Z - log Zmin)/(log Zmax - log Zmin) (Eq. 8),
+#       graded in [0,1] between a maximally-coherent ceiling (contradictions
+#       removed) and a maximally-incoherent floor (contradictions saturated to
+#       p=1), both built from the SAME edge skeleton as the base (see below).
 #
 # (a) is the selected headline: MRF-native, monotone, constant-free, in [0,1], and
 # read directly off Merlin's MAR marginals. (b)-(d) are alternative readouts that
@@ -117,8 +120,12 @@ class LCSScorer:
               * ``"marginals"``: ``{atom_id: P(a_i=1)}`` from the base network.
               * ``"num_atoms"``, ``"num_below_prior"``, ``"avg_norm_entropy"``.
               * ``"log_z"``: base-network log partition (always computed).
-              * ``"log_z_max"``: contradiction-free log partition (only for
-                ``method="log_partition"``, else ``None``).
+              * ``"log_z_max"``: contradiction-free (ceiling) log partition (only
+                for ``method="log_partition"``, else ``None``).
+              * ``"log_z_min"``: floor log partition -- the same edge skeleton
+                with every contradiction factor saturated to probability 1
+                (entailment/equivalence untouched); the maximally-incoherent
+                reference (only for ``method="log_partition"``, else ``None``).
 
         Raises:
             ValueError: If ``method`` is not one of ``LCS_METHODS``.
@@ -146,6 +153,7 @@ class LCSScorer:
             "avg_norm_entropy": 0.0,
             "log_z": None,
             "log_z_max": None,
+            "log_z_min": None,
         }
         if n == 0:
             return out
@@ -173,9 +181,12 @@ class LCSScorer:
             out["reified"] = self._reified_coherence(result, reified_prior)
             out["lcs"] = out["reified"]
         elif method == "log_partition":
-            norm, log_z_max = self._normalized_log_partition(result, out["log_z"])
+            norm, log_z_max, log_z_min = self._normalized_log_partition(
+                result, out["log_z"]
+            )
             out["log_partition"] = norm
             out["log_z_max"] = log_z_max
+            out["log_z_min"] = log_z_min
             out["lcs"] = norm
 
         return out
@@ -206,6 +217,26 @@ class LCSScorer:
             return pr["log_z"]
         except Exception as e:
             print(f"[LCSScorer] PR (log Z) task unavailable: {e}")
+            return None
+
+    def _log_map(self, network: MarkovNetwork) -> Optional[float]:
+        """Run MAP and return the log-mass of the most-probable configuration.
+
+        Because ``Z = sum_x mass(x)`` is a sum of non-negative terms, the single
+        largest term ``max_x mass(x)`` (the MAP world) satisfies
+        ``log max_x mass(x) <= log Z`` for ANY network -- a provably valid, tight,
+        and coherence-graded lower bound (strengthening a contradiction lowers even
+        the best world's mass). Used as ``log Zmin`` for the normalized
+        log-partition. Returns None if the MAP task is unavailable.
+        """
+        try:
+            mp = run_merlin(
+                network, self.merlin_path, task="MAP", ibound=self.ibound,
+                verbose=self.verbose,
+            )
+            return mp["log_z"]
+        except Exception as e:
+            print(f"[LCSScorer] MAP (log Zmin) task unavailable: {e}")
             return None
 
     # -- (b) consistency probability -----------------------------------------
@@ -282,31 +313,58 @@ class LCSScorer:
     def _normalized_log_partition(
         self, result: MiningResult, log_z: Optional[float]
     ) -> (Any):
-        """(log Z - log Zmin)/(log Zmax - log Zmin) — deep-dive Eq. 8.
+        """(log Z - log Zmin)/(log Zmax - log Zmin) — deep-dive Eq. 8, graded.
 
-        ``Zmax`` is the same network with all CONTRADICT factors removed (the
-        maximally-coherent reference); ``Zmin`` is the base network. With
-        ``Zmin == Z`` the base normalizes to 0.0 by construction; both ``log Z``
-        and ``log Z_max`` are returned so a caller can renormalize against another
-        reference. Returns ``(normalized, log_z_max)``.
+        The two references bracket the base network's ``log Z``:
+
+          * ``Zmax`` (ceiling): the SAME edge skeleton with all CONTRADICT factors
+            removed -- the maximally-coherent arrangement, and an upper bound on
+            ``log Z`` (removing constraint factors only adds mass).
+          * ``Zmin`` (floor): the MAP world mass of the base network itself,
+            ``max_x prod factors(x)``, obtained from Merlin's MAP task. Since
+            ``Z = sum_x mass(x)`` is a sum of non-negative terms, the single
+            largest term is a PROVABLE lower bound: ``log Zmin <= log Z`` for any
+            network. It is also coherence-graded -- strengthening a contradiction
+            lowers even the best world's mass -- so the base grades smoothly in
+            ``[0, 1]``. (Earlier skeleton-derived floors -- "retype all edges to
+            contradiction", or "saturate contradictions to p=1" -- are NOT valid
+            lower bounds for the row-stochastic with-priors tables: the base's mix
+            of a mass-concentrating entailment backbone and many soft
+            contradictions can remove more mass than either, and empirically the
+            base ``log Z`` fell below both on real graphs. The MAP world mass is
+            the correct floor.)
+
+        ``1.0`` = base is as coherent as the skeleton allows; ``0.0`` = base is at
+        its own single-world floor (fully saturated conflict). Returns
+        ``(normalized, log_z_max, log_z_min)``.
         """
         if log_z is None:
-            return None, None
+            return None, None, None
+
+        priors = self._node_priors(result)
 
         cf_graph = _contradiction_free_graph(result.fact_graph)
         cf_network = build_markov_network(
-            cf_graph, use_priors=True, node_priors=self._node_priors(result)
+            cf_graph, use_priors=True, node_priors=priors
         )
         log_z_max = self._log_z(cf_network)
-        if log_z_max is None:
-            return None, None
 
-        log_z_min = log_z  # deep-dive's stated Zmin choice: the base network.
+        # Zmin = MAP world mass of the BASE network (provable lower bound on log Z).
+        log_z_min = self._log_map(result.markov_network)
+
+        if log_z_max is None or log_z_min is None:
+            return None, log_z_max, log_z_min
+
         denom = log_z_max - log_z_min
         if abs(denom) < 1e-12:
-            # No contradictions (or none bind): base is already maximally coherent.
-            return 1.0, log_z_max
-        return (log_z - log_z_min) / denom, log_z_max
+            # Degenerate: ceiling and floor coincide (e.g. no edges, or a single
+            # world carries all the mass). Nothing to grade -> maximally coherent.
+            return 1.0, log_z_max, log_z_min
+        norm = (log_z - log_z_min) / denom
+        # Clamp for numerical safety: the MAP bound is exact in theory, but WMB
+        # runs PR and MAP with finite i-bound, so tiny tolerance slips are possible.
+        norm = max(0.0, min(1.0, norm))
+        return norm, log_z_max, log_z_min
 
     # -- network construction helpers ----------------------------------------
 
