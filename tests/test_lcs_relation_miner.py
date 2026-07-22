@@ -41,9 +41,11 @@ from fact_reasoner.factors import (
 )
 from fact_reasoner.lcs import candidate_pairs as cp
 from fact_reasoner.lcs.taxonomy import (
+    LEVEL1_CONECESSITY,
     LEVEL1_CONTRADICTION,
     LEVEL1_ENTAILMENT,
     LEVEL1_EQUIVALENCE,
+    LEVEL1_EXCLUSIVE,
     LEVEL1_NONE,
     Level2Sense,
     compile_sense,
@@ -102,6 +104,19 @@ AEROPARTS_CONCESSION = [
     for (s, t, ty, p) in AEROPARTS_BASE
 ]
 
+# The REVISED 5-coupling AeroParts (Level-1 3->5). The casualty (a7/a10) and blame
+# (a11/a12) conflicts are EXHAUSTIVE alternatives, so they are `exclusive`, not
+# `contradiction` (revised deep-dive Section 5 / Tables 3-5): base LCS 0.607.
+AEROPARTS_BASE_5 = [
+    (s, t, ("exclusive" if (s, t) in (("a7", "a10"), ("a11", "a12")) else ty), p)
+    for (s, t, ty, p) in AEROPARTS_BASE
+]
+
+AEROPARTS_CONCESSION_5 = [
+    (s, t, ty, (0.55 if (s, t) == ("a11", "a12") else p))
+    for (s, t, ty, p) in AEROPARTS_BASE_5
+]
+
 AEROPARTS_IDS = [f"a{i}" for i in range(1, 17)]
 
 
@@ -147,6 +162,8 @@ class TestTaxonomy:
             (Level2Sense.RESTATEMENT, LEVEL1_EQUIVALENCE),
             (Level2Sense.CONTRAST, LEVEL1_CONTRADICTION),
             (Level2Sense.CONCESSION, LEVEL1_CONTRADICTION),
+            (Level2Sense.ALTERNATIVE, LEVEL1_EXCLUSIVE),
+            (Level2Sense.DISJUNCTION, LEVEL1_CONECESSITY),
             (Level2Sense.PRECEDENCE, LEVEL1_NONE),
             (Level2Sense.SUCCESSION, LEVEL1_NONE),
             (Level2Sense.NONE, LEVEL1_NONE),
@@ -173,10 +190,21 @@ class TestTaxonomy:
         assert strength is None
         assert spec.ordering_only is True
 
+    def test_alternative_and_disjunction_are_symmetric(self):
+        _l, _s, spec_alt = compile_sense(Level2Sense.ALTERNATIVE, 0.9)
+        _l2, _s2, spec_dis = compile_sense(Level2Sense.DISJUNCTION, 0.9)
+        assert spec_alt.directed is False
+        assert spec_dis.directed is False
+
     def test_coupling_from_string(self):
         assert coupling_from_string("[entailment]") == LEVEL1_ENTAILMENT
         assert coupling_from_string("contradiction") == LEVEL1_CONTRADICTION
         assert coupling_from_string("equivalence") == LEVEL1_EQUIVALENCE
+        assert coupling_from_string("[coupling=exclusive]") == LEVEL1_EXCLUSIVE
+        assert coupling_from_string("exactly one") == LEVEL1_EXCLUSIVE
+        assert coupling_from_string("co_necessity") == LEVEL1_CONECESSITY
+        assert coupling_from_string("at least one") == LEVEL1_CONECESSITY
+        assert coupling_from_string("disjunction") == LEVEL1_CONECESSITY
         assert coupling_from_string("neutral") == LEVEL1_NONE
         assert coupling_from_string("independent") == LEVEL1_NONE
         assert coupling_from_string("") == LEVEL1_NONE
@@ -211,6 +239,22 @@ class TestFactorTables:
         # [p, 1-p, 1-p, p] (symmetric; priors-independent).
         vals = edge_factor_values(_E("equivalence", "atom_atom", 0.88), use_priors=True)
         assert vals == pytest.approx([0.88, 0.12, 0.12, 0.88])
+
+    def test_exclusive(self):
+        # exactly-one: [1-p, p, p, 1-p] (penalizes (0,0) and (1,1)); same in both
+        # variants. Revised deep-dive Table 1.
+        for up in (True, False):
+            vals = edge_factor_values(_E("exclusive", "atom_atom", 0.93), use_priors=up)
+            assert vals == pytest.approx([0.07, 0.93, 0.93, 0.07])
+
+    def test_co_necessity_with_priors(self):
+        # at-least-one: [1-p, pi_s, pi_s, p] (penalizes only (0,0)).
+        vals = edge_factor_values(_E("co_necessity", "atom_atom", 0.9), use_priors=True)
+        assert vals == pytest.approx([0.1, 0.5, 0.5, 0.9])
+
+    def test_co_necessity_no_priors(self):
+        vals = edge_factor_values(_E("co_necessity", "atom_atom", 0.9), use_priors=False)
+        assert vals == pytest.approx([0.1, 0.9, 0.9, 0.9])
 
     def test_no_priors_entailment(self):
         vals = edge_factor_values(_E("entailment", "atom_atom", 0.7), use_priors=False)
@@ -390,6 +434,49 @@ class TestAeroPartsBehaviour:
         coherent = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
         _lcs2, _z2, marg_coh = _aeroparts_lcs(coherent)
         assert marg_base["a10"] < marg_coh["a10"]
+
+
+class TestAeroPartsBehaviour5Couplings:
+    """The revised 5-coupling model: a7/a10 & a11/a12 as EXCLUSIVE (deep-dive 0.607)."""
+
+    _CONFLICT = ("contradiction", "exclusive")
+
+    def test_base_lcs_matches_revised_deepdive(self):
+        lcs, log_z, _ = _aeroparts_lcs(AEROPARTS_BASE_5)
+        # Revised deep-dive Tables 3-4: base LCS 0.607, log Z -9.64.
+        assert lcs == pytest.approx(0.607, abs=1e-3)
+        assert log_z == pytest.approx(-9.64, abs=0.05)
+
+    def test_coherent_rewrite_raises_lcs(self):
+        coherent = [r for r in AEROPARTS_BASE_5 if r[2] not in self._CONFLICT]
+        lcs, log_z, _ = _aeroparts_lcs(coherent)
+        # Revised deep-dive: coherent rewrite LCS 0.620, log Z -8.25 (unchanged).
+        assert lcs == pytest.approx(0.620, abs=1e-3)
+        assert log_z == pytest.approx(-8.25, abs=0.05)
+
+    def test_concession_discount_raises_lcs(self):
+        # Discounting the resolved concession exclusive (0.80 -> 0.55) lifts the
+        # base 0.607 to 0.612 (revised deep-dive concession row).
+        base_lcs, _z, _m = _aeroparts_lcs(AEROPARTS_BASE_5)
+        conc_lcs, _z2, _m2 = _aeroparts_lcs(AEROPARTS_CONCESSION_5)
+        assert conc_lcs == pytest.approx(0.612, abs=1e-3)
+        assert conc_lcs > base_lcs
+
+    def test_lcs_is_monotone_in_conflicts(self):
+        base_lcs, base_z, _ = _aeroparts_lcs(AEROPARTS_BASE_5)
+        coherent = [r for r in AEROPARTS_BASE_5 if r[2] not in self._CONFLICT]
+        coh_lcs, coh_z, _ = _aeroparts_lcs(coherent)
+        assert coh_lcs > base_lcs
+        assert coh_z > base_z
+
+    def test_exclusive_lifts_loser_above_contradiction(self):
+        # Exclusive forbids "neither", so the casualty loser a10 sits higher under
+        # exclusive (~0.40) than under a bare contradiction (~0.24): rejecting a10
+        # no longer drives it near zero.
+        _l, _z, marg_contra = _aeroparts_lcs(AEROPARTS_BASE)
+        _l2, _z2, marg_excl = _aeroparts_lcs(AEROPARTS_BASE_5)
+        assert marg_excl["a10"] > marg_contra["a10"]
+        assert marg_excl["a10"] == pytest.approx(0.404, abs=1e-2)
 
 
 # ---------------------------------------------------------------------------

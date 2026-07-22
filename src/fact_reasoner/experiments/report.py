@@ -407,11 +407,15 @@ def _write_dat(path: str, header: List[str], rows: List[List[str]]) -> None:
 # ---------------------------------------------------------------------------
 
 # Edge styles per Level-1 coupling (deep-dive visual conventions): solid blue
-# arrow = entailment, dashed red = contradiction, solid teal = equivalence.
+# arrow = entailment, dashed red = contradiction, solid teal = equivalence,
+# double-dashed red = exclusive (exactly-one conflict), dotted olive = co_necessity
+# (at-least-one). The last two are the couplings added in the revised deep-dive.
 _EDGE_STYLE = {
     "entailment": "-{Stealth[length=1.6mm]}, blue!70!black",
     "contradiction": "-{Stealth[length=1.6mm]}, red!75!black, dashed",
     "equivalence": "-{Stealth[length=1.6mm]}, teal!70!black",
+    "exclusive": "{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]}, red!75!black, densely dashdotted",
+    "co_necessity": "{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]}, olive!80!black, dotted",
 }
 
 
@@ -511,8 +515,10 @@ def _relation_graphs_section(
         f"Mined relation graphs for model \\textbf{{{_tex_escape(model)}}} "
         f"(strength method: {_tex_escape(_short_strength(strength))}). Nodes are "
         "atoms on a circle; edges are mined relations --- solid blue = entailment, "
-        "dashed red = contradiction, solid teal = equivalence --- with thickness "
-        "proportional to the mined probability. "
+        "dashed red = contradiction, solid teal = equivalence, dash-dotted red "
+        "(double-headed) = exclusive (exactly-one), dotted olive (double-headed) = "
+        "co-necessity (at-least-one) --- with thickness proportional to the mined "
+        "probability. "
     )
     if multi_pol:
         intro += ("The all-pairs graph (left) is far denser than the windowed one "
@@ -1020,6 +1026,11 @@ def write_report(results: Dict[str, Any], out_dir: str, filename: str = "report.
         + mining_clause
         + "For every mined coherence MRF all four LCS readouts are computed: "
         + ", ".join(_tex_escape(m) for m in LCS_METHODS) + ". "
+        + ("The miner uses the extended \\textbf{five-coupling} Level-1 vocabulary of "
+           "the revised deep dive: entailment, contradiction, equivalence, and the two "
+           "additions \\emph{exclusive} (exactly one of a pair holds --- exhaustive "
+           "alternatives) and \\emph{co-necessity} (at least one holds); a coupling only "
+           "appears when the response actually draws it. ")
         + (f"{n_err} of {len(records)} cells failed and are omitted from the tables. "
            if n_err else "")
         + ("Numbers were produced by the offline dry-run oracle (exact brute-force "

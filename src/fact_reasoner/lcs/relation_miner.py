@@ -21,10 +21,12 @@
 #      response is supplied);
 #   2. selects candidate ordered atom pairs (candidate_pairs policies);
 #   3. mines each pair with two LLM prompts -- Prompt A (Level-2 discourse sense +
-#      Level-1 coupling, with a type-confidence P(tau | a_i, a_j) read from the
-#      [coupling=...] logprob span or SIMBA-UQ) and Prompt B (conditional strength
-#      P(a_j | a_i, tau)) -- and forms p = type_confidence x strength;
-#   4. discounts contradictions that a resolving holding atom concedes (Eq. 2);
+#      one of the five Level-1 couplings entailment/contradiction/equivalence/
+#      exclusive/co_necessity, with a type-confidence P(tau | a_i, a_j) read from
+#      the [coupling=...] logprob span or SIMBA-UQ) and Prompt B (conditional
+#      strength P(a_j | a_i, tau)) -- and forms p = type_confidence x strength;
+#   4. discounts resolved-concession conflicts (contradiction or exclusive) that a
+#      resolving holding atom concedes (Eq. 2);
 #   5. builds the FactGraph and the Markov network (MRF) encoding.
 #
 # The output is a :class:`MiningResult` carrying the mined relations, their
@@ -68,6 +70,7 @@ from fact_reasoner.lcs.strength import (
     surrogate_probability_from_logprobs,
 )
 from fact_reasoner.lcs.taxonomy import (
+    LEVEL1_CONFLICT_COUPLINGS,
     LEVEL1_CONTRADICTION,
     LEVEL1_NONE,
     Level2Sense,
@@ -104,9 +107,11 @@ class MinedRelation:
         source_id / target_id: Atom ids; source precedes target in source order.
         level2_sense: The interpretable PDTB/RST discourse sense (string value of
             a :class:`Level2Sense`).
-        level1_type: The inferential coupling the MRF uses (``entailment`` /
-            ``contradiction`` / ``equivalence``). NONE relations are dropped, so a
-            :class:`MinedRelation` always has an edge-producing coupling.
+        level1_type: The inferential coupling the MRF uses, one of the five
+            edge-producing couplings (``entailment`` / ``contradiction`` /
+            ``equivalence`` / ``exclusive`` / ``co_necessity``). NONE relations are
+            dropped, so a :class:`MinedRelation` always has an edge-producing
+            coupling.
         probability: The factor strength ``p = type_confidence x strength`` (after
             any concession discount).
         type_confidence: ``P(tau | a_i, a_j)`` from Prompt A.
@@ -952,10 +957,13 @@ class RelationMiner:
     def _apply_concession_discount(
         self, atoms: Dict[str, Atom], relations: List[MinedRelation]
     ) -> None:
-        """Discount resolved-concession contradictions in place (Eq. 2).
+        """Discount resolved-concession conflicts in place (Eq. 2).
 
-        A Concession contradiction ``s != t`` that a holding atom ``h`` resolves is
-        softened: ``p_eff = p * (1 - lambda*pi_h)``. We detect a resolving holding
+        A Concession conflict ``s != t`` that a holding atom ``h`` resolves is
+        softened: ``p_eff = p * (1 - lambda*pi_h)``. The conflict factor may be a
+        ``contradiction`` OR an ``exclusive`` (the revised deep-dive models the
+        AeroParts blame conflict, an exhaustive alternative, as a discounted
+        ``exclusive``); both are handled here. We detect a resolving holding
         heuristically: a later atom (id after both endpoints) that shares content
         with the target and reads like an adjudication/holding. When found, the
         relation is flagged and its probability discounted.
@@ -966,8 +974,12 @@ class RelationMiner:
             aid for aid, a in atoms.items() if _looks_like_holding(a.text)
         ]
         for rel in relations:
-            if rel.level1_type != LEVEL1_CONTRADICTION or not rel.concession_resolved:
-                # Only Concession-sensed contradictions are discountable.
+            if (
+                rel.level1_type not in LEVEL1_CONFLICT_COUPLINGS
+                or not rel.concession_resolved
+            ):
+                # Only Concession-sensed conflicts (contradiction/exclusive) are
+                # discountable.
                 continue
             resolver = _find_resolving_holding(
                 rel, holding_ids, atoms

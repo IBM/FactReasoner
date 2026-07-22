@@ -58,8 +58,10 @@ class Edge:
             target: str
                 The `to` node ID in the graph.
             type: str
-                The NLI relation type represented by the edge. Allowed values are:
-                ["entailment", "contradiction", "equivalence"].
+                The relation type represented by the edge. Allowed values are:
+                ["entailment", "contradiction", "equivalence", "exclusive",
+                "co_necessity"]. The last two are the Level-1 couplings added in
+                the revised coherence deep-dive (exactly-one / at-least-one).
             probability: float
                 The probability value associated with the NLI relation type.
             link: str
@@ -70,6 +72,8 @@ class Edge:
             "entailment",
             "contradiction",
             "equivalence",
+            "exclusive",
+            "co_necessity",
         ], f"Unknown relation type: {type}."
         assert link in [
             "context_atom",

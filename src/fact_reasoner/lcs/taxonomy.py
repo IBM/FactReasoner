@@ -45,12 +45,22 @@ from typing import Optional
 LEVEL1_ENTAILMENT = "entailment"
 LEVEL1_CONTRADICTION = "contradiction"
 LEVEL1_EQUIVALENCE = "equivalence"
+# The two couplings added in the revised coherence_mrf_deepdive (Level-1 3->5).
+#   * EXCLUSIVE  -- exactly one of (s, t) holds: penalizes BOTH same-value worlds
+#     (0,0) and (1,1). Exhaustive alternatives (competing, mutually exclusive
+#     claims). Strictly stronger than CONTRADICTION (which forbids only (1,1)).
+#   * CO_NECESSITY -- at least one of (s, t) holds: penalizes only (0,0). A
+#     disjunction / joint prerequisite.
+LEVEL1_EXCLUSIVE = "exclusive"
+LEVEL1_CONECESSITY = "co_necessity"
 LEVEL1_NONE = "none"
 
 LEVEL1_COUPLINGS = (
     LEVEL1_ENTAILMENT,
     LEVEL1_CONTRADICTION,
     LEVEL1_EQUIVALENCE,
+    LEVEL1_EXCLUSIVE,
+    LEVEL1_CONECESSITY,
     LEVEL1_NONE,
 )
 
@@ -59,6 +69,18 @@ LEVEL1_EDGE_COUPLINGS = (
     LEVEL1_ENTAILMENT,
     LEVEL1_CONTRADICTION,
     LEVEL1_EQUIVALENCE,
+    LEVEL1_EXCLUSIVE,
+    LEVEL1_CONECESSITY,
+)
+
+# Conflict couplings: those whose "both-endpoints-true" world is the incoherent
+# configuration a consistency/reified readout treats as an active conflict
+# (deep-dive Sections 7-8). CONTRADICTION and EXCLUSIVE both down-weight (1,1);
+# CO_NECESSITY does not (its defect is the both-false world, which the marginals
+# already see), so it is not a "conflict" for the P(consistent) event.
+LEVEL1_CONFLICT_COUPLINGS = (
+    LEVEL1_CONTRADICTION,
+    LEVEL1_EXCLUSIVE,
 )
 
 
@@ -83,6 +105,11 @@ class Level2Sense(str, Enum):
     INSTANTIATION = "Instantiation"
     CONTRAST = "Contrast"
     CONCESSION = "Concession"
+    # Exhaustive competing alternatives (exactly one holds) -> EXCLUSIVE, and a
+    # disjunction / joint prerequisite (at least one holds) -> CO_NECESSITY.
+    # Added with the Level-1 3->5 coupling extension (revised deep-dive Table 2).
+    ALTERNATIVE = "Alternative"
+    DISJUNCTION = "Disjunction"
     PRECEDENCE = "Precedence"
     SUCCESSION = "Succession"
     NONE = "None"
@@ -157,6 +184,10 @@ COMPILE = {
     Level2Sense.CONCESSION: SenseSpec(
         LEVEL1_CONTRADICTION, None, directed=True, is_concession=True
     ),
+    # Exhaustive alternatives (exactly one true) -> EXCLUSIVE; a disjunction /
+    # joint prerequisite (at least one true) -> CO_NECESSITY. Both symmetric.
+    Level2Sense.ALTERNATIVE: SenseSpec(LEVEL1_EXCLUSIVE, None, directed=False),
+    Level2Sense.DISJUNCTION: SenseSpec(LEVEL1_CONECESSITY, None, directed=False),
     Level2Sense.PRECEDENCE: SenseSpec(
         LEVEL1_NONE, None, directed=True, ordering_only=True
     ),
@@ -220,6 +251,13 @@ def coupling_from_string(value: str) -> str:
     v = value.strip().lower()
     if "entail" in v:
         return LEVEL1_ENTAILMENT
+    # Order matters: "exclusive" / "exactly one" before the generic contradiction
+    # check, since an exclusion is also a (stronger) opposition.
+    if "exclus" in v or "exactly" in v or "exactly-one" in v:
+        return LEVEL1_EXCLUSIVE
+    if "co-nec" in v or "co_nec" in v or "conec" in v or "at-least" in v \
+            or "at least" in v or "disjunct" in v:
+        return LEVEL1_CONECESSITY
     if "contradict" in v:
         return LEVEL1_CONTRADICTION
     if "equiv" in v:

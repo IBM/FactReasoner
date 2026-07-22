@@ -27,10 +27,12 @@
 #
 #   * Prompt A (PROMPT_SENSE_COUPLING) -- a chain-of-thought call over an ordered
 #     atom pair (A, B), given the response, that names the Level-2 discourse SENSE
-#     and maps it to a Level-1 COUPLING. The final answer is a bracketed
-#     [coupling=...] tag whose token logprobs give the type confidence
-#     P(tau | a_i, a_j). The chain of thought comes first so the model commits to
-#     the sense only after reasoning, and only when the response draws the link.
+#     and maps it to a Level-1 COUPLING (one of the five: entailment,
+#     contradiction, equivalence, exclusive, co_necessity -- see the revised
+#     coherence_mrf_deepdive). The final answer is a bracketed [coupling=...] tag
+#     whose token logprobs give the type confidence P(tau | a_i, a_j). The chain of
+#     thought comes first so the model commits to the sense only after reasoning,
+#     and only when the response draws the link.
 #
 #   * Prompt B -- given the coupling from Prompt A and the response, elicits the
 #     conditional strength P(a_j | a_i, tau). TWO forms are provided:
@@ -54,7 +56,8 @@
 # ``taxonomy.Level2Sense`` and interpolated into the prompt.
 _SENSE_MENU = (
     "Cause-Effect, Effect-Cause, Evidence, Condition, Restatement, "
-    "Instantiation, Contrast, Concession, Precedence, Succession, None"
+    "Instantiation, Contrast, Concession, Alternative, Disjunction, "
+    "Precedence, Succession, None"
 )
 
 
@@ -90,17 +93,31 @@ is None.
    - Evidence: A provides evidence for B. Condition: A is a condition for B.
    - Restatement: A and B assert the same thing. Instantiation: A is a general \
 claim, B a specific instance (or vice versa).
-   - Contrast: A and B are in opposition. Concession: A and B are in tension but \
-the text concedes/resolves it ("although A, still B", or a holding settles it).
+   - Contrast: A and B are in opposition but NOT exhaustive (they need not cover \
+all possibilities; both could conceivably be false).
+   - Concession: A and B are in tension but the text concedes/resolves it \
+("although A, still B", or a holding settles it).
+   - Alternative: A and B are EXHAUSTIVE competing options -- EXACTLY ONE holds \
+(they are mutually exclusive AND together cover the possibilities: not both, and \
+not neither). E.g. "no one was harmed" vs "three people died"; "the cause was \
+pilot error" vs "the cause was a metallurgical defect".
+   - Disjunction: AT LEAST ONE of A and B holds (they may both hold, but the \
+response rules out neither being true) -- e.g. two supporting findings at least \
+one of which must be present.
    - Precedence/Succession: A and B are ordered in time with no truth dependence.
    - None: the response draws no logical or discourse dependence between A and B.
 
 3. Map the sense to a COUPLING, one of: entailment, contradiction, \
-equivalence, none.
+equivalence, exclusive, co_necessity, none.
    - Cause-Effect, Effect-Cause, Evidence, Condition, Instantiation -> entailment
    - Restatement -> equivalence
    - Contrast, Concession -> contradiction
+   - Alternative -> exclusive       (exactly one of A, B is true)
+   - Disjunction -> co_necessity     (at least one of A, B is true)
    - Precedence, Succession, None -> none
+   Prefer "exclusive" over "contradiction" when the two claims are not just \
+incompatible but EXHAUSTIVE (one of them must be true); prefer "contradiction" \
+when they merely cannot both hold but could both be false.
 
 4. Give your final answer as two bracketed tags on ONE line, sense first:
 [sense=Cause-Effect] [coupling=entailment]
@@ -136,17 +153,32 @@ separate and unrelated. The response draws no dependence from A to B.
 4. Final answer:
 [sense=None] [coupling=none]
 
-Example 3 (the response states the contradiction):
+Example 3 (the response states an EXHAUSTIVE alternative -> exclusive):
 RESPONSE: The official statement said no one was harmed in the incident. However, \
 the coroner's report confirmed that three people died in the incident.
 A: No one was harmed in the incident.
 B: Three people died in the incident.
 1. Reasoning: the response sets A and B against each other ("However, ...") and \
-they cannot both be true; A being true makes B false. No holding resolves it.
-2. Discourse sense: Contrast.
-3. Coupling: A makes B false, i.e. contradiction.
+they cannot both be true; but they also cannot both be false -- either people \
+were harmed or they were not -- so exactly one holds. This is exhaustive, not a \
+mere contrast. No holding resolves it.
+2. Discourse sense: Alternative.
+3. Coupling: exactly one of A, B is true, i.e. exclusive.
 4. Final answer:
-[sense=Contrast] [coupling=contradiction]
+[sense=Alternative] [coupling=exclusive]
+
+Example 4 (at least one must hold -> co_necessity):
+RESPONSE: The defect was caught in review: at least one of the two independent \
+checks -- the vibration analysis or the metallurgical assay -- flagged it.
+A: The vibration analysis flagged the defect.
+B: The metallurgical assay flagged the defect.
+1. Reasoning: the response asserts the defect WAS caught by at least one check, so \
+A and B cannot both be false; but both could hold (both checks may have flagged \
+it). This is a disjunction, not an exclusion.
+2. Discourse sense: Disjunction.
+3. Coupling: at least one of A, B is true, i.e. co_necessity.
+4. Final answer:
+[sense=Disjunction] [coupling=co_necessity]
 
 Your task:
 RESPONSE: {{response}}
@@ -182,8 +214,11 @@ credible: at least plausible / more likely than not, NOT whether it is certain.
 
 - entailment or equivalence: given A and how the response uses it, is B at least \
 plausibly TRUE (more likely than not)?
-- contradiction: given A and how the response uses it, is B at least plausibly \
-FALSE (more likely than not)?
+- contradiction or exclusive: given A and how the response uses it, is B at least \
+plausibly FALSE (more likely than not)? (For "exclusive", A and B are exhaustive \
+alternatives, so A being true makes B false.)
+- co_necessity: A and B are a pair of which at least one holds. Given the response \
+rules out "neither", is it at least plausible that B holds when A does NOT?
 
 Answer with a SINGLE WORD, the very first word of your reply: Yes or No.
 - Answer "Yes" if the implication is credible/plausible (even if not certain).
@@ -236,7 +271,10 @@ claim A is TRUE and, IN THE CONTEXT OF THIS RESPONSE, estimate how strongly A \
 determines B under a {{coupling}} relation from A to B.
 
 - For an entailment or equivalence coupling: how likely is B to be TRUE given A?
-- For a contradiction coupling: how likely is B to be FALSE given A?
+- For a contradiction or exclusive coupling: how likely is B to be FALSE given A? \
+(exclusive = A and B are exhaustive alternatives, so A true forces B false.)
+- For a co_necessity coupling (at least one of A, B holds): how likely is B to be \
+TRUE when A is FALSE?
 
 Answer with a single probability in [0, 1] to two decimals, after one short \
 sentence of justification. A near-certain link is close to 1.00; a merely \

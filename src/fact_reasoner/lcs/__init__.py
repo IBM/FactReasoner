@@ -66,6 +66,10 @@ from fact_reasoner.lcs.strength import (
 )
 from fact_reasoner.lcs.taxonomy import (
     COMPILE,
+    LEVEL1_CONECESSITY,
+    LEVEL1_CONFLICT_COUPLINGS,
+    LEVEL1_EDGE_COUPLINGS,
+    LEVEL1_EXCLUSIVE,
     Level2Sense,
     SenseSpec,
     compile_sense,
@@ -85,6 +89,10 @@ __all__ = [
     "Level2Sense",
     "SenseSpec",
     "COMPILE",
+    "LEVEL1_EXCLUSIVE",
+    "LEVEL1_CONECESSITY",
+    "LEVEL1_EDGE_COUPLINGS",
+    "LEVEL1_CONFLICT_COUPLINGS",
     "compile_sense",
     "coupling_from_string",
     "build_markov_network",

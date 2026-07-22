@@ -85,6 +85,18 @@ def edge_factor_values(edge, use_priors: bool = True) -> List[float]:
         return [prob, prob, prob, 1.0 - prob]
     elif edge.type == "equivalence":  # source and target agree
         return [prob, 1.0 - prob, 1.0 - prob, prob]
+    elif edge.type == "exclusive":  # exactly one holds: penalize (0,0) AND (1,1)
+        # Symmetric; equivalence with the interaction sign flipped. Same in both
+        # variants (no source-prior term -- it already pushes both endpoints).
+        # Row-major (0,0),(0,1),(1,0),(1,1) = [1-p, p, p, 1-p].
+        return [1.0 - prob, prob, prob, 1.0 - prob]
+    elif edge.type == "co_necessity":  # at least one holds: penalize only (0,0)
+        if use_priors:
+            src_prior = pairwise_prior(edge.link)
+            # [1-p, pi_s, pi_s, p]: only the both-false world is down-weighted;
+            # the source keeps its own prior on the (0,*) / (1,*) split.
+            return [1.0 - prob, src_prior, src_prior, prob]
+        return [1.0 - prob, prob, prob, prob]
     else:
         raise ValueError(f"Unknown edge type: {edge.type}")
 

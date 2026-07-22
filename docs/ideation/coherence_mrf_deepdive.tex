@@ -45,6 +45,7 @@
   efac/.style={fac,fill=blue!60!black},                          % entail factor
   qfac/.style={fac,fill=violet!60!black},                        % equiv factor
   cfac/.style={fac,fill=red!70!black},                           % contradiction factor
+  xfac/.style={draw,fill=red!70!black,diamond,minimum size=2.9mm,inner sep=0pt}, % exclusive factor
   link/.style={-,gray!65,thick},
 }
 
@@ -82,7 +83,7 @@ variable ($a_i=1$: "the claim holds"; $a_i=0$: "it does not"). The relation mine
 set of directed, typed, weighted relations
 \[
   R=\{\,r=(s,t,\tau,p)\,\},\qquad
-  \tau\in\{\textsc{entail},\textsc{contradict},\textsc{equiv}\},\ \ p\in[0,1],
+  \tau\in\{\textsc{entail},\textsc{contradict},\textsc{equiv},\textsc{exclusive},\textsc{co-nec}\},\ \ p\in[0,1],
 \]
 where $s,t$ are the source/target atom ids, $\tau$ the Level-1 coupling
 (Section~\ref{sec:level1}), and $p$ its confidence/strength (from
@@ -131,12 +132,17 @@ $\tau$ & \textbf{no-priors} (atom$\leftrightarrow$context default)
 \textsc{entail}     & $[\,p,\ p,\ 1{-}p,\ p\,]$ & $[\,1{-}\pi_s,\ \pi_s,\ 1{-}p,\ p\,]$\\
 \textsc{contradict} & $[\,p,\ p,\ p,\ 1{-}p\,]$ & $[\,1{-}\pi_s,\ \pi_s,\ p,\ 1{-}p\,]$\\
 \textsc{equiv}      & $[\,p,\ 1{-}p,\ 1{-}p,\ p\,]$ & $[\,p,\ 1{-}p,\ 1{-}p,\ p\,]$\\
+\textsc{exclusive}  & $[\,1{-}p,\ p,\ p,\ 1{-}p\,]$ & $[\,1{-}p,\ p,\ p,\ 1{-}p\,]$\\
+\textsc{co-nec}     & $[\,1{-}p,\ p,\ p,\ p\,]$ & $[\,1{-}p,\ \pi_s,\ \pi_s,\ p\,]$\\
 \bottomrule
 \end{tabular}
-\caption{Pairwise factor tables. Reading, e.g., \textsc{entail} with-priors: if the source
-is false the factor is the source prior $[\,1{-}\pi_s,\pi_s\,]$ (the implication says
-nothing); if the source is true, the target is pushed to $p$ (cell $(1,1){=}p$) and away
-from $1{-}p$ (cell $(1,0)$).}
+\caption{Pairwise factor tables for the five Level-1 couplings. Reading, e.g., \textsc{entail}
+with-priors: if the source is false the factor is the source prior $[\,1{-}\pi_s,\pi_s\,]$
+(the implication says nothing); if the source is true, the target is pushed to $p$ (cell
+$(1,1){=}p$) and away from $1{-}p$ (cell $(1,0)$). \textsc{exclusive} (exactly-one) penalizes
+\emph{both} same-value worlds $(0,0)$ and $(1,1)$; \textsc{co-nec} (at-least-one) penalizes
+only $(0,0)$. The last two are new (Section~\ref{sec:level1}); \textsc{exclusive} and
+\textsc{equiv} share their symmetric form up to the sign of the interaction.}
 \label{tab:tables}
 \end{table}
 
@@ -154,25 +160,47 @@ decouple the source's own probability from the implication and behave correctly
 \section{Level 1: inferential couplings}
 \label{sec:level1}
 
-Level~1 is the minimal set of couplings the MRF understands --- exactly FactReasoner's NLI
-edge types. Each maps to one row block of Table~\ref{tab:tables}.
+Level~1 is the set of couplings the MRF understands. The first three are FactReasoner's NLI
+edge types; a coupling is fully characterized by which world(s) its $2\times2$ factor
+penalizes, and enumerating the corners gives two more that cost only a new table (both
+already inside the pairwise family --- see the coupling-vocabulary analysis in the companion
+\texttt{coherence\_mln\_deepdive}). Each maps to one row of Table~\ref{tab:tables}.
 
 \begin{itemize}[leftmargin=*]
   \item \textbf{\textsc{entail}} $s\!\Rightarrow\!t$ --- source true makes target true.
         Encodes prerequisite, cause$\to$effect, evidence, and subsumption. Directed:
-        the factor is asymmetric ($(1,0)\neq(0,1)$).
+        the factor is asymmetric ($(1,0)\neq(0,1)$); penalizes the world $(1,0)$.
   \item \textbf{\textsc{contradict}} $s\!\Rightarrow\!\neg t$ --- source true makes target
         false. Encodes contrast and position invalidation. The factor down-weights the
         $(1,1)$ cell to $1-p$: both-true is the incoherent configuration.
   \item \textbf{\textsc{equiv}} $s\!\Leftrightarrow\!t$ --- the two agree. Encodes
         restatement and mutual entailment. Symmetric: rewards $(0,0)$ and $(1,1)$, penalizes
-        disagreement.
+        disagreement (the off-diagonal $s\neq t$).
+  \item \textbf{\textsc{exclusive}} --- \emph{exactly one} of $s,t$ holds. Symmetric;
+        penalizes \emph{both} same-value worlds $(0,0)$ and $(1,1)$. Encodes genuine
+        alternatives (competing hypotheses, incompatible values of one slot) that are not
+        only mutually exclusive but \emph{exhaustive}. It is \textsc{equiv} with the sign of
+        the interaction flipped, and strictly stronger than \textsc{contradict} (which forbids
+        only $(1,1)$).
+  \item \textbf{\textsc{co-nec}} --- \emph{at least one} of $s,t$ holds. Symmetric; penalizes
+        only the both-false world $(0,0)$. Encodes a disjunction or a joint prerequisite
+        (``at least one of the two supporting findings must hold'').
   \item \textbf{\textsc{none}} --- no factor (atoms independent given the rest).
 \end{itemize}
 
+\paragraph{A standalone \textsc{co-nec} illustration.} \textsc{co-nec} has no natural home in
+the AeroParts example (Section~\ref{sec:example}), so consider it in isolation. Two claims
+$b_1$ ``the defect was detected by vibration analysis'' and $b_2$ ``the defect was detected by
+metallurgical assay'' back a conclusion; the text asserts \emph{at least one} detection method
+found it. With the with-priors table $[\,1{-}p,\ \pi_s,\ \pi_s,\ p\,]$ at $p{=}0.9$,
+$\pi_s{=}0.5$, the both-false world $(0,0)$ carries mass $0.1$ against $0.5,0.5,0.9$ for the
+others (normalized $0.05\,/\,0.25\,/\,0.25\,/\,0.45$): the joint denial of both methods is
+suppressed while any single detection, or both, is fine. This is the positive-disjunction
+mirror of \textsc{exclusive}.
+
 At Level~1 the pipeline is complete: mine $\tau$ and $p$ for candidate atom pairs, drop
-\textsc{none}, emit one factor each. This alone yields a working coherence model. Level~2
-adds interpretability and better strengths on top.
+\textsc{none}, emit one factor each. These five couplings yield a working coherence model;
+Level~2 adds interpretability and better strengths on top.
 
 % =====================================================================================
 \section{Level 2: encoding discourse relations}
@@ -195,25 +223,31 @@ deterministic rule
 Contingency & Cause-Effect / Effect-Cause & \textsc{entail} & one \textsc{entail} factor $s\!\to\!t$; $p$ $=$ causal plausibility (often $<1$)\\
 Contingency & Evidence & \textsc{entail} & \textsc{entail} from evidence atom to claim\\
 Contingency & Condition & \textsc{entail} & \textsc{entail} antecedent$\to$consequent\\
-Comparison  & Contrast & \textsc{contradict} & one \textsc{contradict} factor; $p$ $=$ conflict confidence\\
-Comparison  & \textbf{Concession} & \textsc{contradict} \emph{(discounted)} & \textsc{contradict} factor whose $p$ is \emph{reduced} when a resolving atom is present (below)\\
+Comparison  & Contrast (non-exhaustive) & \textsc{contradict} & one \textsc{contradict} factor; $p$ $=$ conflict confidence\\
+Comparison  & \textbf{Alternative} (exhaustive) & \textsc{exclusive} & one \textsc{exclusive} factor; the two are exclusive \emph{and} exhaustive (exactly one holds)\\
+Comparison  & \textbf{Concession} & \textsc{contradict}/\textsc{exclusive} \emph{(discounted)} & the conflict factor whose $p$ is \emph{reduced} when a resolving atom is present (below)\\
 Expansion   & Restatement & \textsc{equiv} & one \textsc{equiv} factor, high $p$\\
 Expansion   & Instantiation / Subsumption & \textsc{entail} & \textsc{entail} general$\to$specific (or specific$\to$general)\\
+Expansion   & \textbf{Disjunction} (at least one) & \textsc{co-nec} & one \textsc{co-nec} factor; at least one of the disjuncts holds\\
 Temporal    & Precedence / Succession & \textsc{none} $+$ order & no truth coupling; record order for the invalidation direction\\
 \bottomrule
 \end{tabular}
-\caption{Compiling Level-2 discourse senses to Level-1 factors. The map carries a
-\emph{strength prior} (e.g.\ Restatement starts near $p{=}0.9$, a Cause-Effect at the
-miner's confidence) that the confidence estimate then refines.}
+\caption{Compiling Level-2 discourse senses to Level-1 factors (now five couplings). The map
+carries a \emph{strength prior} (e.g.\ Restatement starts near $p{=}0.9$, a Cause-Effect at
+the miner's confidence) that the confidence estimate then refines. A Comparison sense compiles
+to \textsc{contradict} when the two claims are merely incompatible, and to \textsc{exclusive}
+when they are \emph{exhaustive} alternatives (exactly one is true) --- the AeroParts casualty
+and blame conflicts are of the latter kind (Section~\ref{sec:example}).}
 \label{tab:compile}
 \end{table}
 
 \paragraph{The one structural case: Concession / resolved tension.}
 A Concession (``although $X$, still $Y$'') or an adjudicating \emph{holding} is not a
-coherence defect --- it is a contradiction the text \emph{itself resolves}, and must be
-discounted. In the MRF we encode this by letting the resolving atom modulate the
-contradiction strength. Concretely, for a contradiction $s\!\neq\!t$ that a holding atom $h$
-resolves, set
+coherence defect --- it is a conflict the text \emph{itself resolves}, and must be
+discounted. In the MRF we encode this by letting the resolving atom modulate the conflict
+factor's strength (whether that factor is a \textsc{contradict} or, as with the AeroParts
+blame conflict, an \textsc{exclusive}). Concretely, for a conflict factor on $(s,t)$ that a
+holding atom $h$ resolves, set
 \begin{equation}
   p_{\text{eff}}(s,t)\;=\;p_{\text{raw}}(s,t)\cdot\big(1-\lambda\,\pi_h\big),
   \label{eq:concession}
@@ -363,7 +397,7 @@ $\tau$; pairs typed \textsc{none} contribute no factor. Two practical points:
 \end{itemize}
 The strengths in the running example (Section~\ref{sec:example}) are exactly the kind of
 $p$ this procedure would produce: high for restatement ($a_6\!\leftrightarrow\!a_8$, $0.88$)
-and near-certain contradiction ($a_7\!\neq\!a_{10}$, $0.93$), moderate for a plausible causal
+and near-certain exclusion ($a_7\!\oplus\!a_{10}$, $0.93$), moderate for a plausible causal
 step ($a_3\!\to\!a_4$, $0.70$; $a_5\!\to\!a_{16}$, $0.60$).
 
 % =====================================================================================
@@ -388,25 +422,32 @@ $a_6\!\leftrightarrow\!a_8$ & Restatement & \textsc{equiv} & $.88$\\
 $a_1\!\to\!a_{14},\ a_{14}\!\to\!a_{15}$ & Evidence/Cause & \textsc{entail} & $.78,.70$\\
 $a_5\!\to\!a_{16}$ & Cause-Effect (weak) & \textsc{entail} & $.60$\\
 $a_{13}\!\to\!a_{12}$ & Evidence & \textsc{entail} & $.85$\\
-$\mathbf{a_7\!\neq\!a_{10}}$ & \textbf{Contrast (unresolved)} & \textsc{contradict} & $\mathbf{.93}$\\
-$\mathbf{a_{11}\!\neq\!a_{12}}$ & \textbf{Concession (resolved by $a_{13}$)} & \textsc{contradict} & $.80\!\to\!.55$\\
+$\mathbf{a_7\!\oplus\!a_{10}}$ & \textbf{Alternative (unresolved)} & \textsc{exclusive} & $\mathbf{.93}$\\
+$\mathbf{a_{11}\!\oplus\!a_{12}}$ & \textbf{Concession (resolved by $a_{13}$)} & \textsc{exclusive} & $.80\!\to\!.55$\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The defect is the \emph{unresolved} casualty contradiction $a_7\!\neq\!a_{10}$ (``no one
-harmed'' vs.\ ``three died''); the blame tension $a_{11}\!\neq\!a_{12}$ is
-\emph{resolved} by the holding $a_{13}$ and discounted per
-Eq.~\eqref{eq:concession}.
+Both casualty and blame conflicts are \emph{exhaustive} alternatives, so they compile to
+\textsc{exclusive} (exactly one holds), not merely \textsc{contradict}: the passengers were
+either harmed or not ($a_7\!\oplus\!a_{10}$, ``no one harmed'' vs.\ ``three died''), and the
+root cause was either pilot error or the metallurgical defect ($a_{11}\!\oplus\!a_{12}$) ---
+in each case exactly one is true, and the both-false world is as incoherent as the both-true
+one. The defect is the \emph{unresolved} casualty alternative $a_7\!\oplus\!a_{10}$; the blame
+alternative $a_{11}\!\oplus\!a_{12}$ is \emph{resolved} by the holding $a_{13}$ and discounted
+per Eq.~\eqref{eq:concession} ($p:0.80\!\to\!0.55$). Using \textsc{exclusive} rather than
+\textsc{contradict} lifts the losing endpoints off the floor: rejecting $a_{10}$ no longer
+drives it to near-zero, because the exclusion also forbids ``neither.''
 
 % =====================================================================================
 \section{Picture of the Markov network}
 \label{sec:picture}
 
 Figure~\ref{fig:mrf} draws the MRF as a \emph{factor graph}: round nodes are atom variables,
-small squares are factors. Grey squares are unary priors $\phi_i$; blue/violet/red squares
-are the \textsc{entail}/\textsc{equiv}/\textsc{contradict} pairwise factors $\psi_r$. This is
-literally the structure serialized by \texttt{MarkovNetwork.to\_uai()} and handed to Merlin.
+small squares are factors. Grey squares are unary priors $\phi_i$; blue and violet squares
+are the \textsc{entail} and \textsc{equiv} pairwise factors $\psi_r$, and the red diamonds are
+the \textsc{exclusive} conflict factors. This is literally the structure serialized by
+\texttt{MarkovNetwork.to\_uai()} and handed to Merlin.
 
 \begin{figure}[h]\centering
 \begin{tikzpicture}[x=15.5mm,y=13mm]
@@ -443,8 +484,8 @@ literally the structure serialized by \texttt{MarkovNetwork.to\_uai()} and hande
   \pf{efac}{f516}{a5}{a16}
   \pf{efac}{f114}{a1}{a14}
   \pf{efac}{f1415}{a14}{a15}
-  \pf{cfac}{f710}{a7}{a10}
-  \pf{cfac}{f1112}{a11}{a12}
+  \pf{xfac}{f710}{a7}{a10}
+  \pf{xfac}{f1112}{a11}{a12}
   \pf{efac}{f1312}{a13}{a12}
 
   % ---- unary prior factors (small grey square hanging off each var) ----
@@ -460,14 +501,14 @@ literally the structure serialized by \texttt{MarkovNetwork.to\_uai()} and hande
     \tikz\node[ufac]{};~unary prior $\phi_i$ \quad
     \tikz\node[efac]{};~\textsc{entail} $\psi$ \quad
     \tikz\node[qfac]{};~\textsc{equiv} $\psi$ \quad
-    \tikz\node[cfac]{};~\textsc{contradict} $\psi$\\[2pt]
-    Colours on variables mark roles: green $=$ evidence, violet $=$ restatement,
-    red/pink $=$ contradiction endpoints, orange $=$ resolving holding $a_{13}$.};
+    \tikz\node[xfac]{};~\textsc{exclusive} $\psi$\\[2pt]
+    Variable colours: green $=$ evidence, violet $=$ restatement, red/pink $=$ the two
+    exclusive-alternative endpoints, orange $=$ holding $a_{13}$.};
 \end{tikzpicture}
 \caption{The AeroParts response as a factor graph (the Markov network of
 Eq.~\eqref{eq:joint}). Every atom has a unary prior factor; every mined relation is one
-pairwise factor. The two red factors are the contradictions; the strong one, $\psi_{7,10}$,
-is the coherence defect.}
+pairwise factor. The two red diamonds are the \textsc{exclusive} (exactly-one) conflict
+factors; the strong one, $\psi_{7,10}$, is the coherence defect.}
 \label{fig:mrf}
 \end{figure}
 
@@ -487,7 +528,7 @@ Let $q_i=P(a_i{=}1)$ be the posterior marginals from inference on
 Eq.~\eqref{eq:joint}.
 \begin{enumerate}[leftmargin=*,label=(\alph*)]
   \item \textbf{Mean marginal support} $\ \mathrm{LCS}=\frac1n\sum_i q_i$.
-  \item \textbf{Consistency probability} $\ P\big(\bigwedge_{r:\tau_r=\textsc{contradict}}\neg(a_{s_r}\wedge a_{t_r})\big)$.
+  \item \textbf{Consistency probability} $\ P\big(\bigwedge_{r:\ \tau_r\in\{\textsc{contradict},\textsc{exclusive}\}}\neg(a_{s_r}\wedge a_{t_r})\big)$ (no conflict coupling has both endpoints true).
   \item \textbf{Reified coherence node} $P(R{=}1)$ for an added variable $R$ tied to relation
         satisfaction.
   \item \textbf{Normalized log-partition} $\big(\log Z - \log Z_{\min}\big)/\big(\log Z_{\max}-\log Z_{\min}\big)$.
@@ -512,8 +553,8 @@ the \textbf{mean posterior marginal support} of the atoms under the coherence MR
 exactly the FactReasoner ``precision-style'' aggregate, reused: Merlin already returns the
 $P(a_i)$ (MAR task), so the LCS is a one-line reduction. Interpretation: the expected
 fraction of the response's atoms that the argument, taken as a whole, \emph{upholds}. A
-contradiction drives the losing endpoint's marginal down (in the example
-$q_{10}{:}0.5\!\to\!0.24$), which lowers the mean; a satisfied entailment chain lifts its
+conflict drives the losing endpoint's marginal down (in the example
+$q_{10}{:}0.5\!\to\!0.40$), which lowers the mean; a satisfied entailment chain lifts its
 members, which raises it.
 
 \paragraph{Reported diagnostics.} Alongside the scalar we report, for transparency:
@@ -541,10 +582,10 @@ five variants of Section~\ref{sec:change} (from least to most coherent:
 \toprule
 \textbf{Variant} & (a) mean supp. & (b) $P(\text{cons})$ & (c) $P(R{=}1)$ & (d) $\log Z$ & (d) norm.\\
 \midrule
-worse        & $0.567$ & $0.803$ & $0.137$ & $-10.47$ & $0.69$\\
-base         & $0.587$ & $0.813$ & $0.150$ & $-9.75$  & $0.78$\\
-concession   & $0.601$ & $\mathbf{0.661}$ & $\mathbf{0.146}$ & $-9.66$ & $0.80$\\
-fixcasualty  & $0.603$ & $0.849$ & $0.157$ & $-9.06$  & $0.88$\\
+worse        & $0.586$ & $0.738$ & $0.116$ & $-10.54$ & $0.68$\\
+base         & $0.607$ & $0.828$ & $0.148$ & $-9.64$  & $0.78$\\
+concession   & $0.612$ & $\mathbf{0.666}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$\\
+fixcasualty  & $0.613$ & $0.865$ & $0.156$ & $-8.95$  & $0.89$\\
 coherent     & $0.620$ & $1.000$ & $0.181$ & $-8.25$  & $1.00$\\
 \midrule
 \textbf{monotone?} & \textbf{yes} & no (bold) & no (bold) & \textbf{yes} & \textbf{yes}\\
@@ -562,26 +603,28 @@ the noisy-AND reified node with $\rho{=}0.5$.}
 \label{sec:consistency}
 
 \paragraph{What it is.} The probability, under the joint $P(\mathbf a)$, that \emph{no}
-contradiction relation is jointly active --- i.e.\ for every \textsc{contradict} edge
-$r=(s,t)$ not both endpoints are true:
+conflict coupling is jointly active --- i.e.\ for every \textsc{contradict} \emph{or}
+\textsc{exclusive} edge $r=(s,t)$ not both endpoints are true:
 \begin{equation}
   \mathrm{LCS}_{\text{(b)}}
   \;=\;
-  P\!\Big(\textstyle\bigwedge_{r:\,\tau_r=\textsc{contradict}}\ \neg\big(a_{s_r}\wedge a_{t_r}\big)\Big)
+  P\!\Big(\textstyle\bigwedge_{r:\,\tau_r\in\{\textsc{contradict},\textsc{exclusive}\}}\ \neg\big(a_{s_r}\wedge a_{t_r}\big)\Big)
   \;=\;
-  \frac{1}{Z}\sum_{\mathbf a}\ \mathbb 1\!\big[\text{no contra.\ active in }\mathbf a\big]
+  \frac{1}{Z}\sum_{\mathbf a}\ \mathbb 1\!\big[\text{no conflict active in }\mathbf a\big]
   \prod_i\phi_i\!\prod_r\psi_r .
   \label{eq:cons}
 \end{equation}
+(For \textsc{exclusive} we take ``active'' as the both-true world, the incoherent half of the
+exclusion; the both-false half is a separate, milder defect the marginals already see.)
 
 \paragraph{How it is computed.} It is the marginal of a derived event, so it needs no new
 factors: either (i) sum the joint over the worlds satisfying the indicator (the brute-force
 oracle), or (ii) in production, add \emph{one} deterministic AND-style query variable
 $U=\bigvee_r (a_{s_r}\wedge a_{t_r})$ and read $P(U{=}0)$ from Merlin. On the example
-$\mathrm{LCS}_{\text{(b)}}$ runs $0.803\to0.813\to\mathbf{0.661}\to0.849\to1.000$.
+$\mathrm{LCS}_{\text{(b)}}$ runs $0.738\to0.828\to\mathbf{0.666}\to0.865\to1.000$.
 
 \paragraph{Why it is rejected.} It is \emph{not monotone}: the \emph{concession} variant
-\emph{drops} to $0.66$ even though softening the resolved tension makes the response
+\emph{drops} to $0.67$ even though softening the resolved tension makes the response
 \emph{more} coherent. Root cause in Section~\ref{sec:quirk}. It also ignores
 entailment/equivalence entirely --- a response with a beautifully satisfied causal spine and
 a response that is a disconnected bag of atoms score identically at $1.0$ if neither has an
@@ -611,8 +654,9 @@ branch is flat:
   h_r(R{=}0,\,x,\,y)=1,
   \label{eq:reified}
 \end{equation}
-with ``violated'' meaning $x{=}1,y{=}0$ (\textsc{entail}), $x\neq y$ (\textsc{equiv}), or
-$x{=}y{=}1$ (\textsc{contradict}) --- the same conditions as the diagnostics. A Bernoulli
+with ``violated'' meaning $x{=}1,y{=}0$ (\textsc{entail}), $x\neq y$ (\textsc{equiv}),
+$x{=}y{=}1$ (\textsc{contradict}), $x{=}y$ (\textsc{exclusive}, either same-value world), or
+$x{=}y{=}0$ (\textsc{co-nec}) --- the same conditions as the diagnostics. A Bernoulli
 prior $\rho$ on $R$ completes it. The reified network's joint is
 \begin{equation}
   P(\mathbf a,R)\;=\;\frac1{Z'}\,\rho^{R}(1-\rho)^{1-R}
@@ -661,7 +705,7 @@ Figure~\ref{fig:mrf} plus the node $R$, its prior factor, and one $h_r$ factor p
   \rf{efac}{f45}{a4}{a5}\rf{efac}{f56}{a5}{a6}\rf{qfac}{f68}{a6}{a8}
   \rf{efac}{f94}{a9}{a4}\rf{efac}{f47}{a4}{a7}\rf{efac}{f516}{a5}{a16}
   \rf{efac}{f114}{a1}{a14}\rf{efac}{f1415}{a14}{a15}
-  \rf{cfac}{f710}{a7}{a10}\rf{cfac}{f1112}{a11}{a12}\rf{efac}{f1312}{a13}{a12}
+  \rf{xfac}{f710}{a7}{a10}\rf{xfac}{f1112}{a11}{a12}\rf{efac}{f1312}{a13}{a12}
 
   % the reified node R, bottom-centre, with its prior factor
   \node[coh] (R) at (2.6,-1.2) {$R$};
@@ -692,12 +736,12 @@ $|R|$; every relation gets a say in whether the response is coherent.}
 
 \begin{figure}[h]\centering
 \begin{tikzpicture}[x=15mm,y=11mm]
-  % minimal subnet: a4 ->(entail .65) a7 !=(contra .93) a10
+  % minimal subnet: a4 ->(entail .65) a7 (excl .93) a10
   \node[var]  (a4) at (0,0) {$a_4$};
   \node[varCA](a7) at (1.6,0){$a_7$};
   \node[varCB](a10)at (3.2,0){$a_{10}$};
   \node[efac] (e) at (0.8,0){}; \draw[link](a4)--(e);\draw[link](e)--(a7);
-  \node[cfac] (c) at (2.4,0){}; \draw[link](a7)--(c);\draw[link](c)--(a10);
+  \node[xfac] (c) at (2.4,0){}; \draw[link](a7)--(c);\draw[link](c)--(a10);
   \node[coh]  (R) at (1.6,-1.4){$R$};
   \node[fac,fill=orange!70!black,minimum size=1.8mm] (he) at ($(e)!0.55!(R)$){};
   \node[fac,fill=orange!70!black,minimum size=1.8mm] (hc) at ($(c)!0.55!(R)$){};
@@ -708,32 +752,33 @@ $|R|$; every relation gets a say in whether the response is coherent.}
     \begin{tabular}{@{}ccc|ccc@{}}
     \multicolumn{3}{c|}{world} & base & $h(R{=}1)$ & $\rho w h$\\
     $a_4$&$a_7$&$a_{10}$ & $w$ & & \\ \hline
-    0&0&0 & .031 & $1.00$ & .0156\\
-    0&0&1 & .031 & $1.00$ & .0156\\
+    0&0&0 & .004 & $0.07$ & .0002\\
+    0&0&1 & .058 & $1.00$ & .0291\\
     0&1&0 & .058 & $1.00$ & .0291\\
     0&1&1 & .004 & $0.07$ & .0002\\
-    1&0&0 & .022 & $0.35$ & .0038\\
-    1&0&1 & .022 & $0.35$ & .0038\\
+    1&0&0 & .003 & $0.02$ & .0000\\
+    1&0&1 & .041 & $0.35$ & .0071\\
     1&1&0 & .076 & $1.00$ & .0378\\
     1&1&1 & .006 & $0.07$ & .0002\\
     \end{tabular}};
   \node[anchor=north west,align=left,font=\scriptsize] at (4.1,-2.55)
-    {$R{=}1$ mass $=\rho\!\sum_w w\,h = 0.106$\\
+    {$R{=}1$ mass $=\rho\!\sum_w w\,h = 0.104$\\
      $R{=}0$ mass $=(1{-}\rho)\!\sum_w w = 0.125$\\[2pt]
-     $\mathrm{LCS}_{\text{(c)}}=P(R{=}1)=\dfrac{0.106}{0.106+0.125}=\mathbf{0.459}$};
+     $\mathrm{LCS}_{\text{(c)}}=P(R{=}1)=\dfrac{0.104}{0.104+0.125}=\mathbf{0.453}$};
 \end{tikzpicture}
 \caption{Reified computation on a 3-atom subnet ($a_4\!\to\!a_7$, \textsc{entail} $.65$;
-$a_7\!\neq\!a_{10}$, \textsc{contradict} $.93$), $\rho{=}0.5$. Worlds that break the strong
-contradiction (rows with $a_7{=}a_{10}{=}1$) get $h{=}1{-}.93{=}.07$, and the one that breaks
-the entailment ($a_4{=}1,a_7{=}0$) gets $h{=}1{-}.65{=}.35$; $R{=}1$'s posterior mass is
-suppressed accordingly. Summing gives $P(R{=}1)=0.459$.}
+$a_7\!\oplus\!a_{10}$, \textsc{exclusive} $.93$), $\rho{=}0.5$. Worlds that break the strong
+exclusion --- \emph{both} same-value rows $a_7{=}a_{10}$ (both-true \emph{and} both-false) ---
+get $h{=}1{-}.93{=}.07$; the world that also breaks the entailment ($a_4{=}1,a_7{=}0,a_{10}{=}0$)
+compounds to $h{=}.35\!\times\!.07{=}.02$; $R{=}1$'s posterior mass is suppressed accordingly.
+Summing gives $P(R{=}1)=0.453$.}
 \label{fig:reified-calc}
 \end{figure}
 
 \paragraph{Behaviour and why it is rejected.} $P(R{=}1)$ \emph{is} discriminative and
-monotone for add/remove edits ($0.137$ \emph{worse} $\to 0.181$ \emph{coherent}) and it
+monotone for add/remove edits ($0.116$ \emph{worse} $\to 0.181$ \emph{coherent}) and it
 folds in \emph{all} relation types (unlike (b)). But it inherits the same
-\emph{concession non-monotonicity} ($0.150$ \emph{base} $\to 0.146$ \emph{concession}) --- it
+\emph{concession non-monotonicity} ($0.148$ \emph{base} $\to 0.134$ \emph{concession}) --- it
 reads ``is the relation active'' through the same lens as (b) --- and it introduces a free
 hyper-parameter $\rho$ (and, in richer variants, per-relation vote weights) that must be
 calibrated. A single tuned constant standing between the model and the headline number is
@@ -746,18 +791,18 @@ exactly what we wanted to avoid; (a) needs none. We therefore keep the reified n
 
 \paragraph{What it is.} The (log) partition function $Z=\sum_{\mathbf a}\prod_i\phi_i\prod_r\psi_r$
 measures how much total probability mass the factors let the network retain. Entailment and
-equivalence factors that are jointly satisfiable \emph{raise} $Z$; an active contradiction
-factor caps mass on the offending configurations and \emph{lowers} it. Rescaled to $[0,1]$
-against two references,
+equivalence factors that are jointly satisfiable \emph{raise} $Z$; an active conflict factor
+(\textsc{contradict} or \textsc{exclusive}) caps mass on the offending configurations and
+\emph{lowers} it. Rescaled to $[0,1]$ against two references,
 \begin{equation}
   \mathrm{LCS}_{\text{(d)}}
   \;=\;
   \frac{\log Z - \log Z_{\min}}{\log Z_{\max}-\log Z_{\min}} ,
   \label{eq:logz}
 \end{equation}
-with $Z_{\max}$ the same network with all \textsc{contradict} factors removed (the
-maximally-coherent reference; removing constraint factors only adds mass, so
-$\log Z\le\log Z_{\max}$).
+with $Z_{\max}$ the same network with all conflict factors (\textsc{contradict} and
+\textsc{exclusive}) removed (the maximally-coherent reference; removing constraint factors
+only adds mass, so $\log Z\le\log Z_{\max}$).
 
 \paragraph{The floor $Z_{\min}$: the MAP-world mass.} A graded $[0,1]$ score needs a valid
 \emph{lower} reference. We use the mass of the single most-probable world,
@@ -795,13 +840,13 @@ Merlin's \textbf{PR} (partition) task returns $\log Z$, and its \textbf{MAP} tas
 $\log Z_{\min}$ (the log-mass of the argmax configuration) --- one extra query on the
 \emph{same} base network, plus one PR run on the contradiction-free network for
 $\log Z_{\max}$. On the \emph{AeroParts} base network (exact, over $2^{16}$ worlds)
-$\log Z=-9.75$, $\log Z_{\min}=-15.16$, $\log Z_{\max}=-8.25$, giving
-$\mathrm{LCS}_{\text{(d)}}=(-9.75+15.16)/(-8.25+15.16)=\mathbf{0.78}$; the contradiction-free
+$\log Z=-9.64$, $\log Z_{\min}=-14.69$, $\log Z_{\max}=-8.25$, giving
+$\mathrm{LCS}_{\text{(d)}}=(-9.64+14.69)/(-8.25+14.69)=\mathbf{0.78}$; the conflict-free
 variant has $\log Z=\log Z_{\max}$ and normalizes to $\mathbf{1.00}$. Across the
 coherence-ordered family of Section~\ref{sec:change} the normalized score runs
-$0.69\to0.78\to0.80\to0.88\to1.00$ (Table~\ref{tab:allcands}) --- \emph{cleanly monotone} and
+$0.68\to0.78\to0.80\to0.89\to1.00$ (Table~\ref{tab:allcands}) --- \emph{cleanly monotone} and
 genuinely graded in $[0,1]$; raw $\log Z$ is likewise monotone and the most
-contradiction-sensitive of the four candidates (a single confident contradiction costs
+conflict-sensitive of the four candidates (a single confident conflict costs
 $\approx$ a full nat).
 
 \paragraph{Status: a graded diagnostic, still not the headline.} With the \textsc{map} floor,
@@ -820,10 +865,10 @@ companion, as in Table~\ref{tab:variants}.
 \label{sec:quirk}
 
 Candidates (b) and (c) both dip at the \emph{concession} variant; (a) and (d) do not. The
-reason is precise. The concession edit \emph{softens} the resolved contradiction
-$a_{11}\!\neq\!a_{12}$ from $p{=}0.80$ to $p{=}0.55$. A weaker \textsc{contradict} factor
-puts \emph{more} mass on the both-true cell: for a lone edge with uniform priors the
-with-priors table gives
+reason is precise. The concession edit \emph{softens} the resolved conflict
+$a_{11}\!\oplus\!a_{12}$ from $p{=}0.80$ to $p{=}0.55$. A weaker \textsc{exclusive} factor
+puts \emph{more} mass on the both-true cell (its $(1,1)$ entry is $1{-}p$, exactly as for
+\textsc{contradict}): for a lone edge with uniform priors the with-priors table gives
 \[
   P(a_{11}{=}1,a_{12}{=}1)\ =\ 0.10\ \ (p{=}0.80)\qquad\longrightarrow\qquad 0.225\ \ (p{=}0.55).
 \]
@@ -902,38 +947,43 @@ family of edits to the same response, ordered from least to most coherent.
 \toprule
 \textbf{Variant} & \textbf{LCS} (Eq.~\ref{eq:lcs}) & \textbf{$\#\{q_i{<}\pi\}$} & \textbf{$\log Z$}\\
 \midrule
-\emph{worse}: add a spurious contradiction $a_3\!\neq\!a_{12}$ ($p{=}.85$) & $0.567$ & 4 & $-10.47$\\
-\textbf{base}: both conflicts present                                       & $0.587$ & 3 & $-9.75$\\
-concession resolved: $a_{11}\!\neq\!a_{12}$ discounted $.80\!\to\!.55$        & $0.601$ & 2 & $-9.66$\\
-fix casualty conflict only: drop $a_7\!\neq\!a_{10}$                          & $0.603$ & 2 & $-9.06$\\
-\textbf{coherent rewrite}: remove both contradictions                        & $0.620$ & 0 & $-8.25$\\
+\emph{worse}: add a spurious contradiction $a_3\!\neq\!a_{12}$ ($p{=}.85$) & $0.586$ & 4 & $-10.54$\\
+\textbf{base}: both conflicts present                                       & $0.607$ & 3 & $-9.64$\\
+concession resolved: $a_{11}\!\oplus\!a_{12}$ discounted $.80\!\to\!.55$      & $0.612$ & 2 & $-9.64$\\
+fix casualty conflict only: drop $a_7\!\oplus\!a_{10}$                        & $0.613$ & 1 & $-8.95$\\
+\textbf{coherent rewrite}: remove both conflicts                             & $0.620$ & 0 & $-8.25$\\
 \bottomrule
 \end{tabular}
 \caption{Exact LCS across coherence-changing edits (with-priors MRF, $\pi{=}0.5$, $2^{16}$
-worlds). LCS is \emph{monotone}: it falls when a contradiction is added and rises as tensions
+worlds). LCS is \emph{monotone}: it falls when a conflict is added and rises as tensions
 are resolved or removed. The diagnostics move in lockstep --- the below-prior count drops
-$4\!\to\!0$ and $\log Z$ rises $-10.47\!\to\!-8.25$.}
+$4\!\to\!0$ and $\log Z$ rises $-10.54\!\to\!-8.25$.}
 \label{tab:variants}
 \end{table}
 
 \paragraph{Where the change comes from.} Table~\ref{tab:margchange} shows the per-atom
 marginals for the base vs.\ the coherent rewrite. Only the atoms attached to the removed
-contradictions move: the casualty pair's loser $a_{10}$ recovers $0.24\!\to\!0.50$, and the
-blame cluster $a_{11},a_{12},a_{13}$ un-suppresses. The entire causal backbone
+conflicts move: the casualty pair's loser $a_{10}$ recovers $0.40\!\to\!0.50$ and the blame
+loser $a_{11}$ recovers $0.40\!\to\!0.50$. (The \textsc{exclusive} coupling already keeps the
+losers well off the floor at $\approx 0.40$ --- because ``neither'' is forbidden too, so
+rejecting one endpoint half-supports the other --- which is why the recovery is a gentle
+$0.10$ rather than the $0.26$ a bare \textsc{contradict} would show; $a_{12}$ is held up by
+the $a_{13}\!\to\!a_{12}$ evidence link and does not move.) The entire causal backbone
 ($a_1$--$a_6$, $a_{14}$--$a_{16}$) is \emph{unchanged} --- coherence editing is local, exactly
-as it should be. The $+0.033$ LCS gain is the averaged lift of those five atoms.
+as it should be. The $+0.013$ LCS gain is the averaged lift of the two freed atoms.
 
 \begin{table}[h]\centering\small
 \begin{tabular}{@{}l*{8}{c}@{}}
 \toprule
       & $a_7$ & $a_{10}$ & $a_{11}$ & $a_{12}$ & $a_{13}$ & (backbone) & mean & LCS\\
 \midrule
-base             & .611 & \textbf{.237} & \textbf{.441} & \textbf{.528} & \textbf{.441} & unchanged & .587 & \textbf{0.587}\\
-coherent rewrite & .611 & \textbf{.500} & \textbf{.500} & \textbf{.675} & \textbf{.500} & unchanged & .620 & \textbf{0.620}\\
+base             & .611 & \textbf{.404} & \textbf{.395} & .675 & .500 & unchanged & .607 & \textbf{0.607}\\
+coherent rewrite & .611 & \textbf{.500} & \textbf{.500} & .675 & .500 & unchanged & .620 & \textbf{0.620}\\
 \bottomrule
 \end{tabular}
-\caption{Per-atom marginals, base vs.\ coherent rewrite. Only the contradiction-attached
-atoms change (bold); the backbone is untouched. The LCS rises $0.587\!\to\!0.620$.}
+\caption{Per-atom marginals, base vs.\ coherent rewrite. Only the two conflict-loser atoms
+change (bold); the backbone and the evidence-supported $a_{12}$/$a_{13}$ are untouched. The
+LCS rises $0.607\!\to\!0.620$.}
 \label{tab:margchange}
 \end{table}
 
@@ -955,9 +1005,9 @@ atoms change (bold); the backbone is untouched. The LCS rises $0.587\!\to\!0.620
         Merlin.
   \item \textbf{Algorithm:} \textsc{ComputeLCS} (Alg.~1) is a thin extension of the existing
         pipeline: add Level-2 compilation and a final averaging step.
-  \item \textbf{Behaviour:} on AeroParts the LCS moves $0.567$ (worse) $\to 0.587$ (base)
-        $\to 0.620$ (coherent), driven entirely by the local un-suppression of
-        contradiction-attached atoms.
+  \item \textbf{Behaviour:} on AeroParts the LCS moves $0.586$ (worse) $\to 0.607$ (base)
+        $\to 0.620$ (coherent), driven entirely by the local un-suppression of the
+        conflict-attached atoms.
 \end{itemize}
 
 % =====================================================================================

@@ -44,9 +44,15 @@ from fact_reasoner.fact_graph import Edge, FactGraph, Node
 from fact_reasoner.inference import run_merlin
 from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.lcs.relation_miner import MiningResult, _atom_sort_key
+from fact_reasoner.lcs.taxonomy import LEVEL1_CONFLICT_COUPLINGS
 
 # The four LCS readouts. ``mean_marginal`` is the default headline (deep-dive Eq. 4).
 LCS_METHODS = ("mean_marginal", "consistency", "reified", "log_partition")
+
+# Conflict couplings whose both-true world is the incoherent configuration the
+# consistency / conflict-free readouts key on: contradiction and exclusive (both
+# down-weight (1,1)). co_necessity is a positive coupling and is NOT a conflict.
+_CONFLICT_TYPES = frozenset(LEVEL1_CONFLICT_COUPLINGS)
 
 # Prefix for derived / auxiliary variables (consistency U-chain, reified R). It
 # sorts after atom ids "a..." under Merlin's (cardinality, name) ordering, so the
@@ -242,22 +248,28 @@ class LCSScorer:
     # -- (b) consistency probability -----------------------------------------
 
     def _consistency_probability(self, result: MiningResult) -> float:
-        """P( no CONTRADICT edge is jointly active ) — deep-dive Eq. 5.
+        """P( no CONFLICT edge is jointly active ) — deep-dive Eq. 5.
 
-        Adds, on a copy of the base network, one AND aux-var per contradiction
-        edge (``u_r = a_s AND a_t``) and a running-OR accumulator ``U = OR_r u_r``,
-        then reads ``P(U=0)``. All aux factors are deterministic and at most
-        ternary (no 2^k blow-up). Returns 1.0 when there are no contradiction edges.
+        A conflict coupling is a ``contradiction`` OR an ``exclusive`` (both
+        down-weight the both-true cell). Adds, on a copy of the base network, one
+        AND aux-var per conflict edge (``u_r = a_s AND a_t``) and a running-OR
+        accumulator ``U = OR_r u_r``, then reads ``P(U=0)``. For ``exclusive`` we
+        take "active" as the both-true world (the incoherent half of the
+        exclusion); the both-false half is a milder defect the marginals see.
+        ``co_necessity`` is NOT a conflict here. All aux factors are deterministic
+        and at most ternary (no 2^k blow-up). Returns 1.0 when no conflict edges.
         """
         contradictions = [
-            r for r in result.relations if r.level1_type == "contradiction"
+            r
+            for r in result.relations
+            if r.level1_type in _CONFLICT_TYPES
         ]
         if not contradictions:
             return 1.0
 
         network = self._base_network(result)
 
-        # One AND aux var per contradiction edge: u_r = (s AND t).
+        # One AND aux var per conflict edge: u_r = (s AND t).
         u_vars: List[str] = []
         for i, rel in enumerate(contradictions):
             u = f"{_AUX}u{i}"
@@ -418,9 +430,11 @@ def _vote_factor(level1_type: str, p: float) -> List[float]:
 
     R=0 branch is flat (1.0). R=1 branch is 1.0 when the relation is satisfied at
     (s, t) and ``1 - p`` when it is violated (deep-dive Eq. 6). Violation:
-      * entailment  -> (s=1, t=0)
-      * equivalence -> (s != t)
-      * contradiction -> (s=1, t=1)
+      * entailment   -> (s=1, t=0)
+      * equivalence  -> (s != t)
+      * contradiction-> (s=1, t=1)
+      * exclusive    -> (s == t)          [both same-value world]
+      * co_necessity -> (s=0, t=0)        [both-false world]
     """
     vals = []
     for R in (0, 1):
@@ -441,16 +455,26 @@ def _satisfied(level1_type: str, s: int, t: int) -> bool:
         return s == t
     if level1_type == "contradiction":
         return not (s == 1 and t == 1)
+    if level1_type == "exclusive":  # exactly one holds: violated when s == t
+        return s != t
+    if level1_type == "co_necessity":  # at least one holds: violated only at (0,0)
+        return not (s == 0 and t == 0)
     raise ValueError(f"Unknown relation type: {level1_type}")
 
 
 def _contradiction_free_graph(fact_graph: FactGraph) -> FactGraph:
-    """Return a copy of ``fact_graph`` with all contradiction edges removed."""
+    """Return a copy of ``fact_graph`` with all CONFLICT edges removed.
+
+    Conflict edges are ``contradiction`` and ``exclusive`` (both down-weight the
+    both-true world); removing them gives the maximally-coherent ceiling network
+    for the normalized-logZ score (deep-dive Section 8(d)). ``co_necessity`` is a
+    positive/at-least-one coupling and is kept.
+    """
     cf = FactGraph()
     for node in fact_graph.get_nodes():
         cf.add_node(Node(id=node.id, type=node.type, probability=node.probability))
     for edge in fact_graph.get_edges():
-        if edge.type == "contradiction":
+        if edge.type in _CONFLICT_TYPES:
             continue
         cf.add_edge(
             Edge(
