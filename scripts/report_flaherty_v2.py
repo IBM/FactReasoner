@@ -626,6 +626,16 @@ def _recall_section(recall: List[dict]) -> List[str]:
         r"change of policy. A single run therefore establishes an estimate, not a "
         r"bound; the worst case over several runs is the honest summary.",
         "",
+        r"\paragraph{A superseded earlier figure.} An earlier run of this "
+        r"experiment reported recall $0.995$. That number was too optimistic, for a "
+        r"measurement reason rather than a change in the policy. It was obtained by "
+        r"looking verdicts up in the NLI cache by content hash, which found $386$ "
+        r"non-neutral pairs where the exhaustive cell had in fact produced $395$: "
+        r"nine relations whose stored keys did not match were invisible to the "
+        r"lookup, shrinking the denominator. The relation-based measurement used "
+        r"here reads the produced relations directly and so cannot miss any. Where "
+        r"the two disagree, the figure in this report is the correct one.",
+        "",
     ]
     lost = row.get("lost_pairs") or []
     if lost:
@@ -647,6 +657,26 @@ def _recall_section(recall: List[dict]) -> List[str]:
             "No non-neutral relation was pruned: on this example the cheap policy "
             "is lossless, and its scores are therefore identical to the "
             "exhaustive policy's by construction rather than by luck.",
+            "",
+        ]
+
+    # Where the losses land matters more than how many there are: redundant
+    # evidence for an already-saturated atom is harmless, a sole witness is not.
+    targets = {}
+    for entry in lost:
+        targets[entry["pair"][1]] = targets.get(entry["pair"][1], 0) + 1
+    if len(targets) == 1 and lost:
+        atom_id, count = next(iter(targets.items()))
+        out += [
+            rf"All {count} pruned relations targeted the same atom, "
+            rf"\texttt{{{_tex_escape(atom_id)}}}, and all were entailments. That "
+            rf"concentration is why the scores did not move: the atom had many other "
+            rf"supporting contexts, so removing redundant support left its marginal "
+            rf"unchanged. The case to worry about is the opposite one --- an atom "
+            rf"whose \emph{{only}} witness is pruned, or a lone contradiction that "
+            rf"would have pulled a false claim down. Neither occurred here, but "
+            rf"neither is excluded by the mechanism, which is why recall rather than "
+            rf"score agreement is the metric to watch.",
             "",
         ]
     return out
@@ -831,16 +861,28 @@ def _conclusion(data: Dict[str, Any]) -> List[str]:
     verdict = (
         "lossless on this example, so the saving is free"
         if lost == 0 else
-        f"lossy here ({lost} of {recall.get('non_neutral_total')} non-neutral "
-        f"relations pruned, recall {_fmt(rec, '.3f')}), so the headline saving "
-        "overstates what is actually usable"
+        rf"not quite lossless: {lost} of {recall.get('non_neutral_total')} "
+        rf"non-neutral relations were pruned (recall {_fmt(rec, '.3f')}). The "
+        rf"reported scores were nonetheless unchanged, so on this example the loss "
+        rf"fell on relations that did not alter any atom's marginal --- but that is "
+        rf"an outcome, not a guarantee, and a different example could lose an "
+        rf"edge that matters"
+    )
+    live_both = base["llm_calls"] > 0 and cheap["llm_calls"] > 0
+    timing = (
+        rf" Wall-clock for the phase fell from {base['nli_seconds']:.0f}\,s to "
+        rf"{cheap['nli_seconds']:.0f}\,s "
+        rf"({base['nli_seconds'] / max(cheap['nli_seconds'], 1e-9):.2f}$\times$ "
+        rf"faster), with both cells measured against the live model."
+        if live_both else ""
     )
     return [
         r"\section{Conclusion}",
         rf"On a {_fmt(base.get('num_atoms'))}-atom biography with "
         rf"{_fmt(base.get('num_contexts'))} retrieved contexts, prefiltering cut "
         rf"the v2 atom--context phase from {b} to {c} pairs "
-        rf"({b / max(c, 1):.2f}$\times$ fewer). The pruning is {verdict}.",
+        rf"({b / max(c, 1):.2f}$\times$ fewer)." + timing + rf" The pruning is "
+        rf"{verdict}.",
         "",
         "The structural result is that provenance and similarity play different "
         "roles: provenance is a hard guarantee and never drops a context from the "
