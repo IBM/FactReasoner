@@ -1,0 +1,431 @@
+"""
+granite_switch_vs_factreaser_demo.py
+=====================================
+Runs the FULL state_media_eval pipeline on ALL 4 label types
+(factual, false, biased, biased/false), then for each evaluated atom
+also runs Granite Guardian 3.3-8B in factuality-detection mode
+by prompting it directly via RITS (since mellea intrinsics require
+LocalHFBackend or vLLM — neither available on RITS).
+
+Two backends:
+  - Llama-3.3-70B       → NLI, core claim extraction
+  - Granite Guardian 3.3-8B → factuality check (direct Guardian prompt)
+
+Usage:
+    cd /u/samit/FactReasoner
+    nohup python3 scripts/granite_switch_vs_factreaser_demo.py \
+        --cache-mode use > /u/samit/granite_test.txt 2>&1 &
+    echo "PID: $!"
+"""
+
+import os, sys, re, csv, json, math, time, asyncio, argparse, random
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+import requests
+from mellea_ibm.rits import RITSBackend, RITS
+from mellea.backends import ModelOption
+from mellea.stdlib.components.chat import Message as MelleaMessage
+from mellea.stdlib.context import ChatContext
+import mellea.stdlib.functional as mfuncs
+
+from fact_reasoner.core.trust import BayesianTrustFusion
+from fact_reasoner.core.nli import NLIExtractor as _NLIExtractor
+from fact_reasoner.core.base import Context, Atom
+from fact_reasoner.core.utils import build_relations
+from fact_reasoner.assessor import FactReasoner as FR
+from state_media_eval import fetch_page_excerpt
+
+from state_media_eval import (
+    load_dataset, serper_search, make_pipeline, LABEL_TO_GT,
+    DATASET_PATH, MODEL_PATH, MERLIN, STATE_PATH_BASE,
+    OUT_DIR, N_SERPER_RESULTS, classify_source_type,
+    normalize_social_domain,
+)
+import state_media_eval as sme
+from core_claim_query import extract_core_claim, build_queries
+
+
+# ── NLIFixed ──────────────────────────────────────────────────────────────────
+class NLIFixed(_NLIExtractor):
+    def _get_probability(self, output) -> float:
+        try:
+            r = output._meta["oai_chat_response"]
+            lp = (r.get("choices",[{}])[0].get("logprobs") or r.get("logprobs"))
+            if not lp or not lp.get("content"): return 1.0
+            s, n = 0, 0
+            for item in reversed(lp["content"][:-1]):
+                if item["token"] == "[": break
+                elif item["token"] != "]":
+                    s += item["logprob"]; n += 1
+            return math.exp(s/n) if n > 0 else 0.0
+        except Exception:
+            return 1.0
+
+
+# ── Granite Guardian direct prompt ────────────────────────────────────────────
+# Granite Guardian understands the Guardian prompt format natively.
+# factuality_detection checks: does the assistant's response contain factual
+# errors relative to the provided documents?
+# "yes" = errors found (claim is NOT supported), "no" = consistent (supported)
+
+GUARDIAN_FACTUALITY_SYSTEM = (
+    "As a Guardian agent, your role is to assess whether the provided "
+    "assistant response contains factual errors based on the given context "
+    "documents. Return 'yes' if the response contains factual inaccuracies "
+    "or claims not supported by the documents, 'no' if it is consistent."
+)
+
+def run_granite_guardian(claim: str, contexts: dict, guardian_backend) -> dict:
+    """
+    Call Granite Guardian 3.3-8B directly via RITS using the Guardian
+    prompt format. Bypasses mellea intrinsics (which require LocalHFBackend
+    or vLLM) and prompts the model directly as a plain LLM.
+
+    The Guardian model is trained to respond to this prompt format and
+    returns "yes" (factual errors found) or "no" (claim is consistent).
+    """
+    # Build document context
+    docs_text = "\n\n".join(
+        f"[Document {i+1}]: {ctx.text[:400]}"
+        for i, ctx in enumerate(contexts.values())
+    )
+
+    prompt = (
+        f"{GUARDIAN_FACTUALITY_SYSTEM}\n\n"
+        f"Context documents:\n{docs_text}\n\n"
+        f"Assistant response to evaluate:\n{claim}\n\n"
+        f"Does this response contain factual errors? Answer only 'yes' or 'no'."
+    )
+
+    try:
+        ctx_mellea = ChatContext().add(MelleaMessage("user", prompt))
+        out, _ = mfuncs.act(
+            MelleaMessage("user", prompt),
+            ctx_mellea,
+            guardian_backend,
+            model_options={ModelOption.MAX_NEW_TOKENS: 16},
+        )
+        raw = str(out).strip().lower()
+        # Parse: "yes" = errors found → NS, "no" = consistent → S
+        if "yes" in raw:
+            verdict = "NS"
+        elif "no" in raw:
+            verdict = "S"
+        else:
+            verdict = "UNCLEAR"
+        return {"raw": raw, "verdict": verdict, "error": None}
+    except Exception as e:
+        return {"raw": None, "verdict": "ERROR", "error": str(e)[:120]}
+
+
+# ── Single row evaluation ─────────────────────────────────────────────────────
+async def eval_row(row, trust_scorer, nli, llm_backend, guardian_backend, row_idx):
+    gt    = row["ground_truth"]
+    claim = row["text"]
+    atom  = Atom(id="a0", text=claim)
+    atoms_dict = {"a0": atom}
+    contexts = {}
+
+    # Core claim extraction
+    core_claim = await extract_core_claim(row, llm_backend)
+    search_q1, search_q2, _ = build_queries(
+        core_claim, row.get("date",""), row.get("category","")
+    )
+    print(f"\n    [CoreClaim] {core_claim[:110]}")
+    print(f"    [search] q1: {search_q1!r}")
+    print(f"    [search] q2: {search_q2!r}")
+
+    # Date-scoped q1: prefer sources from ±45 days of post date
+    from state_media_eval import _date_to_tbs
+    tbs = _date_to_tbs(row.get("date",""))
+    r1_dated = serper_search(search_q1, num_results=N_SERPER_RESULTS, tbs=tbs) if tbs else []
+    r1_broad  = serper_search(search_q1, num_results=N_SERPER_RESULTS)
+    r2 = serper_search(search_q2, num_results=N_SERPER_RESULTS)
+    # Use date-scoped results if we get enough, else fall back to broad
+    r1 = r1_dated if len(r1_dated) >= 2 else r1_broad
+    if tbs:
+        print(f"    [tbs] date-scoped: {len(r1_dated)} results, using {'dated' if len(r1_dated)>=2 else 'broad'}")
+
+    seen = set()
+    for res in r1 + r2:
+        cid = f"c{len(contexts)+1}"
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(res["link"])
+        norm = urlunparse(parsed._replace(
+            netloc=parsed.netloc.replace("x.com","twitter.com")))
+        full_text = fetch_page_excerpt(norm, res["snippet"])
+        ctx = Context(id=cid, atom=atom, text=full_text,
+                      title=res["title"], snippet=res["snippet"][:80], link=norm)
+        fused = trust_scorer.score(ctx)
+        ctx.set_probability(fused)
+        atom.add_contexts([ctx])
+        contexts[cid] = ctx
+
+    if len(contexts) < 2:
+        print(f"    [SKIP] only {len(contexts)} context(s)")
+        return None, None, core_claim
+
+    # NLI
+    relations = None
+    for attempt in range(3):
+        try:
+            relations = build_relations(
+                atoms=atoms_dict, contexts=contexts, nli_extractor=nli,
+                rel_atom_context=True, rel_context_context=False,
+                use_summarized_contexts=False,
+            )
+            break
+        except Exception as e:
+            await asyncio.sleep(1.5*(attempt+1))
+    if not relations:
+        print(f"    [SKIP] NLI failed")
+        return None, None, core_claim
+
+    connected = {r.source.id for r in relations}
+    for cid in list(contexts.keys()):
+        if cid not in connected:
+            print(f"    [drop] {cid} ({contexts[cid].title[:45]}) — NLI inconclusive")
+            del contexts[cid]
+    atom = Atom(id="a0", text=claim)
+    atoms_dict = {"a0": atom}
+    atom.add_contexts(list(contexts.values()))
+    relations = [r for r in relations if r.source.id in contexts]
+
+    if len(contexts) < 2 or not relations:
+        print(f"    [SKIP] only {len(contexts)} classifiable context(s)")
+        return None, None, core_claim
+
+    # FactReasoner Trust
+    pipeline = make_pipeline(atoms_dict, contexts, relations, gt)
+    _, marginals = pipeline.score()
+    p_true = next((m["probabilities"][1] for m in marginals if m["variable"]=="a0"), 0.5)
+    verdict = "S" if p_true > 0.5 else "NS"
+
+    edges = []
+    for r in relations:
+        cid = r.source.id
+        ctx = contexts[cid]
+        edges.append({
+            "context_id":   cid,
+            "title":        ctx.title,
+            "link":         ctx.link,
+            "fused_prior":  round(ctx.get_probability(), 4),
+            "nli_type":     r.type,
+            "nli_strength": round(r.probability, 6),
+            "source_type":  classify_source_type(ctx.link),
+        })
+
+    # Vanilla
+    for ctx in contexts.values(): ctx.set_probability(0.9)
+    pipeline.fact_graph = pipeline.markov_network = None
+    pipeline._build_fact_graph(); pipeline._build_markov_network()
+    _, van_m = pipeline.score()
+    p_van = next((m["probabilities"][1] for m in van_m if m["variable"]=="a0"), 0.5)
+    van_verdict = "S" if p_van > 0.5 else "NS"
+
+    fr_result = {
+        "p_trust": round(p_true,4), "verdict": verdict, "correct": verdict==gt,
+        "p_vanilla": round(p_van,4), "van_verdict": van_verdict,
+        "van_correct": van_verdict==gt, "edges": edges,
+    }
+
+    # Granite Guardian direct prompt
+    print(f"    [GraniteGuardian] Running factuality check...")
+    gs_result = run_granite_guardian(claim, contexts, guardian_backend)
+    gs_result["correct"] = gs_result["verdict"] == gt
+
+    trust_scorer.update_from_results(contexts, marginals, relations)
+    return fr_result, gs_result, core_claim
+
+
+# ── Print per atom ─────────────────────────────────────────────────────────────
+def print_atom(idx, row, core_claim, fr, gs):
+    gt     = row["ground_truth"]
+    fr_sym = "✓" if fr["correct"]      else "✗"
+    van_sym= "✓" if fr["van_correct"]  else "✗"
+    if gs["error"]:
+        gs_line = f"ERROR — {gs['error'][:70]}"
+        gs_sym  = "E"
+    else:
+        gs_sym  = "✓" if gs["correct"] else "✗"
+        gs_line = f"raw={gs['raw']!r} → {gs['verdict']} {gs_sym}"
+
+    print(f"\n{'═'*68}")
+    print(f"[{idx}] {row['account_name']:<22} {row['category']:<10} "
+          f"GT={gt}  ({row['raw_label']})")
+    print(f"  Post:  {row['text'][:100]}...")
+    print(f"  Claim: {core_claim}")
+
+    print(f"\n  Edge graph:")
+    print(f"  {'ctx':<4} {'NLI type':<14} {'fused_prior':<13} {'strength':<10} title")
+    print(f"  {'─'*64}")
+    for e in fr["edges"]:
+        print(f"  {e['context_id']:<4} {e['nli_type']:<14} "
+              f"{e['fused_prior']:<13.4f} {e['nli_strength']:<10.4f} "
+              f"{e['title'][:35]}")
+        print(f"       {e['link'][:65]}")
+
+    print(f"\n  FactReasoner (Trust):    P(S)={fr['p_trust']:.4f} → "
+          f"{fr['verdict']} {fr_sym}")
+    print(f"  FactReasoner (Vanilla):  P(S)={fr['p_vanilla']:.4f} → "
+          f"{fr['van_verdict']} {van_sym}")
+    print(f"  Granite Guardian:        {gs_line}")
+
+    if fr["correct"] and not fr["van_correct"]:
+        print(f"  ★ Trust recovered — Vanilla failed")
+    elif not fr["correct"] and fr["van_correct"]:
+        print(f"  ⚠ Trust failed — Vanilla correct")
+    if not gs["error"] and gs["correct"] != fr["correct"]:
+        print(f"  ↔ Guardian and TrustFusion disagreed")
+
+
+# ── Summary ────────────────────────────────────────────────────────────────────
+def print_summary(all_results):
+    total  = len(all_results)
+    if not total:
+        print("\nNo atoms evaluated.")
+        return
+
+    fr_c  = sum(1 for r in all_results if r["fr"]["correct"])
+    van_c = sum(1 for r in all_results if r["fr"]["van_correct"])
+    gs_ok = [r for r in all_results if not r["gs"]["error"]]
+    gs_c  = sum(1 for r in gs_ok if r["gs"]["correct"])
+
+    print(f"\n\n{'═'*68}")
+    print(f"FINAL COMPARISON — {total} atoms evaluated")
+    print(f"{'═'*68}")
+    print(f"  {'System':<30} {'Correct':>8} {'Accuracy':>10}")
+    print(f"  {'─'*50}")
+    print(f"  {'Trust Fusion (DynaTD+UTD)':<30} {fr_c:>8} {fr_c/total*100:>9.1f}%")
+    print(f"  {'Vanilla FactReasoner':<30} {van_c:>8} {van_c/total*100:>9.1f}%")
+    if gs_ok:
+        print(f"  {'Granite Guardian 3.3-8B':<30} {gs_c:>8} "
+              f"{gs_c/len(gs_ok)*100:>9.1f}%  ({len(gs_ok)}/{total} ran)")
+    else:
+        print(f"  {'Granite Guardian 3.3-8B':<30} {'ALL ERRORS':>8}")
+
+    # Per-label breakdown
+    for label in ["factual","false","biased","biased/false"]:
+        rs = [r for r in all_results if r["raw_label"]==label]
+        if not rs: continue
+        fr_l  = sum(1 for r in rs if r["fr"]["correct"])
+        van_l = sum(1 for r in rs if r["fr"]["van_correct"])
+        gs_rs = [r for r in rs if not r["gs"]["error"]]
+        gs_l  = sum(1 for r in gs_rs if r["gs"]["correct"])
+        print(f"\n  [{label} n={len(rs)}]")
+        print(f"    Trust Fusion:    {fr_l}/{len(rs)} ({fr_l/len(rs)*100:.1f}%)")
+        print(f"    Vanilla:         {van_l}/{len(rs)} ({van_l/len(rs)*100:.1f}%)")
+        if gs_rs:
+            print(f"    Granite Guardian:{gs_l}/{len(gs_rs)} ({gs_l/len(gs_rs)*100:.1f}%)")
+
+    # Per-atom table
+    print(f"\n  {'Acct':<22} {'GT':<4} {'Label':<14} {'Trust':>7} "
+          f"{'Van':>5} {'Guard':>6}  CoreClaim")
+    print(f"  {'─'*82}")
+    for r in all_results:
+        fr_s  = f"{r['fr']['verdict']}{'✓' if r['fr']['correct'] else '✗'}"
+        van_s = f"{r['fr']['van_verdict']}{'✓' if r['fr']['van_correct'] else '✗'}"
+        if r["gs"]["error"]:
+            gs_s = "ERR"
+        else:
+            gs_s = f"{r['gs']['verdict']}{'✓' if r['gs']['correct'] else '✗'}"
+        print(f"  {r['account'][:22]:<22} {r['ground_truth']:<4} "
+              f"{r['raw_label']:<14} {fr_s:>7} {van_s:>5} {gs_s:>6}  "
+              f"{r['core_claim'][:35]}")
+
+    print(f"\n  Key insight:")
+    print(f"  Granite Guardian gives a binary yes/no from a single prompted model.")
+    print(f"  FactReasoner builds a Markov network over ALL retrieved contexts,")
+    print(f"  weighting each edge by DynaTD+UTD fused_prior (source trust).")
+    print(f"  The edge graph shows WHO said what and HOW MUCH to trust them.")
+
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+async def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--cache-mode", choices=["use","fresh","refresh"], default="use")
+    args = ap.parse_args()
+    sme.CACHE_MODE = args.cache_mode
+
+    if not os.environ.get("SERPER_API_KEY"):
+        sys.exit("ERROR: SERPER_API_KEY not set")
+
+    print("Initialising backends...")
+    llm_backend = RITSBackend(
+        RITS.LLAMA_3_3_70B_INSTRUCT,
+        model_options={ModelOption.MAX_NEW_TOKENS: 1024},
+    )
+    guardian_backend = RITSBackend(
+        RITS.GRANITE_GUARDIAN_3_3_8B,
+        model_options={ModelOption.MAX_NEW_TOKENS: 16},
+    )
+    print(f"  LLM:      {RITS.LLAMA_3_3_70B_INSTRUCT.model_name}")
+    print(f"  Guardian: {RITS.GRANITE_GUARDIAN_3_3_8B.model_name}")
+
+    trust_scorer = BayesianTrustFusion(
+        model_path=MODEL_PATH,
+        state_path=f"{STATE_PATH_BASE}_all.json",  # all 4 labels
+    )
+    nli = NLIFixed(llm_backend)
+
+    # ALL 4 labels
+    rows = load_dataset(DATASET_PATH, only_labels=None)
+    random.shuffle(rows)
+    print(f"\nLoaded {len(rows)} rows (all labels). Starting...\n")
+
+    all_results = []
+    fr_c = gs_c = van_c = total = 0
+
+    for i, row in enumerate(rows):
+        print(f"\n{'─'*68}")
+        print(f"ROW {i+1}/{len(rows)}: {row['account_name']} | "
+              f"{row['category']} | GT={row['ground_truth']} | {row['raw_label']}")
+
+        fr_result = gs_result = None
+        for attempt in range(3):
+            try:
+                fr_result, gs_result, core_claim = await eval_row(
+                    row, trust_scorer, nli, llm_backend, guardian_backend, i,
+                )
+                break
+            except Exception as e:
+                import traceback
+                print(f"    [retry {attempt+1}/3] {e}")
+                if attempt == 0: traceback.print_exc()
+                await asyncio.sleep(2.0*(attempt+1))
+
+        if fr_result is None:
+            print(f"    [SKIPPED]")
+            continue
+
+        total += 1
+        if fr_result["correct"]:    fr_c  += 1
+        if fr_result["van_correct"]: van_c += 1
+        if not gs_result["error"] and gs_result["correct"]: gs_c += 1
+
+        print_atom(total, row, core_claim, fr_result, gs_result)
+
+        gs_n = sum(1 for r in all_results if not r["gs"]["error"]) + \
+               (0 if gs_result["error"] else 1)
+        print(f"\n  Totals: Trust={fr_c}/{total} ({fr_c/total*100:.1f}%)  "
+              f"Vanilla={van_c}/{total} ({van_c/total*100:.1f}%)  "
+              f"Guardian={gs_c}/{max(gs_n,1)} ({gs_c/max(gs_n,1)*100:.1f}%)")
+
+        all_results.append({
+            "row_idx": i, "account": row["account_name"],
+            "category": row["category"], "raw_label": row["raw_label"],
+            "ground_truth": row["ground_truth"],
+            "claim": row["text"], "core_claim": core_claim,
+            "fr": fr_result, "gs": gs_result,
+        })
+
+    print_summary(all_results)
+
+    out_path = "/u/samit/granite_switch_comparison.json"
+    with open(out_path, "w") as f:
+        json.dump(all_results, f, indent=2)
+    print(f"\nSaved → {out_path}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

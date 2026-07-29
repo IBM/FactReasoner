@@ -1,0 +1,655 @@
+"""
+trust_comprehensiveness_eval.py
+================================
+Three-way evaluation on the Chinese state media dataset:
+
+  System A — Vanilla Comprehensiveness (NLI-based, Dejl et al. 2025)
+               Measures how much of the background corpus a response covers,
+               using relevance-filtered atoms and NLI entailment relations.
+               No source trust weighting at all.
+
+  System B — FactReasoner (Vanilla, Marinescu et al. 2025)
+               Probabilistic factuality assessment via Markov Network.
+               Assesses factual accuracy of the RESPONSE atoms against
+               retrieved evidence. No trust signal.
+
+  System C — Trust-Weighted Comprehensiveness (Our System)
+               Same NLI-based comprehensiveness pipeline as System A, but:
+               (1) Context atoms are weighted by BayesianTrustFusion score
+                   of their source URL — untrusted sources (state media,
+                   advocacy sites) contribute less to the "missing" penalty.
+               (2) The comprehensiveness score becomes:
+                     S = Σ_{covered} w_i / (Σ_{covered} w_i + Σ_{missing} w_i)
+                   where w_i = relevance_score(a_i) × trust_score(source_i)
+               (3) An atom from a Chinese state media repost of the same
+                   claim does NOT penalize a response for omitting it.
+
+The dataset is the 40-row hand-labeled Chinese state media dataset.
+Each row has: text (post), category, raw_label, post_url, account_name.
+
+For comprehensiveness evaluation, each post is treated as:
+  - query:    the post claim text
+  - corpus:   the Serper-retrieved contexts (already cached in serper_cache.json)
+  - response: the post text itself (we measure how much of the retrieved
+              background is covered in the post — a self-coverage score)
+
+This gives a meaningful signal: high-trust contradicting sources that are
+NOT mentioned in the post reveal what the post is omitting (i.e., the
+other side of the story). Low-trust sources that echo the post's claim
+should NOT penalize it for covering "their version."
+
+Usage:
+    cd /u/samit/FactReasoner
+    python3 scripts/trust_comprehensiveness_eval.py \
+        --dataset  data/state_media_dataset.tsv \
+        --cache    data/serper_cache.json \
+        --out-dir  /u/samit/comprehensiveness_results \
+        --labels   factual_false \
+        --max-rows 40
+"""
+
+import os, sys, re, json, csv, time, math, asyncio, argparse, datetime
+from collections import defaultdict
+from urllib.parse import urlparse
+
+# ── IBM FactReasoner imports (server environment) ────────────────────────────
+import sys as _sys
+# Ensure FactReasoner src is on the path when run from /u/samit/FactReasoner/
+for _p in ["src", ".", "/u/samit/FactReasoner", "/u/samit/FactReasoner/src"]:
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
+
+try:
+    from fact_reasoner.core.trust import BayesianTrustFusion
+    from fact_reasoner.core.nli   import NLIExtractor as _NLIExtractor
+    from fact_reasoner.core.base  import Context, Atom
+    from fact_reasoner.core.utils import build_relations
+    from mellea_ibm.rits          import RITSBackend, RITS
+    from mellea.backends          import ModelOption
+    HAVE_FR = True
+except ImportError:
+    HAVE_FR = False
+    print("[warn] FactReasoner not importable — Systems B and C will use "
+          "mock trust scores. Run on the IBM server for real results.")
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+MODEL_PATH       = "/u/samit/utd_model.pkl"
+DYNATD_STATE     = "/u/samit/dynaTD_state_state_media_factual_false.json"
+SERPER_CACHE     = "data/serper_cache.json"
+
+LABEL_MAP = {
+    "all":           None,
+    "factual_false": {"factual", "false"},
+    "factual":       {"factual"},
+    "false":         {"false"},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. DATA LOADING
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_dataset(path: str, label_filter: set | None) -> list[dict]:
+    rows = []
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            # TSV uses 'factuality_label' — mirror state_media_eval.py
+            label = row.get("factuality_label") or row.get("raw_label") or ""
+            label = label.strip().lower()
+            # Normalise: "biased/false" -> "biased_false" etc.
+            row["raw_label"] = label
+            if label_filter and label not in label_filter:
+                continue
+            # Ensure 'text' field exists (TSV might call it 'post_text')
+            if "text" not in row:
+                row["text"] = row.get("post_text", row.get("content", ""))
+            # Ensure date and account fields
+            if "date" not in row:
+                row["date"] = row.get("post_date", "")
+            if "account_name" not in row:
+                row["account_name"] = row.get("account", row.get("source", ""))
+            if "category" not in row:
+                row["category"] = row.get("topic", "")
+            rows.append(row)
+    return rows
+
+def load_serper_cache(path: str) -> dict:
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+def get_cached_contexts(row: dict, serper_cache: dict) -> list[dict]:
+    """
+    Reconstruct the Serper contexts for a row from the cache.
+    Returns list of {title, link, snippet}.
+    """
+    import re as _re
+    text = _re.sub(r"#\w+|@\w+|https?://\S+", "", row["text"]).strip()
+    text = _re.sub(r"\s+", " ", text)
+    date = row.get("date", "")
+
+    q1 = f"{text[:180]} {date}".strip() if date else text[:180]
+    snippet90 = text[:90]
+    last_space = snippet90.rfind(" ")
+    if last_space > 20:
+        snippet90 = snippet90[:last_space]
+    snippet90 = snippet90.rstrip(".,;:!?")
+    category = row.get("category", "")
+    if category == "Xinjiang":
+        q2 = "Xinjiang forced labor fact check independent report"
+    else:
+        date_suffix = f" {date}" if date else ""
+        q2 = f"{snippet90} fact check{date_suffix}"
+
+    results = []
+    for q in [q1, q2]:
+        hits = serper_cache.get(q, [])
+        for h in hits:
+            if isinstance(h, dict) and h.get("link"):
+                results.append(h)
+    # Deduplicate by link
+    seen = set()
+    deduped = []
+    for r in results:
+        if r["link"] not in seen:
+            seen.add(r["link"])
+            deduped.append(r)
+    return deduped
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. TRUST SCORING
+# ─────────────────────────────────────────────────────────────────────────────
+
+class MockTrustScorer:
+    """Fallback when FactReasoner not available — returns 0.5 for all."""
+    def score(self, ctx):
+        return 0.5
+
+def get_trust_scorer():
+    if not HAVE_FR:
+        return MockTrustScorer()
+    return BayesianTrustFusion(
+        model_path=MODEL_PATH,
+        state_path=DYNATD_STATE,
+    )
+
+def score_source_trust(url: str, trust_scorer) -> float:
+    """
+    Returns BayesianTrustFusion fused_prior for a given URL.
+    High = trusted source (e.g. Reuters, DoL, AP)
+    Low  = untrusted source (e.g. state media, advocacy)
+    """
+    try:
+        atom  = Atom(id="a0", text="placeholder")
+        ctx   = Context(id="c0", atom=atom, text="placeholder",
+                        title="", snippet="", link=url)
+        score = trust_scorer.score(ctx)
+        return float(score)
+    except Exception:
+        return 0.5
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. NLI RELATION EXTRACTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def nli_entailment(response_text: str, context_text: str, nli) -> float:
+    """
+    Returns entailment probability that context_text is covered by response_text.
+    Uses the FactReasoner NLI module directly.
+    Returns value in [0, 1]; >0.5 means entailed (covered).
+    """
+    try:
+        atom = Atom(id="a0", text=context_text)
+        ctx  = Context(id="c0", atom=atom, text=response_text,
+                       title="", snippet=response_text[:80], link="")
+        # build_relations returns list of (ctx_id, atom_id, relation, strength)
+        relations = asyncio.get_event_loop().run_until_complete(
+            build_relations([ctx], [atom], nli)
+        )
+        for rel in relations:
+            if rel[2] == "entailment":
+                return float(rel[3])
+        return 0.0
+    except Exception:
+        return 0.0
+
+def get_nli():
+    if not HAVE_FR:
+        return None
+    backend = RITSBackend(
+        RITS.LLAMA_3_3_70B_INSTRUCT,
+        model_options={ModelOption.MAX_NEW_TOKENS: 1024}
+    )
+    class NLIFixed(_NLIExtractor):
+        def __init__(self):
+            super().__init__(backend)
+    return NLIFixed()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. SYSTEM A — Vanilla Comprehensiveness (Dejl et al. 2025)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def system_a_comprehensiveness(row: dict, contexts: list[dict], nli,
+                                relevance_threshold: float = 0.5) -> dict:
+    """
+    NLI-based comprehensiveness per Dejl et al. 2025:
+      - Each retrieved context snippet = one background atom
+      - Relevance filter: all contexts included (using retrieval as proxy
+        for relevance — Serper already filters by topic)
+      - NLI entailment: does the response TEXT cover this context atom?
+      - Score = |covered| / (|covered| + |missing|)
+      - No trust weighting at all.
+    """
+    if not contexts:
+        return {"score": None, "covered": 0, "missing": 0, "n_contexts": 0,
+                "system": "A_vanilla_comprehensiveness"}
+
+    response = row["text"]
+    covered = 0
+    missing = 0
+    details = []
+
+    for ctx in contexts:
+        snippet = ctx.get("snippet", "") or ctx.get("title", "")
+        if not snippet or len(snippet) < 10:
+            continue
+        ent = nli_entailment(response, snippet, nli) if nli else 0.5
+        is_covered = ent > 0.5
+        if is_covered:
+            covered += 1
+        else:
+            missing += 1
+        details.append({
+            "link": ctx["link"],
+            "snippet": snippet[:80],
+            "entailment": round(ent, 4),
+            "covered": is_covered,
+        })
+
+    total = covered + missing
+    score = covered / total if total > 0 else None
+    return {
+        "system": "A_vanilla_comprehensiveness",
+        "score": round(score, 4) if score is not None else None,
+        "covered": covered,
+        "missing": missing,
+        "n_contexts": total,
+        "details": details,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. SYSTEM B — Vanilla FactReasoner
+# ─────────────────────────────────────────────────────────────────────────────
+
+def system_b_factreasonerscore(row: dict, contexts: list[dict],
+                                trust_scorer, nli) -> dict:
+    """
+    Vanilla FactReasoner factuality score for the post:
+      - The POST is the 'response' being evaluated
+      - Serper contexts are the 'evidence'
+      - Returns P(supported) from the Markov Network
+      - No trust weighting (uniform priors from UTD only, not DynaTD)
+
+    For the state media dataset this is equivalent to the standard
+    FactReasoner factuality score we already compute per-atom, but here
+    we aggregate at the row level for a single comprehensiveness-style score.
+    """
+    if not HAVE_FR or not contexts:
+        return {"score": None, "system": "B_vanilla_factreasonerscore",
+                "p_supported": None}
+
+    # Re-use the per-row FactReasoner computation result already saved
+    # in state_media_results.json if available (avoid re-running)
+    return {
+        "system": "B_vanilla_factreasonerscore",
+        "note": "Use p_trust from state_media_results.json for this row",
+        "score": None,  # filled in during aggregation from saved results
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. SYSTEM C — Trust-Weighted Comprehensiveness (Our System)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def system_c_trust_comprehensiveness(row: dict, contexts: list[dict],
+                                      trust_scorer, nli,
+                                      trust_threshold: float = 0.3) -> dict:
+    """
+    Trust-Weighted Comprehensiveness — our contribution:
+
+    Key insight: not all background sources should count equally.
+    A Chinese state media repost of the same claim should NOT penalize the
+    response for failing to cover it. A DoL/AP/Reuters contradiction SHOULD.
+
+    Algorithm:
+      For each context C_i from source URL u_i:
+        w_i = trust_score(u_i)            [BayesianTrustFusion fused_prior]
+        e_i = NLI_entailment(response, C_i)
+        if e_i > 0.5: contributes w_i to covered pool
+        else:         contributes w_i to missing pool
+
+      Score = Σ_covered w_i / (Σ_covered w_i + Σ_missing w_i)
+
+    Effect: missing a fact from a trusted independent source (w~0.9) has
+    much more impact than missing a re-statement from state media (w~0.3).
+
+    trust_threshold: contexts with trust_score < threshold are excluded
+    entirely (they're treated as unreliable enough to not count at all).
+    Default 0.3 excludes the worst state-media echo sources.
+    """
+    if not contexts:
+        return {"score": None, "system": "C_trust_weighted_comprehensiveness",
+                "covered_weight": 0, "missing_weight": 0, "n_contexts": 0}
+
+    response = row["text"]
+    covered_weight = 0.0
+    missing_weight = 0.0
+    excluded_low_trust = 0
+    details = []
+
+    for ctx in contexts:
+        snippet = ctx.get("snippet", "") or ctx.get("title", "")
+        if not snippet or len(snippet) < 10:
+            continue
+
+        # Trust score for this source
+        trust = score_source_trust(ctx["link"], trust_scorer)
+
+        if trust < trust_threshold:
+            excluded_low_trust += 1
+            details.append({
+                "link": ctx["link"],
+                "snippet": snippet[:80],
+                "trust": round(trust, 4),
+                "excluded": True,
+                "reason": f"trust < {trust_threshold}",
+            })
+            continue
+
+        # NLI entailment: is this context covered by the response?
+        ent = nli_entailment(response, snippet, nli) if nli else 0.5
+        is_covered = ent > 0.5
+
+        if is_covered:
+            covered_weight += trust
+        else:
+            missing_weight += trust
+
+        details.append({
+            "link": ctx["link"],
+            "snippet": snippet[:80],
+            "trust": round(trust, 4),
+            "entailment": round(ent, 4),
+            "covered": is_covered,
+            "weight": round(trust, 4),
+            "excluded": False,
+        })
+
+    total_weight = covered_weight + missing_weight
+    score = covered_weight / total_weight if total_weight > 0 else None
+
+    return {
+        "system": "C_trust_weighted_comprehensiveness",
+        "score": round(score, 4) if score is not None else None,
+        "covered_weight": round(covered_weight, 4),
+        "missing_weight": round(missing_weight, 4),
+        "n_contexts_used": len([d for d in details if not d.get("excluded")]),
+        "n_excluded_low_trust": excluded_low_trust,
+        "trust_threshold": trust_threshold,
+        "details": details,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. AGGREGATION AND REPORTING
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_fr_results(results_path: str) -> dict:
+    """
+    Load existing FactReasoner results (state_media_results.json) to get
+    the per-row p_trust scores for System B without re-running.
+    """
+    if not os.path.exists(results_path):
+        return {}
+    with open(results_path) as f:
+        data = json.load(f)
+    # Index by multiple keys for robust matching
+    indexed = {}
+    for r in (data if isinstance(data, list) else []):
+        claim_key = (r.get("claim") or "")[:80]
+        if claim_key:
+            indexed[claim_key] = r
+        url_key = r.get("post_url") or r.get("url") or ""
+        if url_key:
+            indexed[url_key] = r
+    return indexed
+
+def aggregate_results(all_results: list[dict], label: str) -> dict:
+    rows_a = [r["A"] for r in all_results if r["A"].get("score") is not None]
+    rows_b = [r["B"] for r in all_results if r["B"].get("score") is not None]
+    rows_c = [r["C"] for r in all_results if r["C"].get("score") is not None]
+
+    def stats(scores):
+        if not scores: return {"n": 0, "mean": None, "std": None, "min": None, "max": None}
+        n = len(scores)
+        m = sum(scores) / n
+        std = (sum((x-m)**2 for x in scores) / n) ** 0.5
+        return {"n": n, "mean": round(m, 4), "std": round(std, 4),
+                "min": round(min(scores), 4), "max": round(max(scores), 4)}
+
+    return {
+        "label_filter": label,
+        "n_rows_evaluated": len(all_results),
+        "A_vanilla_comprehensiveness": stats([r["score"] for r in rows_a]),
+        "B_vanilla_factreasonerscore": stats([r["score"] for r in rows_b]),
+        "C_trust_weighted_comprehensiveness": stats([r["score"] for r in rows_c]),
+    }
+
+def format_report(agg: dict, all_results: list[dict]) -> str:
+    lines = [
+        "=" * 70,
+        "THREE-WAY EVALUATION — Chinese State Media Dataset",
+        "=" * 70,
+        f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Label filter: {agg['label_filter']}",
+        f"Rows evaluated: {agg['n_rows_evaluated']}",
+        "",
+        "SYSTEM DESCRIPTIONS",
+        "-" * 70,
+        "  A: Vanilla Comprehensiveness (Dejl et al. 2025, NLI-based)",
+        "     Measures: how much of retrieved background does the post cover?",
+        "     Trust: none — all sources weighted equally",
+        "",
+        "  B: Vanilla FactReasoner (Marinescu et al. 2025)",
+        "     Measures: P(response is factually supported by evidence)",
+        "     Trust: UTD+DynaTD source priors (no comprehensiveness)",
+        "",
+        "  C: Trust-Weighted Comprehensiveness (Our System)",
+        "     Measures: coverage weighted by source trustworthiness",
+        "     Trust: BayesianTrustFusion — state media echo sources",
+        "            down-weighted, independent trusted sources up-weighted",
+        "",
+        "AGGREGATE SCORES",
+        "-" * 70,
+        f"{'System':<45} {'n':>4} {'Mean':>7} {'Std':>7} {'Min':>7} {'Max':>7}",
+        "-" * 70,
+    ]
+
+    for key, label in [
+        ("A_vanilla_comprehensiveness",       "A: Vanilla Comprehensiveness    "),
+        ("B_vanilla_factreasonerscore",       "B: Vanilla FactReasoner         "),
+        ("C_trust_weighted_comprehensiveness","C: Trust-Weighted Comprehensiveness"),
+    ]:
+        s = agg[key]
+        if s["n"] == 0:
+            lines.append(f"  {label:<43} {'N/A':>4}")
+        else:
+            lines.append(
+                f"  {label:<43} {s['n']:>4} {s['mean']:>7.4f} "
+                f"{s['std']:>7.4f} {s['min']:>7.4f} {s['max']:>7.4f}"
+            )
+
+    lines += ["", "PER-ROW RESULTS", "-" * 70,
+              f"{'Row':<4} {'Account':<22} {'Label':<14} "
+              f"{'A_score':>8} {'B_score':>8} {'C_score':>8} "
+              f"{'C_excl':>7} {'C_n_ctx':>8}"]
+    lines.append("-" * 70)
+
+    for r in all_results:
+        row = r["row"]
+        a = r["A"]
+        b = r["B"]
+        c = r["C"]
+        lines.append(
+            f"{r['row_idx']:<4} {row.get('account_name','?')[:21]:<22} "
+            f"{row.get('raw_label','?'):<14} "
+            f"{str(a.get('score','—')):>8} "
+            f"{str(b.get('score','—')):>8} "
+            f"{str(c.get('score','—')):>8} "
+            f"{c.get('n_excluded_low_trust',0):>7} "
+            f"{c.get('n_contexts_used',0):>8}"
+        )
+
+    lines += [
+        "",
+        "KEY FINDINGS",
+        "-" * 70,
+        "  System C vs A delta shows the trust-weighting effect:",
+        "  Positive delta (C > A) = post covers trusted sources well",
+        "    but misses untrusted echo-sources (correct behavior)",
+        "  Negative delta (C < A) = post fails to cover even trusted",
+        "    independent sources (genuine comprehensiveness failure)",
+        "",
+        "  For 'false'-labeled posts, we expect C < A because:",
+        "    The post's claim is echoed by untrusted sources (inflating A)",
+        "    but contradicted by trusted sources (correctly penalized in C)",
+        "=" * 70,
+    ]
+    return "\n".join(lines)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset",   default="data/state_media_dataset.tsv")
+    ap.add_argument("--cache",     default="data/serper_cache.json")
+    ap.add_argument("--fr-results",
+                    default="/u/samit/state_media_results/state_media_results.json")
+    ap.add_argument("--out-dir",   default="/u/samit/comprehensiveness_results")
+    ap.add_argument("--labels",    default="factual_false",
+                    choices=list(LABEL_MAP.keys()))
+    ap.add_argument("--max-rows",  type=int, default=None)
+    ap.add_argument("--trust-threshold", type=float, default=0.3,
+                    help="Min trust score for context to count in System C")
+    args = ap.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    label_filter = LABEL_MAP[args.labels]
+    rows = load_dataset(args.dataset, label_filter)
+    if args.max_rows:
+        rows = rows[:args.max_rows]
+    print(f"[data] {len(rows)} rows loaded (filter={args.labels})")
+
+    serper_cache = load_serper_cache(args.cache)
+    print(f"[cache] {len(serper_cache)} Serper cache entries")
+
+    fr_results = load_fr_results(args.fr_results)
+    print(f"[fr] {len(fr_results)} existing FactReasoner results loaded")
+
+    print("[init] Setting up trust scorer and NLI ...")
+    trust_scorer = get_trust_scorer()
+    nli          = get_nli()
+    print(f"[init] Trust scorer: {'real BayesianTrustFusion' if HAVE_FR else 'mock'}")
+    print(f"[init] NLI: {'real FactReasoner NLI' if nli else 'mock (unavailable)'}")
+
+    all_results = []
+
+    for i, row in enumerate(rows):
+        print(f"\n[row {i+1}/{len(rows)}] {row.get('account_name','?')} "
+              f"| {row.get('raw_label','?')} | {row['text'][:60]}...")
+
+        contexts = get_cached_contexts(row, serper_cache)
+        print(f"  contexts: {len(contexts)} from cache")
+
+        # System A
+        print("  [A] Vanilla Comprehensiveness ...")
+        res_a = system_a_comprehensiveness(row, contexts, nli)
+        print(f"      score={res_a.get('score')}  "
+              f"covered={res_a.get('covered')}  missing={res_a.get('missing')}")
+
+        # System B — use saved FactReasoner result
+        # Try multiple keys: claim text prefix, post_url
+        claim_key = row["text"][:80]
+        fr_row = fr_results.get(claim_key)
+        if not fr_row:
+            # Try matching by post_url
+            post_url = row.get("post_url", row.get("url", ""))
+            fr_row = fr_results.get(post_url)
+        if not fr_row:
+            # Try partial text match
+            for k, v in fr_results.items():
+                if claim_key[:40] in k or k[:40] in claim_key:
+                    fr_row = v
+                    break
+        score_b = fr_row.get("p_trust") if fr_row else None
+        res_b = {
+            "system": "B_vanilla_factreasonerscore",
+            "score": round(score_b, 4) if score_b is not None else None,
+            "source": "state_media_results.json",
+        }
+        print(f"  [B] Vanilla FactReasoner: score={res_b.get('score')}")
+
+        # System C
+        print("  [C] Trust-Weighted Comprehensiveness ...")
+        res_c = system_c_trust_comprehensiveness(
+            row, contexts, trust_scorer, nli, args.trust_threshold
+        )
+        print(f"      score={res_c.get('score')}  "
+              f"covered_w={res_c.get('covered_weight')}  "
+              f"missing_w={res_c.get('missing_weight')}  "
+              f"excluded={res_c.get('n_excluded_low_trust')}")
+
+        all_results.append({
+            "row_idx": i,
+            "row":     row,
+            "A":       res_a,
+            "B":       res_b,
+            "C":       res_c,
+        })
+
+    # Aggregate
+    agg = aggregate_results(all_results, args.labels)
+
+    # Save full results JSON
+    out_json = os.path.join(args.out_dir, "three_way_eval_results.json")
+    with open(out_json, "w") as f:
+        # Remove 'details' from output to keep JSON clean, keep scores
+        clean = []
+        for r in all_results:
+            clean.append({
+                "row_idx": r["row_idx"],
+                "account": r["row"].get("account_name"),
+                "raw_label": r["row"].get("raw_label"),
+                "category": r["row"].get("category"),
+                "claim": r["row"]["text"][:100],
+                "A": {k: v for k, v in r["A"].items() if k != "details"},
+                "B": r["B"],
+                "C": {k: v for k, v in r["C"].items() if k != "details"},
+            })
+        json.dump({"aggregate": agg, "rows": clean}, f, indent=2)
+    print(f"\n[saved] {out_json}")
+
+    # Save report
+    report = format_report(agg, all_results)
+    out_txt = os.path.join(args.out_dir, "three_way_eval_report.txt")
+    with open(out_txt, "w") as f:
+        f.write(report)
+    print(f"[saved] {out_txt}")
+
+    # Print summary
+    print("\n" + report)
+
+if __name__ == "__main__":
+    main()
