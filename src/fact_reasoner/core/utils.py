@@ -404,7 +404,7 @@ def build_relations(
             print(f"[NLI] Using only the contexts retrieved per atom.")
             # Create the (context, atom) pairs
             for _, atom in atoms.items():
-                for context in atom.get_contexts():
+                for context in atom.get_contexts().values():
                     atom_context_pairs.append((context, atom))
 
         # Get all relationships (NLI-prompt)

@@ -668,11 +668,13 @@ class ContextRetriever:
         self,
         retriever: Retriever,
         context_summarizer: Optional[ContextSummarizer] = None,
+        trust_scorer=None,
         num_workers: int = 4,
         per_atom_timeout: int = DEFAULT_PER_ATOM_TIMEOUT,
     ):
         self.retriever = retriever
         self.context_summarizer = context_summarizer
+        self.trust_scorer = trust_scorer
         self.num_workers = num_workers
         self.per_atom_timeout = per_atom_timeout
 
@@ -695,6 +697,9 @@ class ContextRetriever:
                 link=ctx["link"],
                 snippet=ctx["snippet"],
             )
+            if self.trust_scorer is not None: #added_by_Samit
+                trust = self.trust_scorer.score(context)
+                context.set_probability(trust)
             contexts.append(context)
 
         # Summarize in the same worker thread if summarizer is provided

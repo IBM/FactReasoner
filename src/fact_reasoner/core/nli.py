@@ -218,7 +218,7 @@ class NLIExtractor:
                 )
             ],
             user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-            strategy=RejectionSamplingStrategy(loop_budget=3),
+            strategy=RejectionSamplingStrategy(loop_budget=5),
             return_sampling_results=True,
             model_options={
                 "logprobs": True,
@@ -269,7 +269,7 @@ class NLIExtractor:
                     )
                 ],
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-                strategy=RejectionSamplingStrategy(loop_budget=3),
+                strategy=RejectionSamplingStrategy(loop_budget=5),
                 return_sampling_results=True,
                 model_options={
                     "logprobs": True,
@@ -280,7 +280,14 @@ class NLIExtractor:
 
         results = []
         print(f"[NLI] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
+        CHUNK = 30
+        all_outputs = []
+        for i in range(0, len(coroutines), CHUNK):
+            chunk_out = await asyncio.gather(*(coroutines[i:i+CHUNK]))
+            all_outputs.extend(chunk_out)
+            if i + CHUNK < len(coroutines):
+                await asyncio.sleep(2)
+        outputs = all_outputs
         for output in outputs:
 
             if output.success:
