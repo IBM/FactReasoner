@@ -20,7 +20,7 @@ Usage (no changes to FactReasoner's inference code are required):
     for ctx in contexts:
         ctx.set_probability(scorer.score(ctx))
     result, marginals = pipeline.score()
-    scorer.update_from_results(contexts, marginals, relations)
+    scorer.update_from_results(marginals, pipeline.relations)
 
 Credibility prior data: idiap/Factual-Reporting-and-Political-Bias-Web-Interactions
 (Apache-2.0). Sanchez-Cortes et al., CLEF 2024, pp. 127-138.
@@ -194,8 +194,13 @@ class ContrustScorer:
             den[aid] = den.get(aid, 0.0) + w
         return {a: num[a] / den[a] for a in num if den.get(a, 0.0) > 0.0}
 
-    def update_from_results(self, contexts, marginals, relations) -> None:
-        """Score each source against the consensus target and update its record."""
+    def update_from_results(self, marginals, relations) -> None:
+        """Score each source against the consensus target and update its record.
+
+        Args:
+            marginals: the ``marginals`` list returned by ``FactReasoner.score()``
+            relations: the pipeline's context-atom relations
+        """
         targets = self.consensus_targets(relations, marginals)
         for rel in relations:
             if getattr(rel, "link", None) != "context_atom":
