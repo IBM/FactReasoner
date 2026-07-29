@@ -25,13 +25,74 @@ from granite_switch_vs_factreaser_demo import NLIFixed
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.trust.credibility_fusion import CredibilityTrustFusion
 
+# --- ABLATION_FLAGS ---
+if os.environ.get('NO_MBFC'):
+    _flat = float(os.environ.get('NO_MBFC'))
+    import fact_reasoner.core.trust.credibility_scorer as _csx
+    import fact_reasoner.core.trust.credibility_fusion as _cfx
+    _csx.score_url = lambda u, _f=_flat: _f
+    _cfx.score_url = lambda u, _f=_flat: _f
+    print("[ablation] NO_MBFC: flat prior %.2f for every source" % _flat, flush=True)
+if os.environ.get('UTD_PRIOR'):
+    from fact_reasoner.core.trust.url_trust import UTD, DEFAULT_MODEL_PATH
+    _utd = UTD(model_path=DEFAULT_MODEL_PATH)
+    def _utd_score(u):
+        try: return float(_utd.score(u)) if u else 0.5
+        except Exception: return 0.5
+    import fact_reasoner.core.trust.credibility_scorer as _csu
+    import fact_reasoner.core.trust.credibility_fusion as _cfu
+    _csu.score_url = _utd_score
+    _cfu.score_url = _utd_score
+    print("[ablation] UTD_PRIOR: URL-feature model as prior (full URL)", flush=True)
+if os.environ.get('MBFC_UTD_FALLBACK'):
+    from urllib.parse import urlparse as _up
+    from fact_reasoner.core.trust.url_trust import UTD as _UTDH, DEFAULT_MODEL_PATH as _DMP
+    import fact_reasoner.core.trust.credibility_scorer_v3 as _v3h
+    _utdh = _UTDH(model_path=_DMP)
+    def _hybrid(u):
+        if not u: return 0.5
+        pm = _v3h.score_url(u)
+        if pm != 0.5: return pm            # MBFC-rated or .gov rule
+        d = _v3h._norm(_up(u if '://' in u else 'https://' + u).netloc)
+        if not d: return 0.5
+        try: return float(_utdh.score('https://' + d))   # bare domain, stable per source
+        except Exception: return 0.5
+    import fact_reasoner.core.trust.credibility_scorer as _csh
+    import fact_reasoner.core.trust.credibility_fusion as _cfh
+    _csh.score_url = _hybrid
+    _cfh.score_url = _hybrid
+    print("[ablation] MBFC_UTD_FALLBACK: MBFC primary, UTD(bare domain) for unrated", flush=True)
+if os.environ.get('MODEL_FB'):
+    import pickle, sys as _sy
+    _sy.path.insert(0, '/u/samit')
+    from train_bare_domain import feats as _bf
+    from urllib.parse import urlparse as _up2
+    import fact_reasoner.core.trust.credibility_scorer_v3 as _v3m
+    _mdl = pickle.load(open('/u/samit/bare_domain_model.pkl','rb'))['clf']
+    def _fb_score(u):
+        pm = _v3m.score_url(u)
+        if pm != 0.5: return pm
+        d = _v3m._norm(_up2(u if '://' in u else 'https://' + u).netloc)
+        if not d or '.' not in d: return 0.5
+        try: return 0.05 + 0.9 * float(_mdl.predict_proba([_bf(d)])[0,1])
+        except Exception: return 0.5
+    import fact_reasoner.core.trust.credibility_scorer as _csm
+    import fact_reasoner.core.trust.credibility_fusion as _cfm
+    _csm.score_url = _fb_score
+    _cfm.score_url = _fb_score
+    print("[ablation] MODEL_FB: MBFC primary, bare-domain RF for unrated", flush=True)
+if os.environ.get('PRIOR_ONLY'):
+    CredibilityTrustFusion.update_from_results = lambda self, *a, **k: None
+    print("[ablation] PRIOR_ONLY: consensus learning DISABLED", flush=True)
+# --- end ABLATION_FLAGS ---
+
 CC_JSONL  = 'data/trust_eval/eval_dataset_cc.jsonl'   # original cached retrieval — good contexts
 FP_JSONL  = 'data/trust_eval/eval_dataset_fp.jsonl'   # original cached retrieval
 GS41_JSON = 'data/trust_eval/gs41_eval_refresh2026_results.json'
-STATE     = 'data/trust_eval/dynaTD_state_40v2.json'
+STATE     = os.environ.get('DYNATD_STATE', 'data/trust_eval/dynaTD_state_40v2.json')
 OUT_DIR   = f"data/trust_eval/final_eval_40v2_{time.strftime('%Y%m%d_%H%M%S')}"
 os.makedirs(OUT_DIR, exist_ok=True)
-N_WARMUP  = 1
+N_WARMUP  = int(os.environ.get('N_WARMUP', '1'))
 
 JUDGE_PROMPT = """Context documents:
 {{ctx_block}}
@@ -75,19 +136,27 @@ async def run_fr(data, scorer=None, label="", update=True):
     if len(ctxs) < 2: return None
     rels = None
     import random as _rnd
+    _empty = 0
     for k in range(10):
         try:
             rels = build_relations(atoms=atoms, contexts=ctxs, nli_extractor=nli,
                                    rel_atom_context=True, rel_context_context=False,
                                    use_summarized_contexts=False)
-            break
+            if rels: break
+            _empty += 1
+            if _empty >= 3:
+                print(f"  [SKIP:{label}] empty after 3 fast retries -> legit skip", flush=True)
+                return None
+            print(f"  [FAIL:{label}] empty {_empty}/3 -> fast retry", flush=True)
+            rels = None
+            await asyncio.sleep(1.5)
+            continue
         except Exception as e:
             print(f"  [FAIL:{label}] NLI try {k+1}/10: {type(e).__name__}: {str(e)[:80]}", flush=True)
             await asyncio.sleep(min(45, 5*(k+1)) + _rnd.uniform(0, 3))
     if rels is None:
         print(f"  [GAVE-UP:{label}] after 10 tries", flush=True)
         return None
-    if not rels: return None   # rels==[] means NLI ran fine, found nothing informative: legit skip
     live = {r.source.id for r in rels}
     ctxs = {k: v for k, v in ctxs.items() if k in live}
     rels = [r for r in rels if r.source.id in ctxs]
@@ -146,14 +215,16 @@ async def main():
     shutil.copy(STATE, f"{OUT_DIR}/state_after_warmup.json")
     print("=== WARMUP done, state frozen ===", flush=True)
 
-    SYS = ["cc_trust", "cc_vanilla", "fp_trust", "fp_vanilla", "guardian"] + (["gs41"] if gs41_by else [])
+    SYS = (["fp_trust", "fp_vanilla", "guardian"] if os.environ.get('FP_ONLY')
+           else ["cc_trust", "cc_vanilla", "fp_trust", "fp_vanilla", "guardian"]) + (["gs41"] if gs41_by else [])
     ind = {s: {"c": 0, "t": 0} for s in SYS}
     rows_out = []
     for i, r in enumerate(cc):
         gt = r['ground_truth']; fpr = fp_by.get(r['input'])
         o = {}
-        o["cc_trust"]   = await run_fr(r,   scorer, "cc_trust",   update=False)
-        o["cc_vanilla"] = await run_fr(r,   None,   "cc_vanilla", update=False)
+        if not os.environ.get('FP_ONLY'):
+            o["cc_trust"]   = await run_fr(r,   scorer, "cc_trust",   update=False)
+            o["cc_vanilla"] = await run_fr(r,   None,   "cc_vanilla", update=False)
         o["fp_trust"]   = await run_fr(fpr, scorer, "fp_trust",   update=False)
         o["fp_vanilla"] = await run_fr(fpr, None,   "fp_vanilla", update=False)
         o["guardian"]   = await run_guardian(r)
