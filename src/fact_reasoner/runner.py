@@ -33,7 +33,7 @@ from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.nli import NLIExtractor
-from fact_reasoner.core.nli_config import get_pair_config
+from fact_reasoner.core.nli_config import NLI_MODES, get_pair_config
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.reviser import Reviser
@@ -43,17 +43,16 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 PIPELINES = ("factreasoner", "factscore", "veriscore", "factverify")
 
 # FactReasoner version -> (rel_atom_context, rel_context_context,
-# remove_duplicates, contexts_per_atom_only, nli_pair_config).
+# remove_duplicates, contexts_per_atom_only).
 #
-# The `-cheap` variants keep the same graph semantics but prefilter the candidate
-# pairs, so they cost far fewer LLM calls. The plain versions map to the faithful
-# config and so reproduce previously published numbers with no flags.
+# The version selects the *graph shape* only. How many NLI candidate pairs get
+# scored within that shape is an orthogonal axis, chosen by `nli_mode` -- so every
+# (version, mode) combination is expressible rather than only the handful that
+# once had a named `-cheap` row here.
 _FR_VERSIONS = {
-    "v1": (True, False, False, True, "faithful"),  # context-atom only, allow duplicated contexts
-    "v2": (True, False, True, False, "faithful"),  # context-atom only, no duplicated contexts
-    "v3": (True, True, True, False, "faithful"),  # context-atom + context-context, no duplicates
-    "v2-cheap": (True, False, True, False, "provenance"),
-    "v3-cheap": (True, True, True, False, "provenance"),
+    "v1": (True, False, False, True),  # context-atom only, allow duplicated contexts
+    "v2": (True, False, True, False),  # context-atom only, no duplicated contexts
+    "v3": (True, True, True, False),  # context-atom + context-context, no duplicates
 }
 
 
@@ -100,6 +99,17 @@ class FactualityRunner:
             Ollama which does not expose logprobs).
         nli_similarity_metric: Similarity metric for the SIMBA-UQ NLI method
             (only used when ``nli_method='simbauq'``).
+        nli_mode: Which NLI candidate-pair preset to start from — ``"allpairs"``
+            (default) scores every enumerated pair and reproduces the published
+            numbers, while ``"fast"`` applies the provenance preset (atom-context
+            pairs restricted to the atoms that retrieved each context, gated
+            context-context pairs, near-duplicate contexts collapsed, and
+            one-direction context-pair scoring). Orthogonal to
+            ``pipeline_version``: the version fixes the graph shape, this fixes how
+            many pairs are scored within it. Individual ``nli_*`` arguments below
+            override whichever preset this selects. Has little effect on ``"v1"``,
+            whose atom-context pairs are already restricted to each atom's own
+            contexts and which runs no context-context phase.
     """
 
     def __init__(
@@ -120,6 +130,7 @@ class FactualityRunner:
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: str | None = None,
+        nli_mode: str = "allpairs",
         nli_pair_policy: str | None = None,
         nli_gate_threshold: float | None = None,
         nli_neighbor_window: int | None = None,
@@ -139,6 +150,10 @@ class FactualityRunner:
             raise ValueError(
                 f"Unknown pipeline_version: {pipeline_version!r} "
                 f"(expected one of {list(_FR_VERSIONS)})."
+            )
+        if nli_mode not in NLI_MODES:
+            raise ValueError(
+                f"Unknown nli_mode: {nli_mode!r} (expected one of {list(NLI_MODES)})."
             )
         if pipeline == "factreasoner" and not merlin_path:
             raise ValueError("The 'factreasoner' pipeline requires a merlin_path.")
@@ -161,9 +176,9 @@ class FactualityRunner:
         self.nli_cache_dir = nli_cache_dir
         self.show_progress = show_progress
 
-        # The version table picks the pair-config preset; any explicit override
-        # then wins, so a caller can start from a preset and adjust one knob.
-        _preset_name = _FR_VERSIONS[pipeline_version][4]
+        # `nli_mode` picks the pair-config preset; any explicit override then wins,
+        # so a caller can start from a preset and adjust one knob.
+        self.nli_mode = nli_mode
         _overrides = {
             "policy": nli_pair_policy,
             "gate_threshold": nli_gate_threshold,
@@ -174,7 +189,7 @@ class FactualityRunner:
             "merge_phases": nli_merge_phases,
         }
         _overrides = {k: v for k, v in _overrides.items() if v is not None}
-        self.nli_pair_config = replace(get_pair_config(_preset_name), **_overrides)
+        self.nli_pair_config = replace(get_pair_config(nli_mode), **_overrides)
 
         # Shared components.
         self.atom_extractor = Atomizer(backend)
@@ -289,7 +304,7 @@ class FactualityRunner:
         context_retriever = self._build_context_retriever()
         pipeline_obj = self._make_pipeline(context_retriever)
 
-        rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
+        rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[
             self.pipeline_version
         ]
         _run_build(
@@ -345,7 +360,7 @@ class FactualityRunner:
             if self.pipeline == "factreasoner"
             else self.pipeline
         )
-        _rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
+        _rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[
             self.pipeline_version
         ]
 

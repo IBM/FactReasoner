@@ -296,11 +296,15 @@ class TestProvenancePolicy:
 
 
 class TestGateFallback:
-    def test_falls_back_to_jaccard_without_sentence_transformers(self, monkeypatch):
-        """Selection must work with no embedding stack installed.
+    def test_falls_back_to_jaccard_when_embedding_stack_unavailable(
+        self, monkeypatch
+    ):
+        """Selection must still work when the embedding model cannot be loaded.
 
-        sentence-transformers is an optional dependency, so CI may not have it.
-        The gate reports which backend it used.
+        sentence-transformers is a base dependency, so in practice this path is
+        reached via a model-load failure (offline, corrupt cache) rather than a
+        missing package -- the gate catches both. Simulating the import failure is
+        the cheapest way to exercise it. The gate reports which backend it used.
         """
         import builtins
 
@@ -463,6 +467,37 @@ class TestNLIPairConfig:
         """Caching returns previously computed verdicts, so results are unchanged."""
         cfg = NLIPairConfig(cache_dir="/tmp/whatever")
         assert cfg.is_faithful
+
+    def test_mode_presets_alias_the_internal_names(self):
+        """`allpairs`/`fast` are the user-facing names for the same two configs."""
+        from fact_reasoner.core.nli_config import NLI_MODES, get_pair_config
+
+        assert tuple(NLI_MODES) == ("allpairs", "fast")
+        assert get_pair_config("allpairs") is get_pair_config("faithful")
+        assert get_pair_config("fast") is get_pair_config("provenance")
+
+    def test_fast_preset_is_more_than_the_bare_policy(self):
+        """The trap: `fast` must bundle dedup/cascade/merge, not just set policy."""
+        from fact_reasoner.core.nli_config import get_pair_config
+
+        fast = get_pair_config("fast")
+        assert fast.policy == "provenance"
+        assert fast.dedup_near_duplicates is True
+        assert fast.ctx_ctx_single_direction_cascade is True
+        assert fast.merge_phases is True
+        assert not fast.is_faithful
+        # A bare policy=provenance config sets none of those extras.
+        bare = NLIPairConfig(policy="provenance")
+        assert bare.dedup_near_duplicates is False
+        assert bare.ctx_ctx_single_direction_cascade is False
+
+    def test_allpairs_preset_is_faithful(self):
+        from fact_reasoner.core.nli_config import get_pair_config
+
+        cfg = get_pair_config("allpairs")
+        assert cfg.is_faithful
+        assert cfg.policy == "all_pairs"
+        assert not cfg.needs_gate
 
     def test_validation(self):
         with pytest.raises(ValueError, match="Unknown NLI pair policy"):

@@ -18,7 +18,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 - **RITS** — a configured remote IBM RITS backend (requires the `mellea` and `mellea_ibm` packages plus RITS credentials/config).
 - **vLLM** — a vLLM OpenAI-compatible server (pass `--served-model` and optionally `--base-url`).
 
-Plus the SIMBA-UQ extra: `pip install fact_reasoner[simbauq]` (the default `rouge` metric needs `rouge-score`; the `sbert` metric additionally needs `sentence-transformers` and `scikit-learn`).
+No extra install is needed: `rouge-score` (for the default `rouge` metric) and `sentence-transformers` / `scikit-learn` (for the `sbert` metric) are base dependencies.
 
 ## Key Components
 

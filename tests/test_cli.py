@@ -378,3 +378,76 @@ class TestLogprobsWarning:
             ]
         )
         assert "[warning]" not in capsys.readouterr().out
+
+
+class TestNliModeAndVersion:
+    """`--pipeline-version` (graph shape) and `--nli-mode` (pair cost) are two
+    orthogonal axes; this pins the CLI surface for both."""
+
+    def _run_and_capture(self, extra_argv):
+        """Run a minimal single-mode assessment, returning the runner kwargs."""
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "ollama",
+                    *extra_argv,
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+        return ctor.call_args.kwargs
+
+    def test_nli_mode_defaults_to_allpairs(self):
+        assert self._run_and_capture([])["nli_mode"] == "allpairs"
+
+    def test_nli_mode_fast_reaches_runner(self):
+        kwargs = self._run_and_capture(["--nli-mode", "fast"])
+        assert kwargs["nli_mode"] == "fast"
+
+    def test_invalid_nli_mode_rejected(self):
+        with pytest.raises(SystemExit):
+            self._run_and_capture(["--nli-mode", "bogus"])
+
+    @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
+    def test_cheap_pipeline_version_rejected(self, version):
+        """The user-facing half of the -cheap removal: argparse refuses it."""
+        with pytest.raises(SystemExit):
+            self._run_and_capture(["--pipeline-version", version])
+
+    @pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+    def test_plain_versions_accepted(self, version):
+        kwargs = self._run_and_capture(["--pipeline-version", version])
+        assert kwargs["pipeline_version"] == version
+
+    def test_pipeline_version_choices_are_exactly_v1_v2_v3(self):
+        """Guards the `choices=list(_FR_VERSIONS)` coupling in the parser."""
+        parser = cli._build_arg_parser()
+        action = next(
+            a for a in parser._actions if "--pipeline-version" in a.option_strings
+        )
+        assert set(action.choices) == {"v1", "v2", "v3"}
+
+    def test_nli_mode_choices_match_the_shared_tuple(self):
+        from fact_reasoner.core.nli_config import NLI_MODES
+
+        parser = cli._build_arg_parser()
+        action = next(a for a in parser._actions if "--nli-mode" in a.option_strings)
+        assert tuple(action.choices) == tuple(NLI_MODES)
+
+    def test_nli_pair_policy_still_forwarded_alongside_mode(self):
+        """The CLI must not swallow either; the runner does the layering."""
+        kwargs = self._run_and_capture(
+            ["--nli-mode", "fast", "--nli-pair-policy", "all_pairs"]
+        )
+        assert kwargs["nli_mode"] == "fast"
+        assert kwargs["nli_pair_policy"] == "all_pairs"

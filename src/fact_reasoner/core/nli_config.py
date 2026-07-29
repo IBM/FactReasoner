@@ -21,13 +21,24 @@ context-context phase (both directions). Since contexts are retrieved *per atom*
 and effectively cubic for v3.
 
 Every knob here defaults to today's behavior, so :data:`FAITHFUL` reproduces the
-published numbers with no flags. The efficiency features are opt-in.
+published numbers with no flags. The efficiency features are opt-in, selected as a
+bundle by ``--nli-mode`` (see :data:`NLI_MODES`) or individually via the
+``--nli-*`` flags, which override whichever mode was chosen.
 """
 
 from dataclasses import dataclass
 from typing import Optional
 
 NLI_PAIR_POLICIES = ("all_pairs", "gated", "provenance")
+
+#: Preset selectors for ``--nli-mode`` / ``FactualityRunner(nli_mode=...)``.
+#:
+#: Distinct from :data:`NLI_PAIR_POLICIES`, which names a *mechanism* (the single
+#: ``policy`` field). A mode names a whole *preset*: ``"fast"`` selects the
+#: provenance preset below, which sets ``policy="provenance"`` **and** flips
+#: ``dedup_near_duplicates``, ``ctx_ctx_single_direction_cascade`` and
+#: ``merge_phases`` -- strictly more than the bare ``"provenance"`` policy does.
+NLI_MODES = ("allpairs", "fast")
 
 
 @dataclass(frozen=True)
@@ -56,12 +67,15 @@ class NLIPairConfig:
             ``all-MiniLM-L6-v2``, provenance holds recall at 1.000 through 0.20,
             slips to 0.985 at 0.30 and 0.833 at 0.40.
 
-            **Install sentence-transformers before relying on any gated policy.**
-            On the same example the token-Jaccard fallback lost 22 of 72
-            non-neutral relations (recall 0.694) and moved the factuality score by
-            0.05, and *no* threshold reached full recall -- even 0.05 lost 6. The
-            fallback keeps the pipeline running without the embedding stack; it is
-            not a substitute for it, because lexical overlap misses pairs that are
+            **Make sure the embedding model actually loads before relying on any
+            gated policy.** sentence-transformers is a base dependency, so the
+            token-Jaccard fallback now signals a model *load* failure (offline,
+            corrupt cache, incomplete install) rather than a missing package -- but
+            the cost of landing on it is unchanged. On the same example that
+            fallback lost 22 of 72 non-neutral relations (recall 0.694) and moved
+            the factuality score by 0.05, and *no* threshold reached full recall --
+            even 0.05 lost 6. It keeps the pipeline running; it is not a substitute
+            for embeddings, because lexical overlap misses pairs that are
             semantically related through entities and events rather than shared
             vocabulary.
 
@@ -136,8 +150,8 @@ class NLIPairConfig:
     def needs_gate(self) -> bool:
         """Whether any enabled feature requires the embedding gate.
 
-        When this is False the gate is never constructed, so the faithful path
-        does not even import sentence-transformers.
+        When this is False the gate is never constructed, so the all-pairs path
+        pays no embedding-model load cost at all.
         """
         return self.policy in ("gated", "provenance") or self.dedup_near_duplicates
 
@@ -146,16 +160,28 @@ class NLIPairConfig:
 #: the original implementation.
 FAITHFUL = NLIPairConfig()
 
-#: Presets addressable by name from the runner's version table and the CLI.
+#: The cost-reducing preset: restrict atom-context pairs to the atoms that
+#: actually retrieved each context, gate context-context pairs, collapse
+#: near-duplicate contexts, and score one direction per context pair.
+_PROVENANCE = NLIPairConfig(
+    policy="provenance",
+    dedup_near_duplicates=True,
+    ctx_ctx_single_direction_cascade=True,
+    merge_phases=True,
+)
+
+#: Presets addressable by name from ``--nli-mode`` and the runner's ``nli_mode``
+#: argument. ``"allpairs"``/``"fast"`` are the user-facing vocabulary;
+#: ``"faithful"``/``"provenance"`` are retained as aliases for the same two
+#: configs, since they name the same thing from the implementation's point of view
+#: (and ``is_faithful`` still reads naturally against the former).
 NLI_PAIR_CONFIGS = {
-    "faithful": FAITHFUL,
+    "allpairs": FAITHFUL,
+    "fast": _PROVENANCE,
     "gated": NLIPairConfig(policy="gated"),
-    "provenance": NLIPairConfig(
-        policy="provenance",
-        dedup_near_duplicates=True,
-        ctx_ctx_single_direction_cascade=True,
-        merge_phases=True,
-    ),
+    # Retained aliases.
+    "faithful": FAITHFUL,
+    "provenance": _PROVENANCE,
 }
 
 

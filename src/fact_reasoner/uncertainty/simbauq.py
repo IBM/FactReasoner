@@ -173,14 +173,15 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
 
         # --- Similarity metric initialization ---
         if similarity_metric == "rouge":
-            # Lazy import: rouge_score is part of the optional `simbauq` extra.
+            # Lazy import: only the selected similarity metric's backend is loaded.
             try:
                 from rouge_score.rouge_scorer import RougeScorer
             except ImportError:
                 raise ImportError(
                     "rouge-score is required for rouge similarity. "
-                    "Please install with extra dependencies: "
-                    "`pip install fact_reasoner[simbauq]`."
+                    "It is a base dependency of fact_reasoner, so this "
+                    "usually means an incomplete install; reinstall or "
+                    "`pip install rouge-score`."
                 )
             self._rouge_scorer = RougeScorer([rouge_type], use_stemmer=True)
         elif similarity_metric == "sbert":
@@ -189,7 +190,9 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
             except ImportError:
                 msg = (
                     "sentence-transformers is required for sbert similarity. "
-                    "Please install with extra dependencies: `pip install fact_reasoner[simbauq]`."
+                    "It is a base dependency of fact_reasoner, so this "
+                    "usually means an incomplete install; reinstall or "
+                    "`pip install sentence-transformers`."
                 )
                 raise ImportError(msg)
             self._sbert_model_obj = sentence_transformers.SentenceTransformer(
@@ -457,8 +460,11 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
                 )
             except ImportError:
                 msg = (
-                    "sklearn.metrics.pairwise.cosine_similarity is required for sbert similarity. "
-                    "Please install with extra dependencies: `pip install fact_reasoner[simbauq]`."
+                    "sklearn.metrics.pairwise.cosine_similarity is required for "
+                    "sbert similarity. "
+                    "It is a base dependency of fact_reasoner, so this "
+                    "usually means an incomplete install; reinstall or "
+                    "`pip install scikit-learn`."
                 )
                 raise ImportError(msg)
 
@@ -505,8 +511,11 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
                 )
             except ImportError:
                 msg = (
-                    "sklearn.metrics.pairwise.cosine_similarity is required for sbert similarity. "
-                    "Please install with extra dependencies: `pip install fact_reasoner[simbauq]`."
+                    "sklearn.metrics.pairwise.cosine_similarity is required for "
+                    "sbert similarity. "
+                    "It is a base dependency of fact_reasoner, so this "
+                    "usually means an incomplete install; reinstall or "
+                    "`pip install scikit-learn`."
                 )
                 raise ImportError(msg)
 
@@ -600,8 +609,10 @@ class SIMBAUQSamplingStrategy(SamplingStrategy):
             )
         except ImportError:
             msg = (
-                "sklearn is required for training a Random Forest classifier. "
-                "Please install with extra dependencies: `pip install fact_reasoner[simbauq]`."
+                "scikit-learn is required for training a Random Forest classifier. "
+                "It is a base dependency of fact_reasoner, so this "
+                "usually means an incomplete install; reinstall or "
+                "`pip install scikit-learn`."
             )
             raise ImportError(msg)
 

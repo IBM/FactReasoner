@@ -89,49 +89,117 @@ class TestConstruction:
 
     @pytest.mark.parametrize("version", ["v1", "v2", "v3"])
     def test_published_versions_use_the_faithful_config(self, version):
-        """v1/v2/v3 must reproduce the original behavior with no flags."""
+        """v1/v2/v3 must reproduce the original behavior with no flags.
+
+        This is the default-preservation guard: nli_mode defaults to "allpairs",
+        so no version scores fewer pairs unless asked to.
+        """
         r = FactualityRunner(
             MagicMock(), pipeline="factscore", pipeline_version=version
         )
+        assert r.nli_mode == "allpairs"
         assert r.nli_pair_config.is_faithful
         assert r.nli_pair_config.policy == "all_pairs"
 
-    @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
-    def test_cheap_versions_enable_prefiltering(self, version):
+    @pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+    def test_fast_mode_enables_prefiltering(self, version):
+        """`fast` applies the provenance preset on top of any version."""
         r = FactualityRunner(
-            MagicMock(), pipeline="factscore", pipeline_version=version
+            MagicMock(),
+            pipeline="factscore",
+            pipeline_version=version,
+            nli_mode="fast",
         )
         assert not r.nli_pair_config.is_faithful
         assert r.nli_pair_config.policy == "provenance"
 
+    def test_unknown_nli_mode_raises(self):
+        with pytest.raises(ValueError, match="Unknown nli_mode"):
+            FactualityRunner(MagicMock(), pipeline="factscore", nli_mode="bogus")
+
+    def test_default_nli_mode_is_allpairs(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.nli_mode == "allpairs"
+        assert r.nli_pair_config.is_faithful
+
+    @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
+    def test_cheap_version_names_are_rejected(self, version):
+        """The `-cheap` versions were replaced by the orthogonal nli_mode axis.
+
+        Pinned deliberately: re-adding them as aliases would resurrect the
+        partial cross-product this refactor removed.
+        """
+        with pytest.raises(ValueError, match="Unknown pipeline_version"):
+            FactualityRunner(
+                MagicMock(), pipeline="factscore", pipeline_version=version
+            )
+
+    def test_nli_mode_is_orthogonal_to_version(self):
+        """Every (version, mode) pair is expressible, and the two do not interact."""
+        for version in ("v1", "v2", "v3"):
+            for mode in ("allpairs", "fast"):
+                r = FactualityRunner(
+                    MagicMock(),
+                    pipeline="factscore",
+                    pipeline_version=version,
+                    nli_mode=mode,
+                )
+                # The mode decides the pair config...
+                assert r.nli_pair_config.is_faithful is (mode == "allpairs")
+                # ...and the version alone decides the graph shape.
+                assert (
+                    runner_mod._FR_VERSIONS[version]
+                    == runner_mod._FR_VERSIONS[r.pipeline_version]
+                )
+
     def test_version_table_phase_flags(self):
-        """Only v3 variants mine context-context; only v1 is per-atom."""
+        """Only v3 mines context-context; only v1 is per-atom."""
         assert runner_mod._FR_VERSIONS["v1"][3] is True  # contexts_per_atom_only
         assert runner_mod._FR_VERSIONS["v2"][1] is False  # rel_context_context
         assert runner_mod._FR_VERSIONS["v3"][1] is True
         # rel_atom_context is on for every version.
         assert all(tup[0] is True for tup in runner_mod._FR_VERSIONS.values())
+        # The table carries graph flags only -- the NLI preset moved to nli_mode.
+        assert all(len(tup) == 4 for tup in runner_mod._FR_VERSIONS.values())
+        assert set(runner_mod._FR_VERSIONS) == {"v1", "v2", "v3"}
 
-    def test_explicit_policy_overrides_the_version_preset(self):
+    def test_explicit_policy_overrides_the_nli_mode_preset(self):
         r = FactualityRunner(
             MagicMock(),
             pipeline="factscore",
-            pipeline_version="v3",  # preset is faithful
+            pipeline_version="v3",
+            nli_mode="allpairs",
             nli_pair_policy="gated",
             nli_gate_threshold=0.4,
         )
         assert r.nli_pair_config.policy == "gated"
         assert r.nli_pair_config.gate_threshold == 0.4
 
+    def test_explicit_policy_overrides_fast_mode(self):
+        """An explicit policy wins over `fast`, but its other knobs survive."""
+        r = FactualityRunner(
+            MagicMock(),
+            pipeline="factscore",
+            nli_mode="fast",
+            nli_pair_policy="all_pairs",
+        )
+        assert r.nli_pair_config.policy == "all_pairs"
+        # Still not faithful: the preset's dedup/cascade knobs are untouched.
+        assert r.nli_pair_config.dedup_near_duplicates is True
+        assert not r.nli_pair_config.is_faithful
+
     def test_partial_override_keeps_other_preset_values(self):
         r = FactualityRunner(
             MagicMock(),
             pipeline="factscore",
-            pipeline_version="v3-cheap",
+            pipeline_version="v3",
+            nli_mode="fast",
             nli_gate_threshold=0.5,
         )
         assert r.nli_pair_config.gate_threshold == 0.5
-        # Untouched knobs still come from the preset.
+        # Untouched knobs still come from the preset. `fast` must map to the whole
+        # provenance PRESET, not the bare `policy="provenance"` -- which would
+        # leave the cascade off and fail this assertion.
         assert r.nli_pair_config.policy == "provenance"
         assert r.nli_pair_config.ctx_ctx_single_direction_cascade is True
 

@@ -25,7 +25,7 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend, is_anthropic_compat_endpoint
-from fact_reasoner.core.nli_config import NLI_PAIR_POLICIES
+from fact_reasoner.core.nli_config import NLI_MODES, NLI_PAIR_POLICIES
 from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 
 
@@ -51,9 +51,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         # Read from the table so the two can never drift apart.
         choices=list(_FR_VERSIONS),
         help=(
-            "FactReasoner version (default: v2; ignored by baselines). The "
-            "'-cheap' variants keep the same graph semantics but prefilter NLI "
-            "candidate pairs, costing far fewer LLM calls."
+            "FactReasoner version (default: v2; ignored by baselines). Selects the "
+            "graph shape only -- to cut the number of NLI calls within that shape, "
+            "see --nli-mode."
         ),
     )
     p.add_argument(
@@ -113,6 +113,24 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     # Every flag here defaults to the original behavior.
     n = parser.add_argument_group("nli relation extraction (cost control)")
     n.add_argument(
+        "--nli-mode",
+        default="allpairs",
+        # Read from the shared tuple so the two can never drift apart.
+        choices=list(NLI_MODES),
+        help=(
+            "Which NLI candidate-pair preset to start from (default: allpairs). "
+            "'allpairs' scores every enumerated pair and reproduces published "
+            "numbers. 'fast' restricts atom-context pairs to the atoms that "
+            "actually retrieved each context, gates context-context pairs, "
+            "collapses near-duplicate contexts and scores one direction per "
+            "context pair -- far fewer LLM calls for the same graph semantics. "
+            "Orthogonal to --pipeline-version; the individual --nli-* flags below "
+            "override whichever preset this selects. Little effect with "
+            "--pipeline-version v1, whose atom-context pairs are already limited to "
+            "each atom's own contexts and which runs no context-context phase."
+        ),
+    )
+    n.add_argument(
         "--nli-pair-policy",
         default=None,
         choices=list(NLI_PAIR_POLICIES),
@@ -122,7 +140,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "prefilters with a cheap embedding/Jaccard similarity gate. "
             "'provenance' additionally restricts atom-context pairs to the atoms "
             "that actually retrieved each context, plus query-level contexts and "
-            "near neighbors. Overrides the --pipeline-version preset."
+            "near neighbors. Overrides the --nli-mode preset."
         ),
     )
     n.add_argument(
@@ -132,9 +150,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Similarity at or above which a pair survives the gate (default: "
         "0.20, calibrated for the embedding backend). Kept low on purpose: a "
         "false prune silently weakens an atom's evidence, while a false keep only "
-        "costs money. Requires sentence-transformers -- the token-Jaccard "
-        "fallback lost 22 of 72 real relations on a 20-atom narrative at any "
-        "threshold. See scripts/e2e_nli_live.py.",
+        "costs money. If the embedding model fails to load the gate degrades to "
+        "token Jaccard, which lost 22 of 72 real relations on a 20-atom narrative "
+        "at any threshold -- watch for that warning. See scripts/e2e_nli_live.py.",
     )
     n.add_argument(
         "--nli-neighbor-window",
@@ -400,6 +418,7 @@ def main() -> None:
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,
+            nli_mode=args.nli_mode,
             nli_pair_policy=args.nli_pair_policy,
             nli_gate_threshold=args.nli_gate_threshold,
             nli_neighbor_window=args.nli_neighbor_window,

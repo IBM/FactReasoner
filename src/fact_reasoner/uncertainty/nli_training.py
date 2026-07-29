@@ -326,8 +326,10 @@ def _fit_classifier(
         )
     except ImportError:
         raise ImportError(
-            "scikit-learn is required to train the classifier. Install with extra "
-            "dependencies: `pip install fact_reasoner[simbauq]`."
+            "scikit-learn is required to train the classifier. "
+            "It is a base dependency of fact_reasoner, so this "
+            "usually means an incomplete install; reinstall or "
+            "`pip install scikit-learn`."
         )
 
     groups = list(zip(training_samples, training_labels))
@@ -424,14 +426,16 @@ def save_classifier(
 ) -> None:
     """Persist a trained classifier together with its config metadata.
 
-    Uses ``joblib`` (ships with scikit-learn, already in the ``simbauq`` extra).
+    Uses ``joblib`` (a base dependency).
     """
     try:
         import joblib  # type: ignore[import-not-found]
     except ImportError:
         raise ImportError(
-            "joblib is required to save the classifier. Install with extra "
-            "dependencies: `pip install fact_reasoner[simbauq]`."
+            "joblib is required to save the classifier. "
+            "It is a base dependency of fact_reasoner, so this "
+            "usually means an incomplete install; reinstall or "
+            "`pip install joblib`."
         )
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     joblib.dump({"clf": clf, "metadata": dict(metadata)}, path)
@@ -452,8 +456,10 @@ def load_classifier(path: str) -> tuple[ProbabilisticClassifier, dict[str, Any]]
         import joblib  # type: ignore[import-not-found]
     except ImportError:
         raise ImportError(
-            "joblib is required to load the classifier. Install with extra "
-            "dependencies: `pip install fact_reasoner[simbauq]`."
+            "joblib is required to load the classifier. "
+            "It is a base dependency of fact_reasoner, so this "
+            "usually means an incomplete install; reinstall or "
+            "`pip install joblib`."
         )
     obj = joblib.load(path)
     if not isinstance(obj, dict) or "clf" not in obj:

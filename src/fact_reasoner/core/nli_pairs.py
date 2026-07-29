@@ -138,8 +138,10 @@ class _PairGate:
     construct one gate per phase.
 
     Delegates to :class:`fact_reasoner.lcs.candidate_pairs._EmbeddingGate`, which
-    uses sentence-transformers when available and transparently falls back to
-    token Jaccard otherwise, recording which in :attr:`backend`.
+    uses sentence-transformers and transparently falls back to token Jaccard if the
+    embedding model cannot be loaded, recording which in :attr:`backend`. That
+    fallback is a degraded mode, not a supported configuration -- see the warning
+    emitted below.
     """
 
     def __init__(
@@ -160,11 +162,13 @@ class _PairGate:
             # whereas embeddings were lossless. Degrading quietly here would
             # silently weaken evidence rather than merely cost accuracy.
             print(
-                "[NLI][WARNING] Similarity gate fell back to token Jaccard: "
-                "sentence-transformers is not installed. Lexical overlap misses "
-                "semantically related pairs, so gated/provenance policies can "
-                "drop real relations. Install sentence-transformers, or use "
-                "policy='all_pairs'."
+                "[NLI][WARNING] Similarity gate fell back to token Jaccard: the "
+                "sentence-transformers embedding model could not be loaded. It is "
+                "a base dependency, so this usually means an offline or corrupt "
+                "model cache rather than a missing package. Lexical overlap misses "
+                "semantically related pairs, so --nli-mode fast and the "
+                "gated/provenance policies can drop real relations. Fix the model "
+                "load, or use --nli-mode allpairs."
             )
 
     def atom_context(self, atom_index: int, context_index: int) -> float:

@@ -239,8 +239,9 @@ class NLIExtractor:
         Raises:
             ValueError: If the classifier's feature dimension does not match.
         """
-        # Imported here (not at module top) to avoid importing joblib/sklearn
-        # unless a classifier is actually being loaded.
+        # Imported here rather than at module top purely to keep the classifier
+        # path self-contained; `fact_reasoner.uncertainty` is already imported
+        # above, so this defers nothing at the package level.
         from fact_reasoner.uncertainty import load_classifier
 
         clf, metadata = load_classifier(path)

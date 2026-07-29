@@ -15,7 +15,7 @@ This example loads a classifier trained by `scripts/train_simbauq_nli.py` and us
 
 ## Prerequisites
 
-- The SIMBA-UQ extra: `pip install fact_reasoner[simbauq]` (provides `scikit-learn` and `joblib` for training/loading the classifier, plus `rouge-score` for the default metric).
+- No extra install: `scikit-learn` and `joblib` (training/loading the classifier) and `rouge-score` (the default metric) are base dependencies.
 - A Mellea backend (`--backend`, defaults to Ollama; see [`ex_nli_simbauq`](ex_nli_simbauq.md) for backend details).
 - A **trained classifier**. Produce one from labeled `{premise, hypothesis, label}` NLI data:
 

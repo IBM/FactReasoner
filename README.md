@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.7.0-red.svg)](https://github.com/IBM/FactReasoner)
+[![Version](https://img.shields.io/badge/version-0.8.0-red.svg)](https://github.com/IBM/FactReasoner)
 ![Static Badge](https://img.shields.io/badge/mellea-0.6.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
@@ -71,8 +71,10 @@ FactReasoner addresses hallucination detection through a principled five-stage p
    - **Neutral**: The context neither supports nor contradicts the atom
 
    Each relationship carries a probability that becomes the strength of the corresponding edge in the Markov Network. Two methods are available for estimating it (`--nli-method`):
-   - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM).
-   - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama**, which does not expose logprobs. Install with `pip install fact_reasoner[simbauq]`.
+   - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM / OpenAI).
+   - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama** and for **Claude via Anthropic's OpenAI-compatible endpoint**, neither of which exposes logprobs. No extra install needed.
+
+   The number of NLI calls is the dominant cost of a run; see [`--nli-mode fast`](#nli-cost-control-advanced) for how to reduce it.
 
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
    - **Nodes** represent atoms and contexts as binary random variables
@@ -83,13 +85,19 @@ FactReasoner addresses hallucination detection through a principled five-stage p
 
 ### Pipeline Versions
 
-FactReasoner supports three configurations based on how atom-context relationships are modeled:
+FactReasoner supports three graph configurations, based on how atom-context
+relationships are modeled, each selected with `--pipeline-version`:
 
-| Version | Relationships | Description |
-|---------|---------------|-------------|
-| **FR1** | Atom ↔ Own Contexts | Each atom is connected only to its `k` retrieved contexts. Simplest model with localized reasoning. |
-| **FR2** | Atom ↔ All Contexts | Duplicate contexts are removed, and each atom is connected to all `m` unique contexts. Enables cross-atom evidence sharing. |
-| **FR3** | FR2 + Context ↔ Context | Adds context-to-context relationships, allowing the model to reason about consistency between different evidence sources. |
+| Version | Flag | Relationships | Description |
+|---------|------|---------------|-------------|
+| **FR1** | `v1` | Atom ↔ Own Contexts | Each atom is connected only to its `k` retrieved contexts. Simplest model with localized reasoning. |
+| **FR2** | `v2` *(default)* | Atom ↔ All Contexts | Duplicate contexts are removed, and each atom is connected to all `m` unique contexts. Enables cross-atom evidence sharing. |
+| **FR3** | `v3` | FR2 + Context ↔ Context | Adds context-to-context relationships, allowing the model to reason about consistency between different evidence sources. |
+
+The version fixes the **graph shape**. How many NLI candidate pairs are scored
+*within* that shape is an independent axis, chosen by
+[`--nli-mode`](#nli-cost-control-advanced) — so any version can be run cheaply
+without changing the network structure.
 
 ### Why Probabilistic Reasoning?
 
@@ -118,9 +126,10 @@ Traditional factuality methods (like FactScore) make independent binary decision
 uv pip install fact_reasoner
 ```
 
-The default install includes the **Ollama** backend (via `mellea`) and the
-Google / Wikipedia / ChromaDB retrievers. Backend-specific pieces are optional
-extras:
+The default install is self-contained: the **Ollama** backend (via `mellea`), the
+Google / Wikipedia / ChromaDB retrievers, SIMBA-UQ NLI uncertainty estimation, and
+the embedding similarity gate behind `--nli-mode fast`. Only backend-specific pieces
+are optional extras:
 
 ```bash
 uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
@@ -159,6 +168,13 @@ FactReasoner requires:
 - Python >= 3.11
 - [`Merlin`](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
 - [`Mellea`](https://pypi.org/project/mellea/) - LLM interaction library
+
+Note that the base install pulls `sentence-transformers` (and therefore PyTorch),
+which is a large download on a fresh environment. It is a base rather than optional
+dependency for two reasons: `fact_reasoner.uncertainty` imports `numpy` at module
+scope on the eager import path, so even `fact-reasoner --help` needs it; and the
+embedding similarity gate backs `--nli-mode fast`, whose token-Jaccard fallback
+measurably loses real relations.
 
 ### Environment Variables
 
@@ -304,10 +320,31 @@ fact-reasoner \
 
 | Value | Assessor | Notes |
 |-------|----------|-------|
-| `factreasoner` (default) | Probabilistic FactReasoner | Requires `--merlin-path`. Version via `--pipeline-version {v1,v2,v3}` (default `v2`). |
+| `factreasoner` (default) | Probabilistic FactReasoner | Requires `--merlin-path`. Version via `--pipeline-version` (default `v2`) — see below. |
 | `factscore` | FactScore baseline | — |
 | `veriscore` | VeriScore baseline | — |
 | `factverify` | FactVerify baseline | — |
+
+### Choosing the FactReasoner version (`--pipeline-version`)
+
+The version selects which relations enter the Markov Network:
+
+| Value | Relations | Duplicate contexts |
+|-------|-----------|--------------------|
+| `v1` | atom–context | kept |
+| `v2` *(default)* | atom–context | removed |
+| `v3` | atom–context **+** context–context | removed |
+
+This is the **graph shape** only. How many NLI candidate pairs get scored within
+that shape is an orthogonal axis — see [`--nli-mode`](#nli-cost-control-advanced) —
+so all six `{v1,v2,v3} × {allpairs,fast}` combinations are available.
+
+**Why cost is a separate axis.** NLI relation extraction dominates the cost of a
+FactReasoner run: one LLM call per candidate pair, which is `A × C` for the
+atom–context phase and `C × (C−1)` for context–context. Because contexts are
+retrieved *per atom* (`C ≈ A × top_k`), that is quadratic in the number of atoms
+for `v2` and effectively cubic for `v3` — which is exactly why you may want a
+cheaper pair set without giving up `v3`'s richer graph.
 
 ### Choosing the backend (`--backend`)
 
@@ -316,6 +353,7 @@ fact-reasoner \
 | `ollama` (default) | `--model-id` = Ollama model name (needs a running Ollama server). |
 | `rits` | `--model-id` = shortcut (`llama3`, `granite4`, `mistral`, `gpt-oss`); needs `mellea-ibm` + `RITS_API_KEY`. |
 | `vllm` | `--served-model` + either `--model` (start a local server) or `--base-url` (connect to a running one) — see [below](#serving-a-local-model-on-a-gpu-cluster-lsf). |
+| `openai` | `--model-id` = provider model id (`gpt-4o`, `claude-opus-5`); needs `OPENAI_API_KEY`. Add `--base-url https://api.anthropic.com/v1/` for Claude — then also pass `--nli-method simbauq`, since that endpoint returns no logprobs. |
 
 ### Common options
 
@@ -328,6 +366,71 @@ fact-reasoner \
 | `--use-priors` | Use atom/context priors (FactReasoner only). |
 | `--use-query-builder` | Generate search queries with the QueryBuilder. |
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
+| `--list-models` | Print the available unified model ids (and aliases) and exit. |
+| `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
+
+### SIMBA-UQ options (`--nli-method simbauq`)
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-similarity-metric {rouge,jaccard,sbert,difflib,levenshtein}` | How samples are compared when scoring consensus (default `rouge`). |
+| `--nli-confidence-method {aggregation,classifier}` | How sample confidence is scored. `aggregation` (default) is data-free; `classifier` uses a trained model. |
+| `--nli-classifier-path` | Trained SIMBA-UQ classifier (joblib) from `scripts/train_simbauq_nli.py`. Required with `--nli-confidence-method classifier`. |
+
+### NLI cost control (advanced)
+
+**`--nli-mode` is the headline knob**; everything below it is a finer-grained
+override. Each `--nli-*` flag **overrides** whichever preset `--nli-mode` selected,
+so you can start from a mode and adjust one feature at a time.
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-mode {allpairs,fast}` | **Which pair-scoring preset to start from** (default `allpairs`). `allpairs` scores every enumerated pair and reproduces published numbers. `fast` bundles the four settings below the line: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
+| `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score. `all_pairs` scores every enumerated pair (published numbers); `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. Note this sets *only* the policy — unlike `--nli-mode fast`, which also enables dedup, cascade and merged phases. |
+| `--nli-gate-threshold` | Similarity at or above which a pair survives the gate (default `0.20`, calibrated for the embedding backend). Deliberately low: a false prune silently weakens an atom's evidence, a false keep only costs money. |
+| `--nli-neighbor-window` | For `provenance`, how many atoms either side of an owning atom are also compared against a context (default `1`). |
+| `--nli-dedup-near-duplicates` / `--nli-dedup-threshold` | Collapse near-duplicate contexts before mining (default threshold `0.92`). Both dominant cost terms are super-linear in the context count, so this has quadratic leverage. |
+| `--nli-ctx-ctx-cascade` | Score one direction per context pair, mirroring only where the reverse can change the reconciled outcome. |
+| `--nli-merge-phases` | Issue the atom–context and first context–context batches as one fan-out. Latency only — the call count is unchanged. |
+| `--nli-cache-dir` | Cross-run NLI verdict cache. Score-neutral (a hit returns the verdict the model already produced), so re-scoring the same data costs no LLM calls. |
+
+`--nli-merge-phases` and `--nli-cache-dir` are score-neutral and safe to combine
+with an `allpairs` run. Everything else prunes or collapses pairs and so relies on
+the embedding similarity gate — see the accuracy note below.
+
+> ⚠️ **`fast` trades recall for cost, and the trade is workload-dependent.**
+>
+> The prefilter's similarity gate uses `sentence-transformers` (a base dependency).
+> If the embedding model fails to load — offline, corrupt cache, incomplete install
+> — the gate degrades to token Jaccard and prints a warning. **Do not ignore it:**
+> on a 20-atom narrative that fallback lost 22 of 72 real relations at *any*
+> threshold and moved the factuality score by 0.05, because lexical overlap misses
+> pairs related through entities and events rather than shared vocabulary.
+>
+> The saving is not a constant either. The same policy that prunes ~5× across
+> unrelated subtopics prunes only ~1.2× on a narrative where every atom shares
+> characters, since the cross-product there holds little genuine waste. And the
+> models are not deterministic, so a single run cannot establish recall — take the
+> worst case over several. Use `allpairs` when you need bit-for-bit reproducibility.
+
+Example — `v3`'s full graph at a fraction of the LLM calls, with a warm cache:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --pipeline-version v3 --merlin-path /path/to/merlin \
+    --nli-mode fast --nli-cache-dir .cache/nli \
+    --query "Who was Albert Einstein?" --response "..."
+```
+
+Example — start from `fast` but keep full atom–context fidelity, overriding just the
+policy while leaving the preset's other savings in place:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --pipeline-version v3 --merlin-path /path/to/merlin \
+    --nli-mode fast --nli-pair-policy all_pairs \
+    --query "Who was Albert Einstein?" --response "..."
+```
 
 ### Programmatic use
 
@@ -341,6 +444,17 @@ runner = FactualityRunner(
     backend,
     pipeline="factscore",          # or "factreasoner" (+ merlin_path=...), etc.
     service_type="google",
+)
+
+# FactReasoner with the cheap NLI prefilter (same graph, far fewer LLM calls).
+# Every --nli-* flag has a matching keyword argument and overrides the preset.
+runner = FactualityRunner(
+    backend,
+    pipeline="factreasoner",
+    pipeline_version="v3",         # "v1" / "v2" / "v3" -- graph shape
+    nli_mode="fast",               # "allpairs" (default) or "fast" -- pair cost
+    merlin_path="/path/to/merlin",
+    nli_cache_dir=".cache/nli",    # score-neutral; re-runs cost no LLM calls
 )
 
 # Single item -> results dict
@@ -370,6 +484,9 @@ fact-reasoner --backend vllm \
     --input-file data/example.jsonl --output-dir results/ \
     --pipeline factreasoner --merlin-path /path/to/merlin
 ```
+
+The server can be tuned with `--tensor-parallel-size` (defaults to the detected GPU
+count), `--gpu-memory-utilization` (default `0.90`) and `--max-model-len`.
 
 When `--backend vllm` is given with `--model`, the server lifecycle is managed by
 `fact_reasoner.VLLMServer` (a context manager): it auto-detects the
@@ -543,15 +660,13 @@ LLM Response
 Factuality Score + Per-atom Marginals
 ```
 
-### Pipeline Versions
+### Pipeline Versions (reference)
 
-FactReasoner supports three configurations:
-
-| Version | Description |
-|---------|-------------|
-| **FR1** | Each atom connected only to its own retrieved contexts |
-| **FR2** | All atoms connected to all unique contexts (removes duplicates) |
-| **FR3** | FR2 + context-to-context relationships |
+FR1 / FR2 / FR3 map to `--pipeline-version v1` / `v2` / `v3`, and pair-scoring cost
+is chosen separately with `--nli-mode`. See
+[Pipeline Versions](#pipeline-versions) for the graph shapes and
+[NLI cost control](#nli-cost-control-advanced) for the cost axis — kept in one place
+so the two descriptions cannot drift.
 
 ## Context Retrieval Options
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
-version = "0.7.0"
+version = "0.8.0"
 description = "Factuality Assessment for Foundation Models"
 authors = [
     {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
@@ -20,20 +20,34 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+# `numpy`, `scikit-learn`, `sentence-transformers`, `rouge-score` and `joblib`
+# were once an optional "simbauq" extra, but none of them is actually optional:
+#   * numpy is imported unguarded at module scope by fact_reasoner.uncertainty,
+#     which core.nli imports eagerly -- so even `fact-reasoner --help` needs it.
+#   * the sentence-transformers similarity gate backs `--nli-mode fast`, which is
+#     a cost control unrelated to SIMBA-UQ.
+#   * joblib is imported directly by uncertainty.nli_training rather than being
+#     used through scikit-learn, so it is declared here rather than relied on
+#     transitively.
 dependencies = [
     "beautifulsoup4",
     "chromadb",
+    "joblib",
     "langchain-community",
     "langchain-core",
     "langchain-huggingface",
     "langchain-text-splitters",
-    "mellea (==0.6.0)",
+    "mellea==0.6.0",
     "networkx",
     "nltk",
-    "pandas (>=2.3.1)",
+    "numpy",
+    "pandas>=2.3.1",
     "pypdf2",
     "python-dotenv",
     "requests",
+    "rouge-score",
+    "scikit-learn",
+    "sentence-transformers",
     "thefuzz",
     "tqdm",
     "wikipedia",
@@ -45,11 +59,6 @@ rits = ["mellea-ibm"]
 # Local vLLM server path (GPU node). vLLM is invoked as an external process, not
 # imported, so this only needs to be installed where the server is launched.
 vllm = ["vllm"]
-# SIMBA-UQ NLI uncertainty estimation (fact_reasoner.uncertainty.simbauq).
-# Needed to run NLIExtractor(nli_method="simbauq") — e.g. on Ollama, which does
-# not expose logprobs. sentence-transformers/scikit-learn are only required for
-# the "sbert" similarity metric and the classifier confidence method.
-simbauq = ["numpy", "rouge-score", "scikit-learn", "sentence-transformers"]
 dev = ["pytest", "ruff", "mypy", "build", "twine"]
 
 [project.scripts]
@@ -57,6 +66,15 @@ fact-reasoner = "fact_reasoner.cli:main"
 
 [project.urls]
 Source = "https://github.com/IBM/FactReasoner"
+
+# Test configuration (previously a standalone pytest.ini). `pythonpath` is what
+# lets the suite import `fact_reasoner` from src/ without an editable install.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra -q"
+markers = ["asyncio: mark test as asyncio"]
+asyncio_mode = "auto"
 
 # uv-specific: tells `uv lock`/`uv sync` where to find the IBM-internal
 # `mellea-ibm` package (the `rits` extra). This metadata is ignored by the built
