@@ -146,6 +146,68 @@ def build_backend_and_components(show_progress: bool):
     )
 
 
+def load_example(path: str) -> Tuple[str, List[str]]:
+    """Load ``(response, atom_texts)`` from a ``data/lcs`` example file."""
+    with open(path) as handle:
+        data = json.load(handle)
+    atoms = [
+        a["text"] if isinstance(a, dict) else str(a) for a in data.get("atoms", [])
+    ]
+    return data.get("response", ""), atoms
+
+
+def retrieve_contexts(
+    atom_texts: List[str], top_k: int, num_workers: int, cache_dir: str
+) -> Tuple[Dict[str, Atom], Dict[str, Context]]:
+    """Retrieve real web contexts per atom, once, for reuse across configs.
+
+    Retrieval happens exactly once and the resulting objects are deep-copied per
+    config. Retrieving separately per config would let search nondeterminism
+    change the context set between runs, which would confound the comparison the
+    whole test exists to make.
+    """
+    from fact_reasoner.core.retriever import SourceRetriever
+
+    retriever = SourceRetriever(
+        service_type="google",
+        top_k=top_k,
+        fetch_text=True,
+        num_workers=num_workers,
+        cache_dir=cache_dir,
+    )
+
+    atoms: Dict[str, Atom] = {}
+    contexts: Dict[str, Context] = {}
+    for i, text in enumerate(atom_texts):
+        atom = Atom(id=f"a{i}", text=text)
+        atoms[atom.id] = atom
+        try:
+            hits = retriever.query(text) or []
+        except Exception as exc:  # a single failed query must not kill the run
+            print(f"  [warn] retrieval failed for a{i}: {exc}")
+            hits = []
+        for j, hit in enumerate(hits):
+            body = str(hit.get("text") or hit.get("snippet") or "").strip()
+            if not body:
+                continue
+            context = Context(
+                id=f"c_a{i}_{j}",
+                atom=atom,
+                text=body,
+                title=str(hit.get("title") or ""),
+                link=str(hit.get("link") or ""),
+                snippet=str(hit.get("snippet") or ""),
+                # Use the snippet as the comparison text so the NLI premise stays
+                # short; summarizing every page would cost more calls than the
+                # experiment being measured.
+                synthetic_summary=str(hit.get("snippet") or body)[:600],
+            )
+            contexts[context.id] = context
+            atom.add_context(context)
+        print(f"  a{i}: {len(atom.get_contexts())} contexts", flush=True)
+    return atoms, contexts
+
+
 def make_offline_pipeline(components, merlin_path, pair_config, cache_dir):
     """A FactReasoner preloaded with fixture atoms/contexts (no retrieval)."""
     pipeline = FactReasoner(
@@ -184,13 +246,65 @@ def make_offline_pipeline(components, merlin_path, pair_config, cache_dir):
     return pipeline
 
 
-def run_offline_case(components, merlin_path, pair_config, cache_dir, label):
-    """Build relations + score for one config, returning (results, stats, elapsed)."""
+def make_pipeline_from(
+    components,
+    merlin_path,
+    pair_config,
+    cache_dir,
+    atoms: Dict[str, Atom],
+    contexts: Dict[str, Context],
+    query: str,
+    response: str,
+    topic: str,
+):
+    """A FactReasoner preloaded with a supplied atom/context set."""
+    pipeline = FactReasoner(
+        merlin_path=merlin_path,
+        use_priors=False,
+        nli_pair_config=pair_config,
+        nli_cache_dir=cache_dir,
+        **components,
+    )
+    pipeline.query = query
+    pipeline.response = response
+    pipeline.topic = topic
+    pipeline.atoms = atoms
+    pipeline.contexts = contexts
+    pipeline.summarize_contexts = True
+    pipeline.num_retrieved_contexts = len(contexts)
+    pipeline.num_summarized_contexts = len(contexts)
+    return pipeline
+
+
+def run_offline_case(
+    components,
+    merlin_path,
+    pair_config,
+    cache_dir,
+    label,
+    *,
+    rel_context_context: bool = True,
+    preloaded=None,
+):
+    """Build relations + score for one config, returning (results, stats, elapsed).
+
+    Set ``rel_context_context=False`` for v2 (atom-context only). ``preloaded`` is
+    a ``(atoms, contexts, query, response, topic)`` tuple; when given it replaces
+    the built-in fixture, and the caller is responsible for handing over a fresh
+    deep copy per config so dedup cannot mutate a set another config will use.
+    """
     from fact_reasoner.core.utils import build_relations
 
-    pipeline = make_offline_pipeline(
-        components, merlin_path, pair_config, cache_dir
-    )
+    if preloaded is None:
+        pipeline = make_offline_pipeline(
+            components, merlin_path, pair_config, cache_dir
+        )
+    else:
+        atoms, contexts, query, response, topic = preloaded
+        pipeline = make_pipeline_from(
+            components, merlin_path, pair_config, cache_dir,
+            atoms, contexts, query, response, topic,
+        )
 
     # Near-duplicate dedup normally happens inside build(); apply it here since the
     # offline path preloads contexts.
@@ -209,7 +323,7 @@ def run_offline_case(components, merlin_path, pair_config, cache_dir, label):
         atoms=pipeline.atoms,
         contexts=pipeline.contexts,
         rel_atom_context=True,
-        rel_context_context=True,
+        rel_context_context=rel_context_context,
         contexts_per_atom_only=False,
         nli_extractor=pipeline.nli_extractor,
         use_summarized_contexts=True,
@@ -388,6 +502,156 @@ def compare_scores(a: dict, b: dict) -> dict:
     }
 
 
+def run_big_example(args, components, cache_dir, report) -> int:
+    """v2 faithful vs v2-cheap on a real example with live web retrieval.
+
+    v2 is atom-context only, so this isolates the phase the provenance policy
+    targets. Contexts are retrieved once and deep-copied per config, so the two
+    runs see byte-identical evidence and the only difference is pair selection.
+    """
+    import copy
+
+    response, atom_texts = load_example(args.example)
+    if args.max_atoms:
+        atom_texts = atom_texts[: args.max_atoms]
+    print(f"example      : {args.example}")
+    print(f"atoms        : {len(atom_texts)}")
+    print(f"top_k        : {args.top_k}\n")
+
+    print("--- retrieving contexts (live web search, once) ---")
+    t0 = time.perf_counter()
+    atoms0, contexts0 = retrieve_contexts(
+        atom_texts,
+        args.top_k,
+        args.num_workers,
+        os.path.join(args.output_dir, "search_cache"),
+    )
+    print(
+        f"retrieved {len(contexts0)} contexts for {len(atoms0)} atoms "
+        f"in {time.perf_counter() - t0:.1f}s\n"
+    )
+    if not contexts0:
+        print("ERROR: retrieval produced no contexts.", file=sys.stderr)
+        return 2
+
+    query = f"Tell me about: {response[:80]}"
+    faithful = NLIPairConfig()
+    cheap = NLIPairConfig(
+        policy="provenance",
+        dedup_near_duplicates=True,
+        ctx_ctx_single_direction_cascade=True,
+        merge_phases=True,
+    )
+
+    runs = {}
+    for label, cfg in (("v2 all_pairs", faithful), ("v2-cheap", cheap)):
+        print(f"--- {label} ---")
+        preloaded = (
+            copy.deepcopy(atoms0),
+            copy.deepcopy(contexts0),
+            query,
+            response,
+            "",
+        )
+        results, stats, elapsed, pipeline = run_offline_case(
+            components,
+            args.merlin_path,
+            cfg,
+            cache_dir,
+            label,
+            rel_context_context=False,  # v2: atom-context only
+            preloaded=preloaded,
+        )
+        runs[label] = {
+            "stats": stats,
+            "elapsed_s": round(elapsed, 2),
+            "results": results,
+            "pipeline": pipeline,
+        }
+        print()
+
+    base, chp = runs["v2 all_pairs"], runs["v2-cheap"]
+    bt, ct = base["stats"]["totals"], chp["stats"]["totals"]
+    b_att = bt["llm_calls"] + bt["cache_hits"]
+    c_att = ct["llm_calls"] + ct["cache_hits"]
+
+    # Recall, replayed against the faithful run's recorded verdicts.
+    cache = NLIVerdictCache(cache_dir)
+    recall_rows = measure_recall_loss(
+        base["pipeline"], cache, [("provenance", cheap)]
+    )
+    sweep_rows = sweep_threshold(base["pipeline"], cache)
+
+    b_score = base["results"].get("factuality_score")
+    c_score = chp["results"].get("factuality_score")
+    delta = compare_scores(base["results"], chp["results"])
+
+    print("=" * 72)
+    print("SUMMARY (v2: atom-context only)")
+    print("=" * 72)
+    print(f"atoms={len(atoms0)}  contexts={len(contexts0)}")
+    print(
+        f"v2 all_pairs : {b_att:>5} pairs scored  "
+        f"{base['elapsed_s']:>7.1f}s  score={b_score:.4f}"
+    )
+    print(
+        f"v2-cheap     : {c_att:>5} pairs scored  "
+        f"{chp['elapsed_s']:>7.1f}s  score={c_score:.4f}"
+    )
+    print(
+        f"saved        : {b_att - c_att:>5} calls  "
+        f"({b_att / max(c_att, 1):.2f}x fewer)"
+    )
+    print(f"score delta  : {abs(b_score - c_score):.6f} "
+          f"(max per-atom {delta['max_abs_delta']:.6f})")
+    row = recall_rows[0]
+    print(
+        f"recall       : {row['recall']:.3f}  "
+        f"({row['non_neutral_lost']} of {row['non_neutral_total']} "
+        f"non-neutral relations lost)"
+    )
+    print()
+    print("threshold sweep (replayed against recorded verdicts)")
+    print(f"  {'policy':12} {'thresh':>7} {'scored':>7} {'saving':>8} "
+          f"{'lost':>5} {'recall':>7}")
+    for r in sweep_rows:
+        print(
+            f"  {r['policy']:12} {r['gate_threshold']:>7.2f} "
+            f"{r['pairs_scored']:>7} {r['saving']:>7.2f}x "
+            f"{r['non_neutral_lost']:>5} {r['recall']:>7.3f}"
+        )
+    safe = [r for r in sweep_rows if r["recall"] == 1.0]
+    if safe:
+        best = max(safe, key=lambda r: r["saving"])
+        print(
+            f"  -> cheapest lossless setting: {best['policy']} @ "
+            f"{best['gate_threshold']:.2f} ({best['saving']}x)"
+        )
+
+    report.update(
+        example=args.example,
+        num_atoms=len(atoms0),
+        num_contexts=len(contexts0),
+        top_k=args.top_k,
+        pairs_scored={"faithful": b_att, "cheap": c_att},
+        calls_saved=b_att - c_att,
+        reduction=round(b_att / max(c_att, 1), 3),
+        factuality_score={"faithful": b_score, "cheap": c_score},
+        score_delta=delta,
+        recall=recall_rows,
+        threshold_sweep=sweep_rows,
+        elapsed_s={
+            "faithful": base["elapsed_s"],
+            "cheap": chp["elapsed_s"],
+        },
+    )
+    out = os.path.join(args.output_dir, "report.json")
+    with open(out, "w") as handle:
+        json.dump(report, handle, indent=2, default=str)
+    print(f"\nReport written to {out}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--merlin-path", required=True)
@@ -398,6 +662,20 @@ def main() -> int:
     )
     parser.add_argument("--output-dir", default="results/e2e_nli_live")
     parser.add_argument("--progress-bar", action="store_true")
+    parser.add_argument(
+        "--example",
+        default=None,
+        help="Path to a data/lcs example JSON. Runs the v2 faithful vs v2-cheap "
+        "comparison with live web retrieval instead of the built-in fixture.",
+    )
+    parser.add_argument("--top-k", type=int, default=3)
+    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument(
+        "--max-atoms",
+        type=int,
+        default=None,
+        help="Truncate the example to this many atoms (to bound cost).",
+    )
     args = parser.parse_args()
 
     if not os.getenv("RITS_API_KEY"):
@@ -416,8 +694,13 @@ def main() -> int:
     print(f"=== Live end-to-end NLI cost test: {MODEL_ID} ===\n")
     backend, components = build_backend_and_components(args.progress_bar)
 
+    if args.example:
+        return run_big_example(args, components, cache_dir, report)
+
     if not args.offline:
-        print("Live retrieval mode is not wired in this harness yet; use --offline.")
+        print(
+            "Live retrieval requires --example; use --offline for the fixture.",
+        )
         return 2
 
     faithful = NLIPairConfig()

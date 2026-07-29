@@ -50,19 +50,29 @@ class NLIPairConfig:
             gate. Deliberately low: a false prune silently weakens an atom's
             evidence, while a false keep only costs money.
 
-            The default of 0.10 was chosen by replaying policies against recorded
-            verdicts from two live llama-3.3-70b runs (see
-            ``scripts/e2e_nli_live.py``). Worst case across both runs, the
-            provenance policy holds recall at 1.000 up to 0.10 and slips to 0.923 at
-            0.15, where a low-overlap entailment with token Jaccard 0.11 is pruned.
+            The default of 0.20 is calibrated for the **embedding** backend. It was
+            measured by replaying policies against recorded live llama-3.3-70b
+            verdicts on a 20-atom narrative with 60 retrieved contexts (see
+            ``scripts/e2e_nli_live.py --example``): with sbert
+            ``all-MiniLM-L6-v2``, provenance holds recall at 1.000 through 0.20,
+            slips to 0.985 at 0.30 and 0.833 at 0.40.
 
-            Two caveats worth knowing before raising this. The model is not
-            deterministic -- the same inputs yielded 13 non-neutral pairs in one run
-            and 11 in another -- so a single run cannot establish recall; take the
-            worst case over several. And the threshold interacts with the gate
-            backend: without sentence-transformers the token-Jaccard fallback scores
-            genuinely related text far lower than embeddings would, so a threshold
-            tuned on one backend does not transfer to the other.
+            **Install sentence-transformers before relying on any gated policy.**
+            On the same example the token-Jaccard fallback lost 22 of 72
+            non-neutral relations (recall 0.694) and moved the factuality score by
+            0.05, and *no* threshold reached full recall -- even 0.05 lost 6. The
+            fallback keeps the pipeline running without the embedding stack; it is
+            not a substitute for it, because lexical overlap misses pairs that are
+            semantically related through entities and events rather than shared
+            vocabulary.
+
+            Two further caveats. The saving is workload-dependent, not a constant:
+            the same policy that prunes ~5x on unrelated subtopics prunes only
+            ~1.2x on a narrative where every atom shares characters, because there
+            the cross-product contains little genuine waste. And the model is not
+            deterministic -- identical inputs yielded 72 and 66 non-neutral pairs
+            across runs -- so a single run cannot establish recall; take the worst
+            case over several.
         neighbor_window: For ``"provenance"``, how many atoms on either side of an
             owning atom also get compared against the context.
         dedup_near_duplicates: Collapse near-duplicate contexts before mining.
@@ -82,7 +92,7 @@ class NLIPairConfig:
     """
 
     policy: str = "all_pairs"
-    gate_threshold: float = 0.10
+    gate_threshold: float = 0.20
     neighbor_window: int = 1
     dedup_near_duplicates: bool = False
     dedup_threshold: float = 0.92

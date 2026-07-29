@@ -154,6 +154,19 @@ class _PairGate:
             list(atom_texts) + list(context_texts), model_name=model_name
         )
         self.backend = self._gate.backend
+        if self.backend == "jaccard":
+            # Loud on purpose. Measured on a 20-atom narrative, the lexical
+            # fallback lost 22 of 72 non-neutral relations and shifted the
+            # factuality score by 0.05, with no threshold reaching full recall --
+            # whereas embeddings were lossless. Degrading quietly here would
+            # silently weaken evidence rather than merely cost accuracy.
+            print(
+                "[NLI][WARNING] Similarity gate fell back to token Jaccard: "
+                "sentence-transformers is not installed. Lexical overlap misses "
+                "semantically related pairs, so gated/provenance policies can "
+                "drop real relations. Install sentence-transformers, or use "
+                "policy='all_pairs'."
+            )
 
     def atom_context(self, atom_index: int, context_index: int) -> float:
         """Similarity between an atom and a context, by positional index."""
@@ -230,7 +243,7 @@ def select_atom_context_pairs(
     *,
     policy: str = "all_pairs",
     contexts_per_atom_only: bool = False,
-    gate_threshold: float = 0.10,
+    gate_threshold: float = 0.20,
     neighbor_window: int = 1,
     gate: Optional[_PairGate] = None,
     gate_atom_ids: Optional[Sequence[str]] = None,
@@ -402,7 +415,7 @@ def select_context_context_pairs(
     contexts: Dict[str, Context],
     *,
     policy: str = "all_pairs",
-    gate_threshold: float = 0.10,
+    gate_threshold: float = 0.20,
     gate: Optional[_PairGate] = None,
     gate_context_ids: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Tuple[str, str]], Dict[str, object]]:

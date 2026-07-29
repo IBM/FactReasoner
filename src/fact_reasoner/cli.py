@@ -129,10 +129,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Similarity at or above which a pair survives the gate (default: "
-        "0.10). Kept low on purpose: a false prune silently weakens an atom's "
-        "evidence, while a false keep only costs money. Measured against live "
-        "llama-3.3-70b verdicts, provenance holds full recall to 0.10 and slips "
-        "at 0.15; see scripts/e2e_nli_live.py.",
+        "0.20, calibrated for the embedding backend). Kept low on purpose: a "
+        "false prune silently weakens an atom's evidence, while a false keep only "
+        "costs money. Requires sentence-transformers -- the token-Jaccard "
+        "fallback lost 22 of 72 real relations on a 20-atom narrative at any "
+        "threshold. See scripts/e2e_nli_live.py.",
     )
     n.add_argument(
         "--nli-neighbor-window",
