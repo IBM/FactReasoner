@@ -129,8 +129,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Similarity at or above which a pair survives the gate (default: "
-        "0.22). Kept low on purpose: a false prune silently weakens an atom's "
-        "evidence, while a false keep only costs money.",
+        "0.10). Kept low on purpose: a false prune silently weakens an atom's "
+        "evidence, while a false keep only costs money. Measured against live "
+        "llama-3.3-70b verdicts, provenance holds full recall to 0.10 and slips "
+        "at 0.15; see scripts/e2e_nli_live.py.",
     )
     n.add_argument(
         "--nli-neighbor-window",

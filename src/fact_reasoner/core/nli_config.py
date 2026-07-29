@@ -49,6 +49,20 @@ class NLIPairConfig:
         gate_threshold: Similarity at or above which a pair is admitted by the
             gate. Deliberately low: a false prune silently weakens an atom's
             evidence, while a false keep only costs money.
+
+            The default of 0.10 was chosen by replaying policies against recorded
+            verdicts from two live llama-3.3-70b runs (see
+            ``scripts/e2e_nli_live.py``). Worst case across both runs, the
+            provenance policy holds recall at 1.000 up to 0.10 and slips to 0.923 at
+            0.15, where a low-overlap entailment with token Jaccard 0.11 is pruned.
+
+            Two caveats worth knowing before raising this. The model is not
+            deterministic -- the same inputs yielded 13 non-neutral pairs in one run
+            and 11 in another -- so a single run cannot establish recall; take the
+            worst case over several. And the threshold interacts with the gate
+            backend: without sentence-transformers the token-Jaccard fallback scores
+            genuinely related text far lower than embeddings would, so a threshold
+            tuned on one backend does not transfer to the other.
         neighbor_window: For ``"provenance"``, how many atoms on either side of an
             owning atom also get compared against the context.
         dedup_near_duplicates: Collapse near-duplicate contexts before mining.
@@ -68,7 +82,7 @@ class NLIPairConfig:
     """
 
     policy: str = "all_pairs"
-    gate_threshold: float = 0.22
+    gate_threshold: float = 0.10
     neighbor_window: int = 1
     dedup_near_duplicates: bool = False
     dedup_threshold: float = 0.92

@@ -230,7 +230,7 @@ def select_atom_context_pairs(
     *,
     policy: str = "all_pairs",
     contexts_per_atom_only: bool = False,
-    gate_threshold: float = 0.22,
+    gate_threshold: float = 0.10,
     neighbor_window: int = 1,
     gate: Optional[_PairGate] = None,
     gate_atom_ids: Optional[Sequence[str]] = None,
@@ -402,7 +402,7 @@ def select_context_context_pairs(
     contexts: Dict[str, Context],
     *,
     policy: str = "all_pairs",
-    gate_threshold: float = 0.22,
+    gate_threshold: float = 0.10,
     gate: Optional[_PairGate] = None,
     gate_context_ids: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Tuple[str, str]], Dict[str, object]]:
