@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +14,15 @@
 
 # Context summarization using LLMs
 
-import math
 import asyncio
-import mellea.stdlib.functional as mfuncs
+import math
+from typing import Any
 
-from typing import Any, Dict, List
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
-from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 from fact_reasoner.utils import (
     LOOP_BUDGET,
@@ -209,7 +207,7 @@ class ContextSummarizer:
 
         try:
             logprobs = extract_logprobs_from_output(output)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[Summarizer] Failed to extract logprobs: {e}")
             return 0.0
 
@@ -221,7 +219,7 @@ class ContextSummarizer:
 
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
 
-    def run(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
+    def run(self, contexts: list[str], atom_text = None) -> list[dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
 
@@ -241,8 +239,8 @@ class ContextSummarizer:
             return future.result()
 
     async def run_batch(
-        self, contexts: List[str], atom_text: str = None
-    ) -> List[Dict[str, Any]]:
+        self, contexts: list[str], atom_text = None
+    ) -> list[dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
 
@@ -294,7 +292,7 @@ class ContextSummarizer:
 
         # Results are positionally aligned with `contexts`; failures map to an
         # empty summary so callers can zip(contexts, results) safely.
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for context, output in zip(contexts, outputs):
             if isinstance(output, Exception) or not getattr(output, "success", False):
                 if isinstance(output, Exception):

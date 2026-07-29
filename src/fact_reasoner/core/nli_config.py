@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,7 +98,7 @@ class NLIPairConfig:
     ctx_ctx_single_direction_cascade: bool = False
     merge_phases: bool = False
     embedding_model: str = "all-MiniLM-L6-v2"
-    cache_dir: Optional[str] = None
+    cache_dir: str | None = None
 
     def __post_init__(self):
         if self.policy not in NLI_PAIR_POLICIES:

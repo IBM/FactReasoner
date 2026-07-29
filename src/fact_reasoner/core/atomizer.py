@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,21 +16,20 @@
 # (context) to revise or decontextualize the atomc units if needed.
 
 import json
-import mellea.stdlib.functional as mfuncs
 
-from typing import Dict, List
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.utils import (
-    validate_json_code_block,
-    strip_code_fences,
-    run_throttled,
     LOOP_BUDGET,
+    run_throttled,
+    strip_code_fences,
+    validate_json_code_block,
 )
 
 INSTRUCTION_ATOMIZER = """
@@ -148,7 +146,7 @@ OUTPUT:
 """
 
 
-class Atomizer(object):
+class Atomizer:
     """
     The Atomizer class implements the atomic decomposition of the response.
     For our purpose, an atomic unit or atom is either a fact or a claim.
@@ -202,7 +200,7 @@ class Atomizer(object):
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
-    def run(self, response: str) -> Dict[str, str]:
+    def run(self, response: str) -> dict[str, str]:
         """
         Extract atomic units from a single response.
 
@@ -233,7 +231,7 @@ class Atomizer(object):
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[Atomizer] Generation failed: {e}")
             return {}  # empty dict on failure
 
@@ -248,7 +246,7 @@ class Atomizer(object):
             print(f"[Atomizer] Failed to parse output: {e}")
             return {}
 
-    async def run_batch(self, responses: List[str]) -> List[Dict[str, str]]:
+    async def run_batch(self, responses: list[str]) -> list[dict[str, str]]:
         """
         Extract atomic units from a list of responses.
 
@@ -286,7 +284,7 @@ class Atomizer(object):
 
         # Results are positionally aligned with responses; map every failure
         # (raised exception, unsuccessful sampling, or unparsable output) to {}.
-        results: List[Dict[str, str]] = []
+        results: list[dict[str, str]] = []
         for output in outputs:
             if isinstance(output, Exception):
                 print(f"[Atomizer] Batch item failed: {output}")

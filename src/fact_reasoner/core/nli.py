@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,16 +15,14 @@
 # NLI extractor using LLMs.
 
 import math
+from typing import Any
+
 import mellea.stdlib.functional as mfuncs
-
-from typing import Any, Dict, List, Optional
-
 from mellea.backends import Backend
+from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
-from mellea.core import ModelOutputThunk
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.uncertainty import ProbabilisticClassifier, SIMBAUQSamplingStrategy
@@ -112,15 +109,15 @@ class NLIExtractor:
         backend: Backend,
         nli_method: str = "logprobs",
         *,
-        simbauq_temperatures: Optional[List[float]] = None,
+        simbauq_temperatures: list[float] | None = None,
         simbauq_n_per_temp: int = 5,
         simbauq_similarity_metric: str = "rouge",
         simbauq_confidence_method: str = "aggregation",
         simbauq_aggregation: str = "mean",
-        simbauq_classifier: Optional[ProbabilisticClassifier] = None,
-        simbauq_classifier_path: Optional[str] = None,
-        simbauq_training_samples: Optional[List[List[str]]] = None,
-        simbauq_training_labels: Optional[List[List[int]]] = None,
+        simbauq_classifier: ProbabilisticClassifier | None = None,
+        simbauq_classifier_path: str | None = None,
+        simbauq_training_samples: list[list[str]] | None = None,
+        simbauq_training_labels: list[list[int]] | None = None,
         show_progress: bool = False,
     ):
         """
@@ -170,7 +167,7 @@ class NLIExtractor:
         self.backend = backend
         self.show_progress = show_progress
         # Recorded for the preamble when a classifier is loaded from disk.
-        self._classifier_path: Optional[str] = None
+        self._classifier_path: str | None = None
 
         # Build the sampling strategy once. The SIMBA-UQ strategy is what makes
         # the probability estimate backend-agnostic (no logprobs required).
@@ -219,7 +216,7 @@ class NLIExtractor:
     def _load_simbauq_classifier(
         path: str,
         *,
-        temperatures: Optional[List[float]],
+        temperatures: list[float] | None,
         n_per_temp: int,
     ) -> ProbabilisticClassifier:
         """Load and validate a saved SIMBA-UQ classifier.
@@ -298,7 +295,7 @@ class NLIExtractor:
         """Whether the current method requires the backend to return logprobs."""
         return self.method == "logprobs"
 
-    def _logprobs_model_options(self) -> Optional[Dict[str, Any]]:
+    def _logprobs_model_options(self) -> dict[str, Any] | None:
         """Model options for the current method.
 
         The logprobs method must request logprobs from the backend; the
@@ -374,7 +371,7 @@ class NLIExtractor:
         return math.exp(avg_logprob)
 
     @staticmethod
-    def _get_simbauq_confidence(output: ModelOutputThunk) -> Optional[float]:
+    def _get_simbauq_confidence(output: ModelOutputThunk) -> float | None:
         """
         Read the SIMBA-UQ confidence of the selected sample.
 
@@ -413,7 +410,7 @@ class NLIExtractor:
         label, _ = extract_nli_label_and_span(str(output))
         return label
 
-    def run(self, premise: str, hypothesis: str) -> Dict[str, Any]:
+    def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
         """
         Extract the NLI relationship between premise and hypothesis. The
         following relationships are allowed: entailment, contradiction, neutral.
@@ -450,18 +447,18 @@ class NLIExtractor:
                 return_sampling_results=True,
                 model_options=self._logprobs_model_options(),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[NLI] Generation failed: {e}")
             return self._fallback()
 
         return self._parse_output(output)
 
     @staticmethod
-    def _fallback() -> Dict[str, Any]:
+    def _fallback() -> dict[str, Any]:
         """Neutral relationship used when generation or parsing fails."""
-        return dict(label="neutral", probability=1.0)
+        return {"label": "neutral", "probability": 1.0}
 
-    def _parse_output(self, output: Any) -> Dict[str, Any]:
+    def _parse_output(self, output: Any) -> dict[str, Any]:
         """Map a single sampling result to a label/probability dict.
 
         Any failure (unsuccessful sampling or an error while extracting the
@@ -481,17 +478,17 @@ class NLIExtractor:
                 probability = float(confidence)
             else:
                 probability = self._get_probability(output.result)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[NLI] Failed to parse output: {e}")
             return self._fallback()
 
         if label not in ["entailment", "contradiction", "neutral"]:
             label = "neutral"
-        return dict(label=label, probability=probability)
+        return {"label": label, "probability": probability}
 
     async def run_batch(
-        self, premises: List[str], hypotheses: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, premises: list[str], hypotheses: list[str]
+    ) -> list[dict[str, Any]]:
         """
         Extract the NLI relationships between premises and hypotheses. The
         following relationships are allowed: entailment, contradiction, neutral.
@@ -551,7 +548,7 @@ class NLIExtractor:
 
         # Results are positionally aligned with the input pairs; failures map to
         # a neutral relationship so callers can index result[i].
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for output in outputs:
             if isinstance(output, Exception):
                 print(f"[NLI] Batch item failed: {output}")

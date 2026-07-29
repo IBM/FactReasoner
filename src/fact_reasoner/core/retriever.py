@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,39 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 import re
-import chromadb
-import requests
-import asyncio
 from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
+)
+from concurrent.futures import (
     TimeoutError as FuturesTimeoutError,
 )
-from typing import Dict, List, Optional
-
-from tqdm import tqdm
-
-from bs4 import BeautifulSoup
-from chromadb.utils import embedding_functions
-from chromadb.config import Settings as ChromaSettings
-from typing import Any
 from io import BytesIO
-from PyPDF2 import PdfReader
 from itertools import islice
-import wikipedia
+from typing import Any
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import chromadb
+import requests
+import wikipedia
+from bs4 import BeautifulSoup
+from chromadb.config import Settings as ChromaSettings
+from chromadb.utils import embedding_functions
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from PyPDF2 import PdfReader
+from tqdm import tqdm
+
+from fact_reasoner.core.base import Atom, Context
+from fact_reasoner.core.query_builder import QueryBuilder
 
 # Local imports
 from fact_reasoner.core.summarizer import ContextSummarizer
-from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.search_api import SearchAPI
 
 logger = logging.getLogger(__name__)
@@ -156,7 +155,7 @@ def _extract_pdf_paragraphs(pdf_bytes: bytes, max_pages: int = 1) -> str:
     return _clean_text(" ".join(cleaned_paragraphs))
 
 
-def _read_capped(response: requests.Response, max_bytes: int) -> Optional[bytes]:
+def _read_capped(response: requests.Response, max_bytes: int) -> bytes | None:
     """Stream the response body, aborting if it exceeds max_bytes. Returns None on overflow."""
     buf = bytearray()
     for chunk in response.iter_content(chunk_size=64 * 1024):
@@ -208,19 +207,16 @@ def extract_text_from_url(url: str, max_pages: int = 1) -> str:
         soup = BeautifulSoup(body, "html.parser")
         return _extract_html_paragraphs(soup)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Error extracting text from {url}: {e}")
         return ""
 
     finally:
-        try:
-            if response is not None:
-                response.close()
-        except Exception:
-            pass
+        if response is not None:
+            response.close()
 
 
-def fetch_text_from_link(link: str, max_size: int = None) -> str:
+def fetch_text_from_link(link: str, max_size = None) -> str:
     logger.info(f"Fetching text from link: {link}")
     url_text = extract_text_from_url(url=link)
     if max_size is not None and len(url_text) > max_size:
@@ -361,7 +357,7 @@ class SourceRetriever:
         collection_name: str = "wikipedia_en",
         persist_dir: str = "/tmp/wiki_db",
         top_k: int = 1,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
         fetch_text: bool = False,
         use_in_memory_vectorstore: bool = False,
         query_builder: QueryBuilder = None,
@@ -442,7 +438,7 @@ class SourceRetriever:
     def set_query_builder(self, query_builder: QueryBuilder = None):
         self.query_builder = query_builder
 
-    def query(self, text: str, max_size: int = 4000) -> List[Dict[str, Any]]:
+    def query(self, text: str, max_size: int = 4000) -> list[dict[str, Any]]:
         """
         Retrieve a number of contexts relevant to the input text.
 
@@ -496,7 +492,7 @@ class SourceRetriever:
             # Get most relevant docs to the query
             try:
                 rel_docs = self.langchain_retriever.invoke(text)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Wikipedia retrieval failed for query '{text}': {e}")
                 return results
             for doc in rel_docs:
@@ -505,7 +501,7 @@ class SourceRetriever:
                 link = doc.metadata["source"]
                 doc_content = make_uniform(doc.page_content)
                 passages.append(
-                    dict(title=title, text=doc_content, snippet=summary, link=link)
+                    {"title": title, "text": doc_content, "snippet": summary, "link": link}
                 )
 
             # Extract the top_k passages
@@ -566,7 +562,7 @@ class SourceRetriever:
                             idx = fetch_futures[future]
                             try:
                                 fetched_texts[idx] = future.result()
-                            except Exception as e:
+                            except Exception as e:  # noqa: BLE001
                                 link = search_hits[idx]["link"]
                                 logger.warning(f"Fetch failed for {link}: {e}")
                                 fetched_texts[idx] = ""
@@ -633,7 +629,7 @@ class SourceRetriever:
                     count_content += 1
 
                 passages.append(
-                    dict(title=title, text=doc_content, snippet=snippet, link=link)
+                    {"title": title, "text": doc_content, "snippet": snippet, "link": link}
                 )
 
             # --- Fallback to empty-content entries ---
@@ -643,12 +639,12 @@ class SourceRetriever:
                         break
                     hit = search_hits[i]
                     passages.append(
-                        dict(
-                            title=hit["title"],
-                            text="",
-                            snippet=hit["snippet"],
-                            link=hit["link"],
-                        )
+                        {
+                            "title": hit["title"],
+                            "text": "",
+                            "snippet": hit["snippet"],
+                            "link": hit["link"],
+                        }
                     )
                     count_content += 1
 
@@ -666,7 +662,7 @@ class ContextRetriever:
     def __init__(
         self,
         retriever: SourceRetriever,
-        context_summarizer: Optional[ContextSummarizer] = None,
+        context_summarizer: ContextSummarizer | None = None,
         num_workers: int = 4,
         per_atom_timeout: int = DEFAULT_PER_ATOM_TIMEOUT,
     ):
@@ -678,9 +674,9 @@ class ContextRetriever:
     def _retrieve_for_item(
         self,
         text: str,
-        atom: Optional[Atom] = None,
+        atom: Atom | None = None,
         id_prefix: str = "c",
-    ) -> List[Context]:
+    ) -> list[Context]:
         """Worker function: retrieve contexts (and optionally summarize) for one item."""
         retrieved = self.retriever.query(text=text)
 
@@ -720,11 +716,11 @@ class ContextRetriever:
 
     def retrieve_all(
         self,
-        atoms: Dict[str, Atom],
-        query: Optional[str] = None,
-    ) -> Dict[str, Context]:
+        atoms: dict[str, Atom],
+        query: str | None = None,
+    ) -> dict[str, Context]:
         """Retrieve contexts for all atoms (and optionally the query) in parallel."""
-        all_contexts: Dict[str, Context] = {}
+        all_contexts: dict[str, Context] = {}
         futures = {}
 
         with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
@@ -757,7 +753,7 @@ class ContextRetriever:
                         f"{aid!r}: {label[:120]!r}"
                     )
                     continue
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     label = atom.text if atom is not None else "query"
                     logger.warning(
                         f"Retrieval failed for atom {aid!r} ({label[:120]!r}): {e}"

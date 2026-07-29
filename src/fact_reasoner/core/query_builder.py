@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +15,14 @@
 # Query builder for atoms to retrieve results from Google and/or Wikipedia
 
 import mellea.stdlib.functional as mfuncs
-
 from mellea.backends import Backend
+from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
-from fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
+from fact_reasoner.utils import strip_code_fences, validate_markdown_code_block
 
 INSTRUCTION_QUERY_BUILDER = """
 Instructions:
@@ -139,7 +137,7 @@ class QueryBuilder:
                 strategy=RejectionSamplingStrategy(loop_budget=3),
                 return_sampling_results=True,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[QueryBuilder] Generation failed: {e}")
             return text  # the original text
 
@@ -149,6 +147,6 @@ class QueryBuilder:
         # The output is a validated query wrapped in code fences; strip them.
         try:
             return strip_code_fences(str(output))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[QueryBuilder] Failed to parse output: {e}")
             return text  # the original text

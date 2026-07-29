@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,34 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Tuple, Union
-
 import asyncio
+import concurrent.futures
 import time
+
 import nltk
 from nltk.tokenize import sent_tokenize
-import concurrent.futures
 
+from fact_reasoner.utils import punctuation_only_inside_quotes
+
+from . import nli_pairs as _np
+from .atomizer import Atomizer
 
 # Local imports
-from .base import Atom, Context, Relation, PRIOR_PROB_ATOM, PRIOR_PROB_CONTEXT
-from .atomizer import Atomizer
-from .retriever import ContextRetriever
+from .base import Atom, Context, Relation
 from .nli import NLIExtractor
-from . import nli_pairs as _np
 from .nli_cache import extractor_identity
 from .nli_config import FAITHFUL, NLIPairConfig
-from fact_reasoner.utils import punctuation_only_inside_quotes
+from .retriever import ContextRetriever
 
 
 def predict_nli_relationships(
-    object_pairs: List[Tuple[Union[Atom, Context], Union[Atom, Context]]],
+    object_pairs: list[tuple[Atom | Context, Atom | Context]],
     nli_extractor: NLIExtractor,
     links_type: str = "context_atom",
     use_summary: bool = False,
     cache=None,
-    stats: Optional[dict] = None,
-) -> List[Relation]:
+    stats: dict | None = None,
+) -> list[Relation]:
     """
     Predict the NLI relationship between two objects using an model based NLI extractor.
 
@@ -99,7 +98,7 @@ def predict_nli_relationships(
 
     # Serve whatever the cache already knows; only misses reach the model. The
     # verdicts are identical either way, so this changes cost and not results.
-    results: List[Optional[dict]] = [None] * len(premises)
+    results: list[dict | None] = [None] * len(premises)
     cache_hits = 0
     todo = list(range(len(premises)))
     if cache is not None and premises:
@@ -174,7 +173,7 @@ def predict_nli_relationships(
     return relations
 
 
-def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
+def build_atoms(response: str, atom_extractor: Atomizer) -> dict[str, Atom]:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
@@ -200,11 +199,11 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> Dict[str, Atom]:
 
 
 def build_contexts(
-    atoms: Dict[str, Atom] = {},
+    atoms: dict[str, Atom] = {},
     query: str = None,
     retriever: ContextRetriever = None,
     use_fast_retriever: bool = True,
-) -> Dict[str, Context]:
+) -> dict[str, Context]:
     """
     Retrieve the relevant contexts for the input atoms.
 
@@ -255,7 +254,7 @@ def build_contexts(
 
                 for ctxt in contexts_per_atom:
                     contexts[ctxt.id] = ctxt
-                atoms[aid].add_contexts(contexts_per_atom)
+                atom.add_contexts(contexts_per_atom)
 
         # Retrieve the contexts for the question
         retrieved_contexts = retriever.context_retriever.query(
@@ -286,7 +285,7 @@ def build_contexts(
     return contexts
 
 
-def remove_duplicated_atoms(atoms: Dict[str, Atom]) -> Dict[str, Atom]:
+def remove_duplicated_atoms(atoms: dict[str, Atom]) -> dict[str, Atom]:
     """
     Remove the duplicated atoms.
 
@@ -309,7 +308,7 @@ def remove_duplicated_atoms(atoms: Dict[str, Atom]) -> Dict[str, Atom]:
 
 
 def remove_duplicated_contexts(
-    contexts: Dict[str, Context], atoms: Dict[str, Atom], check_summary: bool = False
+    contexts: dict[str, Context], atoms: dict[str, Atom], check_summary: bool = False
 ) -> dict:
     """
     Remove the duplicated contexts.
@@ -332,7 +331,7 @@ def remove_duplicated_contexts(
     # transfer its owners to the survivor instead of discarding them.
     owners = _np.context_owners(atoms, contexts)
 
-    seen: Dict[str, str] = {}  # comparison text -> surviving context id
+    seen: dict[str, str] = {}  # comparison text -> surviving context id
     out = {}
     for k, v in contexts.items():
         # get_summary() returns "" (not None) when a context was never summarized,
@@ -422,14 +421,7 @@ def is_relevant_context(context: str) -> bool:
     num_sentences = len(sentences)
 
     # we filter out summaries of only one sentence of the form: "the context does not..."
-    if (
-        num_sentences == 1
-        and punctuation_only_inside_quotes(sentences[0])
-        and ("the context does not" in sentences[0].lower())
-    ):
-        return False
-
-    return True
+    return not (num_sentences == 1 and punctuation_only_inside_quotes(sentences[0]) and "the context does not" in sentences[0].lower())
 
 
 def _reconcile_ctx_pair(r1: Relation, r2: Relation) -> Relation:
@@ -475,18 +467,18 @@ def _reconcile_ctx_pair(r1: Relation, r2: Relation) -> Relation:
 
 
 def build_relations(
-    atoms: Dict[str, Atom] = {},
-    contexts: Dict[str, Context] = {},
+    atoms: dict[str, Atom] = {},
+    contexts: dict[str, Context] = {},
     contexts_per_atom_only: bool = False,
     rel_atom_context: bool = True,
     rel_context_context: bool = True,
     nli_extractor: NLIExtractor = None,
     use_summarized_contexts: bool = False,
     *,
-    pair_config: Optional[NLIPairConfig] = None,
-    stats: Optional[dict] = None,
+    pair_config: NLIPairConfig | None = None,
+    stats: dict | None = None,
     cache=None,
-) -> List[Relation]:
+) -> list[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
     pairwise relations are considered: atom-context and context-context.
@@ -530,7 +522,7 @@ def build_relations(
     relations = []
 
     num_atoms, num_contexts = len(atoms), len(contexts)
-    phase_stats: Dict[str, dict] = {}
+    phase_stats: dict[str, dict] = {}
 
     # Build the similarity gate once and share it across phases: one embedding
     # pass covers both. Under the faithful config no gate is needed, so
@@ -545,7 +537,7 @@ def build_relations(
         )
 
     # ---- Phase 1: select the pairs both phases will score.
-    ac_pairs: List[Tuple[Context, Atom]] = []
+    ac_pairs: list[tuple[Context, Atom]] = []
     ac_coverage: dict = {}
     if rel_atom_context:
         print("[NLI] Building atom-context relations...")
@@ -570,8 +562,8 @@ def build_relations(
             (contexts[context_id], atoms[atom_id]) for context_id, atom_id in pairs
         ]
 
-    cc_pairs1: List[Tuple[Context, Context]] = []
-    cc_pairs2: List[Tuple[Context, Context]] = []
+    cc_pairs1: list[tuple[Context, Context]] = []
+    cc_pairs2: list[tuple[Context, Context]] = []
     cc_coverage: dict = {}
     if rel_context_context:
         print("[NLI] Building context-context relations...")
@@ -595,8 +587,8 @@ def build_relations(
     # fan-out rather than draining one batch before starting the next. That is a
     # latency win only -- the call count is identical either way.
     _t = time.perf_counter()
-    ac_rels: List[Relation] = []
-    relations1: List[Relation] = []
+    ac_rels: list[Relation] = []
+    relations1: list[Relation] = []
     if cfg.merge_phases and ac_pairs and cc_pairs1:
         merged_stats: dict = {}
         merged = predict_nli_relationships(
@@ -762,7 +754,7 @@ def _split_merged_stats(
     cc_coverage["cache_hits"] = hits - ac_hits
 
 
-def _mirror_needed(relations1: List[Relation]) -> List[int]:
+def _mirror_needed(relations1: list[Relation]) -> list[int]:
     """Indices whose reverse direction must actually be scored.
 
     Scoring only one direction per context pair would be unsound for two
@@ -790,10 +782,10 @@ def _mirror_needed(relations1: List[Relation]) -> List[int]:
 
 
 def _synthesize_mirrors(
-    relations1: List[Relation],
-    need: List[int],
-    relations2_partial: List[Relation],
-) -> List[Relation]:
+    relations1: list[Relation],
+    need: list[int],
+    relations2_partial: list[Relation],
+) -> list[Relation]:
     """Build a full reverse-direction list from the subset that was scored.
 
     Unscored slots get a synthetic ``neutral`` at probability 0.0. That value is
@@ -823,10 +815,10 @@ def _summarize_stats(
     gate,
     num_atoms: int,
     num_contexts: int,
-    phase_stats: Dict[str, dict],
+    phase_stats: dict[str, dict],
 ) -> dict:
     """Assemble the coverage/cost report, including the all_pairs counterfactual."""
-    out: Dict[str, object] = {
+    out: dict[str, object] = {
         "policy": cfg.policy,
         "gate_backend": (gate.backend if gate is not None else None),
         "gate_threshold": (cfg.gate_threshold if cfg.needs_gate else None),

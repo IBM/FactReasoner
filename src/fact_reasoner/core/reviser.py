@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,21 +15,21 @@
 # Atomic fact decontextualization using LLMs
 
 import json
-import mellea.stdlib.functional as mfuncs
+from typing import Any
 
-from typing import Any, Dict, List
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.utils import (
-    validate_json_code_block,
-    strip_code_fences,
-    run_throttled,
     LOOP_BUDGET,
+    run_throttled,
+    strip_code_fences,
+    validate_json_code_block,
 )
 
 INSTRUCTION_REVISER = """
@@ -158,7 +157,7 @@ class Reviser:
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
-    def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    def run(self, units: list[str], response: str) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -196,7 +195,7 @@ class Reviser:
                     strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                     return_sampling_results=True,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"[Reviser] Generation failed: {e}")
                 results.append(self._fallback(atom_text))
                 continue
@@ -206,11 +205,11 @@ class Reviser:
         return results
 
     @staticmethod
-    def _fallback(atom_text: str) -> Dict[str, Any]:
+    def _fallback(atom_text: str) -> dict[str, Any]:
         """Build a no-op revision result for a failed/unparsable atom."""
         return {"revised_unit": atom_text, "rationale": "", "text": atom_text}
 
-    def _parse_output(self, output: Any, atom_text: str) -> Dict[str, Any]:
+    def _parse_output(self, output: Any, atom_text: str) -> dict[str, Any]:
         """Map a single sampling result to a revised-unit dict.
 
         On any failure (unsuccessful sampling or unparsable output) the original
@@ -227,7 +226,7 @@ class Reviser:
             print(f"[Reviser] Failed to parse output: {e}")
             return self._fallback(atom_text)
 
-    async def run_batch(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    async def run_batch(self, units: list[str], response: str) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -268,7 +267,7 @@ class Reviser:
 
         # Results are positionally aligned with `units`; every atom yields one
         # entry (a no-op revision on failure), so callers can index result[i].
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for atom_text, output in zip(units, outputs):
             if isinstance(output, Exception):
                 print(f"[Reviser] Batch item failed: {output}")

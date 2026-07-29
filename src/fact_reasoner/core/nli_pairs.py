@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,8 +50,8 @@ rather than duplicating them.
 """
 
 import re
+from collections.abc import Sequence
 from itertools import combinations
-from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .base import Atom, Context
 from .nli_config import NLI_PAIR_POLICIES
@@ -82,8 +81,8 @@ QUERY_CONTEXT_PREFIX = "c_q"
 
 
 def context_owners(
-    atoms: Dict[str, Atom], contexts: Dict[str, Context]
-) -> Dict[str, Set[str]]:
+    atoms: dict[str, Atom], contexts: dict[str, Context]
+) -> dict[str, set[str]]:
     """Map each context id to the ids of *every* atom that retrieved it.
 
     ``Context.atom`` is a single pointer and is lossy in three ways: it is
@@ -104,7 +103,7 @@ def context_owners(
         ``{context_id: {atom_id, ...}}``, with an entry for every context in
         ``contexts`` (possibly an empty set, e.g. for query-level contexts).
     """
-    owners: Dict[str, Set[str]] = {cid: set() for cid in contexts}
+    owners: dict[str, set[str]] = {cid: set() for cid in contexts}
 
     # Primary source: the atom -> contexts inverse index.
     for atom_id, atom in atoms.items():
@@ -180,12 +179,12 @@ class _PairGate:
 
 
 def build_gate(
-    atoms: Dict[str, Atom],
-    contexts: Dict[str, Context],
+    atoms: dict[str, Atom],
+    contexts: dict[str, Context],
     *,
     use_summary: bool = False,
     embedding_model: str = "all-MiniLM-L6-v2",
-) -> Tuple["_PairGate", List[str], List[str]]:
+) -> tuple["_PairGate", list[str], list[str]]:
     """Build the shared gate plus the id orders it is indexed by.
 
     The texts fed to the gate mirror what the NLI call itself would see, so the
@@ -217,7 +216,7 @@ def _pair_text(obj, use_summary: bool) -> str:
     return obj.get_text()
 
 
-def _atom_order_index(atom_ids: Sequence[str]) -> Dict[str, int]:
+def _atom_order_index(atom_ids: Sequence[str]) -> dict[str, int]:
     """Map atom ids to their source position.
 
     Atom ids are of the form ``a0, a1, ...`` which encode source order, so sort by
@@ -238,17 +237,17 @@ def _atom_order_index(atom_ids: Sequence[str]) -> Dict[str, int]:
 
 
 def select_atom_context_pairs(
-    atoms: Dict[str, Atom],
-    contexts: Dict[str, Context],
+    atoms: dict[str, Atom],
+    contexts: dict[str, Context],
     *,
     policy: str = "all_pairs",
     contexts_per_atom_only: bool = False,
     gate_threshold: float = 0.20,
     neighbor_window: int = 1,
-    gate: Optional[_PairGate] = None,
-    gate_atom_ids: Optional[Sequence[str]] = None,
-    gate_context_ids: Optional[Sequence[str]] = None,
-) -> Tuple[List[Tuple[str, str]], Dict[str, object]]:
+    gate: _PairGate | None = None,
+    gate_atom_ids: Sequence[str] | None = None,
+    gate_context_ids: Sequence[str] | None = None,
+) -> tuple[list[tuple[str, str]], dict[str, object]]:
     """Select ``(context_id, atom_id)`` pairs for the atom-context phase.
 
     Args:
@@ -283,7 +282,7 @@ def select_atom_context_pairs(
     # The all_pairs universe, i.e. what the original implementation would spend.
     pairs_possible = num_atoms * num_contexts
 
-    coverage: Dict[str, object] = {
+    coverage: dict[str, object] = {
         "policy": policy,
         "num_atoms": num_atoms,
         "num_contexts": num_contexts,
@@ -293,7 +292,7 @@ def select_atom_context_pairs(
 
     # ---- all_pairs: reproduce the original enumeration exactly, order included.
     if policy == "all_pairs":
-        pairs: List[Tuple[str, str]] = []
+        pairs: list[tuple[str, str]] = []
         if not contexts_per_atom_only:
             # Original: for atom: for context: append((context, atom)).
             for atom_id in atoms:
@@ -332,7 +331,7 @@ def select_atom_context_pairs(
     num_gate_rescued = 0
 
     pairs = []
-    seen: Set[Tuple[str, str]] = set()
+    seen: set[tuple[str, str]] = set()
 
     # Iterate atom-major, so the pair order matches the original enumeration for
     # whatever survives. This keeps result ordering comparable across policies.
@@ -390,7 +389,7 @@ def select_atom_context_pairs(
 def _within_neighbor_window(
     atom_id: str,
     owner_ids,
-    order: Dict[str, int],
+    order: dict[str, int],
     window: int,
 ) -> bool:
     """Whether ``atom_id`` is within ``window`` positions of an owning atom."""
@@ -412,13 +411,13 @@ def _within_neighbor_window(
 
 
 def select_context_context_pairs(
-    contexts: Dict[str, Context],
+    contexts: dict[str, Context],
     *,
     policy: str = "all_pairs",
     gate_threshold: float = 0.20,
-    gate: Optional[_PairGate] = None,
-    gate_context_ids: Optional[Sequence[str]] = None,
-) -> Tuple[List[Tuple[str, str]], Dict[str, object]]:
+    gate: _PairGate | None = None,
+    gate_context_ids: Sequence[str] | None = None,
+) -> tuple[list[tuple[str, str]], dict[str, object]]:
     """Select unordered ``(context_i, context_j)`` pairs, ``i < j`` by sorted id.
 
     Matches ``combinations(sorted(contexts.keys()), 2)`` under ``"all_pairs"`` so
@@ -451,7 +450,7 @@ def select_context_context_pairs(
     # Unordered pairs; the original scored each in BOTH directions.
     pairs_possible = num_contexts * (num_contexts - 1) // 2
 
-    coverage: Dict[str, object] = {
+    coverage: dict[str, object] = {
         "policy": policy,
         "num_contexts": num_contexts,
         "pairs_possible": pairs_possible,
@@ -495,15 +494,15 @@ def select_context_context_pairs(
 
 
 def dedup_contexts_near(
-    contexts: Dict[str, Context],
-    atoms: Dict[str, Atom],
+    contexts: dict[str, Context],
+    atoms: dict[str, Atom],
     *,
     threshold: float = 0.92,
     use_summary: bool = True,
     embedding_model: str = "all-MiniLM-L6-v2",
-    gate: Optional[_PairGate] = None,
-    gate_context_ids: Optional[Sequence[str]] = None,
-) -> Tuple[Dict[str, Context], Dict[str, Atom], Dict[str, object]]:
+    gate: _PairGate | None = None,
+    gate_context_ids: Sequence[str] | None = None,
+) -> tuple[dict[str, Context], dict[str, Atom], dict[str, object]]:
     """Collapse near-duplicate contexts, *merging* ownership onto the survivor.
 
     ``remove_duplicated_contexts`` matches exact text only, so retrieval across
@@ -533,7 +532,7 @@ def dedup_contexts_near(
         original iteration order of the survivors.
     """
     context_ids = list(contexts.keys())
-    coverage: Dict[str, object] = {
+    coverage: dict[str, object] = {
         "contexts_before": len(context_ids),
         "threshold": threshold,
     }
@@ -555,8 +554,8 @@ def dedup_contexts_near(
 
     # Greedy agglomerative pass: first occurrence wins, later near-duplicates
     # collapse onto it.
-    survivors: List[str] = []
-    collapsed_into: Dict[str, str] = {}
+    survivors: list[str] = []
+    collapsed_into: dict[str, str] = {}
     for context_id in context_ids:
         match = None
         for survivor_id in survivors:
@@ -601,7 +600,7 @@ def dedup_contexts_near(
 
 
 def prune_dangling_context_refs(
-    atoms: Dict[str, Atom], contexts: Dict[str, Context]
+    atoms: dict[str, Atom], contexts: dict[str, Context]
 ) -> int:
     """Drop ``atom.contexts`` entries whose context is no longer registered.
 

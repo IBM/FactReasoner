@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,7 +45,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from collections.abc import Iterable, Sequence
 
 #: Bump whenever ``INSTRUCTION_NLI`` in ``core/nli.py`` changes, or the cache will
 #: serve verdicts obtained from a different prompt.
@@ -55,7 +54,7 @@ PROMPT_VERSION = "nli-v2-2026-07"
 _SEPARATOR = b"\x00"
 
 
-def extractor_identity(nli_extractor) -> Tuple[str, str]:
+def extractor_identity(nli_extractor) -> tuple[str, str]:
     """The ``(model_id, nli_method)`` pair identifying an extractor's verdicts.
 
     Read defensively: the model id lives on the Mellea backend, and mocks in tests
@@ -119,7 +118,7 @@ class NLIVerdictCache:
             digest.update(_SEPARATOR)
         return digest.hexdigest()
 
-    def get_many(self, keys: Sequence[str]) -> Dict[str, dict]:
+    def get_many(self, keys: Sequence[str]) -> dict[str, dict]:
         """Look up several keys at once.
 
         Returns:
@@ -127,7 +126,7 @@ class NLIVerdictCache:
         """
         if not keys:
             return {}
-        found: Dict[str, dict] = {}
+        found: dict[str, dict] = {}
         unique = list(dict.fromkeys(keys))
         with self._connect() as conn:
             cursor = conn.cursor()
@@ -148,13 +147,13 @@ class NLIVerdictCache:
                         continue
         return found
 
-    def put_many(self, items: Iterable[Tuple[str, Optional[dict]]]) -> int:
+    def put_many(self, items: Iterable[tuple[str, dict | None]]) -> int:
         """Store verdicts, overwriting any existing entry for the same key.
 
         Returns:
             The number of rows written.
         """
-        rows: List[Tuple[str, str]] = [
+        rows: list[tuple[str, str]] = [
             (key, json.dumps(verdict))
             for key, verdict in items
             if key and verdict is not None

@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.g
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 # Defaut prior probabilities for atoms and contexts
 PRIOR_PROB_ATOM = 0.5
@@ -25,7 +24,7 @@ class Atom:
     Represents an atomic unit of the model's response.
     """
 
-    def __init__(self, id: str, text: str, label: str = None):
+    def __init__(self, id: str, text: str, label= None):
         """
         Atom constructor.
         Args:
@@ -101,9 +100,9 @@ class Context:
     def __init__(
         self,
         id: str,
-        atom: Optional[Atom],
+        atom: Atom | None,
         text: str = "",
-        synthetic_summary: Optional[str] = None,
+        synthetic_summary: str | None = None,
         title: str = "",
         link: str = "",
         snippet: str = "",
@@ -191,7 +190,7 @@ class Context:
     def set_probability(self, probability):
         self.probability = probability
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "title": self.title,
@@ -210,8 +209,8 @@ class Relation:
 
     def __init__(
         self,
-        source: Union[Atom, Context],
-        target: Union[Atom, Context],
+        source: Atom | Context,
+        target: Atom | Context,
         type: str,
         probability: float,
         link: str,

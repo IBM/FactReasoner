@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +38,7 @@ import json
 import math
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
@@ -53,9 +52,6 @@ from fact_reasoner.core.base import Atom
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.utils import build_atoms
 from fact_reasoner.fact_graph import FactGraph
-from fact_reasoner.markov_network import MarkovNetwork
-from fact_reasoner.utils import extract_logprobs_from_output, run_throttled
-
 from fact_reasoner.factors import build_markov_network
 from fact_reasoner.lcs import candidate_pairs as _cp
 from fact_reasoner.lcs.prompts import (
@@ -71,12 +67,13 @@ from fact_reasoner.lcs.strength import (
 )
 from fact_reasoner.lcs.taxonomy import (
     LEVEL1_CONFLICT_COUPLINGS,
-    LEVEL1_CONTRADICTION,
     LEVEL1_NONE,
     Level2Sense,
     compile_sense,
     coupling_from_string,
 )
+from fact_reasoner.markov_network import MarkovNetwork
+from fact_reasoner.utils import extract_logprobs_from_output, run_throttled
 
 # Methods for estimating the type confidence P(tau|a_i,a_j), mirroring core/nli.py.
 MINER_METHODS = ("logprobs", "simbauq")
@@ -129,12 +126,12 @@ class MinedRelation:
     probability: float
     type_confidence: float
     strength: float
-    strength_raw: Optional[float] = None
+    strength_raw: float | None = None
     directed: bool = True
     concession_resolved: bool = False
-    resolving_atom_id: Optional[str] = None
+    resolving_atom_id: str | None = None
 
-    def to_edge_dict(self) -> Dict[str, Any]:
+    def to_edge_dict(self) -> dict[str, Any]:
         """Return the FactGraph edge dict for this relation (link=atom_atom)."""
         return {
             "from": self.source_id,
@@ -169,16 +166,16 @@ class MiningResult:
         config: The miner configuration in effect.
     """
 
-    atoms: Dict[str, Atom]
-    relations: List[MinedRelation]
+    atoms: dict[str, Atom]
+    relations: list[MinedRelation]
     fact_graph: FactGraph
     markov_network: MarkovNetwork
-    coverage: Dict[str, Any] = field(default_factory=dict)
-    config: Dict[str, Any] = field(default_factory=dict)
+    coverage: dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
     # -- serialization -------------------------------------------------------
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """Return a JSON-serializable representation (round-trips the graph)."""
         return {
             "atoms": {aid: a.text for aid, a in self.atoms.items()},
@@ -251,7 +248,7 @@ def _starts_with_yes_no(s: str) -> bool:
 # ----------------------------------------------------------------------------
 
 
-def _reconstruct_text_and_spans(logprobs) -> Tuple[str, List[Tuple[int, int, float]]]:
+def _reconstruct_text_and_spans(logprobs) -> tuple[str, list[tuple[int, int, float]]]:
     """Rebuild decoded text from token strings, tracking per-token char spans."""
     spans = []
     pos = 0
@@ -263,7 +260,7 @@ def _reconstruct_text_and_spans(logprobs) -> Tuple[str, List[Tuple[int, int, flo
     return text, spans
 
 
-def _span_probability(logprobs, span: Tuple[int, int]) -> Optional[float]:
+def _span_probability(logprobs, span: tuple[int, int]) -> float | None:
     """Geometric-mean token probability over a character span.
 
     Mirrors ``NLIExtractor._get_probability``: averages the logprobs of every
@@ -288,7 +285,9 @@ _JSON_COUPLING_RE = re.compile(r'"coupling"\s*:\s*"([^"]+)"', re.IGNORECASE)
 _JSON_SENSE_RE = re.compile(r'"sense"\s*:\s*"([^"]+)"', re.IGNORECASE)
 
 
-def _last_match_span(pattern: re.Pattern, text: str) -> Optional[Tuple[str, Tuple[int, int]]]:
+def _last_match_span(
+    pattern: re.Pattern, text: str
+) -> tuple[str, tuple[int, int]] | None:
     """Return ``(value, interior_span)`` of the LAST match of ``pattern``."""
     matches = list(pattern.finditer(text))
     if not matches:
@@ -320,8 +319,8 @@ class RelationMiner:
         backend: Backend,
         *,
         nli_method: str = "logprobs",
-        atomizer: Optional[Atomizer] = None,
-        reviser: Optional[Reviser] = None,
+        atomizer: Atomizer | None = None,
+        reviser: Reviser | None = None,
         pair_policy: str = "windowed",
         window: int = 4,
         gate: str = "embedding",
@@ -331,7 +330,7 @@ class RelationMiner:
         concession_discount: float = 0.45,
         strength_method: str = "auto",
         strength_samples: int = 8,
-        strength_calibrator: Optional[StrengthCalibrator] = None,
+        strength_calibrator: StrengthCalibrator | None = None,
         show_progress: bool = False,
     ):
         """Initialize the relation miner.
@@ -442,7 +441,7 @@ class RelationMiner:
     # -- public entry points -------------------------------------------------
 
     @staticmethod
-    def _require_response(response: Optional[str]) -> str:
+    def _require_response(response: str | None) -> str:
         """Validate that a non-empty response was supplied (grounding is required)."""
         if not response or not str(response).strip():
             raise ValueError(
@@ -453,7 +452,7 @@ class RelationMiner:
         return response
 
     def mine_from_response(
-        self, response: str, *, query: Optional[str] = None
+        self, response: str, *, query: str | None = None
     ) -> MiningResult:
         """Atomize ``response`` and mine its inter-atom relations (grounded)."""
         self._require_response(response)
@@ -462,7 +461,7 @@ class RelationMiner:
 
     def mine_from_atoms(
         self,
-        atoms: Union[List[str], List[Atom], Dict[str, Atom]],
+        atoms: list[str] | list[Atom] | dict[str, Atom],
         response: str,
     ) -> MiningResult:
         """Mine inter-atom relations for already-decomposed atoms, grounded in the
@@ -482,7 +481,7 @@ class RelationMiner:
         return asyncio.run(self._mine(norm, source_response=response))
 
     async def amine_from_response(
-        self, response: str, *, query: Optional[str] = None
+        self, response: str, *, query: str | None = None
     ) -> MiningResult:
         """Async variant of :meth:`mine_from_response`."""
         self._require_response(response)
@@ -491,7 +490,7 @@ class RelationMiner:
 
     async def amine_from_atoms(
         self,
-        atoms: Union[List[str], List[Atom], Dict[str, Atom]],
+        atoms: list[str] | list[Atom] | dict[str, Atom],
         response: str,
     ) -> MiningResult:
         """Async variant of :meth:`mine_from_atoms` (response REQUIRED)."""
@@ -501,7 +500,7 @@ class RelationMiner:
 
     # -- atom preparation ----------------------------------------------------
 
-    def _atoms_from_response(self, response: str) -> Dict[str, Atom]:
+    def _atoms_from_response(self, response: str) -> dict[str, Atom]:
         """Decompose a response into atoms (+ optional decontextualization)."""
         if self.atomizer is None:
             raise ValueError(
@@ -519,8 +518,8 @@ class RelationMiner:
 
     @staticmethod
     def _normalize_atoms(
-        atoms: Union[List[str], List[Atom], Dict[str, Atom]],
-    ) -> Dict[str, Atom]:
+        atoms: list[str] | list[Atom] | dict[str, Atom],
+    ) -> dict[str, Atom]:
         """Normalize atom inputs to an ordered ``Dict[str, Atom]``.
 
         Accepts a list of strings, a list of :class:`Atom`, or an existing dict.
@@ -528,7 +527,7 @@ class RelationMiner:
         """
         if isinstance(atoms, dict):
             return atoms
-        norm: Dict[str, Atom] = {}
+        norm: dict[str, Atom] = {}
         for i, item in enumerate(atoms):
             if isinstance(item, Atom):
                 # Preserve provided id if it looks positional; else re-id.
@@ -541,7 +540,7 @@ class RelationMiner:
     # -- core mining ---------------------------------------------------------
 
     async def _mine(
-        self, atoms: Dict[str, Atom], *, source_response: Optional[str]
+        self, atoms: dict[str, Atom], *, source_response: str | None
     ) -> MiningResult:
         """Select pairs, mine each, discount concessions, build the MRF."""
         # 1. candidate pairs (response-anchored; grounding is always on)
@@ -556,7 +555,7 @@ class RelationMiner:
         )
 
         # 2. mine each pair (Prompt A, then Prompt B when the coupling has an edge)
-        relations: List[MinedRelation] = []
+        relations: list[MinedRelation] = []
         dropped_none = 0
         if pairs:
             mined = await self._mine_pairs(atoms, pairs, response=source_response)
@@ -604,19 +603,20 @@ class RelationMiner:
 
     async def _mine_pairs(
         self,
-        atoms: Dict[str, Atom],
-        pairs: List[Tuple[str, str]],
+        atoms: dict[str, Atom],
+        pairs: list[tuple[str, str]],
         *,
         response: str,
-    ) -> List[Optional[MinedRelation]]:
+    ) -> list[MinedRelation | None]:
         """Run Prompt A for every pair (throttled), then Prompt B where needed.
 
         The response-grounded prompts are used throughout (with the response
         injected as context) so the model asserts only relations the response
         actually draws.
         """
+
         # Prompt A for all pairs, concurrently.
-        def sense_factory(pair: Tuple[str, str]):
+        def sense_factory(pair: tuple[str, str]):
             src, trg = pair
             user_vars = {
                 "response": response,
@@ -632,8 +632,10 @@ class RelationMiner:
                         "The output must contain a bracketed [coupling=...] tag "
                         'or a JSON object with a "coupling" field.',
                         validation_fn=simple_validate(
-                            lambda s: _COUPLING_RE.search(s) is not None
-                            or _JSON_COUPLING_RE.search(s) is not None
+                            lambda s: (
+                                _COUPLING_RE.search(s) is not None
+                                or _JSON_COUPLING_RE.search(s) is not None
+                            )
                         ),
                     )
                 ],
@@ -659,7 +661,7 @@ class RelationMiner:
                 bar.close()
 
         # Parse Prompt A → (sense, coupling, type_conf); compile to Level 1.
-        interim: List[Optional[Dict[str, Any]]] = []
+        interim: list[dict[str, Any] | None] = []
         for pair, out in zip(pairs, sense_outputs):
             interim.append(self._parse_sense_output(pair, out))
 
@@ -671,13 +673,15 @@ class RelationMiner:
 
         # Assemble MinedRelation objects (None where coupling was NONE). Apply the
         # post-hoc calibrator to the raw strength before forming the factor weight.
-        results: List[Optional[MinedRelation]] = []
+        results: list[MinedRelation | None] = []
         for i, r in enumerate(interim):
             if r is None:
                 results.append(None)
                 continue
             strength_raw = strengths_raw.get(i, _UNKNOWN_PROBABILITY)
-            strength = max(0.0, min(1.0, self.strength_calibrator.transform(strength_raw)))
+            strength = max(
+                0.0, min(1.0, self.strength_calibrator.transform(strength_raw))
+            )
             prob = max(0.0, min(1.0, r["type_confidence"] * strength))
             results.append(
                 MinedRelation(
@@ -697,12 +701,12 @@ class RelationMiner:
 
     async def _estimate_strengths(
         self,
-        atoms: Dict[str, Atom],
-        interim: List[Optional[Dict[str, Any]]],
-        edge_indices: List[int],
+        atoms: dict[str, Atom],
+        interim: list[dict[str, Any] | None],
+        edge_indices: list[int],
         *,
         response: str,
-    ) -> Dict[int, float]:
+    ) -> dict[int, float]:
         """Estimate the raw conditional strength for each edge-producing pair.
 
         Dispatches on ``self.strength_method``:
@@ -715,13 +719,15 @@ class RelationMiner:
         The response-grounded strength prompt is used so the strength reflects how
         strongly the response ties B to A.
         """
-        strengths: Dict[int, float] = {}
+        strengths: dict[int, float] = {}
         if not edge_indices:
             return strengths
 
         if self.strength_method == "verbalized":
             outputs = await run_throttled(
-                lambda idx: self._verbalized_call(atoms, interim[idx], response=response),
+                lambda idx: self._verbalized_call(
+                    atoms, interim[idx], response=response
+                ),
                 edge_indices,
             )
             for idx, out in zip(edge_indices, outputs):
@@ -748,7 +754,7 @@ class RelationMiner:
             ),
             jobs,
         )
-        per_edge: Dict[int, List[str]] = {idx: [] for idx in edge_indices}
+        per_edge: dict[int, list[str]] = {idx: [] for idx in edge_indices}
         for (idx, _s), out in zip(jobs, outputs):
             per_edge[idx].append(_output_text(out))
         for idx, answers in per_edge.items():
@@ -757,7 +763,7 @@ class RelationMiner:
         return strengths
 
     def _verbalized_call(
-        self, atoms: Dict[str, Atom], r: Dict[str, Any], *, response: str
+        self, atoms: dict[str, Atom], r: dict[str, Any], *, response: str
     ):
         """One verbalized-strength ([p=0.NN]) generation for an edge (grounded)."""
         user_vars = {
@@ -786,8 +792,8 @@ class RelationMiner:
 
     def _surrogate_call(
         self,
-        atoms: Dict[str, Atom],
-        r: Dict[str, Any],
+        atoms: dict[str, Atom],
+        r: dict[str, Any],
         *,
         logprobs: bool,
         response: str,
@@ -844,8 +850,8 @@ class RelationMiner:
     # -- prompt parsing ------------------------------------------------------
 
     def _parse_sense_output(
-        self, pair: Tuple[str, str], output: Any
-    ) -> Optional[Dict[str, Any]]:
+        self, pair: tuple[str, str], output: Any
+    ) -> dict[str, Any] | None:
         """Parse a Prompt A result to a compiled interim relation dict.
 
         Returns None when the coupling is NONE (no edge) or on any failure (so the
@@ -899,7 +905,7 @@ class RelationMiner:
         }
 
     def _type_confidence(
-        self, thunk: ModelOutputThunk, text: str, coupling_span: Tuple[int, int]
+        self, thunk: ModelOutputThunk, text: str, coupling_span: tuple[int, int]
     ) -> float:
         """Estimate ``P(tau | a_i, a_j)`` for the coupling.
 
@@ -946,7 +952,7 @@ class RelationMiner:
             return _UNKNOWN_PROBABILITY
         return max(0.0, min(1.0, val))
 
-    def _model_options(self) -> Optional[Dict[str, Any]]:
+    def _model_options(self) -> dict[str, Any] | None:
         """Model options: request logprobs only for the logprobs method."""
         if self.nli_method == "logprobs":
             return {"logprobs": True, "top_logprobs": 5}
@@ -955,7 +961,7 @@ class RelationMiner:
     # -- concession discount + graph building --------------------------------
 
     def _apply_concession_discount(
-        self, atoms: Dict[str, Atom], relations: List[MinedRelation]
+        self, atoms: dict[str, Atom], relations: list[MinedRelation]
     ) -> None:
         """Discount resolved-concession conflicts in place (Eq. 2).
 
@@ -970,9 +976,7 @@ class RelationMiner:
         """
         if not relations:
             return
-        holding_ids = [
-            aid for aid, a in atoms.items() if _looks_like_holding(a.text)
-        ]
+        holding_ids = [aid for aid, a in atoms.items() if _looks_like_holding(a.text)]
         for rel in relations:
             if (
                 rel.level1_type not in LEVEL1_CONFLICT_COUPLINGS
@@ -981,9 +985,7 @@ class RelationMiner:
                 # Only Concession-sensed conflicts (contradiction/exclusive) are
                 # discountable.
                 continue
-            resolver = _find_resolving_holding(
-                rel, holding_ids, atoms
-            )
+            resolver = _find_resolving_holding(rel, holding_ids, atoms)
             if resolver is not None:
                 rel.resolving_atom_id = resolver
                 rel.probability = max(
@@ -995,7 +997,7 @@ class RelationMiner:
                 rel.concession_resolved = False
 
     def _build_fact_graph(
-        self, atoms: Dict[str, Atom], relations: List[MinedRelation]
+        self, atoms: dict[str, Atom], relations: list[MinedRelation]
     ) -> FactGraph:
         """Build a FactGraph from atoms and mined atom_atom relation edges."""
         fg = FactGraph()
@@ -1021,9 +1023,19 @@ class RelationMiner:
 # ----------------------------------------------------------------------------
 
 _HOLDING_CUES = (
-    "held", "holding", "ruled", "ruling", "concluded", "found that",
-    "tribunal", "court", "ultimately", "determined", "adjudicated",
-    "resolved", "settled",
+    "held",
+    "holding",
+    "ruled",
+    "ruling",
+    "concluded",
+    "found that",
+    "tribunal",
+    "court",
+    "ultimately",
+    "determined",
+    "adjudicated",
+    "resolved",
+    "settled",
 )
 
 
@@ -1034,8 +1046,8 @@ def _looks_like_holding(text: str) -> bool:
 
 
 def _find_resolving_holding(
-    rel: MinedRelation, holding_ids: List[str], atoms: Dict[str, Atom]
-) -> Optional[str]:
+    rel: MinedRelation, holding_ids: list[str], atoms: dict[str, Atom]
+) -> str | None:
     """Find a holding atom that plausibly resolves ``rel``'s tension.
 
     A resolver is a holding-like atom that (a) is not one of the relation's own
