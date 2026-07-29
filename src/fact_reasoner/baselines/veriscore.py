@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,32 +17,31 @@
 # external source such as Wikipedia or Google Search (for the latter we consider
 # the passage retrieved from the corresponding link).
 
-import json
 import asyncio
+import json
 import time
-import mellea.stdlib.functional as mfuncs
+from typing import Any
 
-from typing import Any, Dict, List, Tuple
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
-from mellea.core import ModelOutputThunk
 from mellea.stdlib.requirements import check
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.base import Atom, Context
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.utils import (
     build_atoms,
     build_contexts,
     remove_duplicated_atoms,
 )
 from fact_reasoner.utils import (
-    extract_last_square_brackets,
     LOOP_BUDGET,
+    extract_last_square_brackets,
     gather_with_progress,
 )
 
@@ -141,7 +139,7 @@ class VeriScore:
 
     def from_dict_with_contexts(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ):
         """
         Initialize VeriScore from a dict containing both atoms and contexts.
@@ -175,7 +173,7 @@ class VeriScore:
             atom2contexts[aid] = contexts
 
         print(f"[VeriScore] Atoms found: {len(self.atoms)}")
-        for _, atom in self.atoms.items():
+        for atom in self.atoms.values():
             print(f"[VeriScore] {atom}")
 
         self.labels_human = dict(zip(atom_ids, gold_labels))
@@ -205,7 +203,7 @@ class VeriScore:
             f"[VeriScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
         )
 
-    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+    def to_json(self, json_file_path: str | None = None) -> dict[str, Any]:
         """
         Save the VeriScore instance to a JSON file.
 
@@ -223,9 +221,9 @@ class VeriScore:
 
         # Write the atoms
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
@@ -244,9 +242,9 @@ class VeriScore:
 
     def build(
         self,
-        query: str = None,
-        response: str = None,
-        topic: str = None,
+        query: str | None = None,
+        response: str | None = None,
+        topic: str | None = None,
         has_atoms: bool = False,
         has_contexts: bool = False,
         revise_atoms: bool = False,
@@ -294,7 +292,7 @@ class VeriScore:
             )
             self.revise_atoms = True  # revise atoms if newly created
             print(f"[VeriScore] Extracted {len(self.atoms)} atoms.")
-            for aid in self.atoms.keys():
+            for aid in self.atoms:
                 print(f"[VeriScore] {self.atoms[aid]}")
 
         assert len(self.atoms) > 0, (
@@ -351,7 +349,7 @@ class VeriScore:
             else:
                 return "U"
 
-    async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    async def predict_atom_labels(self) -> tuple[dict[str, str], dict[str, str]]:
         """
         For each atom predict its label given the corresponding retrieved contexts.
         """
@@ -360,15 +358,13 @@ class VeriScore:
         assert len(self.atoms) > 0
 
         # Utility function to assemble the context of an atom
-        def make_knowledge(passages: List[Dict[str, Any]]) -> str:
+        def make_knowledge(passages: list[dict[str, Any]]) -> str:
             knowledge = ""
             for _, psg in enumerate(passages):
                 title = psg["title"]
                 text = psg["text"]
                 snippet = psg.get("snippet", "")
-                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(
-                    title, snippet, text
-                )
+                knowledge += f"Title: {title}\nSummary: {snippet}\nText: {text}\n\n"
 
             return knowledge
 
@@ -386,8 +382,8 @@ class VeriScore:
             contexts = atom.get_contexts()
             passages = []
             if contexts is not None and len(contexts) > 0:
-                for _, c in contexts.items():
-                    passages.append(dict(title=c.get_title(), text=c.get_text()))
+                for c in contexts.values():
+                    passages.append({"title": c.get_title(), "text": c.get_text()})
 
             # prepare the context
             knowledge_text = make_knowledge(passages)
@@ -433,7 +429,7 @@ class VeriScore:
         # Return the labeled atoms
         return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
 
-    def score(self) -> Dict[str, Any]:
+    def score(self) -> dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
@@ -453,7 +449,7 @@ class VeriScore:
         num_false_atoms = 0
         num_uniform_atoms = 0
         labels, raw_outputs = asyncio.run(self.predict_atom_labels())
-        for _, label in labels.items():
+        for label in labels.values():
             if self.binary_output:
                 if label == "S":
                     num_true_atoms += 1
@@ -473,7 +469,7 @@ class VeriScore:
         recall_k = min(float(num_true_atoms) / K, 1.0)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
-        except Exception as _:
+        except Exception as _:  # noqa: BLE001
             f1k = 0.0
 
         # Elapsed time

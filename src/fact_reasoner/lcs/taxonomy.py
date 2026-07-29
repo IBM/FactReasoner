@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,7 +32,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 # ----------------------------------------------------------------------------
 # Level 1 -- inferential couplings (the factor types).
@@ -166,7 +164,7 @@ class SenseSpec:
     """
 
     level1: str
-    strength_prior: Optional[float]
+    strength_prior: float | None
     directed: bool
     is_concession: bool = False
     ordering_only: bool = False
@@ -198,7 +196,7 @@ COMPILE = {
 }
 
 
-def compile_sense(sense, raw_p: Optional[float] = None):
+def compile_sense(sense, raw_p: float | None = None):
     """Compile a Level-2 sense to a Level-1 coupling and effective strength.
 
     Applies the deterministic map ``COMPILE`` (deep-dive Table 2). The effective

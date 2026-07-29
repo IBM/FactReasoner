@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,14 +36,14 @@
 # does not define or duplicate the factuality scoring in ``assessor.py``.
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fact_reasoner.factors import build_markov_network
 from fact_reasoner.fact_graph import Edge, FactGraph, Node
+from fact_reasoner.factors import build_markov_network
 from fact_reasoner.inference import run_merlin
-from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.lcs.relation_miner import MiningResult, _atom_sort_key
 from fact_reasoner.lcs.taxonomy import LEVEL1_CONFLICT_COUPLINGS
+from fact_reasoner.markov_network import MarkovNetwork
 
 # The four LCS readouts. ``mean_marginal`` is the default headline (deep-dive Eq. 4).
 LCS_METHODS = ("mean_marginal", "consistency", "reified", "log_partition")
@@ -98,9 +97,9 @@ class LCSScorer:
         result: MiningResult,
         *,
         method: str = "mean_marginal",
-        prior: Optional[float] = None,
+        prior: float | None = None,
         reified_prior: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compute the LCS and diagnostics for a mining result.
 
         Args:
@@ -146,7 +145,7 @@ class LCSScorer:
         if prior is None:
             prior = float(result.config.get("prior", 0.5))
 
-        out: Dict[str, Any] = {
+        out: dict[str, Any] = {
             "method": method,
             "lcs": 0.0,
             "mean_marginal": 0.0,
@@ -200,8 +199,8 @@ class LCSScorer:
     # -- inference helpers ---------------------------------------------------
 
     def _marginals(
-        self, network: MarkovNetwork, query_variables: List[str]
-    ) -> Dict[str, float]:
+        self, network: MarkovNetwork, query_variables: list[str]
+    ) -> dict[str, float]:
         """Run MAR and return ``{variable: P(=1)}`` for the query variables."""
         mar = run_merlin(
             network,
@@ -213,7 +212,7 @@ class LCSScorer:
         )
         return {m["variable"]: float(m["probabilities"][1]) for m in mar["marginals"]}
 
-    def _log_z(self, network: MarkovNetwork) -> Optional[float]:
+    def _log_z(self, network: MarkovNetwork) -> float | None:
         """Run PR and return log Z, or None if the PR task is unavailable."""
         try:
             pr = run_merlin(
@@ -221,11 +220,11 @@ class LCSScorer:
                 verbose=self.verbose,
             )
             return pr["log_z"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[LCSScorer] PR (log Z) task unavailable: {e}")
             return None
 
-    def _log_map(self, network: MarkovNetwork) -> Optional[float]:
+    def _log_map(self, network: MarkovNetwork) -> float | None:
         """Run MAP and return the log-mass of the most-probable configuration.
 
         Because ``Z = sum_x mass(x)`` is a sum of non-negative terms, the single
@@ -241,7 +240,7 @@ class LCSScorer:
                 verbose=self.verbose,
             )
             return mp["log_z"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"[LCSScorer] MAP (log Zmin) task unavailable: {e}")
             return None
 
@@ -270,7 +269,7 @@ class LCSScorer:
         network = self._base_network(result)
 
         # One AND aux var per conflict edge: u_r = (s AND t).
-        u_vars: List[str] = []
+        u_vars: list[str] = []
         for i, rel in enumerate(contradictions):
             u = f"{_AUX}u{i}"
             network.add_factor(
@@ -323,7 +322,7 @@ class LCSScorer:
     # -- (d) normalized log-partition ----------------------------------------
 
     def _normalized_log_partition(
-        self, result: MiningResult, log_z: Optional[float]
+        self, result: MiningResult, log_z: float | None
     ) -> (Any):
         """(log Z - log Zmin)/(log Zmax - log Zmin) — deep-dive Eq. 8, graded.
 
@@ -380,7 +379,7 @@ class LCSScorer:
 
     # -- network construction helpers ----------------------------------------
 
-    def _node_priors(self, result: MiningResult) -> Dict[str, float]:
+    def _node_priors(self, result: MiningResult) -> dict[str, float]:
         """The per-atom priors used when (re)building a network from the graph."""
         prior = float(result.config.get("prior", 0.5))
         return {aid: prior for aid in result.atoms}
@@ -402,7 +401,7 @@ class LCSScorer:
 # ----------------------------------------------------------------------------
 
 
-def _and_factor() -> List[float]:
+def _and_factor() -> list[float]:
     """Deterministic ``u = (s AND t)`` over [u, s, t] (row-major, 8 values).
 
     Value 1.0 iff ``u == (s==1 and t==1)``, else 0.0.
@@ -415,7 +414,7 @@ def _and_factor() -> List[float]:
     return vals
 
 
-def _or_factor() -> List[float]:
+def _or_factor() -> list[float]:
     """Deterministic ``w = (a OR b)`` over [w, a, b] (row-major, 8 values)."""
     vals = []
     for w in (0, 1):
@@ -425,7 +424,7 @@ def _or_factor() -> List[float]:
     return vals
 
 
-def _vote_factor(level1_type: str, p: float) -> List[float]:
+def _vote_factor(level1_type: str, p: float) -> list[float]:
     """Reified vote factor ``h_r(R, s, t)`` over [R, s, t] (row-major, 8 values).
 
     R=0 branch is flat (1.0). R=1 branch is 1.0 when the relation is satisfied at

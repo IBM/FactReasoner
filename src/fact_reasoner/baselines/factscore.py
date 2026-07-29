@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,25 +14,24 @@
 
 # Our implementation of the FactScore paper using LLAMA3 models
 
-import json
 import asyncio
+import json
 import string
 import time
-import mellea.stdlib.functional as mfuncs
+from typing import Any
 
-from typing import List, Dict, Any, Tuple
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
-from mellea.core import ModelOutputThunk
 from mellea.stdlib.requirements import check
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.base import Atom, Context
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.utils import (
     build_atoms,
     build_contexts,
@@ -127,7 +125,7 @@ class FactScore:
 
     def from_dict_with_contexts(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ):
         """
         Initialize FactScore from a dict containing both atoms and contexts.
@@ -161,7 +159,7 @@ class FactScore:
             atom2contexts[aid] = contexts
 
         print(f"[FactScore] Atoms found: {len(self.atoms)}")
-        for _, atom in self.atoms.items():
+        for atom in self.atoms.values():
             print(f"[FactScore] {atom}")
 
         self.labels_human = dict(zip(atom_ids, gold_labels))
@@ -190,7 +188,7 @@ class FactScore:
             f"[FactScore] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
         )
 
-    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+    def to_json(self, json_file_path: str | None = None) -> dict[str, Any]:
         """
         Save the FactScore instance to a JSON file.
 
@@ -208,9 +206,9 @@ class FactScore:
 
         # Write the atoms
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
@@ -229,9 +227,9 @@ class FactScore:
 
     def build(
         self,
-        query: str = None,
-        response: str = None,
-        topic: str = None,
+        query: str | None = None,
+        response: str | None = None,
+        topic: str | None = None,
         has_atoms: bool = False,
         has_contexts: bool = False,
         revise_atoms: bool = False,
@@ -282,7 +280,7 @@ class FactScore:
             )
             self.revise_atoms = True  # revise atoms is newly created
             print(f"[FactScore] Extracted {len(self.atoms)} atoms.")
-            for aid in self.atoms.keys():
+            for aid in self.atoms:
                 print(f"[FactScore] {self.atoms[aid]}")
 
         # Safety checks
@@ -337,19 +335,17 @@ class FactScore:
                 )
         else:
             is_supported = all(
-                [
-                    keyword
+                keyword
                     not in generated_answer.lower()
                     .translate(str.maketrans("", "", string.punctuation))
                     .split()
                     for keyword in ["not", "cannot", "unknown", "information"]
-                ]
             )
 
         label = "S" if is_supported else "NS"
         return label
 
-    async def predict_atom_labels(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+    async def predict_atom_labels(self) -> tuple[dict[str, str], dict[str, str]]:
         """
         For each atom predict its label (S or NS) given the corresponding
         retrieved contexts.
@@ -359,15 +355,13 @@ class FactScore:
         assert len(self.atoms) > 0
 
         # Utility function to assemble the context of an atom
-        def make_knowledge(passages: List[Dict[str, Any]]) -> str:
+        def make_knowledge(passages: list[dict[str, Any]]) -> str:
             knowledge = ""
             for _, psg in enumerate(passages):
                 title = psg["title"]
                 text = psg["text"]
                 snippet = psg.get("snippet", "")
-                knowledge += "Title: {}\nSummary: {}\nText: {}\n\n".format(
-                    title, snippet, text
-                )
+                knowledge += f"Title: {title}\nSummary: {snippet}\nText: {text}\n\n"
 
             return knowledge
 
@@ -385,8 +379,8 @@ class FactScore:
             contexts = atom.get_contexts()
             passages = []
             if contexts is not None and len(contexts) > 0:
-                for _, c in contexts.items():
-                    passages.append(dict(title=c.get_title(), text=c.get_text()))
+                for c in contexts.values():
+                    passages.append({"title": c.get_title(), "text": c.get_text()})
 
             # Prepare the context
             knowledge_text = make_knowledge(passages)
@@ -442,7 +436,7 @@ class FactScore:
         # Return the labeled atoms (and also the outputs)
         return dict(zip(atom_ids, atom_labels)), dict(zip(atom_ids, atom_outputs))
 
-    def score(self) -> Dict[str, Any]:
+    def score(self) -> dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
@@ -462,7 +456,7 @@ class FactScore:
         num_false_atoms = 0
         num_uniform_atoms = 0
         labels, raw_outputs = asyncio.run(self.predict_atom_labels())
-        for _, label in labels.items():
+        for label in labels.values():
             if self.binary_output:
                 if label == "S":
                     num_true_atoms += 1
@@ -482,7 +476,7 @@ class FactScore:
         recall_k = min(float(num_true_atoms) / K, 1.0)
         try:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
-        except Exception as _:
+        except Exception as _:  # noqa: BLE001
             f1k = 0.0
 
         # Elapsed time

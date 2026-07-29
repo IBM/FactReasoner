@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,7 +48,6 @@
 # atom-id order (a0, a1, ...); direction is meaningful for the relation model.
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 from fact_reasoner.core.base import Atom
 
@@ -60,11 +58,7 @@ GATE_METHODS = ("embedding", "entity", "none")
 # signal an intended link to preceding content (used by response-anchored
 # gating). Kept tiny and dependency-free, like ``_STOPWORDS``.
 _CONNECTIVES = frozenset(
-    """therefore thus hence consequently accordingly so because since as
-    however but yet nevertheless nonetheless although though whereas while
-    meanwhile then afterward afterwards subsequently later thereafter
-    moreover furthermore additionally also besides instead conversely
-    otherwise regardless despite""".split()
+    ["therefore", "thus", "hence", "consequently", "accordingly", "so", "because", "since", "as", "however", "but", "yet", "nevertheless", "nonetheless", "although", "though", "whereas", "while", "meanwhile", "then", "afterward", "afterwards", "subsequently", "later", "thereafter", "moreover", "furthermore", "additionally", "also", "besides", "instead", "conversely", "otherwise", "regardless", "despite"]
 )
 
 # Regex to split a response into sentences (dependency-free; splits on
@@ -74,10 +68,7 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 # Lightweight stopword list for the entity-overlap gate; kept tiny and
 # dependency-free (the goal is a cheap prune, not linguistic accuracy).
 _STOPWORDS = frozenset(
-    """a an the of to in on at for and or but is are was were be been being this
-    that these those it its as by with from into over under after before during
-    he she they them his her their we you i not no than then so such which who
-    whom whose has have had do does did will would can could may might must""".split()
+    ["a", "an", "the", "of", "to", "in", "on", "at", "for", "and", "or", "but", "is", "are", "was", "were", "be", "been", "being", "this", "that", "these", "those", "it", "its", "as", "by", "with", "from", "into", "over", "under", "after", "before", "during", "he", "she", "they", "them", "his", "her", "their", "we", "you", "i", "not", "no", "than", "then", "so", "such", "which", "who", "whom", "whose", "has", "have", "had", "do", "does", "did", "will", "would", "can", "could", "may", "might", "must"]
 )
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
@@ -91,7 +82,7 @@ def _content_tokens(text: str) -> set:
     }
 
 
-def _ordered_atoms(atoms: Dict[str, Atom]) -> List[Atom]:
+def _ordered_atoms(atoms: dict[str, Atom]) -> list[Atom]:
     """Return atoms in source order.
 
     Atom ids are of the form ``a0, a1, ...`` which encode source position, so we
@@ -120,7 +111,7 @@ def _jaccard(a: set, b: set) -> float:
 # ----------------------------------------------------------------------------
 
 
-def _split_sentences(response: str) -> List[str]:
+def _split_sentences(response: str) -> list[str]:
     """Split a response into sentences (dependency-free)."""
     if not response:
         return []
@@ -128,8 +119,8 @@ def _split_sentences(response: str) -> List[str]:
 
 
 def _map_atoms_to_sentences(
-    ordered: List[Atom], response: str
-) -> List[Optional[int]]:
+    ordered: list[Atom], response: str
+) -> list[int | None]:
     """Map each atom (in source order) to the index of its originating sentence.
 
     An atom is aligned to the response sentence whose content-token set it most
@@ -147,10 +138,10 @@ def _map_atoms_to_sentences(
     if not sentences:
         return [None] * len(ordered)
     sent_tokens = [_content_tokens(s) for s in sentences]
-    mapping: List[Optional[int]] = []
+    mapping: list[int | None] = []
     for atom in ordered:
         atok = _content_tokens(atom.text)
-        best_idx: Optional[int] = None
+        best_idx: int | None = None
         best_sim = 0.0
         for si, stok in enumerate(sent_tokens):
             sim = _jaccard(atok, stok)
@@ -176,19 +167,19 @@ class _EmbeddingGate:
     :attr:`backend` for the coverage report.
     """
 
-    def __init__(self, texts: List[str], model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, texts: list[str], model_name: str = "all-MiniLM-L6-v2"):
         self.backend = "jaccard"
         self._vectors = None
         self._token_sets = [_content_tokens(t) for t in texts]
         try:
-            from sentence_transformers import SentenceTransformer  # type: ignore
             import numpy as np  # noqa: F401
+            from sentence_transformers import SentenceTransformer  # type: ignore
 
             model = SentenceTransformer(model_name)
             emb = model.encode(texts, normalize_embeddings=True)
             self._vectors = emb
             self.backend = f"sbert:{model_name}"
-        except Exception:
+        except Exception:  # noqa: BLE001
             # No sentence-transformers (or load failure): stay on Jaccard.
             self._vectors = None
 
@@ -201,7 +192,7 @@ class _EmbeddingGate:
 
 
 def select(
-    atoms: Dict[str, Atom],
+    atoms: dict[str, Atom],
     *,
     response: str,
     policy: str = "windowed",
@@ -211,7 +202,7 @@ def select(
     embedding_model: str = "all-MiniLM-L6-v2",
     discourse_gate_threshold: float = 0.2,
     discourse_sentence_span: int = 2,
-) -> Tuple[List[Tuple[str, str]], Dict[str, object]]:
+) -> tuple[list[tuple[str, str]], dict[str, object]]:
     """Select candidate ordered atom pairs for relation mining.
 
     Selection is always response-anchored: for windowed/gated policies the window
@@ -267,7 +258,7 @@ def select(
     ids = [a.id for a in ordered]
     total_ordered_pairs = n * (n - 1)  # all ordered i != j pairs (forward + back)
 
-    coverage: Dict[str, object] = {
+    coverage: dict[str, object] = {
         "policy": policy,
         "num_atoms": n,
         "total_ordered_pairs": total_ordered_pairs,
@@ -288,12 +279,12 @@ def select(
         return pairs, coverage
 
     # windowed / gated: forward window pairs (source before target).
-    window_pairs: List[Tuple[str, str]] = []
+    window_pairs: list[tuple[str, str]] = []
     for i in range(n):
         for j in range(i + 1, min(i + window + 1, n)):
             window_pairs.append((ids[i], ids[j]))
 
-    callback_pairs: List[Tuple[str, str]] = []
+    callback_pairs: list[tuple[str, str]] = []
     gate_backend = None
     if policy == "gated" and gate != "none":
         texts = [a.text for a in ordered]
@@ -303,7 +294,7 @@ def select(
             gate_backend = g.backend
         else:  # entity
             token_sets = [_content_tokens(t) for t in texts]
-            sim = lambda i, j: _jaccard(token_sets[i], token_sets[j])  # noqa: E731
+            sim = lambda i, j: _jaccard(token_sets[i], token_sets[j])
             gate_backend = "entity:jaccard"
 
         # Long-range forward pairs beyond the window that survive the gate.
@@ -315,7 +306,7 @@ def select(
     # Response-anchored refinement: promote out-of-window discourse callbacks and
     # demote in-window pairs the response does not actually relate. Always runs
     # (grounding is mandatory).
-    discourse_promoted: List[Tuple[str, str]] = []
+    discourse_promoted: list[tuple[str, str]] = []
     discourse_demoted: set = set()
     index_of = {ids[i]: i for i in range(n)}
     token_sets = [_content_tokens(a.text) for a in ordered]
@@ -333,9 +324,7 @@ def select(
             return True
         # The target opens with a connective AND is a near neighbor: an
         # intended discourse link to preceding content.
-        if opens_conn[j] and 0 < j - i <= window:
-            return True
-        return False
+        return bool(opens_conn[j] and 0 < j - i <= window)
 
     # Promote out-of-window forward pairs the response relates.
     already = set(window_pairs) | set(callback_pairs)
@@ -362,7 +351,7 @@ def select(
     # Deduplicate while preserving order (window first, then callbacks, then
     # discourse-promoted), dropping any demoted in-window pairs.
     seen = set()
-    pairs: List[Tuple[str, str]] = []
+    pairs: list[tuple[str, str]] = []
     for p in window_pairs + callback_pairs + discourse_promoted:
         if p in seen or p in discourse_demoted:
             continue

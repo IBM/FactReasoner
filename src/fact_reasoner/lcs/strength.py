@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,7 +33,8 @@
 #     can be fit later on a small labeled set.
 
 import math
-from typing import Any, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 # Returned when a surrogate probability cannot be determined (mirrors the miner's
 # own "unknown confidence" sentinel).
@@ -67,7 +67,7 @@ def _token_matches(token: str, target: str) -> bool:
     return letters == target
 
 
-def _prob_for_word(alternatives: Sequence[Tuple[str, float]], word: str) -> float:
+def _prob_for_word(alternatives: Sequence[tuple[str, float]], word: str) -> float:
     """Total probability mass on ``word`` across ``(token, logprob)`` alternatives.
 
     Sums the exponentiated logprobs of every alternative whose token matches
@@ -80,7 +80,7 @@ def _prob_for_word(alternatives: Sequence[Tuple[str, float]], word: str) -> floa
     return total
 
 
-def _first_token_alternatives(logprobs: List[Any]) -> List[Tuple[str, float]]:
+def _first_token_alternatives(logprobs: list[Any]) -> list[tuple[str, float]]:
     """Extract the first content token's ``(token, logprob)`` alternative list.
 
     Accepts the per-token entries returned by
@@ -100,7 +100,7 @@ def _first_token_alternatives(logprobs: List[Any]) -> List[Tuple[str, float]]:
         return getattr(obj, key, None)
 
     top = _get(first, "top_logprobs")
-    alternatives: List[Tuple[str, float]] = []
+    alternatives: list[tuple[str, float]] = []
     if top:
         for alt in top:
             tok = _get(alt, "token")
@@ -119,11 +119,11 @@ def _first_token_alternatives(logprobs: List[Any]) -> List[Tuple[str, float]]:
 
 
 def surrogate_probability_from_logprobs(
-    logprobs: List[Any],
+    logprobs: list[Any],
     *,
     positive: str = "yes",
     negative: str = "no",
-) -> Optional[float]:
+) -> float | None:
     """Renormalized surrogate-token probability p = P(pos) / (P(pos) + P(neg)).
 
     Reads the first generated token's top-logprob alternatives and renormalizes
@@ -153,7 +153,7 @@ def surrogate_probability_from_logprobs(
     return p_pos / denom
 
 
-def affirm_fraction(answers: Sequence[str], *, positive: str = "yes") -> Optional[float]:
+def affirm_fraction(answers: Sequence[str], *, positive: str = "yes") -> float | None:
     """Fraction of sampled answers whose first word is the positive surrogate.
 
     The backend-agnostic (no-logprobs) strength readout: sample N Yes/No answers
@@ -246,7 +246,7 @@ class TemperatureCalibrator(StrengthCalibrator):
         raw: Sequence[float],
         labels: Sequence[float],
         *,
-        grid: Optional[Sequence[float]] = None,
+        grid: Sequence[float] | None = None,
     ) -> "TemperatureCalibrator":
         """Fit the temperature by minimizing negative log-likelihood on a grid.
 

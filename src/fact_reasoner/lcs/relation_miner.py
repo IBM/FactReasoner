@@ -232,7 +232,7 @@ def _output_text(output: Any) -> str:
         return ""
     try:
         return str(output.result)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return ""
 
 
@@ -240,7 +240,7 @@ def _starts_with_yes_no(s: str) -> bool:
     """Whether the answer's first word is Yes or No (the surrogate token)."""
     first = (s or "").strip().split()
     word = first[0].lower() if first else ""
-    return word.startswith("yes") or word.startswith("no")
+    return word.startswith(("yes", "no"))
 
 
 # ----------------------------------------------------------------------------
@@ -831,7 +831,7 @@ class RelationMiner:
             return _UNKNOWN_PROBABILITY
         try:
             lps = extract_logprobs_from_output(output.result)
-        except Exception:
+        except Exception:  # noqa: BLE001
             lps = None
         if lps:
             p = surrogate_probability_from_logprobs(lps)
@@ -862,7 +862,7 @@ class RelationMiner:
             return None
         try:
             text = str(output.result)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
         # Sense (for interpretability) and coupling (drives the model).
@@ -922,7 +922,7 @@ class RelationMiner:
         # logprobs: align to the coupling value span within the token stream.
         try:
             logprobs = extract_logprobs_from_output(thunk)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return _UNKNOWN_PROBABILITY
         if not logprobs:
             return _UNKNOWN_PROBABILITY
@@ -941,7 +941,7 @@ class RelationMiner:
             return _UNKNOWN_PROBABILITY
         try:
             text = str(output.result)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return _UNKNOWN_PROBABILITY
         hit = _last_match_span(_PROB_RE, text)
         if hit is None:
