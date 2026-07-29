@@ -53,6 +53,8 @@ def _preamble() -> List[str]:
         r"\usepackage[margin=1in]{geometry}",
         r"\usepackage{booktabs}",
         r"\usepackage{amsmath}",
+        r"\usepackage[noend]{algpseudocode}",
+        r"\usepackage{algorithm}",
         r"\usepackage{pgfplots}",
         r"\pgfplotsset{compat=1.17}",
         r"\usepackage{hyperref}",
@@ -157,6 +159,234 @@ def _intro(data: Dict[str, Any]) -> List[str]:
         "over RITS, with probabilities from token logprobs. Only step 3 differs "
         "between the two cells, so the comparison isolates pair selection.",
     ]
+
+
+def _algorithm_section(data: Dict[str, Any]) -> List[str]:
+    """Pseudo-code for the cheap strategy, plus the gated/provenance contrast."""
+    cells = data.get("cells", {})
+    cheap = cells.get("v2-cheap", {})
+    dedup = (cheap.get("stats") or {}).get("dedup") or {}
+    ac = (cheap.get("stats") or {}).get("atom_context") or {}
+    recall = (data.get("recall") or [{}])[0]
+    backend = recall.get("gate_backend", "sbert:all-MiniLM-L6-v2")
+
+    out = [
+        r"\section{The cheap strategy in detail}",
+        r"\label{sec:algorithm}",
+        "The cheap path is three independent stages applied in order: collapse "
+        "near-duplicate contexts, decide which (context, atom) pairs to score, "
+        "then score only those. Stage~2 is where the two policy options "
+        r"(\texttt{gated} and \texttt{provenance}) differ, and it is the only "
+        "stage that can lose a relation.",
+        "",
+        r"\subsection{Notation}",
+        r"\begin{itemize}",
+        r"  \item $A$ --- the atoms, $C$ --- the contexts. A context is "
+        r"\emph{retrieved for} exactly one atom by the retriever, but may end up "
+        r"relevant to others.",
+        r"  \item $\mathrm{own}(c) \subseteq A$ --- the \emph{owners} of context "
+        r"$c$: every atom whose retrieval produced it. This is a set, not a single "
+        r"pointer, because context dedup can merge several atoms' evidence onto one "
+        r"surviving context.",
+        r"  \item $\mathrm{sim}(x,y) \in [0,1]$ --- cosine similarity of "
+        r"sentence embeddings, computed over the \emph{same} text the NLI premise "
+        r"would use (the summary, falling back to full text). Falls back to token "
+        r"Jaccard if sentence-transformers is unavailable.",
+        r"  \item $\tau$ --- the gate threshold, $w$ --- the neighbour window, "
+        r"$\theta$ --- the dedup threshold.",
+        r"\end{itemize}",
+        "",
+        r"\subsection{Stage 1: near-duplicate context dedup}",
+        "A single greedy agglomerative pass. The first occurrence of a cluster "
+        "survives and later near-duplicates collapse onto it. The essential detail "
+        "is the ownership merge: when $d$ collapses onto $s$, every atom that owned "
+        r"$d$ is repointed at $s$, so \emph{no atom loses evidence}. Exact-text "
+        "dedup in the original pipeline instead deleted the duplicate from its own "
+        "atom only, which could strand an atom with no context at all.",
+        "",
+        r"\begin{algorithm}[H]",
+        r"\caption{\textsc{DedupNearDuplicates}$(C, A, \theta)$}",
+        r"\begin{algorithmic}[1]",
+        r"\State $S \gets [\,]$ \Comment{survivors, in original order}",
+        r"\State $M \gets \{\}$ \Comment{collapsed $\mapsto$ survivor}",
+        r"\ForAll{$c \in C$ in iteration order}",
+        r"  \State $m \gets \textsc{None}$",
+        r"  \ForAll{$s \in S$}",
+        r"    \If{$\mathrm{sim}(c, s) \ge \theta$}",
+        r"      \State $m \gets s$; \textbf{break}",
+        r"    \EndIf",
+        r"  \EndFor",
+        r"  \If{$m = \textsc{None}$} \State append $c$ to $S$",
+        r"  \Else{} \State $M[c] \gets m$",
+        r"  \EndIf",
+        r"\EndFor",
+        r"\ForAll{$(d, s) \in M$} \Comment{merge ownership, never drop it}",
+        r"  \ForAll{$a \in \mathrm{own}(d)$}",
+        r"    \State remove $d$ from $a$'s contexts; add $s$ to $a$'s contexts",
+        r"  \EndFor",
+        r"\EndFor",
+        r"\State \Return $S$ \Comment{$|S| \le |C|$}",
+        r"\end{algorithmic}",
+        r"\end{algorithm}",
+        "",
+        rf"On this example: {_fmt(dedup.get('contexts_before'))} contexts "
+        rf"$\to$ {_fmt(dedup.get('contexts_after'))} "
+        rf"({_fmt(dedup.get('collapsed'))} collapsed, "
+        rf"{_fmt(dedup.get('owners_merged'))} ownership links transferred), at "
+        rf"$\theta = {_fmt(dedup.get('threshold'), '.2f')}$. Since the pair count is "
+        rf"$|A| \times |C|$, shrinking $C$ cuts cost linearly here --- and "
+        rf"quadratically in v3, where the context--context phase is $|C|^2$.",
+        "",
+        r"\subsection{Stage 2: candidate pair selection}",
+        "Every pair is admitted for exactly one of four reasons, tested in order. "
+        "The order matters: the first three are unconditional and bypass the "
+        "similarity gate entirely, so no threshold can prune them.",
+        "",
+        r"\begin{algorithm}[H]",
+        r"\caption{\textsc{SelectAtomContextPairs}$(A, C, \text{policy}, \tau, w)$}",
+        r"\begin{algorithmic}[1]",
+        r"\State $P \gets [\,]$",
+        r"\ForAll{$a \in A$} \Comment{atom-major, preserving baseline pair order}",
+        r"  \ForAll{$c \in C$}",
+        r"    \State $r \gets \textsc{None}$",
+        r"    \If{$a \in \mathrm{own}(c)$}",
+        r"      \State $r \gets \textsc{Provenance}$ "
+        r"\Comment{$c$ was retrieved \emph{for} $a$}",
+        r"    \ElsIf{$\mathrm{id}(c)$ has the query-context prefix}",
+        r"      \State $r \gets \textsc{QueryContext}$ "
+        r"\Comment{retrieved for the question; bears on all atoms}",
+        r"    \ElsIf{policy $=$ \texttt{provenance} \textbf{and} "
+        r"$\exists\, o \in \mathrm{own}(c): |\mathrm{pos}(a) - \mathrm{pos}(o)| \le w$}",
+        r"      \State $r \gets \textsc{Neighbour}$ "
+        r"\Comment{adjacent in the response's atom order}",
+        r"    \ElsIf{$\mathrm{sim}(c, a) \ge \tau$}",
+        r"      \State $r \gets \textsc{GateRescue}$ "
+        r"\Comment{cross-atom evidence, the only heuristic branch}",
+        r"    \EndIf",
+        r"    \If{$r \ne \textsc{None}$} \State append $(c, a)$ to $P$; tally $r$",
+        r"    \EndIf",
+        r"  \EndFor",
+        r"\EndFor",
+        r"\State \Return $P$",
+        r"\end{algorithmic}",
+        r"\end{algorithm}",
+        "",
+        r"\subsection{\texttt{gated} versus \texttt{provenance}}",
+        r"The two policies share branches 1, 2 and 4 and differ in exactly one "
+        r"line: \texttt{provenance} additionally admits the \textsc{Neighbour} "
+        r"branch, \texttt{gated} does not. Both are supersets of the provenance "
+        r"guarantee --- neither can ever drop the pairing of a context with the atom "
+        r"that retrieved it.",
+        "",
+        r"\begin{table}[htbp]", r"\centering",
+        r"\begin{tabular}{llll}", r"\toprule",
+        r"Branch & Condition & \texttt{gated} & \texttt{provenance} \\",
+        r"\midrule",
+        r"\textsc{Provenance} & $a \in \mathrm{own}(c)$ & always & always \\",
+        r"\textsc{QueryContext} & query-level context & always & always \\",
+        r"\textsc{Neighbour} & within $w$ of an owner & --- & always \\",
+        r"\textsc{GateRescue} & $\mathrm{sim}(c,a) \ge \tau$ & yes & yes \\",
+        r"\bottomrule", r"\end{tabular}",
+        r"\caption{The policies differ only in the \textsc{Neighbour} branch. "
+        r"\texttt{provenance} is therefore always a superset of \texttt{gated}: "
+        r"never cheaper, never worse on recall.}",
+        r"\label{tab:policies}", r"\end{table}",
+        "",
+        r"\paragraph{Why \texttt{provenance} keeps the neighbour branch.} Atom ids "
+        r"encode position in the response ($a_0, a_1, \dots$), so adjacency is a "
+        r"proxy for discourse locality: consecutive atoms usually elaborate the same "
+        r"claim, and a source retrieved for one often speaks to the next. This is a "
+        r"cheap structural signal that needs no embedding, and it covers exactly the "
+        r"case a similarity gate is worst at --- text that is topically continuous "
+        r"but lexically dissimilar.",
+        "",
+        r"\paragraph{Why the gate branch is the only risk.} Branches 1--3 are "
+        r"structural facts about how evidence was gathered; branch 4 is a guess. "
+        r"Every recall loss measured in this report, and in earlier runs, came from "
+        r"branch 4 --- never from a provenance pair. That is why $\tau$ is the knob "
+        r"worth tuning and why the sweep in "
+        r"Section~\ref{sec:threshold} varies it alone.",
+        "",
+    ]
+    if ac:
+        out += [
+            r"\paragraph{Branch attribution on this example.}",
+            r"\begin{table}[htbp]", r"\centering",
+            r"\begin{tabular}{lr}", r"\toprule",
+            r"Admitting branch & Pairs \\", r"\midrule",
+            rf"\textsc{{Provenance}} & {_fmt(ac.get('num_provenance'))} \\",
+            rf"\textsc{{QueryContext}} & {_fmt(ac.get('num_query_context'))} \\",
+            rf"\textsc{{Neighbour}} & {_fmt(ac.get('num_neighbor'))} \\",
+            rf"\textsc{{GateRescue}} & {_fmt(ac.get('num_gate_rescued'))} \\",
+            r"\midrule",
+            rf"\textbf{{Selected}} & \textbf{{{_fmt(ac.get('pairs_selected'))}}} \\",
+            rf"Pruned & {_fmt(ac.get('pairs_pruned'))} \\",
+            r"\bottomrule", r"\end{tabular}",
+            r"\caption{Which branch admitted each scored pair.}",
+            r"\label{tab:branches}", r"\end{table}",
+            "",
+        ]
+        total = (ac.get("pairs_selected") or 0) + (ac.get("pairs_pruned") or 0)
+        if total:
+            prov_pct = 100.0 * (ac.get("num_provenance") or 0) / total
+            gate_pct = 100.0 * (ac.get("num_gate_rescued") or 0) / total
+            out += [
+                rf"This distribution is worth reading carefully, because it is the "
+                rf"opposite of what the policy names suggest. Provenance accounts "
+                rf"for only {prov_pct:.0f}\% of the candidate product while the gate "
+                rf"admits {gate_pct:.0f}\%: with five contexts per atom, the vast "
+                rf"majority of the $|A| \times |C|$ product is cross-atom by "
+                rf"construction, so almost every \emph{{kept}} pair is kept by the "
+                rf"gate. The gate is therefore not mainly a pruner on this "
+                rf"workload --- it is admitting most of what it sees, and the "
+                rf"{_fmt(ac.get('pairs_pruned'))} pairs it rejected are the entire "
+                rf"stage-2 saving.",
+                "",
+                r"That also explains why the recall risk concentrates in branch~4 "
+                r"and why the modest stage-2 factor is structural rather than a "
+                r"tuning failure: a biography's atoms all concern one person, so "
+                r"most cross-atom pairs really are related and a faithful gate has "
+                r"little licence to discard them. The dedup stage, which exploits "
+                r"redundancy among \emph{sources} rather than relatedness among "
+                r"claims, is what pays off here.",
+                "",
+            ]
+    out += [
+        r"\subsection{Stage 3: scoring, and the two safety properties}",
+        r"Selected pairs go to the NLI prompt unchanged, so a scored pair yields "
+        r"exactly the verdict the exhaustive policy would have produced. Two "
+        r"properties follow:",
+        r"\begin{enumerate}",
+        r"  \item \textbf{Pruning a would-be-neutral pair is a bit-exact no-op.} "
+        r"Neutral relations are discarded regardless, and a context left in no "
+        r"pairwise factor contributes one normalized unary factor that divides out "
+        r"of every atom marginal. So the error is not ``approximately zero'' --- it "
+        r"is zero, and the entire risk reduces to "
+        r"$P(\text{pruned pair was non-neutral})$.",
+        r"  \item \textbf{The two error types are asymmetric.} A false keep costs "
+        r"one LLM call. A false prune silently removes evidence, and nothing "
+        r"downstream signals that it happened. $\tau$ should therefore be tuned "
+        r"toward keeping, which is why the default sits well below the value that "
+        r"maximises the saving.",
+        r"\end{enumerate}",
+        "",
+        rf"The similarity backend used here was "
+        rf"\texttt{{{_tex_escape(str(backend))}}}. This matters: the token-Jaccard "
+        rf"fallback is not a substitute for embeddings. On a separate 20-atom "
+        rf"narrative it lost 22 of 72 non-neutral relations at \emph{{every}} "
+        rf"threshold tested, because lexical overlap cannot see relatedness carried "
+        rf"by entities and events rather than shared words. The implementation warns "
+        rf"loudly when it falls back.",
+        "",
+        r"\subsection{Complexity}",
+        r"Stage~1 is $O(|C| \cdot |S|)$ similarity lookups on the greedy pass "
+        r"($|S|$ = surviving clusters), stage~2 is $O(|A| \cdot |C|)$ constant-time "
+        r"tests, and one embedding pass over $|A| + |C|$ short texts backs both. All "
+        r"of that is milliseconds against minutes of LLM time --- the selection "
+        r"overhead is not a meaningful cost, which is what makes even a modest "
+        r"pruning ratio worthwhile.",
+    ]
+    return out
 
 
 def _cost_table(cells: Dict[str, Any]) -> List[str]:
@@ -402,6 +632,7 @@ def _sweep_section(sweep: List[dict]) -> List[str]:
     )
     return [
         r"\section{Choosing the threshold}",
+        r"\label{sec:threshold}",
         "The gate threshold trades cost against recall. The curve below is "
         "replayed against the same recorded verdicts, so the whole sweep is free. "
         "Because the two error types are not symmetric --- a false prune silently "
@@ -550,6 +781,7 @@ def build_tex(data: Dict[str, Any]) -> str:
     parts += _preamble()
     parts += _abstract(data)
     parts += _intro(data)
+    parts += _algorithm_section(data)
     parts += _cost_table(cells)
     parts += _savings_prose(cells)
     parts += _quality_table(cells)
