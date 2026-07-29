@@ -28,6 +28,7 @@ from .atomizer import Atomizer
 from .retriever import ContextRetriever
 from .nli import NLIExtractor
 from . import nli_pairs as _np
+from .nli_cache import extractor_identity
 from .nli_config import FAITHFUL, NLIPairConfig
 from fact_reasoner.utils import punctuation_only_inside_quotes
 
@@ -102,13 +103,9 @@ def predict_nli_relationships(
     cache_hits = 0
     todo = list(range(len(premises)))
     if cache is not None and premises:
+        model_id, nli_method = extractor_identity(nli_extractor)
         keys = [
-            cache.make_key(
-                getattr(nli_extractor, "model_id", ""),
-                getattr(nli_extractor, "nli_method", ""),
-                premises[i],
-                hypotheses[i],
-            )
+            cache.make_key(model_id, nli_method, premises[i], hypotheses[i])
             for i in range(len(premises))
         ]
         cached = cache.get_many(keys)
@@ -547,11 +544,12 @@ def build_relations(
             embedding_model=cfg.embedding_model,
         )
 
-    # Create atom-context relations (i.e., Context -> Atom)
+    # ---- Phase 1: select the pairs both phases will score.
+    ac_pairs: List[Tuple[Context, Atom]] = []
+    ac_coverage: dict = {}
     if rel_atom_context:
         print("[NLI] Building atom-context relations...")
-        _t = time.perf_counter()
-        pairs, coverage = _np.select_atom_context_pairs(
+        pairs, ac_coverage = _np.select_atom_context_pairs(
             atoms,
             contexts,
             policy=cfg.policy,
@@ -563,42 +561,21 @@ def build_relations(
             gate_context_ids=gate_context_ids,
         )
         print(
-            f"[NLI] Atom-context pairs: {coverage['pairs_selected']} selected, "
-            f"{coverage['pairs_pruned']} pruned "
-            f"(of {coverage['pairs_possible']} possible)."
+            f"[NLI] Atom-context pairs: {ac_coverage['pairs_selected']} selected, "
+            f"{ac_coverage['pairs_pruned']} pruned "
+            f"(of {ac_coverage['pairs_possible']} possible)."
         )
-
         # Resolve ids to objects here, so selection deals only in ids.
-        atom_context_pairs = [
+        ac_pairs = [
             (contexts[context_id], atoms[atom_id]) for context_id, atom_id in pairs
         ]
 
-        all_rels = predict_nli_relationships(
-            atom_context_pairs,
-            nli_extractor=nli_extractor,
-            links_type="context_atom",
-            use_summary=use_summarized_contexts,
-            cache=cache,
-            stats=coverage,
-        )
-
-        # Filter out the neutral relationships
-        kept = 0
-        for rel in all_rels:
-            if rel.get_type() != "neutral":
-                print(f"[NLI] Found relation: {rel}")
-                relations.append(rel)
-                kept += 1
-        coverage["relations_kept"] = kept
-        coverage["neutral_dropped"] = len(all_rels) - kept
-        coverage["seconds"] = round(time.perf_counter() - _t, 3)
-        phase_stats["atom_context"] = coverage
-
-    # Create context-context relations
+    cc_pairs1: List[Tuple[Context, Context]] = []
+    cc_pairs2: List[Tuple[Context, Context]] = []
+    cc_coverage: dict = {}
     if rel_context_context:
         print("[NLI] Building context-context relations...")
-        _t = time.perf_counter()
-        pairs, coverage = _np.select_context_context_pairs(
+        pairs, cc_coverage = _np.select_context_context_pairs(
             contexts,
             policy=cfg.policy,
             gate_threshold=cfg.gate_threshold,
@@ -606,24 +583,84 @@ def build_relations(
             gate_context_ids=gate_context_ids,
         )
         print(
-            f"[NLI] Context-context pairs: {coverage['pairs_selected']} selected, "
-            f"{coverage['pairs_pruned']} pruned "
-            f"(of {coverage['pairs_possible']} possible)."
+            f"[NLI] Context-context pairs: {cc_coverage['pairs_selected']} selected, "
+            f"{cc_coverage['pairs_pruned']} pruned "
+            f"(of {cc_coverage['pairs_possible']} possible)."
         )
+        cc_pairs1 = [(contexts[ci], contexts[cj]) for ci, cj in pairs]
+        cc_pairs2 = [(contexts[cj], contexts[ci]) for ci, cj in pairs]
 
-        context_context_pairs1 = [(contexts[ci], contexts[cj]) for ci, cj in pairs]
-        context_context_pairs2 = [(contexts[cj], contexts[ci]) for ci, cj in pairs]
-
-        # Get relationships (c_i, c_j)
-        stats1: dict = {}
-        relations1 = predict_nli_relationships(
-            context_context_pairs1,
+    # ---- Phase 2: score the atom-context pairs and the first context direction.
+    # These do not depend on each other, so with merge_phases they go out as one
+    # fan-out rather than draining one batch before starting the next. That is a
+    # latency win only -- the call count is identical either way.
+    _t = time.perf_counter()
+    ac_rels: List[Relation] = []
+    relations1: List[Relation] = []
+    if cfg.merge_phases and ac_pairs and cc_pairs1:
+        merged_stats: dict = {}
+        merged = predict_nli_relationships(
+            ac_pairs + cc_pairs1,
             nli_extractor=nli_extractor,
-            links_type="context_context",
+            links_type="context_atom",
             use_summary=use_summarized_contexts,
             cache=cache,
-            stats=stats1,
+            stats=merged_stats,
         )
+        ac_rels = merged[: len(ac_pairs)]
+        # The merged batch is tagged with one link type, so relabel the
+        # context-context slice to its real link before it reaches the graph.
+        relations1 = []
+        for rel in merged[len(ac_pairs) :]:
+            rel.link = "context_context"
+            relations1.append(rel)
+        # Attribute the shared batch's cost proportionally to each phase.
+        _split_merged_stats(
+            merged_stats, ac_coverage, cc_coverage, len(ac_pairs), len(cc_pairs1)
+        )
+        stats1 = {}
+    else:
+        if ac_pairs:
+            ac_rels = predict_nli_relationships(
+                ac_pairs,
+                nli_extractor=nli_extractor,
+                links_type="context_atom",
+                use_summary=use_summarized_contexts,
+                cache=cache,
+                stats=ac_coverage,
+            )
+        stats1 = {}
+        if cc_pairs1:
+            relations1 = predict_nli_relationships(
+                cc_pairs1,
+                nli_extractor=nli_extractor,
+                links_type="context_context",
+                use_summary=use_summarized_contexts,
+                cache=cache,
+                stats=stats1,
+            )
+
+    # Filter out the neutral atom-context relationships.
+    if rel_atom_context:
+        kept = 0
+        for rel in ac_rels:
+            if rel.get_type() != "neutral":
+                print(f"[NLI] Found relation: {rel}")
+                relations.append(rel)
+                kept += 1
+        ac_coverage["relations_kept"] = kept
+        ac_coverage["neutral_dropped"] = len(ac_rels) - kept
+        ac_coverage["seconds"] = round(time.perf_counter() - _t, 3)
+        phase_stats["atom_context"] = ac_coverage
+
+    # Phase 3 starts here, so the two phases' timings do not overlap even when
+    # phase 2 scored both of their first batches together.
+    _t_cc = time.perf_counter()
+
+    # ---- Phase 3: the reverse context direction, which depends on phase 2.
+    if rel_context_context:
+        coverage = cc_coverage
+        context_context_pairs2 = cc_pairs2
 
         # Get relationships (c_j, c_i). The reverse direction is only needed
         # where it can change the reconciled outcome, so the cascade scores a
@@ -671,15 +708,21 @@ def build_relations(
                 relations.append(rel)
                 kept += 1
 
-        coverage["llm_calls_dir1"] = stats1.get("llm_calls", 0)
+        # Under merge_phases the first direction was billed to `coverage` by
+        # _split_merged_stats, so take whichever source holds it.
+        coverage["llm_calls_dir1"] = stats1.get(
+            "llm_calls", coverage.get("llm_calls", 0)
+        )
         coverage["llm_calls_dir2"] = stats2.get("llm_calls", 0)
         coverage["llm_calls"] = coverage["llm_calls_dir1"] + coverage["llm_calls_dir2"]
-        coverage["cache_hits"] = stats1.get("cache_hits", 0) + stats2.get(
-            "cache_hits", 0
-        )
+        coverage["cache_hits"] = stats1.get(
+            "cache_hits", coverage.get("cache_hits", 0)
+        ) + stats2.get("cache_hits", 0)
         coverage["relations_kept"] = kept
         coverage["neutral_dropped"] = len(relations_tmp) - kept
-        coverage["seconds"] = round(time.perf_counter() - _t, 3)
+        # Measured from the phase-3 boundary; when the first direction rode along
+        # with the atom-context batch, its time is billed to that phase.
+        coverage["seconds"] = round(time.perf_counter() - _t_cc, 3)
         phase_stats["context_context"] = coverage
 
     print(f"[NLI] Relations built: {len(relations)}")
@@ -689,6 +732,34 @@ def build_relations(
         _report_savings(stats)
 
     return relations
+
+
+def _split_merged_stats(
+    merged: dict,
+    ac_coverage: dict,
+    cc_coverage: dict,
+    num_ac: int,
+    num_cc: int,
+) -> None:
+    """Attribute a shared fan-out's call counts back to the two phases.
+
+    The merged batch reports one total, but the per-phase report needs a number for
+    each. Cache hits are not tracked per item through the shared call, so both
+    counts are apportioned by pair share -- exact in the common cases (all hits or
+    all misses) and approximate only when a batch is partially cached. The totals
+    remain exact either way.
+    """
+    total = num_ac + num_cc
+    if not total:
+        return
+    calls = merged.get("llm_calls", 0)
+    hits = merged.get("cache_hits", 0)
+    ac_calls = round(calls * num_ac / total)
+    ac_hits = round(hits * num_ac / total)
+    ac_coverage["llm_calls"] = ac_calls
+    ac_coverage["cache_hits"] = ac_hits
+    cc_coverage["llm_calls"] = calls - ac_calls
+    cc_coverage["cache_hits"] = hits - ac_hits
 
 
 def _mirror_needed(relations1: List[Relation]) -> List[int]:

@@ -360,6 +360,135 @@ class TestDirectionalCascade:
         assert mock_nli_batch.total_calls() == cc["pairs_selected"]
 
 
+class TestMergedFanOut:
+    """Merging phases removes a barrier; it must not change results or counts."""
+
+    def test_same_relations_and_call_count_as_unmerged(self, mock_nli_batch):
+        atoms = make_atoms(3)
+        contexts = make_contexts(atoms, per_atom=2)
+        mock_nli_batch.default_verdict = {"label": "entailment", "probability": 0.9}
+
+        plain_stats = {}
+        plain = build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch, stats=plain_stats,
+        )
+        plain_calls = mock_nli_batch.total_calls()
+
+        mock_nli_batch.calls.clear()
+        merged_stats = {}
+        merged = build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+            stats=merged_stats,
+        )
+
+        # Latency win only: identical call count, identical relations.
+        assert mock_nli_batch.total_calls() == plain_calls
+        assert relation_signature(merged) == relation_signature(plain)
+        assert merged_stats["totals"]["llm_calls"] == plain_stats["totals"]["llm_calls"]
+
+    def test_fewer_batches_than_unmerged(self, mock_nli_batch):
+        """The whole point: one less round trip barrier."""
+        atoms = make_atoms(3)
+        contexts = make_contexts(atoms, per_atom=2)
+
+        build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+        )
+        plain_batches = len(mock_nli_batch.calls)
+
+        mock_nli_batch.calls.clear()
+        build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+        )
+
+        assert len(mock_nli_batch.calls) < plain_batches
+
+    def test_context_context_relations_keep_their_link_type(self, mock_nli_batch):
+        """The merged batch carries one link tag, so the slice must be relabeled."""
+        atoms = make_atoms(2)
+        contexts = make_contexts(atoms, per_atom=2)
+        mock_nli_batch.default_verdict = {"label": "contradiction", "probability": 0.8}
+
+        relations = build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+        )
+
+        links = {r.link for r in relations}
+        assert links == {"context_atom", "context_context"}
+        for rel in relations:
+            if isinstance(rel.source, Context) and isinstance(rel.target, Context):
+                assert rel.link == "context_context"
+            elif isinstance(rel.target, Atom):
+                assert rel.link == "context_atom"
+
+    def test_phase_timings_do_not_overlap(self, mock_nli_batch):
+        atoms = make_atoms(2)
+        contexts = make_contexts(atoms, per_atom=2)
+        stats = {}
+
+        build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+            stats=stats,
+        )
+
+        phase_sum = (
+            stats["atom_context"]["seconds"] + stats["context_context"]["seconds"]
+        )
+        assert abs(stats["totals"]["seconds"] - phase_sum) < 1e-6
+
+    def test_merged_call_counts_sum_to_total(self, mock_nli_batch):
+        atoms = make_atoms(3)
+        contexts = make_contexts(atoms, per_atom=2)
+        stats = {}
+
+        build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=True,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+            stats=stats,
+        )
+
+        assert (
+            stats["atom_context"]["llm_calls"]
+            + stats["context_context"]["llm_calls"]
+            == mock_nli_batch.total_calls()
+        )
+
+    def test_merge_with_only_one_phase_enabled(self, mock_nli_batch):
+        """Nothing to merge; must behave exactly as unmerged."""
+        atoms = make_atoms(2)
+        contexts = make_contexts(atoms, per_atom=2)
+        stats = {}
+
+        build_relations(
+            atoms=atoms, contexts=contexts,
+            rel_atom_context=True, rel_context_context=False,
+            nli_extractor=mock_nli_batch,
+            pair_config=NLIPairConfig(policy="all_pairs", merge_phases=True),
+            stats=stats,
+        )
+
+        assert mock_nli_batch.total_calls() == len(atoms) * len(contexts)
+        assert "context_context" not in stats
+
+
 class TestPerAtomPathIntegrity:
     """The v1 path must send context text, never context ids."""
 
