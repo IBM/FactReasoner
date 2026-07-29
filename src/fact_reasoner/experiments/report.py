@@ -338,6 +338,11 @@ def _bar_chart(records, lcs_method, models, examples, variants, out_dir) -> str:
     """A grouped bar chart: x=examples, bars=(model x variant), y=LCS value.
 
     Writes a ``.dat`` file and returns the LaTeX ``figure`` block that reads it.
+
+    Currently unused: the Results section reports one table per LCS readout and
+    omits the charts (see ``write_report``). Kept for when they are wanted again.
+    Re-enabling it also means updating ``test_report_is_well_formed``, which
+    asserts that no ``axis`` environment and no ``.dat`` files are produced.
     """
     multi = _multi_policy(variants)
     multi_g = _multi_grounding(variants)

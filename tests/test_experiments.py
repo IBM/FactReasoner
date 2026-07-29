@@ -159,15 +159,18 @@ class TestReport:
         # Core structure present.
         assert r"\begin{document}" in tex and r"\end{document}" in tex
         assert r"\begin{tabular}" in tex
-        assert r"\begin{axis}" in tex
         assert r"\section{Conclusion}" in tex
         assert r"\section{Future work}" in tex
+        # Results are reported as one table per LCS readout. Per-method bar charts
+        # (and the .dat files feeding them) were deliberately dropped, so the
+        # report emits no `axis` environment; the `tikzpicture`/`figure` blocks
+        # that remain come from the relation-graph section.
+        assert r"\begin{axis}" not in tex
+        assert not list(tmp_path.glob("*.dat"))
+        assert r"\begin{tikzpicture}" in tex
         # Balanced environments.
         for env in ("document", "table", "tabular", "tikzpicture", "axis", "figure"):
             assert tex.count(rf"\begin{{{env}}}") == tex.count(rf"\end{{{env}}}")
-        # A .dat file per LCS method.
-        for m in LCS_METHODS:
-            assert (tmp_path / f"{m}.dat").exists()
         # \label keys must be LaTeX-safe (no escaped underscores, which break refs).
         import re
         for lbl in re.findall(r"\\label\{([^}]*)\}", tex):
