@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,8 +32,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fact_reasoner.backends import build_backend
 
@@ -47,7 +45,7 @@ DEFAULT_TERM_GRACE_S = 20.0
 _LOG_TAIL_CHARS = 4000
 
 
-def _resolve_tensor_parallel_size(explicit: Optional[int]) -> int:
+def _resolve_tensor_parallel_size(explicit: int | None) -> int:
     """Resolve the vLLM tensor-parallel size.
 
     Args:
@@ -102,11 +100,11 @@ def _build_vllm_argv(
     port: int,
     tensor_parallel_size: int,
     gpu_memory_utilization: float,
-    max_model_len: Optional[int],
+    max_model_len: int | None,
     dtype: str,
     api_key: str,
-    extra_args: Optional[List[str]],
-) -> List[str]:
+    extra_args: list[str] | None,
+) -> list[str]:
     """Build the ``vllm serve`` command line.
 
     Returns:
@@ -175,19 +173,19 @@ class VLLMServer:
         self,
         model: str,
         *,
-        served_model_name: Optional[str] = None,
+        served_model_name: str | None = None,
         host: str = DEFAULT_HOST,
-        port: Optional[int] = None,
-        tensor_parallel_size: Optional[int] = None,
+        port: int | None = None,
+        tensor_parallel_size: int | None = None,
         gpu_memory_utilization: float = DEFAULT_GPU_MEMORY_UTILIZATION,
-        max_model_len: Optional[int] = None,
+        max_model_len: int | None = None,
         dtype: str = "auto",
         api_key: str = "EMPTY",
-        extra_args: Optional[List[str]] = None,
+        extra_args: list[str] | None = None,
         startup_timeout_s: float = DEFAULT_STARTUP_TIMEOUT_S,
         term_grace_s: float = DEFAULT_TERM_GRACE_S,
-        log_path: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None,
+        log_path: str | None = None,
+        env: dict[str, str] | None = None,
     ) -> None:
         """Initialize the server manager (does not start vLLM yet)."""
         self.model = model
@@ -205,7 +203,7 @@ class VLLMServer:
         self.log_path = log_path or f"vllm.{self.port}.log"
         self.env = env
 
-        self._proc: Optional[subprocess.Popen] = None
+        self._proc: subprocess.Popen | None = None
         self._log_file = None
 
     @property
@@ -213,7 +211,7 @@ class VLLMServer:
         """OpenAI-compatible base URL for the server (``http://host:port/v1``)."""
         return f"http://{self.host}:{self.port}/v1"
 
-    def argv(self) -> List[str]:
+    def argv(self) -> list[str]:
         """Return the ``vllm serve`` command line this server will launch."""
         return _build_vllm_argv(
             model=self.model,
@@ -359,7 +357,7 @@ class VLLMServer:
             **backend_options,
         )
 
-    def __enter__(self) -> "VLLMServer":
+    def __enter__(self) -> "VLLMServer":  # noqa: PYI034
         """Start the server and return self."""
         self.start()
         return self

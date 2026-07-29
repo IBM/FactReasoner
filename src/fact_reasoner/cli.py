@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,8 +24,8 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend
-from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 from fact_reasoner.core.nli_config import NLI_PAIR_POLICIES
+from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:

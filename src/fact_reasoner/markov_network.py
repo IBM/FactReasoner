@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +30,6 @@
 #     for a pairwise factor over ``[x, y]`` the value order is
 #     ``(x=0,y=0), (x=0,y=1), (x=1,y=0), (x=1,y=1)``.
 
-from typing import Dict, List, Tuple
 
 
 class MarkovNetwork:
@@ -53,9 +51,9 @@ class MarkovNetwork:
 
     def __init__(self) -> None:
         """Initialize an empty Markov network."""
-        self.nodes: Dict[str, int] = {}
-        self.edges: List[Tuple[str, str]] = []
-        self.factors: List[Tuple[List[str], List[int], List[float]]] = []
+        self.nodes: dict[str, int] = {}
+        self.edges: list[tuple[str, str]] = []
+        self.factors: list[tuple[list[str], list[int], list[float]]] = []
 
     def add_node(self, variable: str, cardinality: int = 2) -> None:
         """Add a variable to the network.
@@ -77,9 +75,9 @@ class MarkovNetwork:
 
     def add_factor(
         self,
-        variables: List[str],
-        cardinalities: List[int],
-        values: List[float],
+        variables: list[str],
+        cardinalities: list[int],
+        values: list[float],
     ) -> None:
         """Add a factor over one or more variables.
 
@@ -101,7 +99,7 @@ class MarkovNetwork:
             self.add_node(var, card)
         self.factors.append((list(variables), list(cardinalities), list(values)))
 
-    def _sorted_domain(self) -> List[Tuple[str, int]]:
+    def _sorted_domain(self) -> list[tuple[str, int]]:
         """Return variables sorted by (cardinality, name).
 
         This reproduces pgmpy's canonical UAI variable ordering. With uniform
@@ -109,7 +107,7 @@ class MarkovNetwork:
         """
         return sorted(self.nodes.items(), key=lambda item: (str(item[1]), item[0]))
 
-    def index_to_variable(self) -> Dict[int, str]:
+    def index_to_variable(self) -> dict[int, str]:
         """Map UAI variable indices back to variable names.
 
         Returns:
@@ -127,7 +125,7 @@ class MarkovNetwork:
         domain = self._sorted_domain()
         var_index = {name: i for i, (name, _) in enumerate(domain)}
 
-        lines: List[str] = []
+        lines: list[str] = []
         lines.append("MARKOV")
         lines.append(str(len(self.nodes)))
         # Cardinalities in canonical variable order.

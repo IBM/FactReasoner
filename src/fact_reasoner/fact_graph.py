@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +16,9 @@
 
 import json
 from pathlib import Path
-from typing import List
-from tqdm import tqdm
+
 import networkx as nx
+from tqdm import tqdm
 
 
 class Node:
@@ -98,9 +97,9 @@ class FactGraph:
 
     def __init__(
         self,
-        atoms: List = None,
-        contexts: List = None,
-        relations: List = None,
+        atoms: list | None = None,
+        contexts: list | None = None,
+        relations: list | None = None,
     ):
         """
         FactGraph constructor.
@@ -210,7 +209,7 @@ class FactGraph:
         Generate a networkx.DiGraph representation of the fact graph.
         """
         G = nx.DiGraph()
-        for _, node in self.nodes.items():
+        for node in self.nodes.values():
             if node.type == "atom":
                 G.add_node(node.id, color="green")
             else:
@@ -222,21 +221,21 @@ class FactGraph:
                     edge.source,
                     edge.target,
                     color="green",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
             elif edge.type == "contradiction":
                 G.add_edge(
                     edge.source,
                     edge.target,
                     color="red",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
             elif edge.type == "equivalence":
                 G.add_edge(
                     edge.source,
                     edge.target,
                     color="blue",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
 
         return G
@@ -273,7 +272,7 @@ class FactGraph:
 
     def dump(self):
         print("Nodes:")
-        for i, n in self.nodes.items():
+        for n in self.nodes.values():
             print(n)
         print("Edges:")
         for e in self.edges:

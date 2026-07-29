@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,9 +40,10 @@ from __future__ import annotations
 import json
 import os
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import mellea.stdlib.functional as mfuncs
+import numpy as np
 from mellea.backends import Backend
 from mellea.stdlib.context import SimpleContext
 
@@ -75,10 +75,10 @@ def _sample_label(sample_text: str) -> str:
 def load_nli_pairs(
     path: str,
     *,
-    num_pairs: Optional[int] = None,
+    num_pairs: int | None = None,
     balanced: bool = True,
     seed: int = 0,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Load ``{premise, hypothesis, label}`` triples from a JSON array file.
 
     Args:
@@ -103,9 +103,9 @@ def load_nli_pairs(
         data = json.load(f)
 
     if not isinstance(data, list):
-        raise ValueError(f"Expected a JSON list in {path!r}, got {type(data).__name__}.")
+        raise ValueError(f"Expected a JSON list in {path!r}, got {type(data).__name__}.")  # noqa: TRY004
 
-    pairs: List[Dict[str, str]] = []
+    pairs: list[dict[str, str]] = []
     for i, item in enumerate(data):
         try:
             premise = item["premise"]
@@ -128,13 +128,13 @@ def load_nli_pairs(
         return rng.sample(pairs, num_pairs)
 
     # Balanced subset: split the budget across the labels as evenly as possible.
-    by_label: Dict[str, List[Dict[str, str]]] = {lbl: [] for lbl in NLI_LABELS}
+    by_label: dict[str, list[dict[str, str]]] = {lbl: [] for lbl in NLI_LABELS}
     for p in pairs:
         by_label[p["label"]].append(p)
 
     per_label = num_pairs // len(NLI_LABELS)
     remainder = num_pairs - per_label * len(NLI_LABELS)
-    selected: List[Dict[str, str]] = []
+    selected: list[dict[str, str]] = []
     for idx, lbl in enumerate(NLI_LABELS):
         take = per_label + (1 if idx < remainder else 0)
         bucket = by_label[lbl]
@@ -167,16 +167,16 @@ def _read_completed_keys(out_path: str) -> set:
 
 
 async def generate_training_samples(
-    pairs: List[Dict[str, str]],
+    pairs: list[dict[str, str]],
     backend: Backend,
     out_path: str,
     *,
-    temperatures: Optional[List[float]] = None,
+    temperatures: list[float] | None = None,
     n_per_temp: int = 5,
     similarity_metric: str = "rouge",
     num_workers: int = 4,
     progress: bool = False,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Generate SIMBA-UQ sample groups for each NLI pair and write them to JSONL.
 
     For every pair, runs ``INSTRUCTION_NLI`` under a :class:`SIMBAUQSamplingStrategy`
@@ -220,7 +220,7 @@ async def generate_training_samples(
     todo = [p for p in pairs if _pair_key(p["premise"], p["hypothesis"]) not in completed]
     skipped_existing = len(pairs) - len(todo)
 
-    def factory(pair: Dict[str, str]):
+    def factory(pair: dict[str, str]):
         return mfuncs.ainstruct(
             INSTRUCTION_NLI,
             context=SimpleContext(),
@@ -291,10 +291,10 @@ async def generate_training_samples(
     return summary
 
 
-def _read_groups(samples_path: str) -> Tuple[List[List[str]], List[List[int]]]:
+def _read_groups(samples_path: str) -> tuple[list[list[str]], list[list[int]]]:
     """Read a samples JSONL into (training_samples, training_labels) groups."""
-    training_samples: List[List[str]] = []
-    training_labels: List[List[int]] = []
+    training_samples: list[list[str]] = []
+    training_labels: list[list[int]] = []
     with open(samples_path) as f:
         for line in f:
             line = line.strip()
@@ -308,8 +308,8 @@ def _read_groups(samples_path: str) -> Tuple[List[List[str]], List[List[int]]]:
 
 def _fit_classifier(
     strategy: SIMBAUQSamplingStrategy,
-    training_samples: List[List[str]],
-    training_labels: List[List[int]],
+    training_samples: list[list[str]],
+    training_labels: list[list[int]],
     *,
     progress: bool = False,
 ) -> ProbabilisticClassifier:
@@ -336,8 +336,8 @@ def _fit_classifier(
 
         groups = tqdm(groups, desc="Extracting features", unit="group")
 
-    x_train: List["np.ndarray"] = []
-    y_train: List[int] = []
+    x_train: list[np.ndarray] = []
+    y_train: list[int] = []
     for samples, labels in groups:
         sim_matrix = strategy._compute_similarity_matrix(samples)
         for i, label in enumerate(labels):
@@ -354,13 +354,13 @@ def _fit_classifier(
 def train_classifier_from_jsonl(
     samples_path: str,
     *,
-    temperatures: Optional[List[float]] = None,
+    temperatures: list[float] | None = None,
     n_per_temp: int = 4,
     similarity_metric: str = "rouge",
     clf_max_depth: int = 4,
-    clf_random_state: Optional[int] = 0,
+    clf_random_state: int | None = 0,
     progress: bool = False,
-) -> Tuple[ProbabilisticClassifier, Dict[str, Any]]:
+) -> tuple[ProbabilisticClassifier, dict[str, Any]]:
     """Train a SIMBA-UQ classifier from a generated samples JSONL.
 
     Uses the same feature extraction the strategy applies at inference time
@@ -420,7 +420,7 @@ def train_classifier_from_jsonl(
 
 
 def save_classifier(
-    clf: ProbabilisticClassifier, path: str, metadata: Dict[str, Any]
+    clf: ProbabilisticClassifier, path: str, metadata: dict[str, Any]
 ) -> None:
     """Persist a trained classifier together with its config metadata.
 
@@ -438,7 +438,7 @@ def save_classifier(
     print(f"[nli-training] Saved classifier to {path} (metadata: {metadata})")
 
 
-def load_classifier(path: str) -> Tuple[ProbabilisticClassifier, Dict[str, Any]]:
+def load_classifier(path: str) -> tuple[ProbabilisticClassifier, dict[str, Any]]:
     """Load a classifier and its metadata saved by :func:`save_classifier`.
 
     Returns:
@@ -468,11 +468,11 @@ def evaluate_classifier(
     classifier: ProbabilisticClassifier,
     samples_path: str,
     *,
-    temperatures: Optional[List[float]] = None,
+    temperatures: list[float] | None = None,
     n_per_temp: int = 4,
     similarity_metric: str = "rouge",
     progress: bool = False,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compare classifier vs. aggregation *sample-selection* accuracy on held-out data.
 
     For each group, both methods pick the highest-confidence sample; the pick is

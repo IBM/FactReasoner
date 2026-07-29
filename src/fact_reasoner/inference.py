@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +30,6 @@ import os
 import re
 import subprocess
 import uuid
-from typing import Dict, List, Optional
 
 from fact_reasoner.markov_network import MarkovNetwork
 
@@ -39,7 +37,7 @@ from fact_reasoner.markov_network import MarkovNetwork
 MERLIN_TASKS = ("MAR", "PR", "MAP")
 
 
-def _load_merlin_json(raw: str) -> Optional[Dict[str, object]]:
+def _load_merlin_json(raw: str) -> dict[str, object] | None:
     """Strictly parse Merlin's JSON output, or return ``None`` if malformed.
 
     Some Merlin builds emit a duplicated ``"status"`` field without a separating
@@ -60,9 +58,9 @@ def run_merlin(
     task: str = "MAR",
     algorithm: str = "wmb",
     ibound: int = 6,
-    query_variables: Optional[List[str]] = None,
+    query_variables: list[str] | None = None,
     verbose: bool = True,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Run Merlin inference on a Markov network.
 
     Serializes ``network`` to a temporary UAI file, runs the ``merlin``
@@ -131,7 +129,7 @@ def run_merlin(
     ]
 
     try:
-        proc = subprocess.run(args)
+        proc = subprocess.run(args)  # noqa: PLW1510
         if verbose:
             print(f"[Merlin] return code: {proc.returncode}")
         if proc.returncode != 0:
@@ -159,12 +157,12 @@ def run_merlin(
 
 
 def _parse_marginals(
-    results: Dict[str, object],
-    vars_mapping: Dict[int, str],
-    query_variables: Optional[List[str]],
+    results: dict[str, object],
+    vars_mapping: dict[int, str],
+    query_variables: list[str] | None,
     *,
     verbose: bool,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """Parse a Merlin MAR result into named marginals.
 
     Every reported marginal is mapped from its integer index to a variable name;
@@ -176,15 +174,15 @@ def _parse_marginals(
 
     query_set = set(query_variables) if query_variables is not None else None
 
-    marginals: List[Dict[str, object]] = []
-    all_marginals: List[Dict[str, object]] = []
+    marginals: list[dict[str, object]] = []
+    all_marginals: list[dict[str, object]] = []
     for marginal in results["marginals"]:
         var_index = marginal["variable"]
         var_name = vars_mapping[var_index]
         probs = marginal["probabilities"]
-        all_marginals.append(dict(variable=var_name, probabilities=probs))
+        all_marginals.append({"variable": var_name, "probabilities": probs})
         if query_set is None or var_name in query_set:
-            marginals.append(dict(variable=var_name, probabilities=probs))
+            marginals.append({"variable": var_name, "probabilities": probs})
 
     if verbose:
         print(f"[Merlin] All Marginals:\n{all_marginals}")
@@ -193,8 +191,8 @@ def _parse_marginals(
 
 
 def _parse_partition(
-    results: Optional[Dict[str, object]], raw: str
-) -> Dict[str, object]:
+    results: dict[str, object] | None, raw: str
+) -> dict[str, object]:
     """Parse a Merlin PR result into a ``log_z`` float.
 
     Merlin's PR output reports the (natural-log) partition function; different

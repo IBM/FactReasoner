@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,8 +23,7 @@ import inspect
 import json
 import os
 from dataclasses import replace
-
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mellea.backends import Backend
 
@@ -34,12 +32,12 @@ from fact_reasoner.baselines.factscore import FactScore
 from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
-from fact_reasoner.core.query_builder import QueryBuilder
-from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.nli_config import get_pair_config
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.summarizer import ContextSummarizer
 
 # Recognized factuality pipelines.
 PIPELINES = ("factreasoner", "factscore", "veriscore", "factverify")
@@ -111,25 +109,25 @@ class FactualityRunner:
         pipeline: str = "factreasoner",
         pipeline_version: str = "v2",
         service_type: str = "google",
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
         top_k: int = 3,
         num_workers: int = 4,
         use_priors: bool = False,
         use_summarizer: bool = False,
         use_query_builder: bool = False,
-        merlin_path: Optional[str] = None,
+        merlin_path: str | None = None,
         nli_method: str = "logprobs",
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
-        nli_classifier_path: Optional[str] = None,
-        nli_pair_policy: Optional[str] = None,
-        nli_gate_threshold: Optional[float] = None,
-        nli_neighbor_window: Optional[int] = None,
-        nli_dedup_near_duplicates: Optional[bool] = None,
-        nli_dedup_threshold: Optional[float] = None,
-        nli_ctx_ctx_cascade: Optional[bool] = None,
-        nli_merge_phases: Optional[bool] = None,
-        nli_cache_dir: Optional[str] = None,
+        nli_classifier_path: str | None = None,
+        nli_pair_policy: str | None = None,
+        nli_gate_threshold: float | None = None,
+        nli_neighbor_window: int | None = None,
+        nli_dedup_near_duplicates: bool | None = None,
+        nli_dedup_threshold: float | None = None,
+        nli_ctx_ctx_cascade: bool | None = None,
+        nli_merge_phases: bool | None = None,
+        nli_cache_dir: str | None = None,
         show_progress: bool = False,
     ) -> None:
         """Initialize the runner and its shared components."""
@@ -256,7 +254,7 @@ class FactualityRunner:
             )
 
     @staticmethod
-    def _normalize_results(scored: Any) -> Dict[str, Any]:
+    def _normalize_results(scored: Any) -> dict[str, Any]:
         """Normalize the pipeline ``score()`` return to a results dict.
 
         ``FactReasoner.score`` returns ``(results, marginals)``; the baselines
@@ -270,9 +268,9 @@ class FactualityRunner:
         self,
         query: str,
         response: str,
-        topic: Optional[str] = None,
-        output_file: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        topic: str | None = None,
+        output_file: str | None = None,
+    ) -> dict[str, Any]:
         """Assess a single query/response pair.
 
         Atoms and contexts are generated from scratch (the response is atomized,
@@ -323,9 +321,9 @@ class FactualityRunner:
         input_file: str,
         output_dir: str,
         *,
-        dataset_name: Optional[str] = None,
-        model_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        dataset_name: str | None = None,
+        model_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Assess a jsonl dataset of pre-annotated responses.
 
         Each item is expected to already contain atoms and contexts (as produced
@@ -347,7 +345,7 @@ class FactualityRunner:
             if self.pipeline == "factreasoner"
             else self.pipeline
         )
-        rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
+        _rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
             self.pipeline_version
         ]
 
@@ -363,7 +361,7 @@ class FactualityRunner:
         output_filename = os.path.join(output_dir, out_name)
 
         # Resume: load any previously computed results and skip their inputs.
-        evaluation_data: List[Dict[str, Any]] = []
+        evaluation_data: list[dict[str, Any]] = []
         if os.path.isfile(output_filename):
             with open(output_filename, "r") as f:
                 evaluation_data = [json.loads(line) for line in f if line.strip()]
@@ -379,7 +377,7 @@ class FactualityRunner:
             pipeline_obj = self._make_pipeline(context_retriever)
             pipeline_obj.from_dict_with_contexts(input_data)
 
-            build_kwargs = dict(has_atoms=True, has_contexts=True, revise_atoms=False)
+            build_kwargs = {"has_atoms": True, "has_contexts": True, "revise_atoms": False}
             if self.pipeline == "factreasoner":
                 build_kwargs.update(
                     remove_duplicates=remove_dups,
@@ -396,8 +394,7 @@ class FactualityRunner:
 
             # Write incrementally so a crash keeps completed work.
             with open(output_filename, "w") as f:
-                for res in evaluation_data:
-                    f.write(f"{json.dumps(res)}\n")
+                f.writelines(f"{json.dumps(res)}\n" for res in evaluation_data)
 
         print(f"[FactualityRunner] Results written to: {output_filename}")
         return evaluation_data

@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +26,6 @@
 #   * with-priors -- the source's own probability is decoupled from the
 #     implication. The default (``use_priors=True``).
 
-from typing import Dict, List, Optional
 
 from fact_reasoner.core.base import PRIOR_PROB_ATOM, PRIOR_PROB_CONTEXT
 from fact_reasoner.fact_graph import FactGraph
@@ -55,7 +53,7 @@ def pairwise_prior(link: str) -> float:
         raise ValueError(f"Unknown link type: {link}")
 
 
-def edge_factor_values(edge, use_priors: bool = True) -> List[float]:
+def edge_factor_values(edge, use_priors: bool = True) -> list[float]:
     """Compute the flattened pairwise factor table for a fact-graph edge.
 
     The table is laid out row-major over ``[source, target]``, i.e. the value
@@ -105,7 +103,7 @@ def build_markov_network(
     fact_graph: FactGraph,
     *,
     use_priors: bool = True,
-    node_priors: Optional[Dict[str, float]] = None,
+    node_priors: dict[str, float] | None = None,
 ) -> MarkovNetwork:
     """Create the Markov network corresponding to a fact graph.
 

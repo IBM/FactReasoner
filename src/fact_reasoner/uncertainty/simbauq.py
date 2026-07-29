@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,11 +47,8 @@ from copy import deepcopy
 from difflib import SequenceMatcher
 from typing import Literal, Protocol, runtime_checkable
 
+import mellea.stdlib.functional as mfuncs
 import numpy as np
-
-from mellea.core.base import ComponentParseError
-from mellea.core.utils import MelleaLogger
-
 from mellea.core import (
     Backend,
     BaseModelSubclass,
@@ -64,7 +60,8 @@ from mellea.core import (
     SamplingStrategy,
     ValidationResult,
 )
-import mellea.stdlib.functional as mfuncs
+from mellea.core.base import ComponentParseError
+from mellea.core.utils import MelleaLogger
 
 
 @runtime_checkable

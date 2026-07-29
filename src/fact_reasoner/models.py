@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,7 +35,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from mellea.backends import model_ids as _mellea_model_ids
 from mellea.backends.model_ids import ModelIdentifier
@@ -44,7 +42,7 @@ from mellea.backends.model_ids import ModelIdentifier
 # Friendly aliases -> canonical friendly key. These preserve the short shortcuts
 # the CLI historically accepted (and add a couple of obvious conveniences), so
 # existing invocations such as ``--model-id llama3`` keep working.
-_ALIASES: Dict[str, str] = {
+_ALIASES: dict[str, str] = {
     "llama3": "llama-3-3-70b-instruct",
     "llama-3.3-70b": "llama-3-3-70b-instruct",
     "granite4": "granite-4-0-h-small",
@@ -59,7 +57,7 @@ _ALIASES: Dict[str, str] = {
 # automatic basename match cannot infer (different HF revision / naming). The
 # automatic matches (see ``_build_rits_overlay``) are merged with this table,
 # and this table wins on conflicts.
-_RITS_OVERRIDES: Dict[str, str] = {
+_RITS_OVERRIDES: dict[str, str] = {
     # The historical "mistral" shortcut pointed at RITS' large Mistral, which is
     # a different revision than Mellea's MISTRALAI_MISTRAL_LARGE_123B, so it is
     # not found by basename matching.
@@ -85,8 +83,8 @@ class UnifiedModel:
 
     key: str
     mellea: ModelIdentifier
-    rits: Optional[str] = None
-    vllm: Optional[str] = None
+    rits: str | None = None
+    vllm: str | None = None
 
     def for_backend(self, kind: str):
         """Resolve this model to the identifier the given backend expects.
@@ -165,7 +163,7 @@ def _norm_basename(name: str) -> str:
     return "".join(c for c in base.lower() if c.isalnum())
 
 
-def _build_rits_overlay() -> Dict[str, str]:
+def _build_rits_overlay() -> dict[str, str]:
     """Map normalized HF basenames to RITS attribute names.
 
     Iterates the ``RITS`` catalog and indexes each entry by the normalized
@@ -182,7 +180,7 @@ def _build_rits_overlay() -> Dict[str, str]:
     # These names on RITS are deprecated aliases that warn on attribute access.
     deprecated = {"GRANITE_3_3_8B", "LLAMA_3_3_70B", "QWEN_2_5_72B"}
 
-    overlay: Dict[str, List[str]] = {}
+    overlay: dict[str, list[str]] = {}
     for attr in dir(RITS):
         if attr.startswith("_") or attr in deprecated:
             continue
@@ -192,19 +190,17 @@ def _build_rits_overlay() -> Dict[str, str]:
 
     # Collapse to one attribute per basename, preferring an *_INSTRUCT variant
     # and then the shortest name (avoids picking *_TEST / *_E variants).
-    resolved: Dict[str, str] = {}
+    resolved: dict[str, str] = {}
     for norm, attrs in overlay.items():
-        resolved[norm] = sorted(
-            attrs, key=lambda a: (0 if "INSTRUCT" in a else 1, len(a))
-        )[0]
+        resolved[norm] = min(attrs, key=lambda a: (0 if "INSTRUCT" in a else 1, len(a)))
     return resolved
 
 
-def _build_catalog() -> Dict[str, UnifiedModel]:
+def _build_catalog() -> dict[str, UnifiedModel]:
     """Build the unified catalog from the Mellea model_ids constants."""
     rits_by_basename = _build_rits_overlay()
 
-    catalog: Dict[str, UnifiedModel] = {}
+    catalog: dict[str, UnifiedModel] = {}
     for const_name, value in vars(_mellea_model_ids).items():
         # Module-level ModelIdentifier constants are upper-cased names.
         if not const_name.isupper() or not isinstance(value, ModelIdentifier):
@@ -223,7 +219,7 @@ def _build_catalog() -> Dict[str, UnifiedModel]:
 
 
 # The unified catalog: friendly key -> UnifiedModel. Built once at import time.
-MODELS: Dict[str, UnifiedModel] = _build_catalog()
+MODELS: dict[str, UnifiedModel] = _build_catalog()
 
 # The single default model, used by build_backend for every backend when no
 # model is given. Granite 4 Micro resolves cleanly across ollama, rits and vllm
@@ -232,7 +228,7 @@ MODELS: Dict[str, UnifiedModel] = _build_catalog()
 DEFAULT_MODEL_KEY: str = "granite-4-0-micro"
 
 
-def list_models() -> List[str]:
+def list_models() -> list[str]:
     """Return the sorted list of canonical friendly model keys."""
     return sorted(MODELS)
 

@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,13 +14,14 @@
 
 # Search API
 
-import os
 import json
-import sqlite3
-import requests
 import logging
-
+import os
+import sqlite3
+import sys
 from ast import literal_eval
+
+import requests
 from dotenv import load_dotenv
 from thefuzz import fuzz
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class SearchAPI:
-    def __init__(self, cache_dir: str = None, similarity_threshold: float = 90):
+    def __init__(self, cache_dir: str | None = None, similarity_threshold: float = 90):
         """
         Initialize the SearchAPI with a cache directory and similarity threshold.
 
@@ -100,7 +100,7 @@ class SearchAPI:
             search_result = self.get_search_res(query)
             if "statusCode" in search_result:
                 logger.error(search_result["message"])
-                exit()
+                sys.exit()
             organic_res = search_result.get("organic", [])
 
             search_res_lst = [

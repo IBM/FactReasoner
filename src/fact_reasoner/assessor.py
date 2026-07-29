@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,19 +15,20 @@
 # FactReasoner pipeline
 
 import json
+import logging
 import math
 import time
-import logging
-
-from typing import Any, Dict, List
+from typing import Any
 
 from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.base import (
+    Atom,
+    Context,
+    Relation,
+)
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.nli_cache import NLIVerdictCache
 from fact_reasoner.core.nli_config import FAITHFUL as NLI_FAITHFUL
@@ -36,21 +36,9 @@ from fact_reasoner.core.nli_pairs import (
     dedup_contexts_near,
     prune_dangling_context_refs,
 )
-from fact_reasoner.fact_graph import FactGraph
-from fact_reasoner.markov_network import MarkovNetwork
-from fact_reasoner.factors import (
-    build_markov_network as _build_markov_network_shared,
-    edge_factor_values as _edge_factor_values_shared,
-    pairwise_prior as _pairwise_prior_shared,
-)
-from fact_reasoner.inference import run_merlin as _run_merlin_shared
-from fact_reasoner.core.base import (
-    PRIOR_PROB_ATOM,
-    PRIOR_PROB_CONTEXT,
-    Atom,
-    Context,
-    Relation,
-)
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.utils import (
     build_atoms,
     build_contexts,
@@ -59,6 +47,17 @@ from fact_reasoner.core.utils import (
     remove_duplicated_atoms,
     remove_duplicated_contexts,
 )
+from fact_reasoner.fact_graph import FactGraph
+from fact_reasoner.factors import (
+    build_markov_network as _build_markov_network_shared,
+)
+from fact_reasoner.factors import (
+    edge_factor_values as _edge_factor_values_shared,
+)
+from fact_reasoner.factors import (
+    pairwise_prior as _pairwise_prior_shared,
+)
+from fact_reasoner.inference import run_merlin as _run_merlin_shared
 
 # Set logging levels
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -74,11 +73,11 @@ class FactReasoner:
         nli_extractor: NLIExtractor = None,
         context_retriever: ContextRetriever = None,
         context_summarizer: ContextSummarizer = None,
-        merlin_path: str = None,
+        merlin_path: str | None = None,
         use_priors: bool = True,
-        early_exit_evaluator: callable = None,
+        early_exit_evaluator: callable | None = None,
         nli_pair_config=None,
-        nli_cache_dir: str = None,
+        nli_cache_dir: str | None = None,
     ):
         """
         Initialize the FactReasoner pipeline.
@@ -228,7 +227,7 @@ class FactReasoner:
 
     def from_dict_with_contexts(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ):
         """
         Initialize FactReasoner from a dict containing both atoms and contexts.
@@ -261,7 +260,7 @@ class FactReasoner:
             atom2contexts[aid] = contexts
 
         print(f"[FactReasoner] Atoms found: {len(self.atoms.keys())}")
-        for _, atom in self.atoms.items():
+        for _, atom in self.atoms.items():  # noqa: PERF102
             print(f"[FactReasoner] {atom}")
 
         self.labels_human = dict(zip(atom_ids, gold_labels))
@@ -293,9 +292,9 @@ class FactReasoner:
 
     async def build(
         self,
-        query: str = None,
-        response: str = None,
-        topic: str = None,
+        query: str | None = None,
+        response: str | None = None,
+        topic: str | None = None,
         has_atoms: bool = False,
         has_contexts: bool = False,
         revise_atoms: bool = False,
@@ -371,7 +370,7 @@ class FactReasoner:
             )
             self.revise_atoms = True  # revise the atoms if newly created
             print(f"[FactReasoner] Extracted {len(self.atoms)} atoms.")
-            for aid in self.atoms.keys():
+            for aid in self.atoms:
                 print(f"[FactReasoner] {self.atoms[aid]}")
 
         # Safety checks
@@ -653,7 +652,7 @@ class FactReasoner:
         )
         print("[FactReasoner] Pipeline instance created.")
 
-    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+    def to_json(self, json_file_path: str | None = None) -> dict[str, Any]:
         """
         Save the FactReasoner instance to a JSON file.
 
@@ -671,9 +670,9 @@ class FactReasoner:
 
         # Write the atoms
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
@@ -718,7 +717,7 @@ class FactReasoner:
         """
         return _pairwise_prior_shared(link)
 
-    def _edge_factor_values(self, edge) -> List[float]:
+    def _edge_factor_values(self, edge) -> list[float]:
         """Compute the flattened pairwise factor table for a fact-graph edge.
 
         Thin wrapper over :func:`fact_reasoner.factors.edge_factor_values`,
@@ -769,7 +768,7 @@ class FactReasoner:
         )
         return result["marginals"]
 
-    def score(self) -> Dict[str, Any]:
+    def score(self) -> dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
@@ -918,7 +917,7 @@ class FactReasoner:
             self.labels_human = {
                 k: v
                 for i, (k, v) in enumerate(self.labels_human.items())
-                if k in self.atoms.keys()
+                if k in self.atoms
                 and k not in list(self.labels_human.keys())[:i]
             }
 
@@ -969,7 +968,7 @@ class FactReasoner:
 
         return results, marginals
 
-    def pipeline_to_json(self, json_file_path: str = None):
+    def pipeline_to_json(self, json_file_path: str | None = None):
         """
         Save the pipeline instance to a JSON file.
         """
@@ -982,9 +981,9 @@ class FactReasoner:
         data["contexts"] = []
 
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)

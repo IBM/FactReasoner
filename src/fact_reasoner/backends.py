@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,8 +27,7 @@
 #                 Mellea's ``OpenAIBackend``.
 
 import os
-
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mellea.backends import Backend, ModelOption
 
@@ -46,10 +44,10 @@ DEFAULT_MAX_NEW_TOKENS = 4096
 def build_backend(
     kind: str,
     *,
-    model_id: Optional[Any] = None,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
-    model_options: Optional[Dict[Any, Any]] = None,
+    model_id: Any | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    model_options: dict[Any, Any] | None = None,
 ) -> Backend:
     """Create a Mellea backend selected by a short ``kind`` string.
 
@@ -105,7 +103,7 @@ def build_backend(
     """
 
     # Apply the default generation budget without clobbering caller options.
-    options: Dict[Any, Any] = dict(model_options or {})
+    options: dict[Any, Any] = dict(model_options or {})
     options.setdefault(ModelOption.MAX_NEW_TOKENS, DEFAULT_MAX_NEW_TOKENS)
 
     # Resolve the model to the identifier this backend expects. Precedence:

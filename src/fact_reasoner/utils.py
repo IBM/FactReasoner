@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import asyncio
+import json
+import re
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 import requests
 import tqdm
-import re
-
-from typing import Awaitable, Callable, List, Optional, Tuple, Union, Dict, Any
-
 
 LOOP_BUDGET = 5
 
@@ -86,12 +85,12 @@ class AsyncRateLimiter:
 
 async def run_throttled(
     factory: Callable[[Any], Awaitable[Any]],
-    items: List[Any],
+    items: list[Any],
     *,
     max_concurrency: int = MAX_CONCURRENT_REQUESTS,
     rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
-    on_progress: Optional[Callable[[], None]] = None,
-) -> List[Any]:
+    on_progress: Callable[[], None] | None = None,
+) -> list[Any]:
     """Run one coroutine per item with bounded concurrency and rate limiting.
 
     A fresh coroutine is created for each item via ``factory`` right before it
@@ -128,7 +127,7 @@ async def run_throttled(
             await limiter.acquire()
             try:
                 return await factory(item)
-            except Exception as e:  # capture, so sibling requests are not dropped
+            except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
                 return e
             finally:
                 if on_progress is not None:
@@ -140,10 +139,10 @@ async def run_throttled(
 
 
 async def gather_with_progress(
-    coros: List[Awaitable[Any]],
+    coros: list[Awaitable[Any]],
     *,
-    on_progress: Optional[Callable[[], None]] = None,
-) -> List[Any]:
+    on_progress: Callable[[], None] | None = None,
+) -> list[Any]:
     """Await already-built coroutines concurrently, with a per-completion hook.
 
     Like :func:`asyncio.gather` (results are returned in **input order**), but
@@ -169,7 +168,7 @@ async def gather_with_progress(
         return index, result
 
     tasks = [asyncio.ensure_future(_indexed(i, c)) for i, c in enumerate(coros)]
-    results: List[Any] = [None] * len(tasks)
+    results: list[Any] = [None] * len(tasks)
     for completed in asyncio.as_completed(tasks):
         index, result = await completed
         results[index] = result
@@ -185,7 +184,7 @@ class dotdict(dict):
 
 
 # String manipulation utils
-def join_segments(*args: Union[str, List[str]], separator: str = "\n\n\n") -> str:
+def join_segments(*args: str | list[str], separator: str = "\n\n\n") -> str:
     """Joins an unspecified number of strings using the separator."""
     all_segments = []
 
@@ -212,9 +211,8 @@ def punctuation_only_inside_quotes(text):
 
     # check each comma and semicolon
     for i, char in enumerate(text):
-        if char in [",", ";"]:
-            if not is_inside_quotes(i):
-                return False  # found punctuation outside quotes
+        if char in [",", ";"] and not is_inside_quotes(i):
+            return False  # found punctuation outside quotes
     return True
 
 
@@ -262,7 +260,7 @@ _NLI_JSON_LABEL_RE = re.compile(r'"label"\s*:\s*"([^"]+)"')
 
 def extract_nli_label_and_span(
     input_string: str,
-) -> Tuple[str, Optional[Tuple[int, int]]]:
+) -> tuple[str, tuple[int, int] | None]:
     """Extract the NLI label and the character span of the label text.
 
     Auto-detects two output formats, in priority order:
@@ -340,7 +338,7 @@ def extract_first_code_block(input_string: str, ignore_language: bool = False) -
     return strip_string(match.group(1)) if match else ""
 
 
-def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
+def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
     """
     Extract the per-token log probabilities from the output metadata.
 
@@ -393,7 +391,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
     if not isinstance(logprobs_object, list):
         # If logprobs is not a list, it may be a ChoiceLogprobs object from litellm. Try to extract logprobs from it and massage into the format expected by the _get_probability() functions in Summarizer and NLI extractor  (list of dicts with 'token' and 'logprob' keys).
         try:
-            from litellm.types.utils import ChoiceLogprobs
+            from litellm.types.utils import ChoiceLogprobs  # type: ignore
 
             if isinstance(logprobs_object, ChoiceLogprobs):
                 # logprobs_object = [
@@ -512,7 +510,7 @@ def normalize_ws(text: str) -> str:
 
 
 def validate_json_code_block(
-    input_string: str, required_keys: List[str] = None
+    input_string: str, required_keys: list[str] | None = None
 ) -> bool:
     """
     Checks if the input string is a valid JSON dictionary.
@@ -559,7 +557,4 @@ def validate_markdown_code_block(input_string: str) -> bool:
         bool: True if valid markdown code block, False otherwise.
     """
 
-    if input_string.strip().startswith("```") and input_string.strip().endswith("```"):
-        return True
-    else:
-        return False
+    return bool(input_string.strip().startswith("```") and input_string.strip().endswith("```"))
