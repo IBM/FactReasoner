@@ -58,7 +58,6 @@ from fact_reasoner.backends import build_backend  # noqa: E402
 from fact_reasoner.core.atomizer import Atomizer  # noqa: E402
 from fact_reasoner.core.base import Atom, Context  # noqa: E402
 from fact_reasoner.core.nli import NLIExtractor  # noqa: E402
-from fact_reasoner.core.nli_cache import NLIVerdictCache, extractor_identity  # noqa: E402
 from fact_reasoner.core.nli_config import NLIPairConfig  # noqa: E402
 from fact_reasoner.core import nli_pairs as npairs  # noqa: E402
 from fact_reasoner.core.reviser import Reviser  # noqa: E402
@@ -261,9 +260,15 @@ def score_cell(
     data: dict,
     components: dict,
     merlin_path: str,
-    cache_dir: str,
+    cache_dir: Optional[str],
 ) -> dict:
-    """Run one (version, policy) cell end to end and return its measurements."""
+    """Run one (version, policy) cell end to end and return its measurements.
+
+    Pass ``cache_dir=None`` to disable the verdict cache, so every selected pair
+    reaches the model. That is required for a wall-clock comparison: with the
+    cache on, the second cell is served from the first cell's verdicts and
+    finishes in milliseconds, which measures the cache rather than the policy.
+    """
     pipeline = FactReasoner(
         merlin_path=merlin_path,
         use_priors=False,
@@ -326,7 +331,21 @@ def score_cell(
     gold = {a["id"]: a["label"] for a in data["atoms"]}
     acc = _accuracy(results, gold)
 
+    # Record every non-neutral verdict this cell observed, keyed by id pair. With
+    # the cache disabled this is the only record of the exhaustive run's verdicts,
+    # and it is what the recall replay needs. Neutral relations are dropped by
+    # build_relations before returning, so their absence is itself the signal:
+    # any pair the baseline scored that is missing here came back neutral.
+    verdicts = {
+        f"{rel.source.id}|{rel.target.id}": {
+            "label": rel.get_type(),
+            "probability": rel.get_probability(),
+        }
+        for rel in pipeline.relations
+    }
+
     return {
+        "verdicts": verdicts,
         "label": label,
         "policy": cfg.policy,
         "num_atoms": len(pipeline.atoms),
@@ -383,23 +402,32 @@ def _accuracy(results: dict, gold: Dict[str, str]) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def replay_recall(pipeline, cache: NLIVerdictCache, cfgs) -> List[dict]:
-    """Measure P(pruned pair was non-neutral) against the recorded verdicts."""
-    atoms, contexts = pipeline.atoms, pipeline.contexts
-    model_id, method = extractor_identity(pipeline.nli_extractor)
+def _non_neutral_from_verdicts(verdicts: Dict[str, dict]) -> set:
+    """The set of (context_id, atom_id) pairs the baseline scored as non-neutral.
 
-    truth = {}
-    for atom_id, atom in atoms.items():
-        for context_id, context in contexts.items():
-            key = cache.make_key(
-                model_id, method,
-                context.get_summary() or context.get_text(),
-                atom.get_summary() or atom.get_text(),
-            )
-            got = cache.get_many([key]).get(key)
-            if got is not None:
-                truth[(context_id, atom_id)] = got
-    non_neutral = {p for p, v in truth.items() if v.get("label") != "neutral"}
+    ``build_relations`` returns only non-neutral relations, so every entry here is
+    one; pairs absent from the record came back neutral and are safe to prune.
+    """
+    out = set()
+    for key, verdict in (verdicts or {}).items():
+        if "|" not in key:
+            continue
+        source, target = key.split("|", 1)
+        if verdict.get("label") != "neutral":
+            out.add((source, target))
+    return out
+
+
+def replay_recall(pipeline, verdicts: Dict[str, dict], cfgs) -> List[dict]:
+    """Measure P(pruned pair was non-neutral) against the baseline's verdicts.
+
+    Uses the relations the exhaustive cell actually produced rather than a verdict
+    cache, so this works with caching disabled.
+    """
+    atoms, contexts = pipeline.atoms, pipeline.contexts
+    # The exhaustive cell scored the full product, so that is the pair universe.
+    truth = {(c, a) for a in atoms for c in contexts}
+    non_neutral = _non_neutral_from_verdicts(verdicts) & truth
 
     rows = []
     for label, cfg in cfgs:
@@ -426,30 +454,24 @@ def replay_recall(pipeline, cache: NLIVerdictCache, cfgs) -> List[dict]:
             "recall": round((len(non_neutral) - len(lost)) / len(non_neutral), 4)
             if non_neutral else None,
             "lost_pairs": [
-                {"pair": list(p), "label": truth[p]["label"]} for p in lost
+                {
+                    "pair": list(p),
+                    "label": (verdicts.get(f"{p[0]}|{p[1]}") or {}).get(
+                        "label", "non-neutral"
+                    ),
+                }
+                for p in lost
             ],
         })
     return rows
 
 
-def sweep(pipeline, cache: NLIVerdictCache,
+def sweep(pipeline, verdicts: Dict[str, dict],
           thresholds=(0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40)) -> List[dict]:
     """Recall/cost curve per policy across gate thresholds, replayed."""
     atoms, contexts = pipeline.atoms, pipeline.contexts
-    model_id, method = extractor_identity(pipeline.nli_extractor)
-
-    truth = {}
-    for atom_id, atom in atoms.items():
-        for context_id, context in contexts.items():
-            key = cache.make_key(
-                model_id, method,
-                context.get_summary() or context.get_text(),
-                atom.get_summary() or atom.get_text(),
-            )
-            got = cache.get_many([key]).get(key)
-            if got is not None:
-                truth[(context_id, atom_id)] = got
-    non_neutral = {p for p, v in truth.items() if v.get("label") != "neutral"}
+    truth = {(c, a) for a in atoms for c in contexts}
+    non_neutral = _non_neutral_from_verdicts(verdicts) & truth
 
     gate, atom_ids, context_ids = npairs.build_gate(atoms, contexts, use_summary=True)
     rows = []
@@ -479,6 +501,14 @@ def main() -> int:
     parser.add_argument("--merlin-path", required=True)
     parser.add_argument("--output-dir", default="results/exp_flaherty_v2")
     parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable the NLI verdict cache, so both cells issue live calls. "
+        "Required for a measured (rather than extrapolated) wall-clock "
+        "comparison: with the cache on, the second cell is served from the "
+        "first cell's verdicts and finishes instantly.",
+    )
+    parser.add_argument(
         "--prep-only",
         action="store_true",
         help="Fetch and summarize only; skip the scoring cells.",
@@ -491,14 +521,19 @@ def main() -> int:
         return 2
 
     os.makedirs(args.output_dir, exist_ok=True)
-    cache_dir = os.path.join(args.output_dir, "nli_cache")
+    cache_dir = None if args.no_cache else os.path.join(args.output_dir, "nli_cache")
     report: Dict[str, object] = {
         "model_id": MODEL_ID,
         "data": DATA_PATH,
         "version": "v2 (atom-context only)",
+        "nli_cache_enabled": not args.no_cache,
     }
 
-    print(f"=== FactReasoner v2: all_pairs vs cheap ({MODEL_ID}) ===\n")
+    print(f"=== FactReasoner v2: all_pairs vs cheap ({MODEL_ID}) ===")
+    if args.no_cache:
+        print("NLI verdict cache DISABLED: both cells issue live calls.\n")
+    else:
+        print()
     backend = build_backend("rits", model_id=MODEL_ID, base_url=BASE_URL)
     summarizer = ContextSummarizer(backend, show_progress=args.progress_bar)
     components = dict(
@@ -570,9 +605,13 @@ def main() -> int:
         print()
 
     base, chp = cells["v2 all_pairs"], cells["v2-cheap"]
-    cache = NLIVerdictCache(cache_dir)
-    recall_rows = replay_recall(base["pipeline"], cache, [("provenance", cheap)])
-    sweep_rows = sweep(base["pipeline"], cache)
+    # The exhaustive cell's own relations are the ground truth, so recall can be
+    # replayed with or without a verdict cache.
+    baseline_verdicts = base["verdicts"]
+    recall_rows = replay_recall(
+        base["pipeline"], baseline_verdicts, [("provenance", cheap)]
+    )
+    sweep_rows = sweep(base["pipeline"], baseline_verdicts)
 
     print("=" * 74)
     print("SUMMARY -- FactReasoner v2 (atom-context only), Lanny Flaherty bio")
@@ -591,6 +630,13 @@ def main() -> int:
         f"pairs saved  : {saved} of {base['pairs_attempted']} "
         f"({base['pairs_attempted'] / max(chp['pairs_attempted'], 1):.2f}x fewer)"
     )
+    if base["llm_calls"] > 0 and chp["llm_calls"] > 0:
+        print(
+            f"time saved   : {base['nli_seconds'] - chp['nli_seconds']:.1f}s of "
+            f"{base['nli_seconds']:.1f}s "
+            f"({base['nli_seconds'] / max(chp['nli_seconds'], 1e-9):.2f}x faster) "
+            f"-- both cells measured live"
+        )
     row = recall_rows[0]
     print(
         f"recall       : {row['recall']:.3f} "
@@ -598,8 +644,11 @@ def main() -> int:
         f"gate={row['gate_backend']})"
     )
 
-    for key in ("pipeline", "results"):
-        for cell in cells.values():
+    # Keep only the non-neutral count in the report; the full verdict map is
+    # large and already served its purpose in the replay above.
+    for cell in cells.values():
+        cell["num_non_neutral"] = len(cell.get("verdicts") or {})
+        for key in ("pipeline", "results", "verdicts"):
             cell.pop(key, None)
     report.update(cells=cells, recall=recall_rows, threshold_sweep=sweep_rows)
     out = os.path.join(args.output_dir, "report.json")

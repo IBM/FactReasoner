@@ -78,6 +78,17 @@ def _abstract(data: Dict[str, Any]) -> List[str]:
     b, c = base["pairs_attempted"], cheap["pairs_attempted"]
     per_call = base["nli_seconds"] / max(base["llm_calls"], 1)
     est = c * per_call
+    live_both = base["llm_calls"] > 0 and cheap["llm_calls"] > 0
+    timing = (
+        rf"wall-clock for the phase falling from {base['nli_seconds']:.0f}\,s to "
+        rf"{cheap['nli_seconds']:.0f}\,s "
+        rf"({base['nli_seconds'] / max(cheap['nli_seconds'], 1e-9):.2f}$\times$ "
+        rf"faster, both cells measured live) "
+        if live_both else
+        rf"an estimated wall-clock reduction from {base['nli_seconds']:.0f}\,s to "
+        rf"roughly {est:.0f}\,s at the measured throughput of {per_call:.2f}\,s per "
+        rf"call "
+    )
     same = (
         base.get("factuality_score") == cheap.get("factuality_score")
         and (base.get("accuracy") or {}).get("accuracy")
@@ -89,9 +100,7 @@ def _abstract(data: Dict[str, Any]) -> List[str]:
         rf"relation-extraction phase from {b} to {c} LLM calls on a "
         rf"{base['num_atoms']}-atom biography with {base['num_contexts']} retrieved "
         rf"contexts --- \textbf{{{b - c} calls saved, {b / max(c, 1):.2f}$\times$ "
-        rf"fewer}} --- with an estimated wall-clock reduction from "
-        rf"{base['nli_seconds']:.0f}\,s to roughly {est:.0f}\,s at the measured "
-        rf"throughput of {per_call:.2f}\,s per call. "
+        rf"fewer}} --- with " + timing + ". "
         + (
             rf"The factuality score and gold-label accuracy were "
             rf"\textbf{{identical}} to the exhaustive baseline "
@@ -389,7 +398,7 @@ def _algorithm_section(data: Dict[str, Any]) -> List[str]:
     return out
 
 
-def _cost_table(cells: Dict[str, Any]) -> List[str]:
+def _cost_table(cells: Dict[str, Any], cache_on: Any = None) -> List[str]:
     rows = []
     for label in CELL_ORDER:
         c = cells.get(label)
@@ -413,8 +422,13 @@ def _cost_table(cells: Dict[str, Any]) -> List[str]:
         r"\midrule", *rows, r"\bottomrule", r"\end{tabular}",
         r"\caption{Cost per cell. \emph{Pairs} is the number of (context, atom) "
         r"comparisons the policy selected; \emph{LLM calls} is how many of those "
-        r"actually reached the model, the remainder being served from the verdict "
-        r"cache. \emph{NLI time} covers relation extraction only, excluding "
+        r"reached the model"
+        + (
+            r" --- here every one of them, since the verdict cache was disabled"
+            if cache_on is False else
+            r", the remainder being served from the verdict cache"
+        )
+        + r". \emph{NLI time} covers relation extraction only, excluding "
         r"fetching, summarization and inference.}",
         r"\label{tab:cost}", r"\end{table}",
     ]
@@ -472,12 +486,47 @@ def _savings_prose(cells: Dict[str, Any]) -> List[str]:
     # cache-served cell finishes instantly and would overstate the speed-up.
     if cheap["llm_calls"] > 0 and base["llm_calls"] > 0:
         speedup = base["nli_seconds"] / max(cheap["nli_seconds"], 1e-9)
+        b_rate = base["nli_seconds"] / max(base["llm_calls"], 1)
+        c_rate = cheap["nli_seconds"] / max(cheap["llm_calls"], 1)
         lines += [
-            rf"Wall-clock for relation extraction fell from "
-            rf"{base['nli_seconds']:.1f}\,s to {cheap['nli_seconds']:.1f}\,s "
-            rf"({speedup:.2f}$\times$ faster).",
+            rf"\textbf{{Both cells issued live calls}} (the verdict cache was "
+            rf"disabled), so the wall-clock comparison is measured rather than "
+            rf"extrapolated. Relation extraction fell from "
+            rf"{base['nli_seconds']:.1f}\,s to {cheap['nli_seconds']:.1f}\,s, a "
+            rf"saving of {base['nli_seconds'] - cheap['nli_seconds']:.1f}\,s "
+            rf"(\textbf{{{speedup:.2f}$\times$ faster}}).",
+            "",
+            rf"Per-call throughput was {b_rate:.3f}\,s for the exhaustive cell and "
+            rf"{c_rate:.3f}\,s for the cheap one. "
+            + (
+                r"These are close, as expected: requests fan out concurrently "
+                r"against a shared rate limit, so latency is bound by concurrency "
+                r"rather than by any property of an individual pair, and time saved "
+                r"tracks calls saved roughly linearly."
+                if abs(b_rate - c_rate) / max(b_rate, 1e-9) < 0.35 else
+                r"The gap between them means throughput was not stable across the "
+                r"two cells --- shared-endpoint load varies --- so the speed-up "
+                r"figure carries more uncertainty than the call-count figure, "
+                r"which is exact."
+            ),
             "",
         ]
+        # The speed-up can exceed the call ratio; say so rather than implying a
+        # ceiling the measurement itself contradicts.
+        ratio_gap = speedup - (b_pairs / max(c_pairs, 1))
+        if ratio_gap > 0.05:
+            lines += [
+                rf"The speed-up ({speedup:.2f}$\times$) slightly exceeds the "
+                rf"call-count ratio ({b_pairs / max(c_pairs, 1):.2f}$\times$) "
+                rf"because the per-call rate was {100 * (b_rate - c_rate) / b_rate:.0f}\% "
+                rf"lower in the cheap cell. With a fixed concurrency window, a "
+                rf"shorter queue drains with less contention and fewer stragglers "
+                rf"on the tail, so the wall-clock gain compounds mildly on top of "
+                rf"the call saving. This is a second-order effect and should not be "
+                rf"relied on: the call-count ratio is the exact, reproducible "
+                rf"figure, while timing depends on shared-endpoint load.",
+                "",
+            ]
     else:
         lines += [
             r"\textbf{On wall-clock:} the two cells are not directly comparable "
@@ -539,10 +588,14 @@ def _recall_section(recall: List[dict]) -> List[str]:
         "therefore exactly $P(\\text{pruned pair was non-neutral})$.",
         "",
         "That is measured here by replaying the policy's selection against the "
-        "verdicts \\emph{recorded during the exhaustive run}. The exhaustive run "
-        "already paid for every pair, so the measurement is exact and costs no "
-        "additional calls. Comparing two live runs instead would confound pruning "
-        "with model nondeterminism.",
+        "relations \\emph{the exhaustive cell actually produced}. Since "
+        "\\texttt{build\\_relations} returns only non-neutral relations, that set is "
+        "the ground truth directly, and any pair absent from it came back neutral "
+        "and is safe to prune. The exhaustive cell already paid for every pair, so "
+        "the measurement is exact and costs no additional calls --- and it is "
+        "independent of the verdict cache, so it holds for a fully live run. Note "
+        "this is a stricter test than comparing the two cells' scores, which can "
+        "agree even when individual relations differ.",
         "",
         r"\begin{table}[htbp]", r"\centering",
         r"\begin{tabular}{lrrrrr}", r"\toprule",
@@ -564,6 +617,15 @@ def _recall_section(recall: List[dict]) -> List[str]:
         rf"the post-dedup figure in Table~\ref{{tab:cost}}: this table isolates the "
         rf"gate's decisions, which is what recall is a property of.}}",
         r"\label{tab:recall}", r"\end{table}",
+    ]
+    out += [
+        r"\paragraph{On comparing this figure across runs.} The model is not "
+        r"deterministic: the exhaustive cell has produced different numbers of "
+        r"non-neutral relations on repeated runs over identical prepared inputs, "
+        r"which moves the denominator and hence the recall figure without any "
+        r"change of policy. A single run therefore establishes an estimate, not a "
+        r"bound; the worst case over several runs is the honest summary.",
+        "",
     ]
     lost = row.get("lost_pairs") or []
     if lost:
@@ -734,12 +796,26 @@ def _methodology(data: Dict[str, Any]) -> List[str]:
         "",
         r"\subsection{Reproducing}",
         r"\begin{verbatim}",
-        "python scripts/exp_flaherty_v2.py --merlin-path /path/to/merlin",
+        "python scripts/exp_flaherty_v2.py --merlin-path /path/to/merlin --no-cache",
         "python scripts/report_flaherty_v2.py --results results/exp_flaherty_v2",
         r"\end{verbatim}",
-        "Fetching, summarization and NLI verdicts are all cached, so a second run "
-        "reproduces the tables without contacting the model.",
     ]
+    cache_on = data.get("nli_cache_enabled")
+    if cache_on is False:
+        out += [
+            r"The run behind this report used \texttt{--no-cache}, so both cells "
+            r"issued live NLI calls and the timings are measured. Page fetches and "
+            r"context summaries are still cached on disk, which is what lets the two "
+            r"cells share byte-identical prepared evidence --- the comparison would "
+            r"otherwise be confounded by re-summarization.",
+        ]
+    else:
+        out += [
+            r"Fetching, summarization and NLI verdicts were all cached in this run, "
+            r"so the second cell was largely served from the first cell's verdicts. "
+            r"That makes its wall-clock figure an extrapolation rather than a "
+            r"measurement; pass \texttt{--no-cache} for a live timing comparison.",
+        ]
     return out
 
 
@@ -782,7 +858,7 @@ def build_tex(data: Dict[str, Any]) -> str:
     parts += _abstract(data)
     parts += _intro(data)
     parts += _algorithm_section(data)
-    parts += _cost_table(cells)
+    parts += _cost_table(cells, data.get("nli_cache_enabled"))
     parts += _savings_prose(cells)
     parts += _quality_table(cells)
     parts += _recall_section(data.get("recall") or [])
