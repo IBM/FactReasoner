@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from itertools import combinations
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import asyncio
+import time
 import nltk
 from nltk.tokenize import sent_tokenize
 import concurrent.futures
@@ -27,6 +27,8 @@ from .base import Atom, Context, Relation, PRIOR_PROB_ATOM, PRIOR_PROB_CONTEXT
 from .atomizer import Atomizer
 from .retriever import ContextRetriever
 from .nli import NLIExtractor
+from . import nli_pairs as _np
+from .nli_config import FAITHFUL, NLIPairConfig
 from fact_reasoner.utils import punctuation_only_inside_quotes
 
 
@@ -35,6 +37,8 @@ def predict_nli_relationships(
     nli_extractor: NLIExtractor,
     links_type: str = "context_atom",
     use_summary: bool = False,
+    cache=None,
+    stats: Optional[dict] = None,
 ) -> List[Relation]:
     """
     Predict the NLI relationship between two objects using an model based NLI extractor.
@@ -44,10 +48,20 @@ def predict_nli_relationships(
             A list of object pairs e.g., (atom, context) or (context, context)
         nli_extractor: NLIExtractor
             The model based NLI extractor
-        top_k_per_atom: int
-            The top k relationships considered for each atom.
         links_type: str
             The type of links represented by the object pairs (context_atom, context_context).
+        use_summary: bool
+            Use the objects' summaries rather than their full text as the NLI
+            premise/hypothesis.
+        cache: NLIVerdictCache, optional
+            A cross-run verdict cache. Cached pairs are served without an LLM call;
+            misses are computed and stored. Verdicts are unchanged either way, so
+            this only affects cost.
+        stats: dict, optional
+            Out-param; ``llm_calls`` and ``cache_hits`` are added when provided.
+
+    Returns:
+        A list of Relations, positionally aligned with ``object_pairs``.
     """
 
     # Safety checks
@@ -81,22 +95,73 @@ def predict_nli_relationships(
 
     # Extract the NLI relationships between premises and hyptheses
     print(f"[NLI] Processing {len(premises)} potential relationships ...")
-    # results = [nli_extractor.run(premises[i], hypotheses[i]) for i in range(len(premises))]
-    try:
-        # If an event loop is already running, we cannot call asyncio.run()
-        # directly, so run the batch in a separate thread with its own loop.
-        asyncio.get_running_loop()
 
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            results = pool.submit(
-                asyncio.run, nli_extractor.run_batch(premises, hypotheses)
-            ).result()
-    except RuntimeError:
-        # No running loop -- safe to run directly.
-        results = asyncio.run(nli_extractor.run_batch(premises, hypotheses))
+    # Serve whatever the cache already knows; only misses reach the model. The
+    # verdicts are identical either way, so this changes cost and not results.
+    results: List[Optional[dict]] = [None] * len(premises)
+    cache_hits = 0
+    todo = list(range(len(premises)))
+    if cache is not None and premises:
+        keys = [
+            cache.make_key(
+                getattr(nli_extractor, "model_id", ""),
+                getattr(nli_extractor, "nli_method", ""),
+                premises[i],
+                hypotheses[i],
+            )
+            for i in range(len(premises))
+        ]
+        cached = cache.get_many(keys)
+        todo = []
+        for i, key in enumerate(keys):
+            hit = cached.get(key)
+            if hit is None:
+                todo.append(i)
+            else:
+                results[i] = hit
+                cache_hits += 1
+        if cache_hits:
+            print(f"[NLI] Cache hits: {cache_hits}/{len(premises)}")
+
+    if todo:
+        sub_premises = [premises[i] for i in todo]
+        sub_hypotheses = [hypotheses[i] for i in todo]
+        try:
+            # If an event loop is already running, we cannot call asyncio.run()
+            # directly, so run the batch in a separate thread with its own loop.
+            asyncio.get_running_loop()
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                computed = pool.submit(
+                    asyncio.run,
+                    nli_extractor.run_batch(sub_premises, sub_hypotheses),
+                ).result()
+        except RuntimeError:
+            # No running loop -- safe to run directly.
+            computed = asyncio.run(
+                nli_extractor.run_batch(sub_premises, sub_hypotheses)
+            )
+        for slot, result in zip(todo, computed):
+            results[slot] = result
+        if cache is not None:
+            cache.put_many(
+                [
+                    (keys[slot], results[slot])
+                    for slot in todo
+                    if results[slot] is not None
+                ]
+            )
+
+    if stats is not None:
+        stats["llm_calls"] = stats.get("llm_calls", 0) + len(todo)
+        stats["cache_hits"] = stats.get("cache_hits", 0) + cache_hits
 
     relations = []
     for ii, result in enumerate(results):
+        # A slot can still be unfilled if the extractor returned a short batch;
+        # fall back to the extractor's own neutral verdict rather than crashing.
+        if result is None:
+            result = {"label": "neutral", "probability": 1.0}
         label = result.get("label") or "neutral"
         probability = result.get("probability", 0.0)
         link_type = links_type if links_type is not None else "unknown"
@@ -258,25 +323,45 @@ def remove_duplicated_contexts(
         atoms: Dict[str, Atom]
             The dict containing the atoms.
         check_summary: bool
-            Whether to check the summary of the contexts.
+            Whether to compare the summaries of the contexts rather than their text.
+            Contexts with no summary fall back to their text, so distinct
+            unsummarized contexts are not treated as duplicates of one another.
 
     Returns:
         The updated dicts containing the contexts and atoms.
     """
 
-    seen = set()
+    # Every atom that retrieved each context, so collapsing a duplicate can
+    # transfer its owners to the survivor instead of discarding them.
+    owners = _np.context_owners(atoms, contexts)
+
+    seen: Dict[str, str] = {}  # comparison text -> surviving context id
     out = {}
     for k, v in contexts.items():
-        text = (
-            v.get_text()
-            if not check_summary or v.get_summary() is None
-            else v.get_summary()
-        )
+        # get_summary() returns "" (not None) when a context was never summarized,
+        # so fall back on emptiness rather than on None -- otherwise every
+        # unsummarized context compares equal to every other.
+        text = v.get_summary() if check_summary else ""
+        if not text:
+            text = v.get_text()
+
         if text not in seen:
-            seen.add(text)
+            seen[text] = k
             out[k] = v
-        elif v.atom and v.atom.id in atoms:
-            del atoms[v.atom.id].contexts[k]
+            continue
+
+        # Duplicate: repoint each of its owners at the survivor so no atom loses
+        # evidence, then drop the duplicate from every atom that referenced it.
+        survivor_id = seen[text]
+        survivor = out[survivor_id]
+        for atom_id in owners.get(k, ()):
+            atom = atoms.get(atom_id)
+            if atom is None:
+                continue
+            atom.contexts.pop(k, None)
+            atom.contexts.setdefault(survivor_id, survivor)
+        for atom in atoms.values():
+            atom.contexts.pop(k, None)
 
     return out, atoms
 
@@ -400,6 +485,10 @@ def build_relations(
     rel_context_context: bool = True,
     nli_extractor: NLIExtractor = None,
     use_summarized_contexts: bool = False,
+    *,
+    pair_config: Optional[NLIPairConfig] = None,
+    stats: Optional[dict] = None,
+    cache=None,
 ) -> List[Relation]:
     """
     Create the NLI relations between atoms and contexts. The following
@@ -421,6 +510,17 @@ def build_relations(
         use_summarized_contexts: bool
             Flag indicating that summarized contexts are used. If False, then the
             contexts include the extracted text.
+        pair_config: NLIPairConfig, optional
+            Which candidate pairs to score, and how. Defaults to
+            :data:`~fact_reasoner.core.nli_config.FAITHFUL`, which enumerates
+            every pair exactly as the original implementation did.
+        stats: dict, optional
+            Out-param populated with per-phase pair counts, LLM call counts and
+            timings, plus the ``all_pairs`` counterfactual, so a run reports its
+            own saving without needing a separate baseline run.
+        cache: NLIVerdictCache, optional
+            Cross-run verdict cache. Score-neutral by construction.
+
     Returns:
         A list of Relations.
     """
@@ -429,69 +529,132 @@ def build_relations(
     assert len(contexts) > 0, "The contexts must be initialized!"
     assert nli_extractor is not None, "The NLI extractor must exist!"
 
-    atom_context_pairs = []
-    context_context_pairs1 = []
-    context_context_pairs2 = []
-
+    cfg = pair_config if pair_config is not None else FAITHFUL
     relations = []
+
+    num_atoms, num_contexts = len(atoms), len(contexts)
+    phase_stats: Dict[str, dict] = {}
+
+    # Build the similarity gate once and share it across phases: one embedding
+    # pass covers both. Under the faithful config no gate is needed, so
+    # sentence-transformers is never even imported.
+    gate = gate_atom_ids = gate_context_ids = None
+    if cfg.needs_gate:
+        gate, gate_atom_ids, gate_context_ids = _np.build_gate(
+            atoms,
+            contexts,
+            use_summary=use_summarized_contexts,
+            embedding_model=cfg.embedding_model,
+        )
 
     # Create atom-context relations (i.e., Context -> Atom)
     if rel_atom_context:
         print("[NLI] Building atom-context relations...")
-        if not contexts_per_atom_only:  # use all contexts for each atom
-            # Create the (context, atom) pairs
-            print("[NLI] Using all contexts retrieved.")
-            for _, atom in atoms.items():
-                for _, context in contexts.items():
-                    atom_context_pairs.append((context, atom))
-        else:
-            print("[NLI] Using only the contexts retrieved per atom.")
-            # Create the (context, atom) pairs
-            for _, atom in atoms.items():
-                for context in atom.get_contexts():
-                    atom_context_pairs.append((context, atom))
+        _t = time.perf_counter()
+        pairs, coverage = _np.select_atom_context_pairs(
+            atoms,
+            contexts,
+            policy=cfg.policy,
+            contexts_per_atom_only=contexts_per_atom_only,
+            gate_threshold=cfg.gate_threshold,
+            neighbor_window=cfg.neighbor_window,
+            gate=gate,
+            gate_atom_ids=gate_atom_ids,
+            gate_context_ids=gate_context_ids,
+        )
+        print(
+            f"[NLI] Atom-context pairs: {coverage['pairs_selected']} selected, "
+            f"{coverage['pairs_pruned']} pruned "
+            f"(of {coverage['pairs_possible']} possible)."
+        )
 
-        # Get all relationships (NLI-prompt)
+        # Resolve ids to objects here, so selection deals only in ids.
+        atom_context_pairs = [
+            (contexts[context_id], atoms[atom_id]) for context_id, atom_id in pairs
+        ]
+
         all_rels = predict_nli_relationships(
             atom_context_pairs,
             nli_extractor=nli_extractor,
             links_type="context_atom",
             use_summary=use_summarized_contexts,
+            cache=cache,
+            stats=coverage,
         )
 
         # Filter out the neutral relationships
+        kept = 0
         for rel in all_rels:
             if rel.get_type() != "neutral":
                 print(f"[NLI] Found relation: {rel}")
                 relations.append(rel)
+                kept += 1
+        coverage["relations_kept"] = kept
+        coverage["neutral_dropped"] = len(all_rels) - kept
+        coverage["seconds"] = round(time.perf_counter() - _t, 3)
+        phase_stats["atom_context"] = coverage
 
     # Create context-context relations
     if rel_context_context:
         print("[NLI] Building context-context relations...")
-        clist = [ci for ci in sorted(contexts.keys())]
-        all_pairs = list(combinations(clist, 2))
-        # Create all (context, context) pairs
-        for ci, cj in all_pairs:
-            context_i = contexts[ci]
-            context_j = contexts[cj]
-            context_context_pairs1.append((context_i, context_j))
-            context_context_pairs2.append((context_j, context_i))
+        _t = time.perf_counter()
+        pairs, coverage = _np.select_context_context_pairs(
+            contexts,
+            policy=cfg.policy,
+            gate_threshold=cfg.gate_threshold,
+            gate=gate,
+            gate_context_ids=gate_context_ids,
+        )
+        print(
+            f"[NLI] Context-context pairs: {coverage['pairs_selected']} selected, "
+            f"{coverage['pairs_pruned']} pruned "
+            f"(of {coverage['pairs_possible']} possible)."
+        )
+
+        context_context_pairs1 = [(contexts[ci], contexts[cj]) for ci, cj in pairs]
+        context_context_pairs2 = [(contexts[cj], contexts[ci]) for ci, cj in pairs]
 
         # Get relationships (c_i, c_j)
+        stats1: dict = {}
         relations1 = predict_nli_relationships(
             context_context_pairs1,
             nli_extractor=nli_extractor,
             links_type="context_context",
             use_summary=use_summarized_contexts,
+            cache=cache,
+            stats=stats1,
         )
 
-        # Get relationships (c_j, c_i)
-        relations2 = predict_nli_relationships(
-            context_context_pairs2,
-            nli_extractor=nli_extractor,
-            links_type="context_context",
-            use_summary=use_summarized_contexts,
-        )
+        # Get relationships (c_j, c_i). The reverse direction is only needed
+        # where it can change the reconciled outcome, so the cascade scores a
+        # subset and synthesizes the rest -- see _mirror_needed.
+        stats2: dict = {}
+        if cfg.ctx_ctx_single_direction_cascade:
+            need = _mirror_needed(relations1)
+            relations2_partial = (
+                predict_nli_relationships(
+                    [context_context_pairs2[i] for i in need],
+                    nli_extractor=nli_extractor,
+                    links_type="context_context",
+                    use_summary=use_summarized_contexts,
+                    cache=cache,
+                    stats=stats2,
+                )
+                if need
+                else []
+            )
+            relations2 = _synthesize_mirrors(relations1, need, relations2_partial)
+            coverage["dir2_skipped"] = len(relations1) - len(need)
+        else:
+            relations2 = predict_nli_relationships(
+                context_context_pairs2,
+                nli_extractor=nli_extractor,
+                links_type="context_context",
+                use_summary=use_summarized_contexts,
+                cache=cache,
+                stats=stats2,
+            )
+            coverage["dir2_skipped"] = 0
 
         # Reconcile each pair's two directions by meaning (so a high-probability
         # neutral direction cannot hide a real entailment/contradiction in the
@@ -501,10 +664,144 @@ def build_relations(
         ]
         assert len(relations_tmp) == len(relations1)  # safety checks
 
+        kept = 0
         for rel in relations_tmp:
             if rel.get_type() != "neutral":
                 print(f"[NLI] Found relation: {rel}")
                 relations.append(rel)
+                kept += 1
+
+        coverage["llm_calls_dir1"] = stats1.get("llm_calls", 0)
+        coverage["llm_calls_dir2"] = stats2.get("llm_calls", 0)
+        coverage["llm_calls"] = coverage["llm_calls_dir1"] + coverage["llm_calls_dir2"]
+        coverage["cache_hits"] = stats1.get("cache_hits", 0) + stats2.get(
+            "cache_hits", 0
+        )
+        coverage["relations_kept"] = kept
+        coverage["neutral_dropped"] = len(relations_tmp) - kept
+        coverage["seconds"] = round(time.perf_counter() - _t, 3)
+        phase_stats["context_context"] = coverage
 
     print(f"[NLI] Relations built: {len(relations)}")
+
+    if stats is not None:
+        stats.update(_summarize_stats(cfg, gate, num_atoms, num_contexts, phase_stats))
+        _report_savings(stats)
+
     return relations
+
+
+def _mirror_needed(relations1: List[Relation]) -> List[int]:
+    """Indices whose reverse direction must actually be scored.
+
+    Scoring only one direction per context pair would be unsound for two
+    independent reasons, so the reverse call is skipped only where it provably
+    cannot change the reconciled result:
+
+    * ``entailment`` -- MUST be mirrored. ``equivalence`` arises *only* from
+      entailment in both directions, and a single call cannot distinguish one-way
+      entailment from equivalence. The two produce different factor tables
+      downstream, so dropping the mirror would change scores, not just cost.
+    * ``neutral`` -- MUST be mirrored. This is the reconciler's second chance.
+      Since a backend error is reported as ``neutral`` with probability 1.0,
+      skipping here would make relation recall a function of transient network
+      failures.
+    * ``contradiction`` -- skipped. Contradiction is symmetric, and reconciliation
+      can only replace a contradictory direction with a *higher-probability*
+      non-neutral one, which changes the retained probability but not the edge
+      type.
+    """
+    return [
+        i
+        for i, rel in enumerate(relations1)
+        if rel.get_type() in ("entailment", "neutral")
+    ]
+
+
+def _synthesize_mirrors(
+    relations1: List[Relation],
+    need: List[int],
+    relations2_partial: List[Relation],
+) -> List[Relation]:
+    """Build a full reverse-direction list from the subset that was scored.
+
+    Unscored slots get a synthetic ``neutral`` at probability 0.0. That value is
+    deliberate: :func:`_reconcile_ctx_pair` compares probabilities only between
+    two same-status relations, and a zero-probability neutral takes the
+    "exactly one non-neutral" branch, so the real forward relation is returned
+    unchanged with its own probability and orientation. This lets the reconciler
+    be reused as-is, with no signature change.
+    """
+    relations2 = [
+        Relation(
+            source=rel.target,
+            target=rel.source,
+            type="neutral",
+            probability=0.0,
+            link="context_context",
+        )
+        for rel in relations1
+    ]
+    for slot, rel in zip(need, relations2_partial):
+        relations2[slot] = rel
+    return relations2
+
+
+def _summarize_stats(
+    cfg: NLIPairConfig,
+    gate,
+    num_atoms: int,
+    num_contexts: int,
+    phase_stats: Dict[str, dict],
+) -> dict:
+    """Assemble the coverage/cost report, including the all_pairs counterfactual."""
+    out: Dict[str, object] = {
+        "policy": cfg.policy,
+        "gate_backend": (gate.backend if gate is not None else None),
+        "gate_threshold": (cfg.gate_threshold if cfg.needs_gate else None),
+        "cascade": cfg.ctx_ctx_single_direction_cascade,
+        "num_atoms": num_atoms,
+        "num_contexts": num_contexts,
+    }
+    out.update(phase_stats)
+
+    llm_calls = sum(p.get("llm_calls", 0) for p in phase_stats.values())
+    cache_hits = sum(p.get("cache_hits", 0) for p in phase_stats.values())
+    seconds = sum(p.get("seconds", 0.0) for p in phase_stats.values())
+
+    # What the faithful policy would have spent on the same inputs: A*C for the
+    # atom-context phase, C*(C-1) for context-context (both directions).
+    baseline = 0
+    if "atom_context" in phase_stats:
+        baseline += phase_stats["atom_context"]["pairs_possible"]
+    if "context_context" in phase_stats:
+        baseline += 2 * phase_stats["context_context"]["pairs_possible"]
+
+    total = {
+        "llm_calls": llm_calls,
+        "cache_hits": cache_hits,
+        "llm_calls_all_pairs_equivalent": baseline,
+        "seconds": round(seconds, 3),
+    }
+    attempted = llm_calls + cache_hits
+    total["reduction_factor"] = (
+        round(baseline / attempted, 2) if attempted else None
+    )
+    out["totals"] = total
+    return out
+
+
+def _report_savings(stats: dict) -> None:
+    """Print the headline cost line so a run states its own saving."""
+    totals = stats.get("totals", {})
+    baseline = totals.get("llm_calls_all_pairs_equivalent", 0)
+    calls = totals.get("llm_calls", 0)
+    hits = totals.get("cache_hits", 0)
+    factor = totals.get("reduction_factor")
+    msg = f"[NLI] LLM calls: {calls} (all_pairs equivalent: {baseline}"
+    if factor:
+        msg += f", {factor}x fewer"
+    msg += ")"
+    if hits:
+        msg += f"; cache hits: {hits}"
+    print(msg)

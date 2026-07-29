@@ -198,6 +198,58 @@ def mock_nli_extractor(mock_backend):
 
 
 @pytest.fixture
+def mock_nli_batch(mock_backend):
+    """Create a mock NLIExtractor whose ``run_batch`` is exercised and recorded.
+
+    ``mock_nli_extractor`` stubs only ``run``, but ``predict_nli_relationships``
+    calls ``run_batch``, so it cannot be used to test the relation-building path.
+
+    Two details are load-bearing:
+
+    * ``run_batch`` is a plain ``async def`` rather than an ``AsyncMock``. Under
+      ``asyncio_mode = auto`` a test already runs inside an event loop, so
+      ``predict_nli_relationships`` takes its ThreadPoolExecutor branch and awaits
+      the coroutine on a *different* loop -- which an AsyncMock bound to the
+      test's loop would not survive.
+    * The returned list must be aligned to the input length, since the caller
+      zips results against the pair list positionally.
+
+    Set ``nli.verdicts[(premise, hypothesis)]`` to control individual verdicts;
+    anything unset falls back to ``nli.default_verdict``. Every batch is appended
+    to ``nli.calls`` so tests can assert exact call counts.
+
+    The spec is imported as ``fact_reasoner.core.nli`` -- the same module path the
+    code under test uses -- because ``src.fact_reasoner.core.nli`` loads a second,
+    distinct module object whose class would fail the ``isinstance`` guard in
+    ``predict_nli_relationships``.
+    """
+    from fact_reasoner.core.nli import NLIExtractor
+
+    nli = MagicMock(spec=NLIExtractor)
+    nli.backend = mock_backend
+    nli.model_id = "mock-model"
+    nli.nli_method = "logprobs"
+    nli.calls = []
+    nli.verdicts = {}
+    nli.default_verdict = {"label": "neutral", "probability": 0.9}
+
+    async def run_batch(premises, hypotheses):
+        nli.calls.append((list(premises), list(hypotheses)))
+        return [
+            dict(nli.verdicts.get((p, h), nli.default_verdict))
+            for p, h in zip(premises, hypotheses)
+        ]
+
+    nli.run_batch = run_batch
+
+    def total_calls():
+        return sum(len(premises) for premises, _ in nli.calls)
+
+    nli.total_calls = total_calls
+    return nli
+
+
+@pytest.fixture
 def mock_summarizer(mock_backend):
     """Create a mock ContextSummarizer for testing."""
     from src.fact_reasoner.core.summarizer import ContextSummarizer
