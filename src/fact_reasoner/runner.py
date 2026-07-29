@@ -23,6 +23,7 @@ import asyncio
 import inspect
 import json
 import os
+from dataclasses import replace
 
 from typing import Any, Dict, List, Optional
 
@@ -38,15 +39,23 @@ from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli_config import get_pair_config
 
 # Recognized factuality pipelines.
 PIPELINES = ("factreasoner", "factscore", "veriscore", "factverify")
 
-# FactReasoner version -> (rel_context_context, remove_duplicates, contexts_per_atom_only).
+# FactReasoner version -> (rel_atom_context, rel_context_context,
+# remove_duplicates, contexts_per_atom_only, nli_pair_config).
+#
+# The `-cheap` variants keep the same graph semantics but prefilter the candidate
+# pairs, so they cost far fewer LLM calls. The plain versions map to the faithful
+# config and so reproduce previously published numbers with no flags.
 _FR_VERSIONS = {
-    "v1": (False, False, True),  # context-atom only, allow duplicated contexts
-    "v2": (False, True, False),  # context-atom only, no duplicated contexts
-    "v3": (True, True, False),  # context-atom + context-context, no duplicates
+    "v1": (True, False, False, True, "faithful"),  # context-atom only, allow duplicated contexts
+    "v2": (True, False, True, False, "faithful"),  # context-atom only, no duplicated contexts
+    "v3": (True, True, True, False, "faithful"),  # context-atom + context-context, no duplicates
+    "v2-cheap": (True, False, True, False, "provenance"),
+    "v3-cheap": (True, True, True, False, "provenance"),
 }
 
 
@@ -113,6 +122,14 @@ class FactualityRunner:
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: Optional[str] = None,
+        nli_pair_policy: Optional[str] = None,
+        nli_gate_threshold: Optional[float] = None,
+        nli_neighbor_window: Optional[int] = None,
+        nli_dedup_near_duplicates: Optional[bool] = None,
+        nli_dedup_threshold: Optional[float] = None,
+        nli_ctx_ctx_cascade: Optional[bool] = None,
+        nli_merge_phases: Optional[bool] = None,
+        nli_cache_dir: Optional[str] = None,
         show_progress: bool = False,
     ) -> None:
         """Initialize the runner and its shared components."""
@@ -143,7 +160,23 @@ class FactualityRunner:
         self.nli_similarity_metric = nli_similarity_metric
         self.nli_confidence_method = nli_confidence_method
         self.nli_classifier_path = nli_classifier_path
+        self.nli_cache_dir = nli_cache_dir
         self.show_progress = show_progress
+
+        # The version table picks the pair-config preset; any explicit override
+        # then wins, so a caller can start from a preset and adjust one knob.
+        _preset_name = _FR_VERSIONS[pipeline_version][4]
+        _overrides = {
+            "policy": nli_pair_policy,
+            "gate_threshold": nli_gate_threshold,
+            "neighbor_window": nli_neighbor_window,
+            "dedup_near_duplicates": nli_dedup_near_duplicates,
+            "dedup_threshold": nli_dedup_threshold,
+            "ctx_ctx_single_direction_cascade": nli_ctx_ctx_cascade,
+            "merge_phases": nli_merge_phases,
+        }
+        _overrides = {k: v for k, v in _overrides.items() if v is not None}
+        self.nli_pair_config = replace(get_pair_config(_preset_name), **_overrides)
 
         # Shared components.
         self.atom_extractor = Atomizer(backend)
@@ -194,6 +227,8 @@ class FactualityRunner:
                 context_summarizer=self.context_summarizer,
                 merlin_path=self.merlin_path,
                 use_priors=self.use_priors,
+                nli_pair_config=self.nli_pair_config,
+                nli_cache_dir=self.nli_cache_dir,
             )
         elif self.pipeline == "factscore":
             return FactScore(
@@ -256,7 +291,9 @@ class FactualityRunner:
         context_retriever = self._build_context_retriever()
         pipeline_obj = self._make_pipeline(context_retriever)
 
-        rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[self.pipeline_version]
+        rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
+            self.pipeline_version
+        ]
         _run_build(
             pipeline_obj,
             query=query,
@@ -267,7 +304,7 @@ class FactualityRunner:
             revise_atoms=True,
             remove_duplicates=remove_dups,
             contexts_per_atom_only=ctx_per_atom,
-            rel_atom_context=True,
+            rel_atom_context=rel_atom_ctx,
             rel_context_context=rel_ctx_ctx,
             summarize_contexts=self.use_summarizer,
         )
@@ -310,7 +347,9 @@ class FactualityRunner:
             if self.pipeline == "factreasoner"
             else self.pipeline
         )
-        rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[self.pipeline_version]
+        rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom, _ = _FR_VERSIONS[
+            self.pipeline_version
+        ]
 
         # Load the dataset (one JSON object per line).
         with open(input_file) as f:

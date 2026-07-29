@@ -25,7 +25,8 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend
-from fact_reasoner.runner import PIPELINES, FactualityRunner
+from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
+from fact_reasoner.core.nli_config import NLI_PAIR_POLICIES
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -47,8 +48,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--pipeline-version",
         default="v2",
-        choices=["v1", "v2", "v3"],
-        help="FactReasoner version (default: v2; ignored by baselines).",
+        # Read from the table so the two can never drift apart.
+        choices=list(_FR_VERSIONS),
+        help=(
+            "FactReasoner version (default: v2; ignored by baselines). The "
+            "'-cheap' variants keep the same graph semantics but prefilter NLI "
+            "candidate pairs, costing far fewer LLM calls."
+        ),
     )
     p.add_argument(
         "--merlin-path",
@@ -97,6 +103,79 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show progress bars during execution (NLI relations, context "
         "summarization, and baseline atom labeling).",
+    )
+
+    # --- NLI relation-extraction cost ---
+    # One LLM call per candidate pair means A*C calls for the atom-context phase
+    # and C*(C-1) for context-context. Since contexts are retrieved per atom
+    # (C ~ A*top_k), that is quadratic in atoms for v2 and cubic-ish for v3.
+    # Every flag here defaults to the original behavior.
+    n = parser.add_argument_group("nli relation extraction (cost control)")
+    n.add_argument(
+        "--nli-pair-policy",
+        default=None,
+        choices=list(NLI_PAIR_POLICIES),
+        help=(
+            "Which NLI candidate pairs to score. 'all_pairs' scores every "
+            "enumerated pair, reproducing published numbers exactly. 'gated' "
+            "prefilters with a cheap embedding/Jaccard similarity gate. "
+            "'provenance' additionally restricts atom-context pairs to the atoms "
+            "that actually retrieved each context, plus query-level contexts and "
+            "near neighbors. Overrides the --pipeline-version preset."
+        ),
+    )
+    n.add_argument(
+        "--nli-gate-threshold",
+        type=float,
+        default=None,
+        help="Similarity at or above which a pair survives the gate (default: "
+        "0.22). Kept low on purpose: a false prune silently weakens an atom's "
+        "evidence, while a false keep only costs money.",
+    )
+    n.add_argument(
+        "--nli-neighbor-window",
+        type=int,
+        default=None,
+        help="For the provenance policy, how many atoms either side of an owning "
+        "atom are also compared against a context (default: 1).",
+    )
+    n.add_argument(
+        "--nli-dedup-near-duplicates",
+        action="store_true",
+        default=None,
+        help="Collapse near-duplicate contexts before mining. Both dominant cost "
+        "terms are super-linear in the context count, so this has quadratic "
+        "leverage.",
+    )
+    n.add_argument(
+        "--nli-dedup-threshold",
+        type=float,
+        default=None,
+        help="Similarity at or above which two contexts are near-duplicates "
+        "(default: 0.92).",
+    )
+    n.add_argument(
+        "--nli-ctx-ctx-cascade",
+        action="store_true",
+        default=None,
+        help="Score one direction per context pair, mirroring only where the "
+        "reverse can change the reconciled outcome (entailment, which may promote "
+        "to equivalence, and neutral, the reconciler's second chance).",
+    )
+    n.add_argument(
+        "--nli-merge-phases",
+        action="store_true",
+        default=None,
+        help="Issue the atom-context and first context-context batches as one "
+        "fan-out, removing a barrier. Improves latency only; the call count is "
+        "unchanged.",
+    )
+    n.add_argument(
+        "--nli-cache-dir",
+        default=None,
+        help="Directory for the cross-run NLI verdict cache. Re-scoring the same "
+        "data costs no LLM calls. Score-neutral: a hit returns the verdict the "
+        "model already produced.",
     )
 
     # --- Retrieval ---
@@ -293,6 +372,14 @@ def main() -> None:
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,
+            nli_pair_policy=args.nli_pair_policy,
+            nli_gate_threshold=args.nli_gate_threshold,
+            nli_neighbor_window=args.nli_neighbor_window,
+            nli_dedup_near_duplicates=args.nli_dedup_near_duplicates,
+            nli_dedup_threshold=args.nli_dedup_threshold,
+            nli_ctx_ctx_cascade=args.nli_ctx_ctx_cascade,
+            nli_merge_phases=args.nli_merge_phases,
+            nli_cache_dir=args.nli_cache_dir,
             show_progress=args.progress_bar,
         )
 

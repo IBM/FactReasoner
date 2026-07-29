@@ -87,6 +87,58 @@ class TestConstruction:
         with pytest.raises(ValueError, match="Unknown pipeline_version"):
             FactualityRunner(MagicMock(), pipeline="factscore", pipeline_version="v9")
 
+    @pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+    def test_published_versions_use_the_faithful_config(self, version):
+        """v1/v2/v3 must reproduce the original behavior with no flags."""
+        r = FactualityRunner(
+            MagicMock(), pipeline="factscore", pipeline_version=version
+        )
+        assert r.nli_pair_config.is_faithful
+        assert r.nli_pair_config.policy == "all_pairs"
+
+    @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
+    def test_cheap_versions_enable_prefiltering(self, version):
+        r = FactualityRunner(
+            MagicMock(), pipeline="factscore", pipeline_version=version
+        )
+        assert not r.nli_pair_config.is_faithful
+        assert r.nli_pair_config.policy == "provenance"
+
+    def test_version_table_phase_flags(self):
+        """Only v3 variants mine context-context; only v1 is per-atom."""
+        assert runner_mod._FR_VERSIONS["v1"][3] is True  # contexts_per_atom_only
+        assert runner_mod._FR_VERSIONS["v2"][1] is False  # rel_context_context
+        assert runner_mod._FR_VERSIONS["v3"][1] is True
+        # rel_atom_context is on for every version.
+        assert all(tup[0] is True for tup in runner_mod._FR_VERSIONS.values())
+
+    def test_explicit_policy_overrides_the_version_preset(self):
+        r = FactualityRunner(
+            MagicMock(),
+            pipeline="factscore",
+            pipeline_version="v3",  # preset is faithful
+            nli_pair_policy="gated",
+            nli_gate_threshold=0.4,
+        )
+        assert r.nli_pair_config.policy == "gated"
+        assert r.nli_pair_config.gate_threshold == 0.4
+
+    def test_partial_override_keeps_other_preset_values(self):
+        r = FactualityRunner(
+            MagicMock(),
+            pipeline="factscore",
+            pipeline_version="v3-cheap",
+            nli_gate_threshold=0.5,
+        )
+        assert r.nli_pair_config.gate_threshold == 0.5
+        # Untouched knobs still come from the preset.
+        assert r.nli_pair_config.policy == "provenance"
+        assert r.nli_pair_config.ctx_ctx_single_direction_cascade is True
+
+    def test_cache_dir_defaults_to_none(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.nli_cache_dir is None
+
     @pytest.mark.parametrize("pipeline", ["factscore", "veriscore", "factverify"])
     def test_make_pipeline_wires_backend_and_progress(self, pipeline):
         # Regression: every baseline must be constructed with the runner's

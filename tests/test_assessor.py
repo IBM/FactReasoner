@@ -115,6 +115,79 @@ class TestFactReasonerInit:
 
         assert pipeline.use_priors is False
 
+    def test_nli_pair_config_defaults_to_faithful(
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        """Constructing without the new arguments must not change behavior."""
+        pipeline = FactReasoner(
+            atom_extractor=mock_atomizer,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+        )
+
+        assert pipeline.nli_pair_config.is_faithful
+        assert pipeline.nli_pair_config.policy == "all_pairs"
+        assert pipeline.nli_cache is None
+        assert pipeline.nli_stats == {}
+
+    def test_nli_pair_config_and_cache_are_stored(
+        self,
+        tmp_path,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        from fact_reasoner.core.nli_config import get_pair_config
+
+        pipeline = FactReasoner(
+            atom_extractor=mock_atomizer,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+            nli_pair_config=get_pair_config("provenance"),
+            nli_cache_dir=str(tmp_path / "nli"),
+        )
+
+        assert pipeline.nli_pair_config.policy == "provenance"
+        assert pipeline.nli_cache is not None
+
+    def test_nli_stats_are_serialized_when_present(
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        """The cost report must reach the saved pipeline JSON."""
+        pipeline = FactReasoner(
+            atom_extractor=mock_atomizer,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+        )
+        pipeline.query = "q"
+        pipeline.response = "r"
+        pipeline.nli_stats = {"totals": {"llm_calls": 7}}
+
+        data = pipeline.pipeline_to_json()
+
+        assert data["nli_stats"]["totals"]["llm_calls"] == 7
+
 
 class TestFactReasonerFromDictWithContexts:
     """Tests for FactReasoner.from_dict_with_contexts method."""

@@ -30,6 +30,9 @@ from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli_cache import NLIVerdictCache
+from fact_reasoner.core.nli_config import FAITHFUL as NLI_FAITHFUL
+from fact_reasoner.core.nli_pairs import dedup_contexts_near
 from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.factors import (
@@ -71,6 +74,8 @@ class FactReasoner:
         merlin_path: str = None,
         use_priors: bool = True,
         early_exit_evaluator: callable = None,
+        nli_pair_config=None,
+        nli_cache_dir: str = None,
     ):
         """
         Initialize the FactReasoner pipeline.
@@ -100,6 +105,14 @@ class FactReasoner:
                     response: str
                 ) -> Dict{"continue_pipeline_execution": bool, **additional_items}:
                         ...
+            nli_pair_config: NLIPairConfig
+                Which NLI candidate pairs to score, and how. Defaults to
+                `FAITHFUL`, which enumerates every pair exactly as the original
+                implementation did.
+            nli_cache_dir: str
+                Directory for the cross-run NLI verdict cache. None disables it.
+                Caching returns previously computed verdicts, so it changes cost
+                and never results.
         """
 
         # Initialize FactReasoner
@@ -131,6 +144,26 @@ class FactReasoner:
         self.num_retrieved_contexts = 0
         self.num_summarized_contexts = 0
         self.timing = {}
+
+        # NLI relation-extraction cost control. The default reproduces the
+        # original all-pairs behavior; `nli_stats` records what was scored versus
+        # pruned so a run reports its own saving.
+        self.nli_pair_config = (
+            nli_pair_config if nli_pair_config is not None else NLI_FAITHFUL
+        )
+        self.nli_stats = {}
+        self.nli_cache = (
+            NLIVerdictCache(nli_cache_dir) if nli_cache_dir else None
+        )
+        if self.nli_cache is not None:
+            print(f"[FactReasoner] Using NLI verdict cache at: {nli_cache_dir}")
+        if not self.nli_pair_config.is_faithful:
+            print(
+                "[FactReasoner] NLI pair policy: "
+                f"{self.nli_pair_config.policy} "
+                f"(cascade={self.nli_pair_config.ctx_ctx_single_direction_cascade}, "
+                f"near-dup dedup={self.nli_pair_config.dedup_near_duplicates})"
+            )
 
         # The fact graph and probabilistic model (Markov Network)
         self.fact_graph = None
@@ -501,6 +534,29 @@ class FactReasoner:
                     f"[FactReasoner] Created {len(self.contexts.keys())} unique summarized contexts."
                 )
 
+        # Collapse near-duplicate contexts. Run after summarization on purpose:
+        # summaries are short and synthetic, so near-duplicate detection on them is
+        # both cheaper and more accurate than on raw pages. Because both dominant
+        # NLI cost terms are super-linear in the number of contexts, this has
+        # quadratic leverage on the call count.
+        if self.nli_pair_config.dedup_near_duplicates and len(self.contexts) > 1:
+            _t = time.perf_counter()
+            self.contexts, self.atoms, dedup_stats = dedup_contexts_near(
+                self.contexts,
+                self.atoms,
+                threshold=self.nli_pair_config.dedup_threshold,
+                use_summary=self.summarize_contexts,
+                embedding_model=self.nli_pair_config.embedding_model,
+            )
+            self.nli_stats["dedup"] = dedup_stats
+            self.timing["context_near_dedup"] = time.perf_counter() - _t
+            print(
+                f"[FactReasoner] Near-duplicate dedup: "
+                f"{dedup_stats['contexts_before']} -> {dedup_stats['contexts_after']} "
+                f"contexts ({dedup_stats['collapsed']} collapsed, "
+                f"{dedup_stats['owners_merged']} owners merged)."
+            )
+
         # If the user submits the override early exit flag then this method
         # will be set to None
         if self.early_exit_evaluator is not None:
@@ -554,11 +610,18 @@ class FactReasoner:
             contexts_per_atom_only=contexts_per_atom_only,
             nli_extractor=self.nli_extractor,
             use_summarized_contexts=self.summarize_contexts,
+            pair_config=self.nli_pair_config,
+            stats=self.nli_stats,
+            cache=self.nli_cache,
         )
         self.timing["nli_relation_extraction"] = time.perf_counter() - _t
         print(
             f"[FactReasoner][TIMING] NLI relation extraction: {self.timing['nli_relation_extraction']:.4f}s"
         )
+        # Per-phase sub-timings, so the two phases can be compared directly.
+        for _phase in ("atom_context", "context_context"):
+            if _phase in self.nli_stats:
+                self.timing[f"nli_{_phase}"] = self.nli_stats[_phase].get("seconds")
 
         # Build the fact graph and Markov network
         print("[FactReasoner] Building the graphical model ...")
@@ -830,6 +893,10 @@ class FactReasoner:
         results["avg_explogprob"] = math.exp(avg_logprob)
         results["marginals"] = marginals
         results["predictions"] = labels
+        # Carry the NLI cost report into the scored output, so a whole evaluation
+        # sweep can be analyzed for call counts after the fact.
+        if self.nli_stats:
+            results["nli_stats"] = self.nli_stats
         print(f"[FactReasoner] Predictions: {labels}")
 
         # Remove duplicate atoms in self.labels_human
@@ -913,6 +980,8 @@ class FactReasoner:
             data["early_exit_evaluation"] = self.early_exit_evaluation
         if self.timing:
             data["timing"] = self.timing
+        if self.nli_stats:
+            data["nli_stats"] = self.nli_stats
 
         if json_file_path:
             with open(json_file_path, "w") as f:
