@@ -24,8 +24,16 @@ from fact_reasoner.utils import punctuation_only_inside_quotes
 from . import nli_pairs as _np
 from .atomizer import Atomizer
 
-# Local imports
-from .base import Atom, Context, Relation
+# Local imports. PRIOR_PROB_ATOM/PRIOR_PROB_CONTEXT are unused in this module but
+# are re-exported here as part of its public surface; callers and tests import them
+# from `core.utils`, so removing them as "unused" breaks those imports.
+from .base import (  # noqa: F401
+    PRIOR_PROB_ATOM,
+    PRIOR_PROB_CONTEXT,
+    Atom,
+    Context,
+    Relation,
+)
 from .nli import NLIExtractor
 from .nli_cache import extractor_identity
 from .nli_config import FAITHFUL, NLIPairConfig

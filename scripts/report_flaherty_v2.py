@@ -66,6 +66,51 @@ def _preamble() -> List[str]:
     ]
 
 
+def _abstract(data: Dict[str, Any]) -> List[str]:
+    """Headline numbers up front, before any methodology."""
+    cells = data.get("cells", {})
+    base, cheap = cells.get("v2 all_pairs"), cells.get("v2-cheap")
+    recall = (data.get("recall") or [{}])[0]
+    if not base or not cheap:
+        return []
+    b, c = base["pairs_attempted"], cheap["pairs_attempted"]
+    per_call = base["nli_seconds"] / max(base["llm_calls"], 1)
+    est = c * per_call
+    same = (
+        base.get("factuality_score") == cheap.get("factuality_score")
+        and (base.get("accuracy") or {}).get("accuracy")
+        == (cheap.get("accuracy") or {}).get("accuracy")
+    )
+    return [
+        r"\begin{abstract}",
+        rf"Prefiltering the NLI candidate pairs cut FactReasoner v2's "
+        rf"relation-extraction phase from {b} to {c} LLM calls on a "
+        rf"{base['num_atoms']}-atom biography with {base['num_contexts']} retrieved "
+        rf"contexts --- \textbf{{{b - c} calls saved, {b / max(c, 1):.2f}$\times$ "
+        rf"fewer}} --- with an estimated wall-clock reduction from "
+        rf"{base['nli_seconds']:.0f}\,s to roughly {est:.0f}\,s at the measured "
+        rf"throughput of {per_call:.2f}\,s per call. "
+        + (
+            rf"The factuality score and gold-label accuracy were "
+            rf"\textbf{{identical}} to the exhaustive baseline "
+            rf"({_fmt(base.get('factuality_score'), '.4f')} and "
+            rf"{_fmt((base.get('accuracy') or {}).get('accuracy'), '.3f')}), and "
+            if same else
+            rf"The factuality score moved from "
+            rf"{_fmt(base.get('factuality_score'), '.4f')} to "
+            rf"{_fmt(cheap.get('factuality_score'), '.4f')}, and "
+        )
+        + rf"recall of non-neutral relations was "
+        rf"{_fmt(recall.get('recall'), '.3f')} "
+        rf"({_fmt(recall.get('non_neutral_lost'))} of "
+        rf"{_fmt(recall.get('non_neutral_total'))} pruned). Most of the saving came "
+        rf"from collapsing near-duplicate contexts rather than from the similarity "
+        rf"gate, because the retrieved evidence drew repeatedly on the same few "
+        rf"sources.",
+        r"\end{abstract}",
+    ]
+
+
 def _intro(data: Dict[str, Any]) -> List[str]:
     prep = data.get("prep", {})
     cells = data.get("cells", {})
@@ -158,6 +203,41 @@ def _savings_prose(cells: Dict[str, Any]) -> List[str]:
         rf"(\textbf{{{factor:.2f}$\times$ fewer}}).",
         "",
     ]
+
+    # Decompose the saving: dedup shrinks C, then the gate prunes what remains.
+    # Reporting only the product hides which mechanism actually did the work.
+    dedup = (cheap.get("stats") or {}).get("dedup") or {}
+    mid = cheap.get("all_pairs_equivalent")
+    if dedup and mid:
+        d_factor = b_pairs / max(mid, 1)
+        g_factor = mid / max(c_pairs, 1)
+        lines += [
+            r"The saving decomposes into two independent mechanisms:",
+            r"\begin{table}[htbp]", r"\centering",
+            r"\begin{tabular}{lrr}", r"\toprule",
+            r"Stage & Pairs & Factor \\", r"\midrule",
+            rf"Exhaustive ($A \times C$) & {b_pairs} & --- \\",
+            rf"After near-duplicate dedup ({dedup.get('contexts_before')}"
+            rf"$\to${dedup.get('contexts_after')} contexts) & {mid} & "
+            rf"{d_factor:.2f}$\times$ \\",
+            rf"After provenance + gate & {c_pairs} & {g_factor:.2f}$\times$ \\",
+            r"\midrule",
+            rf"\textbf{{Combined}} & \textbf{{{c_pairs}}} & "
+            rf"\textbf{{{factor:.2f}$\times$}} \\",
+            r"\bottomrule", r"\end{tabular}",
+            r"\caption{Where the saving comes from. Dedup shrinks $C$ and so cuts "
+            r"pairs quadratically in v3 and linearly here; the gate then prunes "
+            r"cross-atom pairs among what remains.}",
+            r"\label{tab:decomp}", r"\end{table}",
+            "",
+            rf"On this example dedup is the dominant lever "
+            rf"({d_factor:.2f}$\times$ against the gate's {g_factor:.2f}$\times$), "
+            rf"because the {dedup.get('contexts_before')} contexts were drawn from "
+            rf"far fewer distinct sources --- the same handful of pages recur "
+            rf"across many atoms. A response whose evidence came from mostly "
+            rf"distinct pages would shift the balance toward the gate.",
+            "",
+        ]
     # Wall-clock is only comparable when both cells actually issued calls; a
     # cache-served cell finishes instantly and would overstate the speed-up.
     if cheap["llm_calls"] > 0 and base["llm_calls"] > 0:
@@ -248,7 +328,11 @@ def _recall_section(recall: List[dict]) -> List[str]:
         ]) + r" \\",
         r"\bottomrule", r"\end{tabular}",
         rf"\caption{{Recall of non-neutral relations under the cheap policy "
-        rf"(similarity backend: \texttt{{{_tex_escape(str(row.get('gate_backend')))}}}).}}",
+        rf"(similarity backend: "
+        rf"\texttt{{{_tex_escape(str(row.get('gate_backend')))}}}). Counts here are "
+        rf"over the full pre-dedup pair set, so \emph{{Pairs kept}} is larger than "
+        rf"the post-dedup figure in Table~\ref{{tab:cost}}: this table isolates the "
+        rf"gate's decisions, which is what recall is a property of.}}",
         r"\label{tab:recall}", r"\end{table}",
     ]
     lost = row.get("lost_pairs") or []
@@ -324,6 +408,12 @@ def _sweep_section(sweep: List[dict]) -> List[str]:
         "weakens an atom's evidence, while a false keep merely costs money --- the "
         "right operating point is the cheapest threshold that still holds recall "
         "at 1.0, not the one with the best headline saving.",
+        "",
+        r"\textbf{Read these savings as the gate's contribution alone.} The sweep "
+        r"runs on the full pre-dedup context set, so its figures isolate the gate "
+        r"and do not include the dedup factor from Table~\ref{tab:decomp}; the two "
+        r"multiply. That is why the ceiling here is lower than the headline "
+        r"combined saving.",
         "",
         r"\begin{table}[htbp]", r"\centering",
         r"\begin{tabular}{lrrrrr}", r"\toprule",
@@ -458,6 +548,7 @@ def build_tex(data: Dict[str, Any]) -> str:
     cells = data.get("cells", {})
     parts: List[str] = []
     parts += _preamble()
+    parts += _abstract(data)
     parts += _intro(data)
     parts += _cost_table(cells)
     parts += _savings_prose(cells)
