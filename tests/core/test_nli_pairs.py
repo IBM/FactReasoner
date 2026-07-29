@@ -428,6 +428,24 @@ class TestPruneDanglingRefs:
 
         assert prune_dangling_context_refs(atoms, contexts) == 0
 
+    def test_cleans_shared_context_from_every_owner(self):
+        """A context shared by several atoms must be cleared from all of them.
+
+        Removal sites in the pipeline clear at most the single owning atom, so a
+        context retrieved for three atoms leaves two stale references behind.
+        """
+        atoms = make_atoms(3)
+        shared = Context(id="c_shared", atom=atoms["a0"], text="Shared evidence.")
+        for atom in atoms.values():
+            atom.add_context(shared)
+
+        # The context is dropped globally but still listed by all three atoms.
+        removed = prune_dangling_context_refs(atoms, {})
+
+        assert removed == 3
+        for atom in atoms.values():
+            assert atom.get_contexts() == {}
+
 
 class TestNLIPairConfig:
     def test_faithful_defaults(self):

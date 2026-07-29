@@ -32,7 +32,10 @@ from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
 from fact_reasoner.core.nli_cache import NLIVerdictCache
 from fact_reasoner.core.nli_config import FAITHFUL as NLI_FAITHFUL
-from fact_reasoner.core.nli_pairs import dedup_contexts_near
+from fact_reasoner.core.nli_pairs import (
+    dedup_contexts_near,
+    prune_dangling_context_refs,
+)
 from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.factors import (
@@ -511,6 +514,17 @@ class FactReasoner:
                 self.timing["context_summarization_question"] = time.perf_counter() - _t
                 print(
                     f"[FactReasoner][TIMING] Context summarization (question): {self.timing['context_summarization_question']:.4f}s"
+                )
+
+            # Contexts judged irrelevant are dropped above, but the atoms that
+            # retrieved them are not all cleaned: the per-atom branch clears only
+            # the one owning atom (so a context shared by several atoms leaves
+            # references behind) and the query branch clears none. Sweep once here
+            # so no atom points at a context that no longer exists.
+            _dangling = prune_dangling_context_refs(self.atoms, self.contexts)
+            if _dangling:
+                print(
+                    f"[FactReasoner] Pruned {_dangling} stale context reference(s)."
                 )
 
             # For tracking purposes
