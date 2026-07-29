@@ -120,6 +120,30 @@ class TestForBackend:
         with pytest.raises(ValueError, match="not available on Ollama"):
             m.for_backend("ollama")
 
+    def test_openai_returns_openai_name(self):
+        # Built locally rather than from the catalog: only one upstream Mellea
+        # entry currently carries an openai_name, so asserting on it would make
+        # this test hostage to the upstream catalog.
+        m = UnifiedModel(
+            key="x",
+            mellea=ModelIdentifier(hf_model_name="org/hf", openai_name="gpt-x"),
+        )
+        served = m.for_backend("openai")
+        assert isinstance(served, str)
+        assert served == "gpt-x"
+
+    def test_openai_unavailable_raises(self):
+        # Most catalog models are open-weight and have no openai_name; the error
+        # must point the caller at passing a provider id verbatim instead.
+        m = UnifiedModel(
+            key="x",
+            mellea=ModelIdentifier(hf_model_name="org/hf", openai_name=None),
+        )
+        with pytest.raises(ValueError, match="no OpenAI-API model name"):
+            m.for_backend("openai")
+        # But the other backends still resolve fine.
+        assert m.for_backend("vllm") == "org/hf"
+
     def test_unknown_backend_kind_raises(self):
         m = resolve("llama-3-3-70b-instruct")
         with pytest.raises(ValueError, match="Unknown backend kind"):
@@ -131,12 +155,20 @@ class TestDefaults:
         assert isinstance(DEFAULT_MODEL_KEY, str)
         assert DEFAULT_MODEL_KEY == "granite-4-0-micro"
 
-    def test_default_resolves_for_every_backend(self):
-        # The shared default must be usable across all three backends.
+    def test_default_resolves_for_every_self_hosted_backend(self):
+        # The shared default must be usable across ollama / vllm / rits.
         m = resolve(DEFAULT_MODEL_KEY)
         assert m.for_backend("ollama").ollama_name == "granite4:micro"
         assert isinstance(m.for_backend("vllm"), str) and m.for_backend("vllm")
         assert m.rits is not None  # available on RITS too
+
+    def test_default_has_no_openai_name(self):
+        # This is *why* build_backend gives the "openai" kind its own default
+        # (DEFAULT_OPENAI_MODEL): the shared default is an open-weight model that
+        # no frontier endpoint serves. If a future Mellea release gives it an
+        # openai_name, this fails and the design note should be revisited.
+        m = resolve(DEFAULT_MODEL_KEY)
+        assert m.mellea.openai_name in (None, "")
 
 
 class TestRitsOverlay:

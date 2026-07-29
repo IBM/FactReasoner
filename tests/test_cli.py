@@ -195,6 +195,60 @@ class TestDispatch:
         assert bb.call_args.kwargs["model_id"] == "my-org/my-model"
         assert bb.call_args.kwargs["base_url"] == "https://my-rits-host/my-model"
 
+    def _run_openai(self, bb, extra_argv=()):
+        """Run a minimal single-mode assessment with --backend openai."""
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with patch.object(cli, "FactualityRunner", return_value=fake_runner):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "openai",
+                    *extra_argv,
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+
+    def test_openai_dispatch_forwards_model_and_base_url(self):
+        # Regression guard: _backend_context ends in `else: # ollama`, which drops
+        # base_url. Widening only the argparse choices would silently route the
+        # openai kind there and lose the endpoint -- i.e. quietly hit OpenAI when
+        # the user asked for Claude. Every other test in the suite would pass.
+        with patch.object(cli, "build_backend", return_value=object()) as bb:
+            self._run_openai(
+                bb,
+                [
+                    "--model-id",
+                    "claude-opus-5",
+                    "--base-url",
+                    "https://api.anthropic.com/v1/",
+                    "--nli-method",
+                    "simbauq",
+                ],
+            )
+        bb.assert_called_once()
+        assert bb.call_args.args[0] == "openai"
+        assert bb.call_args.kwargs["model_id"] == "claude-opus-5"
+        assert bb.call_args.kwargs["base_url"] == "https://api.anthropic.com/v1/"
+
+    def test_openai_dispatch_without_base_url(self):
+        with patch.object(cli, "build_backend", return_value=object()) as bb:
+            self._run_openai(bb, ["--model-id", "gpt-4o"])
+        assert bb.call_args.args[0] == "openai"
+        assert bb.call_args.kwargs["base_url"] is None
+
+    def test_openai_uses_default_model_when_omitted(self):
+        with patch.object(cli, "build_backend", return_value=object()) as bb:
+            self._run_openai(bb)
+        assert bb.call_args.args[0] == "openai"
+        # None is forwarded so build_backend applies DEFAULT_OPENAI_MODEL.
+        assert bb.call_args.kwargs["model_id"] is None
+
     def test_file_mode_calls_assess_file(self, tmp_path):
         fake_runner = MagicMock()
         with (
@@ -248,3 +302,79 @@ class TestDispatch:
         fake_server.__enter__.assert_called_once()
         fake_server.__exit__.assert_called_once()
         fake_runner.assess.assert_called_once()
+
+
+class TestLogprobsWarning:
+    """The logprobs/backend mismatch warning (one if/elif, so never two at once)."""
+
+    def _run_with(self, argv):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner),
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    *argv,
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+
+    def test_ollama_logprobs_warns(self, capsys):
+        self._run_with(["--backend", "ollama", "--nli-method", "logprobs"])
+        out = capsys.readouterr().out
+        assert "[warning]" in out
+        assert "simbauq" in out
+
+    def test_claude_compat_logprobs_warns(self, capsys):
+        self._run_with(
+            [
+                "--backend",
+                "openai",
+                "--base-url",
+                "https://api.anthropic.com/v1/",
+                "--nli-method",
+                "logprobs",
+            ]
+        )
+        out = capsys.readouterr().out
+        assert "[warning]" in out
+        assert "simbauq" in out
+
+    def test_only_one_warning_is_printed(self, capsys):
+        # The if/elif structure must not let both arms fire for one run.
+        self._run_with(
+            [
+                "--backend",
+                "openai",
+                "--base-url",
+                "https://api.anthropic.com/v1/",
+                "--nli-method",
+                "logprobs",
+            ]
+        )
+        assert capsys.readouterr().out.count("[warning]") == 1
+
+    def test_real_openai_logprobs_does_not_warn(self, capsys):
+        # Real OpenAI does return logprobs, so this combination is fine.
+        self._run_with(["--backend", "openai", "--nli-method", "logprobs"])
+        assert "[warning]" not in capsys.readouterr().out
+
+    def test_simbauq_never_warns(self, capsys):
+        self._run_with(
+            [
+                "--backend",
+                "openai",
+                "--base-url",
+                "https://api.anthropic.com/v1/",
+                "--nli-method",
+                "simbauq",
+            ]
+        )
+        assert "[warning]" not in capsys.readouterr().out

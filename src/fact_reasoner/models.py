@@ -14,8 +14,8 @@
 
 # Unified model catalog.
 #
-# FactReasoner drives three backends (ollama, rits, vllm), each of which wants a
-# *different* model identifier:
+# FactReasoner drives four backends (ollama, rits, vllm, openai), each of which
+# wants a *different* model identifier:
 #
 #   * ollama / vllm  -- a ``mellea.backends.model_ids.ModelIdentifier`` (a frozen
 #     dataclass carrying per-platform name variants: ``ollama_name``,
@@ -23,6 +23,10 @@
 #   * rits           -- a ``mellea_ibm.rits.RITSModelIdentifier`` from the RITS
 #     class catalog, which is a *separate* registry (endpoint + model_name) that
 #     Mellea's ``ModelIdentifier`` does not cover.
+#   * openai         -- the ``openai_name`` of a Mellea ``ModelIdentifier``. Very
+#     few catalog entries have one (the catalog is built around open-weight
+#     models), so frontier model ids are normally passed to ``build_backend``
+#     verbatim rather than resolved here.
 #
 # This module exposes a single friendly id (e.g. "llama-3.3-70b-instruct") that
 # resolves to the right identifier for whichever backend is requested. Mellea is
@@ -90,16 +94,18 @@ class UnifiedModel:
         """Resolve this model to the identifier the given backend expects.
 
         Args:
-            kind: One of ``"ollama"``, ``"vllm"`` or ``"rits"``.
+            kind: One of ``"ollama"``, ``"vllm"``, ``"rits"`` or ``"openai"``.
 
         Returns:
             For ``"ollama"``: the Mellea ``ModelIdentifier`` (the backend reads
             its ``ollama_name``). For ``"vllm"``: a served-model ``str``. For
-            ``"rits"``: a ``RITSModelIdentifier`` from the RITS catalog.
+            ``"rits"``: a ``RITSModelIdentifier`` from the RITS catalog. For
+            ``"openai"``: the OpenAI-API model name ``str``.
 
         Raises:
             ValueError: If ``kind`` is unknown, if the model has no Ollama name
-                (ollama), no vLLM/HF name (vllm), or is not available on RITS.
+                (ollama), no vLLM/HF name (vllm), no OpenAI-API name (openai), or
+                is not available on RITS.
         """
         if kind == "ollama":
             if self.mellea.ollama_name in (None, ""):
@@ -118,6 +124,23 @@ class UnifiedModel:
                 )
             return served
 
+        if kind == "openai":
+            # Only a handful of Mellea ModelIdentifiers carry an openai_name (the
+            # catalog is built around open-weight models), so most catalog ids are
+            # simply not servable over the OpenAI API. Frontier ids are normally
+            # passed verbatim instead, which build_backend already supports -- say
+            # so, since a caller who lands here typically used a catalog id (or an
+            # alias such as "gpt-oss") by mistake.
+            if self.mellea.openai_name in (None, ""):
+                raise ValueError(
+                    f"Model {self.key!r} has no OpenAI-API model name (the Mellea "
+                    "ModelIdentifier has no openai_name). Pass the provider's own "
+                    "model id verbatim instead -- e.g. 'gpt-4o' for OpenAI or "
+                    "'claude-opus-5' for Claude via Anthropic's OpenAI-compatible "
+                    "endpoint."
+                )
+            return self.mellea.openai_name
+
         if kind == "rits":
             if self.rits is None:
                 raise ValueError(
@@ -130,7 +153,8 @@ class UnifiedModel:
             return getattr(RITS, self.rits)
 
         raise ValueError(
-            f"Unknown backend kind: {kind!r} (expected 'ollama', 'rits' or 'vllm')."
+            f"Unknown backend kind: {kind!r} "
+            "(expected 'ollama', 'rits', 'vllm' or 'openai')."
         )
 
 

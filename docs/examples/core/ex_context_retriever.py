@@ -30,11 +30,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Parallel context retriever example.")
     parser.add_argument(
         "--backend",
-        choices=["rits", "ollama", "vllm"],
+        choices=["rits", "ollama", "vllm", "openai"],
         default="rits",
         help="Which Mellea backend to use for the query builder: 'rits' "
-        "(remote IBM RITS, default), 'ollama' (local Ollama server), or "
-        "'vllm' (vLLM OpenAI-compatible server).",
+        "(remote IBM RITS, default), 'ollama' (local Ollama server), "
+        "'vllm' (vLLM OpenAI-compatible server), or 'openai' (hosted frontier "
+        "model: OpenAI, or Claude via --base-url https://api.anthropic.com/v1/).",
     )
     parser.add_argument(
         "--served-model",

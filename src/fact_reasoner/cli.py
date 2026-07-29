@@ -15,15 +15,16 @@
 # Command-line entrypoint for the factuality runner.
 #
 # Installed as the ``fact-reasoner`` console command. Runs any factuality
-# assessor (FactReasoner or a baseline) with any backend (ollama, rits, or a
-# local vLLM instance), over a single query/response or a jsonl dataset.
+# assessor (FactReasoner or a baseline) with any backend (ollama, rits, a local
+# vLLM instance, or a hosted frontier model via the OpenAI API), over a single
+# query/response or a jsonl dataset.
 
 import argparse
 import contextlib
 import json
 import os
 
-from fact_reasoner.backends import build_backend
+from fact_reasoner.backends import build_backend, is_anthropic_compat_endpoint
 from fact_reasoner.core.nli_config import NLI_PAIR_POLICIES
 from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 
@@ -32,8 +33,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fact-reasoner",
         description="Run a factuality assessor (FactReasoner or a baseline) over "
-        "a single query/response or a dataset, with an Ollama, RITS, or local "
-        "vLLM backend.",
+        "a single query/response or a dataset, with an Ollama, RITS, local vLLM, "
+        "or hosted frontier (OpenAI / Claude) backend.",
     )
 
     # --- Pipeline ---
@@ -70,9 +71,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default="logprobs",
         choices=["logprobs", "simbauq"],
         help="How the NLI extractor estimates relation probabilities: "
-        "'logprobs' needs a logprobs-capable backend (rits/vllm); 'simbauq' "
-        "uses self-consistency and works on any backend (required for ollama, "
-        "which does not expose logprobs). Default: logprobs.",
+        "'logprobs' needs a logprobs-capable backend (rits/vllm/OpenAI); "
+        "'simbauq' uses self-consistency and works on any backend (required for "
+        "ollama and for Claude via Anthropic's OpenAI-compatible endpoint, "
+        "neither of which exposes logprobs). Default: logprobs.",
     )
     p.add_argument(
         "--nli-similarity-metric",
@@ -196,8 +198,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--backend",
         default="ollama",
-        choices=["ollama", "rits", "vllm"],
-        help="Backend to use (default: ollama).",
+        choices=["ollama", "rits", "vllm", "openai"],
+        help="Backend to use (default: ollama). 'openai' is a hosted frontier "
+        "model: OpenAI itself, or Claude via Anthropic's OpenAI-compatible "
+        "endpoint (see --base-url).",
     )
     b.add_argument(
         "--model-id",
@@ -218,7 +222,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="API endpoint. For --backend vllm: the client base URL (defaults to "
         "VLLM_BASE_URL env). For --backend rits: a custom RITS endpoint — when "
         "set, --model-id is the raw RITS model name and RITS is pointed at this "
-        "endpoint (pass the base endpoint; RITS appends /v1).",
+        "endpoint (pass the base endpoint; RITS appends /v1). For --backend "
+        "openai: selects the provider (defaults to OPENAI_BASE_URL env, then "
+        "OpenAI); pass https://api.anthropic.com/v1/ to use Claude. API keys are "
+        "never CLI flags — set OPENAI_API_KEY (with the Anthropic key, for Claude).",
     )
     # vLLM local-server options: passing --model starts a local server.
     b.add_argument(
@@ -267,6 +274,8 @@ def _backend_context(args):
       the raw RITS model name.
     - vllm + --model: start a local VLLMServer and yield its backend.
     - vllm (no --model): connect as a client to --base-url / VLLM_BASE_URL.
+    - openai: a hosted frontier model; --base-url selects the provider (OpenAI by
+      default, or Claude via Anthropic's OpenAI-compatible endpoint).
     - ollama: build an Ollama backend (default model if --model-id is omitted).
     """
     if args.backend == "rits":
@@ -289,6 +298,12 @@ def _backend_context(args):
         yield build_backend(
             "vllm", model_id=args.served_model or args.model_id, base_url=args.base_url
         )
+    elif args.backend == "openai":
+        # base_url selects the provider (unset -> OpenAI; api.anthropic.com ->
+        # Claude via the compatibility endpoint). api_key stays None so
+        # OpenAIBackend falls back to the OPENAI_API_KEY env var -- keys are
+        # deliberately not CLI flags, since argv is visible to other processes.
+        yield build_backend("openai", model_id=args.model_id, base_url=args.base_url)
     else:  # ollama
         yield build_backend("ollama", model_id=args.model_id)
 
@@ -349,14 +364,25 @@ def main() -> None:
             raise SystemExit(
                 f"--nli-classifier-path not found: {args.nli_classifier_path!r}."
             )
-    # Ollama does not expose token logprobs, so the default NLI method degrades
-    # to all-neutral relations. Steer the user to the SIMBA-UQ method.
-    if args.backend == "ollama" and args.nli_method == "logprobs":
-        print(
-            "[warning] The 'ollama' backend does not expose logprobs, so "
-            "--nli-method logprobs yields all-neutral NLI relations. Use "
-            "--nli-method simbauq for meaningful NLI probabilities on Ollama."
-        )
+    # Some backends do not expose token logprobs, so the default NLI method
+    # degrades to all-neutral relations. Steer the user to the SIMBA-UQ method.
+    # One if/elif so a run never prints two overlapping warnings.
+    if args.nli_method == "logprobs":
+        if args.backend == "ollama":
+            print(
+                "[warning] The 'ollama' backend does not expose logprobs, so "
+                "--nli-method logprobs yields all-neutral NLI relations. Use "
+                "--nli-method simbauq for meaningful NLI probabilities on Ollama."
+            )
+        elif args.backend == "openai" and is_anthropic_compat_endpoint(args.base_url):
+            # Caught here, before any backend is built or any request is made.
+            # A Claude endpoint configured purely via OPENAI_BASE_URL is invisible
+            # to this check; build_backend warns in that case.
+            print(
+                "[warning] Anthropic's OpenAI-compatibility endpoint returns empty "
+                "logprobs, so --nli-method logprobs yields all-neutral NLI "
+                "relations. Use --nli-method simbauq instead."
+            )
 
     with _backend_context(args) as backend:
         runner = FactualityRunner(

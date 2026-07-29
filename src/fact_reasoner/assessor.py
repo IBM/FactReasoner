@@ -18,6 +18,7 @@ import json
 import logging
 import math
 import time
+from collections.abc import Callable
 from typing import Any
 
 from mellea.core import MelleaLogger
@@ -75,7 +76,7 @@ class FactReasoner:
         context_summarizer: ContextSummarizer = None,
         merlin_path: str | None = None,
         use_priors: bool = True,
-        early_exit_evaluator: callable | None = None,
+        early_exit_evaluator: Callable | None = None,
         nli_pair_config=None,
         nli_cache_dir: str | None = None,
     ):

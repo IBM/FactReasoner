@@ -106,7 +106,8 @@ Traditional factuality methods (like FactScore) make independent binary decision
 - **Multiple Knowledge Sources**: Support for Wikipedia, Google Search API, and ChromaDB vector stores
 - **Baseline Implementations**: Includes FactScore and VeriScore methods for comparison
 - **Modular Architecture**: Each component (atomizer, retriever, NLI, summarizer) can be configured independently
-- **Backend-agnostic NLI Uncertainty**: NLI relation probabilities can be estimated from token logprobs or via SIMBA-UQ self-consistency, enabling logprob-free backends such as Ollama
+- **Backend-agnostic NLI Uncertainty**: NLI relation probabilities can be estimated from token logprobs or via SIMBA-UQ self-consistency, enabling logprob-free backends such as Ollama and Claude
+- **Frontier Model Support**: Run any component against OpenAI or Claude through a single `"openai"` backend kind, with no provider-specific SDK
 - **Async Support**: Batch processing with asynchronous LLM calls for efficiency
 - **Caching**: SQLite-based caching for search API results
 
@@ -149,6 +150,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 | Ollama (local)    | default | Works out of the box via `mellea`. |
 | vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
 | vLLM local server | `[vllm]` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
+| OpenAI / Claude   | default | Hosted frontier models via `mellea`'s `OpenAIBackend`. **No extra dependency** — Claude is reached over Anthropic's OpenAI-compatible endpoint, so the `anthropic` SDK is not required. Needs `OPENAI_API_KEY`. |
 | RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 
 ### Dependencies
@@ -172,18 +174,24 @@ export RITS_API_KEY=your_RITS_api_key
 # vLLM (OpenAI-compatible) backend endpoint and key (optional):
 export VLLM_BASE_URL=http://localhost:8000/v1
 export VLLM_API_KEY=EMPTY
+
+# Hosted frontier models (--backend openai). For Claude, put your *Anthropic*
+# key here: the OpenAI SDK is what makes the call.
+export OPENAI_API_KEY=your_openai_or_anthropic_api_key
+export OPENAI_BASE_URL=https://api.openai.com/v1   # optional; see below for Claude
 ```
 
 ### Choosing a Backend
 
 FactReasoner components take a generic Mellea `Backend`. The helper
-`fact_reasoner.build_backend(kind, ...)` constructs one of three backends:
+`fact_reasoner.build_backend(kind, ...)` constructs one of four backends:
 
 | `kind`     | Backend                     | Notes |
 |------------|-----------------------------|-------|
 | `"rits"`   | `RITSBackend`               | Remote IBM RITS service (requires `mellea-ibm` and `RITS_API_KEY`). |
 | `"ollama"` | `OllamaModelBackend`        | Local Ollama server (`http://localhost:11434`; model pulled on first use). |
 | `"vllm"`   | `OpenAIBackend`             | A [vLLM](https://docs.vllm.ai) server exposing an OpenAI-compatible API. |
+| `"openai"` | `OpenAIBackend`             | A hosted frontier model over the OpenAI API: OpenAI itself by default, or **Claude** via Anthropic's OpenAI-compatible endpoint. `base_url` selects the provider. |
 
 **Using a vLLM backend.** Launch vLLM with an explicit served model name, e.g.:
 
@@ -205,8 +213,49 @@ backend = build_backend(
 )
 ```
 
-The example scripts under `docs/examples/` accept a `--backend {rits,ollama,vllm}`
-flag (with `--served-model` / `--base-url` for vLLM).
+**Using a frontier model (OpenAI or Claude).** The `"openai"` kind talks to a
+hosted model over the OpenAI API. The endpoint — not the kind — selects the
+provider, because both speak the same wire protocol:
+
+```python
+from fact_reasoner import build_backend
+
+# OpenAI (default endpoint; key from OPENAI_API_KEY)
+backend = build_backend("openai")                      # defaults to gpt-5.1
+backend = build_backend("openai", model_id="gpt-4o")
+
+# Claude, via Anthropic's OpenAI-compatibility endpoint.
+# Put your Anthropic key in OPENAI_API_KEY (or pass api_key=...).
+backend = build_backend(
+    "openai",
+    model_id="claude-opus-5",
+    base_url="https://api.anthropic.com/v1/",
+)
+```
+
+Pass the provider's own model id (`gpt-4o`, `claude-opus-5`); these are not in the
+unified model catalog and are forwarded verbatim. API keys are read from the
+environment rather than accepted as CLI flags, since command lines are visible to
+other processes on the host.
+
+> **Limitations of Anthropic's compatibility layer.** Anthropic documents this
+> endpoint as a way to *test and compare* models, not as a production solution, and
+> it ignores two things FactReasoner relies on:
+>
+> - **`response_format`** — structured outputs are not schema-enforced, so
+>   component responses may occasionally fail to parse.
+> - **`logprobs`** — returned empty, so `--nli-method logprobs` would yield
+>   all-neutral NLI relations. **Use `--nli-method simbauq`** (SIMBA-UQ
+>   self-consistency), which works on any backend.
+>
+> It also ignores tool `strict`, `seed`, presence/frequency penalties and
+> `reasoning_effort`, clamps `temperature` to `[0,1]`, and requires `n=1`.
+> FactReasoner prints a warning when it detects this endpoint. Real OpenAI
+> supports both `response_format` and `logprobs`, so neither caveat applies there.
+
+The example scripts under `docs/examples/` accept a
+`--backend {rits,ollama,vllm,openai}` flag (with `--served-model` / `--base-url`
+for vLLM, and `--base-url` for Claude).
 
 ## Running assessments (`fact-reasoner` CLI)
 
@@ -287,7 +336,7 @@ The CLI is a thin wrapper over `fact_reasoner.FactualityRunner`:
 ```python
 from fact_reasoner import FactualityRunner, build_backend
 
-backend = build_backend("ollama")  # or "rits" / "vllm"
+backend = build_backend("ollama")  # or "rits" / "vllm" / "openai"
 runner = FactualityRunner(
     backend,
     pipeline="factscore",          # or "factreasoner" (+ merlin_path=...), etc.
@@ -357,6 +406,9 @@ from fact_reasoner.core.query_builder import QueryBuilder
 #   build_backend("rits")                                # IBM RITS (default model)
 #   build_backend("vllm", model_id="granite-4.1-8b",
 #                 base_url="http://localhost:8000/v1")   # vLLM client
+#   build_backend("openai", model_id="gpt-4o")           # OpenAI
+#   build_backend("openai", model_id="claude-opus-5",
+#                 base_url="https://api.anthropic.com/v1/")  # Claude
 # A default of MAX_NEW_TOKENS=4096 is applied unless you pass model_options.
 backend = build_backend("ollama")
 
@@ -637,7 +689,7 @@ FactReasoner/
 │   ├── corrector.py          # FactCorrector (WIP)
 │   ├── runner.py             # FactualityRunner (single + dataset runner)
 │   ├── cli.py                # `fact-reasoner` console entrypoint
-│   ├── backends.py           # build_backend() factory (ollama/rits/vllm)
+│   ├── backends.py           # build_backend() factory (ollama/rits/vllm/openai)
 │   ├── serving.py            # VLLMServer (local vLLM server manager)
 │   ├── markov_network.py     # Markov network + UAI serialization
 │   ├── fact_graph.py         # Graph representation

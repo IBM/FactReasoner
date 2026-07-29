@@ -86,7 +86,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     # Backend (generation only).
     p.add_argument(
         "--backend",
-        choices=["rits", "ollama", "vllm"],
+        choices=["rits", "ollama", "vllm", "openai"],
         default="ollama",
         help="Mellea backend used for generation (default: ollama).",
     )

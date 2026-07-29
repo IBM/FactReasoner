@@ -48,7 +48,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=["rits", "ollama", "vllm"],
+        choices=["rits", "ollama", "vllm", "openai"],
         default="ollama",
         help="Which Mellea backend to use (default: ollama). SIMBA-UQ works on "
         "any backend, including ones without logprobs like Ollama.",

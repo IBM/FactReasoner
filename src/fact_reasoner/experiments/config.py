@@ -28,6 +28,17 @@ from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
 from fact_reasoner.lcs.relation_miner import STRENGTH_METHODS
 
 # Backends that expose token logprobs (so surrogate_logprobs / nli logprobs work).
+#
+# "openai" is deliberately absent. That kind serves two providers and only the
+# base_url tells them apart: real OpenAI does return logprobs, while Anthropic's
+# OpenAI-compatibility endpoint returns them empty. The backend *kind* alone
+# cannot answer the question, so the safe answer is "no".
+#
+# Consequence for an "openai" model in a sweep: it gets nli_method="simbauq"
+# (see ExperimentRunner._run_model) and skips the surrogate_logprobs strength
+# method (see ExperimentRunner._strength_methods_for). That is correct for Claude
+# and merely conservative for real OpenAI -- both still produce valid LCS scores
+# via surrogate_sampled / verbalized.
 LOGPROB_BACKENDS = ("rits", "vllm")
 
 
@@ -39,7 +50,9 @@ class ModelSpec:
         name: A short label used in filenames, tables and plots.
         model_id: The unified friendly id / alias / raw served name passed to
             ``fact_reasoner.backends.build_backend`` (see ``fact_reasoner.models``).
-        backend: The backend kind, one of ``"rits"``, ``"vllm"``, ``"ollama"``.
+        backend: The backend kind, one of ``"rits"``, ``"vllm"``, ``"ollama"`` or
+            ``"openai"`` (see ``LOGPROB_BACKENDS`` for how this affects the NLI
+            and conditional-strength methods available to the model).
         base_url: Optional API endpoint (vLLM client URL / custom RITS endpoint).
         api_key: Optional API key (else read from the backend's env fallback).
     """
