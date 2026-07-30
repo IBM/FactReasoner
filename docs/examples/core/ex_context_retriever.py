@@ -4,9 +4,9 @@ import argparse
 
 # Local imports
 from fact_reasoner.backends import build_backend
+from fact_reasoner.core.base import Atom
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
-from fact_reasoner.core.base import Atom
 
 # A set of atoms to retrieve contexts for, and a standalone query
 ATOMS = {
@@ -22,7 +22,7 @@ def run_all(fast_retriever: ContextRetriever, atoms: dict, query: str) -> None:
 
     contexts = fast_retriever.retrieve_all(atoms=atoms, query=query)
     print(f"\nTotal contexts retrieved: {len(contexts)}")
-    for cid, context in contexts.items():
+    for context in contexts.values():
         print(context)
 
 

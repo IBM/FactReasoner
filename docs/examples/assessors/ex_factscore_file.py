@@ -1,15 +1,15 @@
-import os
-import json
 import argparse
+import json
+import os
 from pathlib import Path
 
 # Local imports
 from fact_reasoner.backends import build_backend
-from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
-from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.factscore import FactScore
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
+from fact_reasoner.core.reviser import Reviser
 
 
 def main() -> None:

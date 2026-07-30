@@ -1,16 +1,16 @@
-import os
-import json
 import argparse
+import json
+import os
 from pathlib import Path
 
 # Local imports
 from fact_reasoner.backends import build_backend
-from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
-from fact_reasoner.core.summarizer import ContextSummarizer
-from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.baselines.veriscore import VeriScore
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.query_builder import QueryBuilder
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.summarizer import ContextSummarizer
 
 # Example query and response
 QUERY = "Tell me a biography of Lanny Flaherty"
