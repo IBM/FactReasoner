@@ -91,13 +91,13 @@ class TestConstruction:
     def test_published_versions_use_the_faithful_config(self, version):
         """v1/v2/v3 must reproduce the original behavior with no flags.
 
-        This is the default-preservation guard: nli_mode defaults to "allpairs",
+        This is the default-preservation guard: nli_mode defaults to "all_pairs",
         so no version scores fewer pairs unless asked to.
         """
         r = FactualityRunner(
             MagicMock(), pipeline="factscore", pipeline_version=version
         )
-        assert r.nli_mode == "allpairs"
+        assert r.nli_mode == "all_pairs"
         assert r.nli_pair_config.is_faithful
         assert r.nli_pair_config.policy == "all_pairs"
 
@@ -117,9 +117,9 @@ class TestConstruction:
         with pytest.raises(ValueError, match="Unknown nli_mode"):
             FactualityRunner(MagicMock(), pipeline="factscore", nli_mode="bogus")
 
-    def test_default_nli_mode_is_allpairs(self):
+    def test_default_nli_mode_is_all_pairs(self):
         r = FactualityRunner(MagicMock(), pipeline="factscore")
-        assert r.nli_mode == "allpairs"
+        assert r.nli_mode == "all_pairs"
         assert r.nli_pair_config.is_faithful
 
     @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
@@ -137,7 +137,7 @@ class TestConstruction:
     def test_nli_mode_is_orthogonal_to_version(self):
         """Every (version, mode) pair is expressible, and the two do not interact."""
         for version in ("v1", "v2", "v3"):
-            for mode in ("allpairs", "fast"):
+            for mode in ("all_pairs", "fast"):
                 r = FactualityRunner(
                     MagicMock(),
                     pipeline="factscore",
@@ -145,7 +145,7 @@ class TestConstruction:
                     nli_mode=mode,
                 )
                 # The mode decides the pair config...
-                assert r.nli_pair_config.is_faithful is (mode == "allpairs")
+                assert r.nli_pair_config.is_faithful is (mode == "all_pairs")
                 # ...and the version alone decides the graph shape.
                 assert (
                     runner_mod._FR_VERSIONS[version]
@@ -168,7 +168,7 @@ class TestConstruction:
             MagicMock(),
             pipeline="factscore",
             pipeline_version="v3",
-            nli_mode="allpairs",
+            nli_mode="all_pairs",
             nli_pair_policy="gated",
             nli_gate_threshold=0.4,
         )

@@ -337,7 +337,7 @@ The version selects which relations enter the Markov Network:
 
 This is the **graph shape** only. How many NLI candidate pairs get scored within
 that shape is an orthogonal axis — see [`--nli-mode`](#nli-cost-control-advanced) —
-so all six `{v1,v2,v3} × {allpairs,fast}` combinations are available.
+so all six `{v1,v2,v3} × {all_pairs,fast}` combinations are available.
 
 **Why cost is a separate axis.** NLI relation extraction dominates the cost of a
 FactReasoner run: one LLM call per candidate pair, which is `A × C` for the
@@ -385,8 +385,8 @@ so you can start from a mode and adjust one feature at a time.
 
 | Option | Meaning |
 |--------|---------|
-| `--nli-mode {allpairs,fast}` | **Which pair-scoring preset to start from** (default `allpairs`). `allpairs` scores every enumerated pair and reproduces published numbers. `fast` bundles the four settings below the line: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
-| `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score. `all_pairs` scores every enumerated pair (published numbers); `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. Note this sets *only* the policy — unlike `--nli-mode fast`, which also enables dedup, cascade and merged phases. |
+| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `all_pairs`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
+| `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score — **one knob**, where `--nli-mode` is a bundle. `all_pairs` scores every enumerated pair; `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. So `--nli-pair-policy provenance` is *weaker* than `--nli-mode fast`, which also turns on dedup, cascade and merged phases. |
 | `--nli-gate-threshold` | Similarity at or above which a pair survives the gate (default `0.20`, calibrated for the embedding backend). Deliberately low: a false prune silently weakens an atom's evidence, a false keep only costs money. |
 | `--nli-neighbor-window` | For `provenance`, how many atoms either side of an owning atom are also compared against a context (default `1`). |
 | `--nli-dedup-near-duplicates` / `--nli-dedup-threshold` | Collapse near-duplicate contexts before mining (default threshold `0.92`). Both dominant cost terms are super-linear in the context count, so this has quadratic leverage. |
@@ -395,7 +395,7 @@ so you can start from a mode and adjust one feature at a time.
 | `--nli-cache-dir` | Cross-run NLI verdict cache. Score-neutral (a hit returns the verdict the model already produced), so re-scoring the same data costs no LLM calls. |
 
 `--nli-merge-phases` and `--nli-cache-dir` are score-neutral and safe to combine
-with an `allpairs` run. Everything else prunes or collapses pairs and so relies on
+with an `all_pairs` run. Everything else prunes or collapses pairs and so relies on
 the embedding similarity gate — see the accuracy note below.
 
 > ⚠️ **`fast` trades recall for cost, and the trade is workload-dependent.**
@@ -411,7 +411,7 @@ the embedding similarity gate — see the accuracy note below.
 > unrelated subtopics prunes only ~1.2× on a narrative where every atom shares
 > characters, since the cross-product there holds little genuine waste. And the
 > models are not deterministic, so a single run cannot establish recall — take the
-> worst case over several. Use `allpairs` when you need bit-for-bit reproducibility.
+> worst case over several. Use `all_pairs` when you need bit-for-bit reproducibility.
 
 Example — `v3`'s full graph at a fraction of the LLM calls, with a warm cache:
 
@@ -422,8 +422,9 @@ fact-reasoner \
     --query "Who was Albert Einstein?" --response "..."
 ```
 
-Example — start from `fast` but keep full atom–context fidelity, overriding just the
-policy while leaving the preset's other savings in place:
+Example — the two flags are different axes, so combining them is meaningful rather
+than contradictory: take `fast`'s dedup / cascade / merged-phase savings, but put the
+*pair policy* back to scoring every pair, so no atom loses evidence:
 
 ```bash
 fact-reasoner \
@@ -452,7 +453,7 @@ runner = FactualityRunner(
     backend,
     pipeline="factreasoner",
     pipeline_version="v3",         # "v1" / "v2" / "v3" -- graph shape
-    nli_mode="fast",               # "allpairs" (default) or "fast" -- pair cost
+    nli_mode="fast",               # "all_pairs" (default) or "fast" -- pair cost
     merlin_path="/path/to/merlin",
     nli_cache_dir=".cache/nli",    # score-neutral; re-runs cost no LLM calls
 )

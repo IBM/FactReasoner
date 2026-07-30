@@ -168,7 +168,7 @@ class _PairGate:
                 "model cache rather than a missing package. Lexical overlap misses "
                 "semantically related pairs, so --nli-mode fast and the "
                 "gated/provenance policies can drop real relations. Fix the model "
-                "load, or use --nli-mode allpairs."
+                "load, or use --nli-mode all_pairs."
             )
 
     def atom_context(self, atom_index: int, context_index: int) -> float:

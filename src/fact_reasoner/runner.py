@@ -99,7 +99,7 @@ class FactualityRunner:
             Ollama which does not expose logprobs).
         nli_similarity_metric: Similarity metric for the SIMBA-UQ NLI method
             (only used when ``nli_method='simbauq'``).
-        nli_mode: Which NLI candidate-pair preset to start from — ``"allpairs"``
+        nli_mode: Which NLI candidate-pair preset to start from — ``"all_pairs"``
             (default) scores every enumerated pair and reproduces the published
             numbers, while ``"fast"`` applies the provenance preset (atom-context
             pairs restricted to the atoms that retrieved each context, gated
@@ -130,7 +130,7 @@ class FactualityRunner:
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: str | None = None,
-        nli_mode: str = "allpairs",
+        nli_mode: str = "all_pairs",
         nli_pair_policy: str | None = None,
         nli_gate_threshold: float | None = None,
         nli_neighbor_window: int | None = None,

@@ -469,11 +469,11 @@ class TestNLIPairConfig:
         assert cfg.is_faithful
 
     def test_mode_presets_alias_the_internal_names(self):
-        """`allpairs`/`fast` are the user-facing names for the same two configs."""
+        """`all_pairs`/`fast` are the user-facing names for the same two configs."""
         from fact_reasoner.core.nli_config import NLI_MODES, get_pair_config
 
-        assert tuple(NLI_MODES) == ("allpairs", "fast")
-        assert get_pair_config("allpairs") is get_pair_config("faithful")
+        assert tuple(NLI_MODES) == ("all_pairs", "fast")
+        assert get_pair_config("all_pairs") is get_pair_config("faithful")
         assert get_pair_config("fast") is get_pair_config("provenance")
 
     def test_fast_preset_is_more_than_the_bare_policy(self):
@@ -491,10 +491,10 @@ class TestNLIPairConfig:
         assert bare.dedup_near_duplicates is False
         assert bare.ctx_ctx_single_direction_cascade is False
 
-    def test_allpairs_preset_is_faithful(self):
+    def test_all_pairs_preset_is_faithful(self):
         from fact_reasoner.core.nli_config import get_pair_config
 
-        cfg = get_pair_config("allpairs")
+        cfg = get_pair_config("all_pairs")
         assert cfg.is_faithful
         assert cfg.policy == "all_pairs"
         assert not cfg.needs_gate

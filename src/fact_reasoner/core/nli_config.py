@@ -33,12 +33,17 @@ NLI_PAIR_POLICIES = ("all_pairs", "gated", "provenance")
 
 #: Preset selectors for ``--nli-mode`` / ``FactualityRunner(nli_mode=...)``.
 #:
-#: Distinct from :data:`NLI_PAIR_POLICIES`, which names a *mechanism* (the single
-#: ``policy`` field). A mode names a whole *preset*: ``"fast"`` selects the
-#: provenance preset below, which sets ``policy="provenance"`` **and** flips
-#: ``dedup_near_duplicates``, ``ctx_ctx_single_direction_cascade`` and
-#: ``merge_phases`` -- strictly more than the bare ``"provenance"`` policy does.
-NLI_MODES = ("allpairs", "fast")
+#: A mode names a whole *preset*, whereas a :data:`NLI_PAIR_POLICIES` value names
+#: one *mechanism* (the single ``policy`` field). The two vocabularies overlap on
+#: purpose: ``"all_pairs"`` means the same thing in both (score every enumerated
+#: pair), so ``--nli-mode all_pairs`` and ``--nli-pair-policy all_pairs`` read
+#: consistently -- just as ``"gated"``/``"provenance"`` already appear in both.
+#:
+#: Where they differ is bundling. ``"fast"`` selects the provenance preset below,
+#: which sets ``policy="provenance"`` **and** flips ``dedup_near_duplicates``,
+#: ``ctx_ctx_single_direction_cascade`` and ``merge_phases`` -- strictly more than
+#: the bare ``"provenance"`` policy does.
+NLI_MODES = ("all_pairs", "fast")
 
 
 @dataclass(frozen=True)
@@ -171,12 +176,12 @@ _PROVENANCE = NLIPairConfig(
 )
 
 #: Presets addressable by name from ``--nli-mode`` and the runner's ``nli_mode``
-#: argument. ``"allpairs"``/``"fast"`` are the user-facing vocabulary;
-#: ``"faithful"``/``"provenance"`` are retained as aliases for the same two
-#: configs, since they name the same thing from the implementation's point of view
-#: (and ``is_faithful`` still reads naturally against the former).
+#: argument. ``"all_pairs"``/``"fast"`` are the :data:`NLI_MODES` vocabulary;
+#: ``"faithful"``/``"provenance"`` are retained aliases for the very same two
+#: config objects, since they name the same thing from the implementation's point
+#: of view (and ``is_faithful`` still reads naturally against the former).
 NLI_PAIR_CONFIGS = {
-    "allpairs": FAITHFUL,
+    "all_pairs": FAITHFUL,
     "fast": _PROVENANCE,
     "gated": NLIPairConfig(policy="gated"),
     # Retained aliases.

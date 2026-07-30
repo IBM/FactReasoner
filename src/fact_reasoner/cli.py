@@ -114,20 +114,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     n = parser.add_argument_group("nli relation extraction (cost control)")
     n.add_argument(
         "--nli-mode",
-        default="allpairs",
+        default="all_pairs",
         # Read from the shared tuple so the two can never drift apart.
         choices=list(NLI_MODES),
         help=(
-            "Which NLI candidate-pair preset to start from (default: allpairs). "
-            "'allpairs' scores every enumerated pair and reproduces published "
+            "Which NLI candidate-pair preset to start from (default: all_pairs). "
+            "'all_pairs' scores every enumerated pair and reproduces published "
             "numbers. 'fast' restricts atom-context pairs to the atoms that "
             "actually retrieved each context, gates context-context pairs, "
             "collapses near-duplicate contexts and scores one direction per "
             "context pair -- far fewer LLM calls for the same graph semantics. "
-            "Orthogonal to --pipeline-version; the individual --nli-* flags below "
-            "override whichever preset this selects. Little effect with "
-            "--pipeline-version v1, whose atom-context pairs are already limited to "
-            "each atom's own contexts and which runs no context-context phase."
+            "This is a preset over the flags below, so 'fast' is more than "
+            "--nli-pair-policy provenance: it also enables the dedup, cascade and "
+            "merge-phases knobs. Orthogonal to --pipeline-version; the individual "
+            "--nli-* flags below override whichever preset this selects. Little "
+            "effect with --pipeline-version v1, whose atom-context pairs are already "
+            "limited to each atom's own contexts and which runs no context-context "
+            "phase."
         ),
     )
     n.add_argument(
