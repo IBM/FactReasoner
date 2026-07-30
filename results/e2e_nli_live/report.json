@@ -1,0 +1,187 @@
+{
+  "model_id": "meta-llama/llama-3-3-70b-instruct",
+  "offline": true,
+  "faithful": {
+    "stats": {
+      "policy": "all_pairs",
+      "gate_backend": null,
+      "gate_threshold": null,
+      "cascade": false,
+      "num_atoms": 6,
+      "num_contexts": 9,
+      "atom_context": {
+        "policy": "all_pairs",
+        "num_atoms": 6,
+        "num_contexts": 9,
+        "pairs_possible": 54,
+        "contexts_per_atom_only": false,
+        "pairs_selected": 54,
+        "pairs_pruned": 0,
+        "gate_threshold": null,
+        "llm_calls": 0,
+        "cache_hits": 54,
+        "relations_kept": 10,
+        "neutral_dropped": 44,
+        "seconds": 0.003
+      },
+      "context_context": {
+        "policy": "all_pairs",
+        "num_contexts": 9,
+        "pairs_possible": 36,
+        "pairs_selected": 36,
+        "pairs_pruned": 0,
+        "gate_threshold": null,
+        "dir2_skipped": 0,
+        "llm_calls_dir1": 0,
+        "llm_calls_dir2": 0,
+        "llm_calls": 0,
+        "cache_hits": 72,
+        "relations_kept": 7,
+        "neutral_dropped": 29,
+        "seconds": 0.001
+      },
+      "totals": {
+        "llm_calls": 0,
+        "cache_hits": 126,
+        "llm_calls_all_pairs_equivalent": 126,
+        "seconds": 0.004,
+        "reduction_factor": 1.0
+      }
+    },
+    "elapsed_s": 0.04,
+    "factuality_score": 0.8333333333333334
+  },
+  "warm": {
+    "llm_calls": 0,
+    "cache_hits": 126,
+    "elapsed_s": 0.03,
+    "score_delta": {
+      "max_abs_delta": 0.0,
+      "mean_abs_delta": 0.0,
+      "overall_delta": 0.0,
+      "per_atom": {
+        "a0": 0.0,
+        "a1": 0.0,
+        "a2": 0.0,
+        "a3": 0.0,
+        "a4": 0.0,
+        "a5": 0.0
+      }
+    }
+  },
+  "cheap": {
+    "stats": {
+      "dedup": {
+        "contexts_before": 9,
+        "threshold": 0.92,
+        "contexts_after": 9,
+        "collapsed": 0,
+        "owners_merged": 0,
+        "gate_backend": "jaccard"
+      },
+      "policy": "provenance",
+      "gate_backend": "jaccard",
+      "gate_threshold": 0.22,
+      "cascade": true,
+      "num_atoms": 6,
+      "num_contexts": 9,
+      "atom_context": {
+        "policy": "provenance",
+        "num_atoms": 6,
+        "num_contexts": 9,
+        "pairs_possible": 54,
+        "contexts_per_atom_only": false,
+        "pairs_selected": 29,
+        "pairs_pruned": 25,
+        "gate_threshold": 0.22,
+        "gate_backend": "jaccard",
+        "neighbor_window": 1,
+        "num_provenance": 9,
+        "num_query_context": 0,
+        "num_neighbor": 14,
+        "num_gate_rescued": 6,
+        "llm_calls": 0,
+        "cache_hits": 29,
+        "relations_kept": 10,
+        "neutral_dropped": 19,
+        "seconds": 0.0
+      },
+      "context_context": {
+        "policy": "provenance",
+        "num_contexts": 9,
+        "pairs_possible": 36,
+        "pairs_selected": 2,
+        "pairs_pruned": 34,
+        "gate_threshold": 0.22,
+        "gate_backend": "jaccard",
+        "llm_calls": 0,
+        "cache_hits": 4,
+        "dir2_skipped": 0,
+        "llm_calls_dir1": 0,
+        "llm_calls_dir2": 0,
+        "relations_kept": 1,
+        "neutral_dropped": 1,
+        "seconds": 0.0
+      },
+      "totals": {
+        "llm_calls": 0,
+        "cache_hits": 33,
+        "llm_calls_all_pairs_equivalent": 126,
+        "seconds": 0.0,
+        "reduction_factor": 3.82
+      }
+    },
+    "elapsed_s": 0.02,
+    "factuality_score": 0.8333333333333334,
+    "score_delta": {
+      "max_abs_delta": 0.09090100000000001,
+      "mean_abs_delta": 0.03938716666666668,
+      "overall_delta": 0.0,
+      "per_atom": {
+        "a0": 0.0015929999999999556,
+        "a1": 0.00032799999999999496,
+        "a2": 0.06737800000000005,
+        "a3": 0.008609000000000006,
+        "a4": 0.06751400000000007,
+        "a5": 0.09090100000000001
+      }
+    }
+  },
+  "recall": [
+    {
+      "policy": "gated",
+      "pairs_total": 54,
+      "pairs_selected": 18,
+      "pairs_pruned": 36,
+      "non_neutral_total": 10,
+      "non_neutral_lost": 1,
+      "recall": 0.9,
+      "gate_backend": "jaccard",
+      "lost_pairs": [
+        {
+          "pair": [
+            "c_a0_1",
+            "a1"
+          ],
+          "label": "entailment"
+        }
+      ]
+    },
+    {
+      "policy": "provenance",
+      "pairs_total": 54,
+      "pairs_selected": 29,
+      "pairs_pruned": 25,
+      "non_neutral_total": 10,
+      "non_neutral_lost": 0,
+      "recall": 1.0,
+      "gate_backend": "jaccard",
+      "lost_pairs": []
+    }
+  ],
+  "checks": {
+    "warm cache costs nothing": true,
+    "warm cache is score-identical": true,
+    "cheap path costs less": false
+  }
+}

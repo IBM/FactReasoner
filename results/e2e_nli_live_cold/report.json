@@ -1,0 +1,207 @@
+{
+  "model_id": "meta-llama/llama-3-3-70b-instruct",
+  "offline": true,
+  "faithful": {
+    "stats": {
+      "policy": "all_pairs",
+      "gate_backend": null,
+      "gate_threshold": null,
+      "cascade": false,
+      "num_atoms": 6,
+      "num_contexts": 9,
+      "atom_context": {
+        "policy": "all_pairs",
+        "num_atoms": 6,
+        "num_contexts": 9,
+        "pairs_possible": 54,
+        "contexts_per_atom_only": false,
+        "pairs_selected": 54,
+        "pairs_pruned": 0,
+        "gate_threshold": null,
+        "llm_calls": 54,
+        "cache_hits": 0,
+        "relations_kept": 13,
+        "neutral_dropped": 41,
+        "seconds": 146.008
+      },
+      "context_context": {
+        "policy": "all_pairs",
+        "num_contexts": 9,
+        "pairs_possible": 36,
+        "pairs_selected": 36,
+        "pairs_pruned": 0,
+        "gate_threshold": null,
+        "dir2_skipped": 0,
+        "llm_calls_dir1": 36,
+        "llm_calls_dir2": 36,
+        "llm_calls": 72,
+        "cache_hits": 0,
+        "relations_kept": 9,
+        "neutral_dropped": 27,
+        "seconds": 84.787
+      },
+      "totals": {
+        "llm_calls": 126,
+        "cache_hits": 0,
+        "llm_calls_all_pairs_equivalent": 126,
+        "seconds": 230.795,
+        "reduction_factor": 1.0
+      }
+    },
+    "elapsed_s": 230.84,
+    "factuality_score": 0.8333333333333334
+  },
+  "warm": {
+    "llm_calls": 0,
+    "cache_hits": 126,
+    "elapsed_s": 0.03,
+    "score_delta": {
+      "max_abs_delta": 0.0,
+      "mean_abs_delta": 0.0,
+      "overall_delta": 0.0,
+      "per_atom": {
+        "a0": 0.0,
+        "a1": 0.0,
+        "a2": 0.0,
+        "a3": 0.0,
+        "a4": 0.0,
+        "a5": 0.0
+      }
+    }
+  },
+  "cheap": {
+    "stats": {
+      "dedup": {
+        "contexts_before": 9,
+        "threshold": 0.92,
+        "contexts_after": 9,
+        "collapsed": 0,
+        "owners_merged": 0,
+        "gate_backend": "jaccard"
+      },
+      "policy": "provenance",
+      "gate_backend": "jaccard",
+      "gate_threshold": 0.22,
+      "cascade": true,
+      "num_atoms": 6,
+      "num_contexts": 9,
+      "atom_context": {
+        "policy": "provenance",
+        "num_atoms": 6,
+        "num_contexts": 9,
+        "pairs_possible": 54,
+        "contexts_per_atom_only": false,
+        "pairs_selected": 29,
+        "pairs_pruned": 25,
+        "gate_threshold": 0.22,
+        "gate_backend": "jaccard",
+        "neighbor_window": 1,
+        "num_provenance": 9,
+        "num_query_context": 0,
+        "num_neighbor": 14,
+        "num_gate_rescued": 6,
+        "llm_calls": 0,
+        "cache_hits": 29,
+        "relations_kept": 12,
+        "neutral_dropped": 17,
+        "seconds": 0.001
+      },
+      "context_context": {
+        "policy": "provenance",
+        "num_contexts": 9,
+        "pairs_possible": 36,
+        "pairs_selected": 2,
+        "pairs_pruned": 34,
+        "gate_threshold": 0.22,
+        "gate_backend": "jaccard",
+        "llm_calls": 0,
+        "cache_hits": 4,
+        "dir2_skipped": 0,
+        "llm_calls_dir1": 0,
+        "llm_calls_dir2": 0,
+        "relations_kept": 1,
+        "neutral_dropped": 1,
+        "seconds": 0.0
+      },
+      "totals": {
+        "llm_calls": 0,
+        "cache_hits": 33,
+        "llm_calls_all_pairs_equivalent": 126,
+        "seconds": 0.001,
+        "reduction_factor": 3.82
+      }
+    },
+    "elapsed_s": 0.03,
+    "factuality_score": 0.8333333333333334,
+    "score_delta": {
+      "max_abs_delta": 0.090754,
+      "mean_abs_delta": 0.03468616666666669,
+      "overall_delta": 0.0,
+      "per_atom": {
+        "a0": 0.017795000000000005,
+        "a1": 0.0002420000000000755,
+        "a2": 0.09070900000000004,
+        "a3": 0.007278999999999994,
+        "a4": 0.0013380000000000614,
+        "a5": 0.090754
+      }
+    }
+  },
+  "recall": [
+    {
+      "policy": "gated",
+      "pairs_total": 54,
+      "pairs_selected": 18,
+      "pairs_pruned": 36,
+      "non_neutral_total": 13,
+      "non_neutral_lost": 2,
+      "recall": 0.8461538461538461,
+      "gate_backend": "jaccard",
+      "lost_pairs": [
+        {
+          "pair": [
+            "c_a4_0",
+            "a0"
+          ],
+          "label": "entailment"
+        },
+        {
+          "pair": [
+            "c_a0_1",
+            "a1"
+          ],
+          "label": "entailment"
+        }
+      ]
+    },
+    {
+      "policy": "provenance",
+      "pairs_total": 54,
+      "pairs_selected": 29,
+      "pairs_pruned": 25,
+      "non_neutral_total": 13,
+      "non_neutral_lost": 1,
+      "recall": 0.9230769230769231,
+      "gate_backend": "jaccard",
+      "lost_pairs": [
+        {
+          "pair": [
+            "c_a4_0",
+            "a0"
+          ],
+          "label": "entailment"
+        }
+      ]
+    }
+  ],
+  "pairs_attempted": {
+    "faithful": 126,
+    "cheap": 33
+  },
+  "checks": {
+    "warm cache costs nothing": true,
+    "warm cache is score-identical": true,
+    "cheap path scores fewer pairs": true,
+    "cheap path loses no non-neutral relations": false
+  }
+}

@@ -1,0 +1,6551 @@
+{
+  "example_id": "example-6-incident",
+  "example_name": "Software incident post-mortem (coherent)",
+  "source": "authored: logically coherent example (software-engineering domain)",
+  "num_atoms": 13,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "At 09:14 the team deployed release 4.2 to production.",
+      "label": "P1"
+    },
+    {
+      "id": "a1",
+      "text": "Release 4.2 contained a change that removed a database index used by the checkout query.",
+      "label": "P2"
+    },
+    {
+      "id": "a2",
+      "text": "Without the removed index, the checkout query began performing a full table scan.",
+      "label": "P3"
+    },
+    {
+      "id": "a3",
+      "text": "The full table scans drove average checkout latency from 120 ms to 9 seconds.",
+      "label": "P4"
+    },
+    {
+      "id": "a4",
+      "text": "Checkout requests exceeded the 5 second gateway timeout.",
+      "label": "P5"
+    },
+    {
+      "id": "a5",
+      "text": "Roughly 40 percent of checkout attempts failed.",
+      "label": "P6"
+    },
+    {
+      "id": "a6",
+      "text": "The monitoring system detected the elevated error rate and paged the on-call engineer at 09:31.",
+      "label": "P7"
+    },
+    {
+      "id": "a7",
+      "text": "The on-call engineer inspected the deployment history and identified release 4.2 as the cause.",
+      "label": "P8"
+    },
+    {
+      "id": "a8",
+      "text": "The engineer rolled back to release 4.1 at 09:47.",
+      "label": "P9"
+    },
+    {
+      "id": "a9",
+      "text": "The rollback restored the previously dropped database index.",
+      "label": "P10"
+    },
+    {
+      "id": "a10",
+      "text": "After the rollback, the checkout query returned to using the index.",
+      "label": "P11"
+    },
+    {
+      "id": "a11",
+      "text": "Checkout latency fell back to about 120 ms and the error rate returned to its normal baseline.",
+      "label": "P12"
+    },
+    {
+      "id": "a12",
+      "text": "The team added a migration-review check so that index-dropping changes are flagged before deployment.",
+      "label": "P13"
+    }
+  ],
+  "response": "At 09:14 the team deployed release 4.2 to production. The release contained a change that removed a database index used by the checkout query. Without that index, the checkout query began performing a full table scan. The full table scans drove average checkout latency from 120 ms to 9 seconds. Because checkout requests now exceeded the 5 second gateway timeout, roughly 40 percent of checkout attempts failed. The monitoring system detected the elevated error rate and paged the on-call engineer at 09:31. The on-call engineer inspected the deployment history and identified release 4.2 as the cause. The engineer rolled back to release 4.1 at 09:47. After the rollback restored the dropped index, the checkout query returned to using the index. Checkout latency then fell back to about 120 ms and the error rate returned to its normal baseline. The team later added a migration-review check so that index-dropping changes are flagged before deployment.",
+  "runs": [
+    {
+      "model": "llama-4-maverick-17b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_logprobs",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 56,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 100,
+        "relations_kept": 56
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999999468421503,
+          "strength": 0.9999999468421503,
+          "strength_raw": 0.9999999468421503,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999317439628,
+          "strength": 0.9999999317439628,
+          "strength_raw": 0.9999999317439628,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999586006098,
+          "strength": 0.9999999586006098,
+          "strength_raw": 0.9999999586006098,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999317439628,
+          "strength": 0.9999999317439628,
+          "strength_raw": 0.9999999317439628,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999123575152,
+          "strength": 0.9999999123575152,
+          "strength_raw": 0.9999999123575152,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999869928715347,
+          "strength": 0.9999869928715347,
+          "strength_raw": 0.9999869928715347,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999586006245,
+          "strength": 0.9999999586006245,
+          "strength_raw": 0.9999999586006245,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999992805867,
+          "strength": 0.999999992805867,
+          "strength_raw": 0.999999992805867,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998874648246,
+          "strength": 0.9999998874648246,
+          "strength_raw": 0.9999998874648246,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999317439547,
+          "strength": 0.9999999317439547,
+          "strength_raw": 0.9999999317439547,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9998766054544028,
+          "strength": 0.9998766054544028,
+          "strength_raw": 0.9998766054544028,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999972464308896,
+          "strength": 0.999972464308896,
+          "strength_raw": 0.999972464308896,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999546021259541,
+          "strength": 0.9999546021259541,
+          "strength_raw": 0.9999546021259541,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.0005527785524441057,
+          "strength": 0.0005527785524441057,
+          "strength_raw": 0.0005527785524441057,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999832985701952,
+          "strength": 0.9999832985701952,
+          "strength_raw": 0.9999832985701952,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999847700205,
+          "strength": 0.9999999847700205,
+          "strength_raw": 0.9999999847700205,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998555019791,
+          "strength": 0.9999998555019791,
+          "strength_raw": 0.9999998555019791,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999996940976275,
+          "strength": 0.9999996940976275,
+          "strength_raw": 0.9999996940976275,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9959298627620805,
+          "strength": 0.9959298627620805,
+          "strength_raw": 0.9959298627620805,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 6.475945666070602e-07,
+          "strength": 6.475945666070602e-07,
+          "strength_raw": 6.475945666070602e-07,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999724643121819,
+          "strength": 0.9999724643121819,
+          "strength_raw": 0.9999724643121819,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999869928761961,
+          "strength": 0.9999869928761961,
+          "strength_raw": 0.9999869928761961,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998555019792,
+          "strength": 0.9999998555019792,
+          "strength_raw": 0.9999998555019792,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998874648247,
+          "strength": 0.9999998874648247,
+          "strength_raw": 0.9999998874648247,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9975273773653847,
+          "strength": 0.9975273773653847,
+          "strength_raw": 0.9975273773653847,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.2501530138473079e-09,
+          "strength": 1.2501530138473079e-09,
+          "strength_raw": 1.2501530138473079e-09,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.04742586997993961,
+          "strength": 0.04742586997993961,
+          "strength_raw": 0.04742586997993961,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9820137860584978,
+          "strength": 0.9820137860584978,
+          "strength_raw": 0.9820137860584978,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9890130598186869,
+          "strength": 0.9890130598186869,
+          "strength_raw": 0.9890130598186869,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999677581337,
+          "strength": 0.9999999677581337,
+          "strength_raw": 0.9999999677581337,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9996646498086433,
+          "strength": 0.9996646498086433,
+          "strength_raw": 0.9996646498086433,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.4449800373118268e-07,
+          "strength": 1.4449800373118268e-07,
+          "strength_raw": 1.4449800373118268e-07,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9998766054690862,
+          "strength": 0.9998766054690862,
+          "strength_raw": 0.9998766054690862,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9997965730746783,
+          "strength": 0.9997965730746783,
+          "strength_raw": 0.9997965730746783,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999546021259337,
+          "strength": 0.9999546021259337,
+          "strength_raw": 0.9999546021259337,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999832985841293,
+          "strength": 0.9999832985841293,
+          "strength_raw": 0.9999832985841293,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.01098694082923955,
+          "strength": 0.01098694082923955,
+          "strength_raw": 0.01098694082923955,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 4.1399375473943306e-08,
+          "strength": 4.1399375473943306e-08,
+          "strength_raw": 4.1399375473943306e-08,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8175744761963033,
+          "strength": 0.8175744761963033,
+          "strength_raw": 0.8175744761963033,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9706877724285167,
+          "strength": 0.9706877724285167,
+          "strength_raw": 0.9706877724285167,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999832985801452,
+          "strength": 0.9999832985801452,
+          "strength_raw": 0.9999832985801452,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9975273771592187,
+          "strength": 0.9975273771592187,
+          "strength_raw": 0.9975273771592187,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999898700126426,
+          "strength": 0.9999898700126426,
+          "strength_raw": 0.9999898700126426,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999677581337,
+          "strength": 0.9999999677581337,
+          "strength_raw": 0.9999999677581337,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.731058584489497,
+          "strength": 0.731058584489497,
+          "strength_raw": 0.731058584489497,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999317439628,
+          "strength": 0.9999999317439628,
+          "strength_raw": 0.9999999317439628,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999586006245,
+          "strength": 0.9999999586006245,
+          "strength_raw": 0.9999999586006245,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998555019792,
+          "strength": 0.9999998555019792,
+          "strength_raw": 0.9999998555019792,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9998766053808388,
+          "strength": 0.9998766053808388,
+          "strength_raw": 0.9998766053808388,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999996072136597,
+          "strength": 0.9999996072136597,
+          "strength_raw": 0.9999996072136597,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997617630334,
+          "strength": 0.9999997617630334,
+          "strength_raw": 0.9999997617630334,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999982396569974,
+          "strength": 0.9999982396569974,
+          "strength_raw": 0.9999982396569974,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997617630334,
+          "strength": 0.9999997617630334,
+          "strength_raw": 0.9999997617630334,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9994472212511284,
+          "strength": 0.9994472212511284,
+          "strength_raw": 0.9994472212511284,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999962733611619,
+          "strength": 0.9999962733611619,
+          "strength_raw": 0.9999962733611619,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999977396748942,
+          "strength": 0.9999977396748942,
+          "strength_raw": 0.9999977396748942,
+          "type_confidence": 1.0
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8461363076923077,
+        "consistency": 1.0,
+        "reified": 0.499805,
+        "log_partition": 1.0,
+        "num_atoms": 13,
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.00023749197527072236,
+        "log_z": -21.314101,
+        "log_z_max": -21.314101,
+        "log_z_min": -21.314329,
+        "marginals": {
+          "a0": 0.0,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 0.0,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 0.999772,
+          "a8": 1.0,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 44.765
+    },
+    {
+      "model": "llama-4-maverick-17b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_sampled",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 56,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 100,
+        "relations_kept": 56
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a12",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.35882423076923076,
+        "consistency": 1.0,
+        "reified": 0.5,
+        "log_partition": 1.0,
+        "num_atoms": 13,
+        "num_below_prior": 8,
+        "avg_norm_entropy": 0.07250650590422103,
+        "log_z": -39.103436,
+        "log_z_max": -39.103436,
+        "log_z_min": -39.509389,
+        "marginals": {
+          "a0": 0.0,
+          "a1": 0.0,
+          "a10": 0.999512,
+          "a11": 0.999512,
+          "a12": 0.666667,
+          "a2": 0.0,
+          "a3": 0.0,
+          "a4": 0.0,
+          "a5": 0.0,
+          "a6": 0.0,
+          "a7": 0.0,
+          "a8": 0.999512,
+          "a9": 0.999512
+        }
+      },
+      "elapsed_s": 47.226
+    },
+    {
+      "model": "llama-4-maverick-17b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "verbalized",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 61,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 95,
+        "relations_kept": 61
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.99,
+          "strength": 0.99,
+          "strength_raw": 0.99,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.7,
+          "strength": 0.7,
+          "strength_raw": 0.7,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a12",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.68,
+          "strength": 0.68,
+          "strength_raw": 0.68,
+          "type_confidence": 1.0
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.9814123846153847,
+        "consistency": 1.0,
+        "reified": 0.453732,
+        "log_partition": 1.0,
+        "num_atoms": 13,
+        "num_below_prior": 0,
+        "avg_norm_entropy": 0.06273952753440752,
+        "log_z": -13.878073,
+        "log_z_max": -13.878073,
+        "log_z_min": -14.154028,
+        "marginals": {
+          "a0": 0.999999,
+          "a1": 1.0,
+          "a10": 0.999992,
+          "a11": 0.999997,
+          "a12": 0.760383,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 0.997998,
+          "a8": 0.999999,
+          "a9": 0.999993
+        }
+      },
+      "elapsed_s": 46.471
+    },
+    {
+      "model": "llama-3.3-70b-instruct",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_logprobs",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 63,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 93,
+        "relations_kept": 63
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999973534265,
+          "strength": 0.9999999973534265,
+          "strength_raw": 0.9999999973534265,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999006880579,
+          "strength": 0.9999999006880579,
+          "strength_raw": 0.9999999006880579,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999952149055932,
+          "strength": 0.9999952149055932,
+          "strength_raw": 0.9999952149055932,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999989322970276,
+          "strength": 0.9999989322970276,
+          "strength_raw": 0.9999989322970276,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 8.939698752026913e-06,
+          "strength": 8.939699462490281e-06,
+          "strength_raw": 8.939699462490281e-06,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999785550419421,
+          "strength": 0.9999785550419421,
+          "strength_raw": 0.9999785550419421,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999950555498,
+          "strength": 0.9999999950555498,
+          "strength_raw": 0.9999999950555498,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998362622783,
+          "strength": 0.9999998362622783,
+          "strength_raw": 0.9999998362622783,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 5.715002398235389e-07,
+          "strength": 5.715002398235389e-07,
+          "strength_raw": 5.715002398235389e-07,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9046505388309198,
+          "strength": 0.9046505388309198,
+          "strength_raw": 0.9046505388309198,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9988304103419297,
+          "strength": 0.9988304897218324,
+          "strength_raw": 0.9988304897218324,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999973534263,
+          "strength": 0.9999999973534263,
+          "strength_raw": 0.9999999973534263,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.22270014169135377,
+          "strength": 0.22270014169135377,
+          "strength_raw": 0.22270014169135377,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 4.785094476409626e-06,
+          "strength": 4.785094476409626e-06,
+          "strength_raw": 4.785094476409626e-06,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999997739674938,
+          "strength": 0.999997739674938,
+          "strength_raw": 0.999997739674938,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999918479798,
+          "strength": 0.9999999918479798,
+          "strength_raw": 0.9999999918479798,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999983947718,
+          "strength": 0.9999999983947718,
+          "strength_raw": 0.9999999983947718,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.3775406750584244,
+          "strength": 0.3775406750584244,
+          "strength_raw": 0.3775406750584244,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 7.88926339030923e-06,
+          "strength": 7.889264330782713e-06,
+          "strength_raw": 7.889264330782713e-06,
+          "type_confidence": 0.9999998807907247
+        },
+        {
+          "source": "a6",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9990889489932367,
+          "strength": 0.9990889489932367,
+          "strength_raw": 0.9990889489932367,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999997218451434,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218451434
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999992331961847,
+          "strength": 0.999999352405371,
+          "strength_raw": 0.999999352405371,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999943972038,
+          "strength": 0.9999999943972038,
+          "strength_raw": 0.9999999943972038,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999576169999,
+          "strength": 0.9999999973534265,
+          "strength_raw": 0.9999999973534265,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999961938887225,
+          "strength": 0.9999962733612734,
+          "strength_raw": 0.9999962733612734,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999987901340504,
+          "strength": 0.9999987901340504,
+          "strength_raw": 0.9999987901340504,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9820137887640894,
+          "strength": 0.9820137887640894,
+          "strength_raw": 0.9820137887640894,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8846153846153846,
+        "consistency": 0.0,
+        "reified": 0.499994,
+        "log_partition": 0.9999884585865215,
+        "num_atoms": 13,
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.07692307692307693,
+        "log_z": -17.152593,
+        "log_z_max": -17.152585,
+        "log_z_min": -17.845741,
+        "marginals": {
+          "a0": 0.0,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 0.5,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 1.0,
+          "a8": 1.0,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 57.932
+    },
+    {
+      "model": "llama-3.3-70b-instruct",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_sampled",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 63,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 93,
+        "relations_kept": 63
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.125,
+          "strength": 0.125,
+          "strength_raw": 0.125,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.12499999006589411,
+          "strength": 0.125,
+          "strength_raw": 0.125,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a5",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998410543312,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a11",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 0.9999996821087633
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.038461538461538464,
+        "consistency": 1.0,
+        "reified": 0.5,
+        "log_partition": 0.33322885082542175,
+        "num_atoms": 13,
+        "num_below_prior": 12,
+        "avg_norm_entropy": 0.07692307692307693,
+        "log_z": -51.986039,
+        "log_z_max": -50.599093,
+        "log_z_min": -52.679186,
+        "marginals": {
+          "a0": 0.0,
+          "a1": 0.0,
+          "a10": 0.0,
+          "a11": 0.0,
+          "a12": 0.5,
+          "a2": 0.0,
+          "a3": 0.0,
+          "a4": 0.0,
+          "a5": 0.0,
+          "a6": 0.0,
+          "a7": 0.0,
+          "a8": 0.0,
+          "a9": 0.0
+        }
+      },
+      "elapsed_s": 84.906
+    },
+    {
+      "model": "llama-3.3-70b-instruct",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "verbalized",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 63,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 93,
+        "relations_kept": 63
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.99,
+          "strength": 0.99,
+          "strength_raw": 0.99,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9799999221166098,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a0",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9199999634424875,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.899999964237216,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.6,
+          "strength": 0.6,
+          "strength_raw": 0.6,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.99,
+          "strength": 0.99,
+          "strength_raw": 0.99,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.7,
+          "strength": 0.7,
+          "strength_raw": 0.7,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.6999999721845013,
+          "strength": 0.7,
+          "strength_raw": 0.7,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.7,
+          "strength": 0.7,
+          "strength_raw": 0.7,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.799999872843465,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a6",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.5999998807907564,
+          "strength": 0.6,
+          "strength_raw": 0.6,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.7999999046325893,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8999995350841722,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.999999483426858
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9799998442332445,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9799999610583018,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9799999610583018,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.98,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 1.0
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.9615254615384615,
+        "consistency": 0.0,
+        "reified": 0.019605,
+        "log_partition": 0.1505463993793286,
+        "num_atoms": 13,
+        "num_below_prior": 0,
+        "avg_norm_entropy": 0.07712494122137295,
+        "log_z": -19.155668,
+        "log_z_max": -15.243653,
+        "log_z_min": -19.848984,
+        "marginals": {
+          "a0": 0.999912,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 0.5,
+          "a2": 1.0,
+          "a3": 0.999997,
+          "a4": 1.0,
+          "a5": 0.999999,
+          "a6": 0.999999,
+          "a7": 0.999942,
+          "a8": 0.999982,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 75.524
+    },
+    {
+      "model": "gpt-oss-120b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_logprobs",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 74,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 82,
+        "relations_kept": 74
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997218451434,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218451434
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999996026359723,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999996026359723
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a10",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a2",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999999721845096,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.999999721845096
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998410543145,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543145
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999995231632965,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999995231632965
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a4",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999994039542605,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999994039542605
+        },
+        {
+          "source": "a4",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999998807907294,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271481,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999996821087278,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999996821087278
+        },
+        {
+          "source": "a6",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a6",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999997218451434,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218451434
+        },
+        {
+          "source": "a7",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999998013178989,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998013178989
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271481,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998807907294,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a8",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999998013179273,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907294,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a11",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.9998500769230769,
+        "consistency": 0.0,
+        "reified": 0.5,
+        "log_partition": 1.0,
+        "num_atoms": 13,
+        "num_below_prior": 0,
+        "avg_norm_entropy": 0.001565847351509172,
+        "log_z": -9.008967,
+        "log_z_max": -9.008967,
+        "log_z_min": -9.010919,
+        "marginals": {
+          "a0": 0.998051,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 1.0,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 1.0,
+          "a8": 1.0,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 193.657
+    },
+    {
+      "model": "gpt-oss-120b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "surrogate_sampled",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 75,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 81,
+        "relations_kept": 75
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998013179273,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998410543145,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543145
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997218450866,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218450866
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998410543312,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997218451434,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218451434
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a2",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8749999652306266,
+          "strength": 0.875,
+          "strength_raw": 0.875,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997615814872,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997615814872
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271529,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999205271481,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999995231632965,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999995231632965
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999205271481,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998410543145,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543145
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999992052725548,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999992052725548
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998410543145,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998410543145
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a7",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999997218451434,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997218451434
+        },
+        {
+          "source": "a7",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999997615814967,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997615814967
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999998807907365,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a9",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a9",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a10",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0,
+          "strength": 0.0,
+          "strength_raw": 0.0,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999998013178989,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999998013178989
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999995628995662,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999995628995662
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1.0,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.7499999701976799,
+          "strength": 0.75,
+          "strength_raw": 0.75,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999997615815085,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999997615815085
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999999602635733,
+          "strength": 1.0,
+          "strength_raw": 1.0,
+          "type_confidence": 0.9999999602635733
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 1.0,
+        "consistency": 0.0,
+        "reified": 0.2,
+        "log_partition": 0.0,
+        "num_atoms": 13,
+        "num_below_prior": 0,
+        "avg_norm_entropy": 0.0,
+        "log_z": -10.530745,
+        "log_z_max": -9.144451,
+        "log_z_min": -10.530745,
+        "marginals": {
+          "a0": 1.0,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 1.0,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 1.0,
+          "a8": 1.0,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 297.803
+    },
+    {
+      "model": "gpt-oss-120b",
+      "backend": "rits",
+      "example_id": "example-6-incident",
+      "example_name": "Software incident post-mortem (coherent)",
+      "strength_method": "verbalized",
+      "nli_method": "logprobs",
+      "pair_policy": "all_pairs",
+      "window": 4,
+      "num_atoms": 13,
+      "num_relations": 87,
+      "coverage": {
+        "policy": "all_pairs",
+        "num_atoms": 13,
+        "total_ordered_pairs": 156,
+        "pairs_selected": 156,
+        "pairs_pruned": 0,
+        "window": null,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 156,
+        "dropped_none": 69,
+        "relations_kept": 87
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9499999622503946,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9399999626477589,
+          "strength": 0.94,
+          "strength_raw": 0.94,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.94,
+          "strength": 0.94,
+          "strength_raw": 0.94,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999237060668,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a0",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9499999622503946,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.96,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.97,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.7999999046325836,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.55,
+          "strength": 0.55,
+          "strength_raw": 0.55,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a0",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8399999666214015,
+          "strength": 0.84,
+          "strength_raw": 0.84,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9699992676586829,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 0.9999992450089515
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.969999961455666,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999618530304,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8999996781350866,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.9999996423723184
+        },
+        {
+          "source": "a1",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.85,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a1",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9599998855591071,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a1",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8399999666214015,
+          "strength": 0.84,
+          "strength_raw": 0.84,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a1",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9799998442332445,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a1",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9199998172124931,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9499998867511996,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.96,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.96,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9199997806549682,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999997615814872
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.45,
+          "strength": 0.45,
+          "strength_raw": 0.45,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a2",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.75,
+          "strength": 0.75,
+          "strength_raw": 0.75,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9199999268849808,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9599998092651943,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999998013179108
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9699999229113336,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9199999268849808,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a3",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.799999872843465,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 0.9999998410543312
+        },
+        {
+          "source": "a3",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.679999783833935,
+          "strength": 0.68,
+          "strength_raw": 0.68,
+          "type_confidence": 0.9999996821087278
+        },
+        {
+          "source": "a3",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.88,
+          "strength": 0.88,
+          "strength_raw": 0.88,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a3",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8999998569488831,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.9999998410543145
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8099999678134944,
+          "strength": 0.81,
+          "strength_raw": 0.81,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.7799999070167746,
+          "strength": 0.78,
+          "strength_raw": 0.78,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9199999634424875,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599998092652102,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999998013179273
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9199998903274776,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a4",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.93,
+          "strength": 0.93,
+          "strength_raw": 0.93,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a4",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9299999630451232,
+          "strength": 0.93,
+          "strength_raw": 0.93,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8799999650319446,
+          "strength": 0.88,
+          "strength_raw": 0.88,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9199998903274711,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.92,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.45,
+          "strength": 0.45,
+          "strength_raw": 0.45,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.88,
+          "strength": 0.88,
+          "strength_raw": 0.88,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a5",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.1199999952316288,
+          "strength": 0.12,
+          "strength_raw": 0.12,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a5",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.65,
+          "strength": 0.65,
+          "strength_raw": 0.65,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.5799999539057487,
+          "strength": 0.58,
+          "strength_raw": 0.58,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a6",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.7999999682108587,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9299999260902523,
+          "strength": 0.93,
+          "strength_raw": 0.93,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999618530304,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.95,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.8,
+          "strength": 0.8,
+          "strength_raw": 0.8,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.88,
+          "strength": 0.88,
+          "strength_raw": 0.88,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9199999268849763,
+          "strength": 0.92,
+          "strength_raw": 0.92,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a7",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.7499999403953647,
+          "strength": 0.75,
+          "strength_raw": 0.75,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999237060621,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9699998843670076,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 0.9999998807907294
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.93,
+          "strength": 0.93,
+          "strength_raw": 0.93,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a7",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.679999945958464,
+          "strength": 0.68,
+          "strength_raw": 0.68,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a8",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.34,
+          "strength": 0.34,
+          "strength_raw": 0.34,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a8",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.5499999781449654,
+          "strength": 0.55,
+          "strength_raw": 0.55,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.24999995032947472,
+          "strength": 0.25,
+          "strength_raw": 0.25,
+          "type_confidence": 0.9999998013178989
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999618530304,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9799999610583018,
+          "strength": 0.98,
+          "strength_raw": 0.98,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.97,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a9",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9299999630451232,
+          "strength": 0.93,
+          "strength_raw": 0.93,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a9",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.09999999602635734,
+          "strength": 0.1,
+          "strength_raw": 0.1,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9599999237060621,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599998855591071,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9599999618530304,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a10",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9499999245007907,
+          "strength": 0.95,
+          "strength_raw": 0.95,
+          "type_confidence": 0.9999999205271481
+        },
+        {
+          "source": "a10",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.14999998807907294,
+          "strength": 0.15,
+          "strength_raw": 0.15,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8999998927116629,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9399999252955237,
+          "strength": 0.94,
+          "strength_raw": 0.94,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9699998843670145,
+          "strength": 0.97,
+          "strength_raw": 0.97,
+          "type_confidence": 0.9999998807907365
+        },
+        {
+          "source": "a11",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.8999993205080564,
+          "strength": 0.9,
+          "strength_raw": 0.9,
+          "type_confidence": 0.9999992450089515
+        },
+        {
+          "source": "a11",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.1199999952316288,
+          "strength": 0.12,
+          "strength_raw": 0.12,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a11",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.21999998251597364,
+          "strength": 0.22,
+          "strength_raw": 0.22,
+          "type_confidence": 0.9999999205271529
+        },
+        {
+          "source": "a11",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.28,
+          "strength": 0.28,
+          "strength_raw": 0.28,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.8499999662240373,
+          "strength": 0.85,
+          "strength_raw": 0.85,
+          "type_confidence": 0.9999999602635733
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.96,
+          "strength": 0.96,
+          "strength_raw": 0.96,
+          "type_confidence": 1.0
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9399998879432923,
+          "strength": 0.94,
+          "strength_raw": 0.94,
+          "type_confidence": 0.9999998807907365
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.9999846923076923,
+        "consistency": 0.0,
+        "reified": 0.31601,
+        "log_partition": 0.00025899522801232054,
+        "num_atoms": 13,
+        "num_below_prior": 0,
+        "avg_norm_entropy": 0.00021501049402487094,
+        "log_z": -24.572436,
+        "log_z_max": -23.800421,
+        "log_z_min": -24.572636,
+        "marginals": {
+          "a0": 0.999812,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 0.999989,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 1.0,
+          "a6": 1.0,
+          "a7": 1.0,
+          "a8": 1.0,
+          "a9": 1.0
+        }
+      },
+      "elapsed_s": 219.922
+    }
+  ]
+}
