@@ -27,7 +27,6 @@ bundle by ``--nli-mode`` (see :data:`NLI_MODES`) or individually via the
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 NLI_PAIR_POLICIES = ("all_pairs", "gated", "provenance")
 

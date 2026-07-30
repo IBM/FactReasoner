@@ -59,10 +59,15 @@ rits = ["mellea-ibm"]
 # Local vLLM server path (GPU node). vLLM is invoked as an external process, not
 # imported, so this only needs to be installed where the server is launched.
 vllm = ["vllm"]
-dev = ["pytest", "ruff", "mypy", "build", "twine"]
+# `pytest-asyncio` is required, not optional: the pytest config below sets
+# `asyncio_mode = "auto"`, and without the plugin every `async def` test is
+# reported as a failure ("async def functions are not natively supported")
+# rather than run.
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine"]
 
 [project.scripts]
 fact-reasoner = "fact_reasoner.cli:main"
+fact-reasoner-lcs = "fact_reasoner.lcs.cli:main"
 
 [project.urls]
 Source = "https://github.com/IBM/FactReasoner"

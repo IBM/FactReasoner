@@ -38,6 +38,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from mellea.backends import model_ids as _mellea_model_ids
@@ -182,9 +183,28 @@ def _friendly_key(mi: ModelIdentifier, const_name: str) -> str:
 
 
 def _norm_basename(name: str) -> str:
-    """Normalize a model name to its alphanumeric basename for matching."""
-    base = name.split("/")[-1]
-    return "".join(c for c in base.lower() if c.isalnum())
+    """Normalize a model name to its alphanumeric basename for matching.
+
+    Two registries name the same model slightly differently, so matching has to
+    look past the cosmetic differences:
+
+      * case and punctuation -- dropped entirely (``-``, ``_``, ``.``);
+      * a ``.0`` patch suffix on a version number -- dropped, because Mellea
+        writes ``granite-4.0-h-small`` where RITS writes ``granite-4-h-small``.
+        Without this the whole Granite 4.0 family fails to match its RITS entry
+        (``granite40hsmall`` vs ``granite4hsmall``) and reports as unavailable on
+        RITS. Only a literal ``.0`` is dropped, so ``granite-3.3-8b`` and
+        ``llama-3.1`` keep their minor versions and stay distinct.
+
+    Args:
+        name: A model name, optionally namespaced (``"ibm-granite/granite-4.0-micro"``).
+
+    Returns:
+        The lowercase alphanumeric basename used as the matching key.
+    """
+    base = name.split("/")[-1].lower()
+    base = re.sub(r"(\d)\.0(?=[-_.]|$)", r"\1", base)
+    return "".join(c for c in base if c.isalnum())
 
 
 def _build_rits_overlay() -> dict[str, str]:

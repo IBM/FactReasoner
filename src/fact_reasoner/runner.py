@@ -301,6 +301,36 @@ class FactualityRunner:
         Returns:
             The results dictionary.
         """
+        results, _pipeline = self.assess_with_pipeline(
+            query, response, topic=topic, output_file=output_file
+        )
+        return results
+
+    def assess_with_pipeline(
+        self,
+        query: str,
+        response: str,
+        topic: str | None = None,
+        output_file: str | None = None,
+    ) -> tuple[dict[str, Any], Any]:
+        """Assess a single pair and also return the assessor instance.
+
+        Identical work to :meth:`assess`; the extra return value exposes the
+        pipeline object, whose ``atoms``, ``contexts`` and ``fact_graph`` outlive
+        the call. A second stage can then reuse the atoms rather than atomizing
+        the response again -- see ``fact_reasoner.lcs.priors``, which turns this
+        run's posterior marginals into the coherence MRF's atom priors.
+
+        Args:
+            query: The input query.
+            response: The response to assess.
+            topic: Optional topic hint.
+            output_file: If set, write the results dict to this path as JSON.
+
+        Returns:
+            ``(results, pipeline)``, where ``results`` is what :meth:`assess`
+            returns.
+        """
         context_retriever = self._build_context_retriever()
         pipeline_obj = self._make_pipeline(context_retriever)
 
@@ -329,7 +359,47 @@ class FactualityRunner:
                 json.dump(results, f, indent=4)
             print(f"[FactualityRunner] Results written to: {output_file}")
 
-        return results
+        return results, pipeline_obj
+
+    def assess_item_with_pipeline(
+        self, item: dict[str, Any]
+    ) -> tuple[dict[str, Any], Any]:
+        """Assess one dataset item and also return the assessor instance.
+
+        The per-item body of :meth:`assess_file`: the item is expected to already
+        carry atoms and contexts (as ``FactReasoner.to_json`` writes them), so
+        nothing is atomized or retrieved -- only the NLI relations are scored and
+        inference is run. Exposed separately so a caller can score a single item
+        without an output file, and so a second stage can reuse the atoms (see
+        :meth:`assess_with_pipeline`).
+
+        Args:
+            item: The dataset item (with ``atoms`` and ``contexts``).
+
+        Returns:
+            ``(results, pipeline)``.
+        """
+        _rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[
+            self.pipeline_version
+        ]
+
+        context_retriever = self._build_context_retriever()
+        pipeline_obj = self._make_pipeline(context_retriever)
+        pipeline_obj.from_dict_with_contexts(item)
+
+        build_kwargs = {"has_atoms": True, "has_contexts": True, "revise_atoms": False}
+        if self.pipeline == "factreasoner":
+            build_kwargs.update(
+                remove_duplicates=remove_dups,
+                contexts_per_atom_only=ctx_per_atom,
+                rel_atom_context=True,
+                rel_context_context=rel_ctx_ctx,
+                summarize_contexts=self.use_summarizer,
+            )
+        _run_build(pipeline_obj, **build_kwargs)
+
+        results = self._normalize_results(pipeline_obj.score())
+        return results, pipeline_obj
 
     def assess_file(
         self,
@@ -360,10 +430,6 @@ class FactualityRunner:
             if self.pipeline == "factreasoner"
             else self.pipeline
         )
-        _rel_atom_ctx, rel_ctx_ctx, remove_dups, ctx_per_atom = _FR_VERSIONS[
-            self.pipeline_version
-        ]
-
         # Load the dataset (one JSON object per line).
         with open(input_file) as f:
             dataset = [json.loads(line) for line in f.read().splitlines() if line]
@@ -388,22 +454,7 @@ class FactualityRunner:
                 print("[FactualityRunner] Skipping already-processed input.")
                 continue
 
-            context_retriever = self._build_context_retriever()
-            pipeline_obj = self._make_pipeline(context_retriever)
-            pipeline_obj.from_dict_with_contexts(input_data)
-
-            build_kwargs = {"has_atoms": True, "has_contexts": True, "revise_atoms": False}
-            if self.pipeline == "factreasoner":
-                build_kwargs.update(
-                    remove_duplicates=remove_dups,
-                    contexts_per_atom_only=ctx_per_atom,
-                    rel_atom_context=True,
-                    rel_context_context=rel_ctx_ctx,
-                    summarize_contexts=self.use_summarizer,
-                )
-            _run_build(pipeline_obj, **build_kwargs)
-
-            results = self._normalize_results(pipeline_obj.score())
+            results, _pipeline = self.assess_item_with_pipeline(input_data)
             results["model_name"] = model_id
             evaluation_data.append(results)
 

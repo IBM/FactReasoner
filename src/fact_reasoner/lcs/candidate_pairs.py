@@ -294,7 +294,11 @@ def select(
             gate_backend = g.backend
         else:  # entity
             token_sets = [_content_tokens(t) for t in texts]
-            sim = lambda i, j: _jaccard(token_sets[i], token_sets[j])
+
+            def sim(i: int, j: int) -> float:
+                """Content-token Jaccard between two atoms (the entity gate)."""
+                return _jaccard(token_sets[i], token_sets[j])
+
             gate_backend = "entity:jaccard"
 
         # Long-range forward pairs beyond the window that survive the gate.

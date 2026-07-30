@@ -27,18 +27,21 @@ def score_all_lcs(
     *,
     methods: Optional[List[str]] = None,
     reified_prior: float = 0.5,
+    node_priors: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """Compute every LCS readout for a single mined MRF.
 
-    All LCS scores read the same coherence MRF, so this calls
-    ``scorer.score(result, method=m)`` once per method and collects the headline
-    of each, plus the shared per-atom diagnostics (read once).
+    A thin adapter over :meth:`LCSScorer.score_all`, which reads all the requested
+    readouts off the same base network while running the shared base MAR and base
+    PR only once (6 Merlin invocations for all four readouts rather than 12).
 
     Args:
         result: The mined :class:`MiningResult`.
         scorer: An :class:`LCSScorer` (real or dry-run monkeypatched).
         methods: LCS methods to compute (defaults to all of ``LCS_METHODS``).
         reified_prior: Bernoulli prior for the reified score.
+        node_priors: Optional per-atom priors ``{atom_id: pi_i}`` (e.g. the
+            factuality stage's posterior marginals).
 
     Returns:
         A dict with one key per LCS method (its scalar value) plus
@@ -47,23 +50,18 @@ def score_all_lcs(
         ``marginals``.
     """
     methods = methods or list(LCS_METHODS)
-    out: Dict[str, Any] = {}
-    diagnostics: Dict[str, Any] = {}
-    marginals: Dict[str, float] = {}
+    scores = scorer.score_all(
+        result,
+        methods=methods,
+        reified_prior=reified_prior,
+        node_priors=node_priors,
+    )
 
-    for m in methods:
-        scores = scorer.score(result, method=m, reified_prior=reified_prior)
-        out[m] = scores.get(m)
-        # Diagnostics are identical across methods except log_z_max / log_z_min
-        # (only the log_partition run computes them); keep the first non-None seen.
-        for key in ("num_atoms", "num_below_prior", "avg_norm_entropy", "log_z",
-                    "log_z_max", "log_z_min"):
-            val = scores.get(key)
-            if val is not None and diagnostics.get(key) is None:
-                diagnostics[key] = val
-        if not marginals and scores.get("marginals"):
-            marginals = scores["marginals"]
-
-    out.update(diagnostics)
-    out["marginals"] = marginals
+    out: Dict[str, Any] = {m: scores.get(m) for m in methods}
+    for key in ("num_atoms", "num_below_prior", "avg_norm_entropy", "log_z",
+                "log_z_max", "log_z_min"):
+        val = scores.get(key)
+        if val is not None:
+            out[key] = val
+    out["marginals"] = scores.get("marginals") or {}
     return out

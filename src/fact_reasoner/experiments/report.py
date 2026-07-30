@@ -19,7 +19,6 @@
 # no external image files and no Python plotting dependency). Compile with
 # ``pdflatex report.tex`` (run twice for references).
 
-import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -609,7 +608,7 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
             if prev_pol is not None and policy != prev_pol:
                 lines.append(r"\cmidrule(l){2-9}")
             prev_pol = policy
-            l = rec["lcs"]
+            lcs = rec["lcs"]
             n = rec.get("num_atoms") or 1
             dens = (rec.get("num_relations") or 0) / n
             row = [
@@ -618,10 +617,10 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
                 "g" if grounded else "p",
                 _tex_escape(_short_strength(strength)),
                 f"{dens:.1f}",
-                _fmt(l.get("mean_marginal"), 2),
-                _fmt(l.get("consistency"), 2),
-                _fmt(l.get("reified"), 2),
-                _fmt(l.get("log_z"), 1),
+                _fmt(lcs.get("mean_marginal"), 2),
+                _fmt(lcs.get("consistency"), 2),
+                _fmt(lcs.get("reified"), 2),
+                _fmt(lcs.get("log_z"), 1),
             ]
             first = False
             lines.append(" & ".join(row) + r" \\")

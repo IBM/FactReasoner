@@ -368,14 +368,13 @@ def score_cell(
 
 
 def _per_atom_scores(results: dict) -> Dict[str, float]:
-    """Flatten ``factuality_score_per_atom`` (a list of single-key dicts)."""
-    out: Dict[str, float] = {}
-    for entry in results.get("factuality_score_per_atom") or []:
-        for var, payload in entry.items():
-            out[var] = (
-                payload.get("score") if isinstance(payload, dict) else float(payload)
-            )
-    return out
+    """Flatten ``factuality_score_per_atom`` (a list of single-key dicts).
+
+    Delegates to the shared extractor in ``fact_reasoner.lcs.priors``.
+    """
+    from fact_reasoner.lcs.priors import atom_priors_from_results
+
+    return atom_priors_from_results(results)
 
 
 def _accuracy(results: dict, gold: Dict[str, str]) -> dict:

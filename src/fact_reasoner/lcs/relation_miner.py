@@ -37,6 +37,7 @@ import asyncio
 import json
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -326,7 +327,7 @@ class RelationMiner:
         gate: str = "embedding",
         gate_threshold: float = 0.3,
         embedding_model: str = "all-MiniLM-L6-v2",
-        prior: float = 0.5,
+        prior: float | Mapping[str, float] = 0.5,
         concession_discount: float = 0.45,
         strength_method: str = "auto",
         strength_samples: int = 8,
@@ -352,8 +353,13 @@ class RelationMiner:
                 ``"entity"`` / ``"none"``).
             gate_threshold: Similarity threshold for the gate.
             embedding_model: Sentence-transformers model for the embedding gate.
-            prior: Uniform atom prior ``pi`` for the unary factors (0.5 for
-                coherence-only). Per-atom priors can be supplied at build time.
+            prior: The atom prior ``pi`` for the unary factors. Either a single
+                float applied to every atom (0.5 for coherence-only, the default)
+                or a ``{atom_id: pi_i}`` mapping -- e.g. the factuality pipeline's
+                posterior marginals, so the coherence MRF starts from how well
+                each atom is externally supported (see ``lcs.priors``). Atoms
+                missing from a mapping fall back to 0.5. Can also be overridden
+                per call on the mining entry points.
             concession_discount: The ``lambda * pi_h`` product applied to a
                 resolved-concession contradiction: ``p_eff = p * (1 - discount)``
                 (deep-dive Eq. 2; a discount of 0.45 with pi_h=1 maps p=0.80 to
@@ -408,7 +414,18 @@ class RelationMiner:
         self.gate = gate
         self.gate_threshold = gate_threshold
         self.embedding_model = embedding_model
-        self.prior = prior
+        # A float prior keeps `self.prior` a float (callers and tests read it);
+        # a mapping sets the per-atom table and leaves the scalar at the default,
+        # which is also the fallback for atoms the mapping does not cover.
+        if isinstance(prior, Mapping):
+            self.node_priors: dict[str, float] | None = {
+                aid: float(p) for aid, p in prior.items()
+            }
+            self.default_prior = _UNKNOWN_PROBABILITY
+        else:
+            self.node_priors = None
+            self.default_prior = float(prior)
+        self.prior = self.default_prior
         self.concession_discount = concession_discount
         self.strength_method = strength_method
         self.strength_samples = strength_samples
@@ -438,6 +455,31 @@ class RelationMiner:
         )
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
+    # -- priors --------------------------------------------------------------
+
+    def _prior_for(
+        self, atom_id: str, node_priors: Mapping[str, float] | None = None
+    ) -> float:
+        """The unary prior for one atom.
+
+        Precedence: a per-call ``node_priors`` entry, then the constructor's
+        per-atom table, then the scalar default.
+        """
+        if node_priors is not None and atom_id in node_priors:
+            return float(node_priors[atom_id])
+        table = getattr(self, "node_priors", None)
+        if table is not None and atom_id in table:
+            return float(table[atom_id])
+        # `prior` is the documented scalar attribute; fall back to it so a miner
+        # built without __init__ (as some tests do) still resolves a prior.
+        return float(getattr(self, "default_prior", getattr(self, "prior", 0.5)))
+
+    def _resolve_priors(
+        self, atoms: dict[str, Atom], node_priors: Mapping[str, float] | None = None
+    ) -> dict[str, float]:
+        """The resolved ``{atom_id: prior}`` table for a set of atoms."""
+        return {aid: self._prior_for(aid, node_priors) for aid in atoms}
+
     # -- public entry points -------------------------------------------------
 
     @staticmethod
@@ -452,51 +494,82 @@ class RelationMiner:
         return response
 
     def mine_from_response(
-        self, response: str, *, query: str | None = None
+        self,
+        response: str,
+        *,
+        query: str | None = None,
+        node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
-        """Atomize ``response`` and mine its inter-atom relations (grounded)."""
+        """Atomize ``response`` and mine its inter-atom relations (grounded).
+
+        Args:
+            response: The response to atomize and mine.
+            query: Unused; accepted for symmetry with the factuality pipeline.
+            node_priors: Optional per-atom unary priors, overriding the miner's
+                own for this call.
+        """
         self._require_response(response)
         atoms = self._atoms_from_response(response)
-        return asyncio.run(self._mine(atoms, source_response=response))
+        return asyncio.run(
+            self._mine(atoms, source_response=response, node_priors=node_priors)
+        )
 
     def mine_from_atoms(
         self,
         atoms: list[str] | list[Atom] | dict[str, Atom],
         response: str,
+        *,
+        node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
         """Mine inter-atom relations for already-decomposed atoms, grounded in the
         response they came from.
 
         Args:
-            atoms: The atoms (strings, :class:`Atom`, or an ordered dict).
+            atoms: The atoms (strings, :class:`Atom`, or an ordered dict). Passing
+                the atoms a factuality run already produced avoids re-atomizing
+                (and re-revising) the response -- see ``lcs.pipeline``.
             response: The original response the atoms came from (REQUIRED). Mining
                 is always response-grounded: it prunes relations the response does
                 not draw and refines candidate pairs with discourse adjacency.
+            node_priors: Optional per-atom unary priors, overriding the miner's
+                own for this call.
 
         Raises:
             ValueError: If ``response`` is empty/None.
         """
         self._require_response(response)
         norm = self._normalize_atoms(atoms)
-        return asyncio.run(self._mine(norm, source_response=response))
+        return asyncio.run(
+            self._mine(norm, source_response=response, node_priors=node_priors)
+        )
 
     async def amine_from_response(
-        self, response: str, *, query: str | None = None
+        self,
+        response: str,
+        *,
+        query: str | None = None,
+        node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
         """Async variant of :meth:`mine_from_response`."""
         self._require_response(response)
         atoms = self._atoms_from_response(response)
-        return await self._mine(atoms, source_response=response)
+        return await self._mine(
+            atoms, source_response=response, node_priors=node_priors
+        )
 
     async def amine_from_atoms(
         self,
         atoms: list[str] | list[Atom] | dict[str, Atom],
         response: str,
+        *,
+        node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
         """Async variant of :meth:`mine_from_atoms` (response REQUIRED)."""
         self._require_response(response)
         norm = self._normalize_atoms(atoms)
-        return await self._mine(norm, source_response=response)
+        return await self._mine(
+            norm, source_response=response, node_priors=node_priors
+        )
 
     # -- atom preparation ----------------------------------------------------
 
@@ -540,7 +613,11 @@ class RelationMiner:
     # -- core mining ---------------------------------------------------------
 
     async def _mine(
-        self, atoms: dict[str, Atom], *, source_response: str | None
+        self,
+        atoms: dict[str, Atom],
+        *,
+        source_response: str | None,
+        node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
         """Select pairs, mine each, discount concessions, build the MRF."""
         # 1. candidate pairs (response-anchored; grounding is always on)
@@ -568,11 +645,13 @@ class RelationMiner:
         # 3. concession discount: a resolved concession's contradiction is softened
         self._apply_concession_discount(atoms, relations)
 
-        # 4. build the FactGraph + Markov network
-        fact_graph = self._build_fact_graph(atoms, relations)
-        node_priors = {aid: self.prior for aid in atoms}
+        # 4. build the FactGraph + Markov network. The resolved priors go on the
+        # graph nodes AND into the network, so a caller reading either sees the
+        # same unary priors (LCSScorer rebuilds from the graph).
+        priors = self._resolve_priors(atoms, node_priors)
+        fact_graph = self._build_fact_graph(atoms, relations, priors)
         markov_network = build_markov_network(
-            fact_graph, use_priors=True, node_priors=node_priors
+            fact_graph, use_priors=True, node_priors=priors
         )
 
         coverage = dict(coverage)
@@ -580,7 +659,12 @@ class RelationMiner:
         coverage["dropped_none"] = dropped_none
         coverage["relations_kept"] = len(relations)
 
-        config = {
+        # `prior` stays a FLOAT: it is JSON-serialized and read as
+        # `float(config["prior"])` by LCSScorer, so it holds the uniform fallback.
+        # Per-atom priors are recorded alongside it, only when actually in effect.
+        default_prior = self._prior_for("\0__absent__")
+        per_atom = any(p != default_prior for p in priors.values())
+        config: dict[str, Any] = {
             "nli_method": self.nli_method,
             "strength_method": self.strength_method,
             "strength_samples": self.strength_samples,
@@ -588,9 +672,12 @@ class RelationMiner:
             "window": self.window,
             "gate": self.gate,
             "gate_threshold": self.gate_threshold,
-            "prior": self.prior,
+            "prior": default_prior,
+            "prior_source": "per_atom" if per_atom else "uniform",
             "concession_discount": self.concession_discount,
         }
+        if per_atom:
+            config["node_priors"] = priors
 
         return MiningResult(
             atoms=atoms,
@@ -997,14 +1084,28 @@ class RelationMiner:
                 rel.concession_resolved = False
 
     def _build_fact_graph(
-        self, atoms: dict[str, Atom], relations: list[MinedRelation]
+        self,
+        atoms: dict[str, Atom],
+        relations: list[MinedRelation],
+        priors: Mapping[str, float] | None = None,
     ) -> FactGraph:
-        """Build a FactGraph from atoms and mined atom_atom relation edges."""
+        """Build a FactGraph from atoms and mined atom_atom relation edges.
+
+        Args:
+            atoms: The atoms, keyed by id.
+            relations: The mined edge-producing relations.
+            priors: Resolved per-atom unary priors; resolved from the miner's own
+                configuration when omitted.
+        """
         fg = FactGraph()
         from fact_reasoner.fact_graph import Edge, Node
 
+        if priors is None:
+            priors = self._resolve_priors(atoms)
         for aid in sorted(atoms, key=_atom_sort_key):
-            fg.add_node(Node(id=aid, type="atom", probability=self.prior))
+            fg.add_node(
+                Node(id=aid, type="atom", probability=self._prior_for(aid, priors))
+            )
         for rel in relations:
             fg.add_edge(
                 Edge(

@@ -36,12 +36,45 @@ Quick start::
 
     lcs = LCSScorer(merlin_path).score(result)   # {"lcs": ..., "log_z": ...}
 
+    # Several readouts at once share the base inference runs (6 Merlin calls, not 12):
+    all_scores = LCSScorer(merlin_path).score_all(result)
+
     # From pre-extracted atoms, pass the response they came from:
     result = miner.mine_from_atoms(atom_texts, response)
 
     # or, one call end-to-end:
     lcs = mine_and_score(response, backend=backend, merlin_path=merlin_path,
                          atomizer=Atomizer(backend))
+
+Two-stage scoring (factuality priors + coherence)
+-------------------------------------------------
+
+By default every atom starts from a flat 0.5 prior, so the LCS measures internal
+coherence alone. Feeding in the factuality pipeline's posterior marginals instead
+makes the coherence MRF start from how well each atom is *externally supported*::
+
+    from fact_reasoner.lcs import CoherencePipeline, FactReasonerPriorProvider
+    from fact_reasoner.runner import FactualityRunner
+
+    runner = FactualityRunner(backend, merlin_path=merlin_path, nli_mode="fast")
+    pipeline = CoherencePipeline(
+        miner=RelationMiner(backend, atomizer=Atomizer(backend)),
+        merlin_path=merlin_path,
+        prior_provider=FactReasonerPriorProvider(runner=runner),
+        methods=("mean_marginal", "consistency"),
+    )
+    out = pipeline.run(response, query=query)
+    out.describe()          # out.priors are stage 1's posteriors
+
+The provider hands its atoms to the miner, so the response is atomized once, not
+once per stage. Priors can also come from a saved factuality run
+(``PrecomputedPriorProvider("results.json")``) or a plain mapping -- both cost no
+LLM calls -- and ``mine_and_score(..., priors=...)`` takes any of these forms.
+
+``formulation="mln"`` selects the Markov-logic model of
+``docs/ideation/coherence_mln_deepdive.pdf``; its closed-form pairwise fragment is
+implemented (and verified to reproduce the MRF exactly), but scoring it raises
+``NotImplementedError`` pending a MC-SAT / MaxWalkSAT engine.
 """
 
 from typing import Any, Dict, List, Optional, Union
@@ -52,7 +85,30 @@ from fact_reasoner.factors import (
     edge_factor_values,
     pairwise_prior,
 )
-from fact_reasoner.lcs.lcs_scorer import LCSScorer
+from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
+from fact_reasoner.lcs.pipeline import (
+    COHERENCE_FORMULATIONS,
+    RULE_SCHEMA,
+    CoherenceModel,
+    CoherencePipeline,
+    CoherenceResult,
+    MLNCoherenceModel,
+    MLNEngine,
+    MRFCoherenceModel,
+    build_coherence_model,
+    mln_weight,
+    three_clause_weights,
+)
+from fact_reasoner.lcs.priors import (
+    NEUTRAL_PRIOR,
+    AtomPriors,
+    FactReasonerPriorProvider,
+    PrecomputedPriorProvider,
+    PriorProvider,
+    UniformPriorProvider,
+    atom_priors_from_results,
+    coerce_prior_provider,
+)
 from fact_reasoner.lcs.relation_miner import (
     MinedRelation,
     MiningResult,
@@ -81,7 +137,29 @@ __all__ = [
     "MinedRelation",
     "MiningResult",
     "LCSScorer",
+    "LCS_METHODS",
     "mine_and_score",
+    # Two-stage pipeline: factuality priors + a coherence model.
+    "CoherencePipeline",
+    "CoherenceResult",
+    "CoherenceModel",
+    "MRFCoherenceModel",
+    "MLNCoherenceModel",
+    "MLNEngine",
+    "build_coherence_model",
+    "COHERENCE_FORMULATIONS",
+    "RULE_SCHEMA",
+    "mln_weight",
+    "three_clause_weights",
+    # Atom priors.
+    "AtomPriors",
+    "PriorProvider",
+    "UniformPriorProvider",
+    "PrecomputedPriorProvider",
+    "FactReasonerPriorProvider",
+    "atom_priors_from_results",
+    "coerce_prior_provider",
+    "NEUTRAL_PRIOR",
     "StrengthCalibrator",
     "IdentityCalibrator",
     "TemperatureCalibrator",
@@ -109,6 +187,8 @@ def mine_and_score(
     atomizer=None,
     reviser=None,
     response: Optional[str] = None,
+    priors=None,
+    formulation: str = "mrf",
     scorer_kwargs: Optional[Dict[str, Any]] = None,
     **miner_kwargs,
 ) -> Dict[str, Any]:
@@ -132,6 +212,16 @@ def mine_and_score(
         response: The original response the atoms came from. REQUIRED when
             ``response_or_atoms`` is a list/dict of atoms (ignored for the raw
             string path, which already grounds on its own text).
+        priors: Optional per-atom priors for the coherence MRF's unary factors --
+            an :class:`AtomPriors`, a ``{atom_id: probability}`` mapping, a float,
+            or a :class:`PriorProvider`. ``None`` (the default) keeps the uniform
+            0.5 prior, i.e. coherence only. To prime the atoms with their
+            factuality posteriors, pass a
+            :class:`FactReasonerPriorProvider` -- or use
+            :class:`CoherencePipeline`, which also reuses the factuality run's
+            atoms instead of atomizing twice.
+        formulation: ``"mrf"`` (default) or ``"mln"``; see
+            :func:`build_coherence_model`.
         scorer_kwargs: Extra kwargs for :meth:`LCSScorer.score` (e.g.
             ``{"method": "reified"}`` to pick an alternative LCS readout).
         **miner_kwargs: Extra kwargs for :class:`RelationMiner` (e.g.
@@ -150,6 +240,7 @@ def mine_and_score(
         backend, atomizer=atomizer, reviser=reviser, **miner_kwargs
     )
     if isinstance(response_or_atoms, str):
+        source_response = response_or_atoms
         result = miner.mine_from_response(response_or_atoms)
     else:
         if not response or not str(response).strip():
@@ -157,9 +248,28 @@ def mine_and_score(
                 "mine_and_score with a list/dict of atoms requires response=... "
                 "(mining is always response-grounded)."
             )
+        source_response = response
         result = miner.mine_from_atoms(response_or_atoms, response=response)
 
-    scorer = LCSScorer(merlin_path)
-    scores = scorer.score(result, **(scorer_kwargs or {}))
+    scorer_kwargs = dict(scorer_kwargs or {})
+    node_priors = None
+    if priors is not None:
+        atom_priors = coerce_prior_provider(priors).priors_for(
+            response=source_response
+        )
+        node_priors, _coverage = atom_priors.resolve(result.atoms)
+
+    if formulation == "mrf":
+        # Route through the scorer directly, so `scorer_kwargs` (method=, prior=,
+        # reified_prior=) keep working exactly as before.
+        scores = LCSScorer(merlin_path).score(
+            result, node_priors=node_priors, **scorer_kwargs
+        )
+    else:
+        model = build_coherence_model(formulation, merlin_path=merlin_path)
+        method = scorer_kwargs.pop("method", "mean_marginal")
+        scores = model.score(
+            result, node_priors=node_priors, methods=(method,), **scorer_kwargs
+        )
     scores["result"] = result
     return scores

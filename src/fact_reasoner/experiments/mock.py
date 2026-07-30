@@ -33,7 +33,7 @@
 import itertools
 import math
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
@@ -277,14 +277,32 @@ def make_mock_ainstruct(*, surrogate_p_yes: float = 0.8, verbalized_p: float = 0
 
 
 @contextmanager
-def dry_run_patches(*, surrogate_p_yes: float = 0.8, verbalized_p: float = 0.7):
+def dry_run_patches(
+    *,
+    surrogate_p_yes: float = 0.8,
+    verbalized_p: float = 0.7,
+    patch_assessor_merlin: bool = False,
+):
     """Context manager installing the dry-run stubs.
 
     Patches ``mellea.stdlib.functional.ainstruct`` (mining) and
     ``fact_reasoner.lcs.lcs_scorer.run_merlin`` (scoring) for the duration, so the
     real ``RelationMiner`` / ``LCSScorer`` run end-to-end with no external services.
+
+    Args:
+        surrogate_p_yes: Stubbed P("Yes") for the surrogate strength prompt.
+        verbalized_p: Stubbed verbalized strength.
+        patch_assessor_merlin: Also patch the factuality pipeline's Merlin helper
+            (``fact_reasoner.assessor._run_merlin_shared``), which the coherence
+            scorer's patch does not cover. Needed for a full two-stage dry run
+            (factuality priors + coherence). Off by default so existing
+            coherence-only dry runs are unaffected. Note the brute-force oracle
+            refuses networks above ``MAX_BRUTEFORCE_VARS`` variables, and a
+            factuality network counts contexts as well as atoms -- keep two-stage
+            fixtures small.
     """
     import mellea.stdlib.functional as mfuncs
+
     from fact_reasoner.lcs import lcs_scorer as lcs_scorer_mod
 
     orig_ainstruct = mfuncs.ainstruct
@@ -293,8 +311,18 @@ def dry_run_patches(*, surrogate_p_yes: float = 0.8, verbalized_p: float = 0.7):
         surrogate_p_yes=surrogate_p_yes, verbalized_p=verbalized_p
     )
     lcs_scorer_mod.run_merlin = brute_force_run_merlin
+
+    assessor_mod = None
+    orig_assessor_merlin = None
+    if patch_assessor_merlin:
+        from fact_reasoner import assessor as assessor_mod
+
+        orig_assessor_merlin = assessor_mod._run_merlin_shared
+        assessor_mod._run_merlin_shared = brute_force_run_merlin
     try:
         yield
     finally:
         mfuncs.ainstruct = orig_ainstruct
         lcs_scorer_mod.run_merlin = orig_merlin
+        if assessor_mod is not None:
+            assessor_mod._run_merlin_shared = orig_assessor_merlin

@@ -26,8 +26,6 @@ These cover the deterministic parts of the coherence pipeline:
     monkeypatched Merlin helper).
 """
 
-import itertools
-import math
 import re
 
 import pytest
@@ -738,7 +736,8 @@ class TestConditionalStrength:
 
     def test_auto_strength_method_resolution(self):
         from unittest.mock import MagicMock
-        be = MagicMock(); be.model_id = "mock"
+        be = MagicMock()
+        be.model_id = "mock"
         lp = RelationMiner(be, nli_method="logprobs").strength_method
         sb = RelationMiner(be, nli_method="simbauq").strength_method
         assert lp == "surrogate_logprobs" and lp in STRENGTH_METHODS
@@ -748,7 +747,8 @@ class TestConditionalStrength:
 
     def test_unknown_strength_method_raises(self):
         from unittest.mock import MagicMock
-        be = MagicMock(); be.model_id = "mock"
+        be = MagicMock()
+        be.model_id = "mock"
         with pytest.raises(ValueError):
             RelationMiner(be, strength_method="bogus")
 

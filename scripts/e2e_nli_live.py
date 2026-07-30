@@ -45,7 +45,6 @@ Usage:
 """
 
 import argparse
-import asyncio
 import json
 import os
 import sys
@@ -65,7 +64,7 @@ from fact_reasoner.core.nli_cache import NLIVerdictCache, extractor_identity  # 
 from fact_reasoner.core.nli_config import NLIPairConfig  # noqa: E402
 from fact_reasoner.core import nli_pairs as npairs  # noqa: E402
 from fact_reasoner.core.reviser import Reviser  # noqa: E402
-from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever  # noqa: E402
+from fact_reasoner.core.retriever import SourceRetriever  # noqa: E402
 from fact_reasoner.core.summarizer import ContextSummarizer  # noqa: E402
 
 MODEL_ID = "meta-llama/llama-3-3-70b-instruct"
@@ -166,7 +165,6 @@ def retrieve_contexts(
     change the context set between runs, which would confound the comparison the
     whole test exists to make.
     """
-    from fact_reasoner.core.retriever import SourceRetriever
 
     retriever = SourceRetriever(
         service_type="google",
@@ -417,15 +415,12 @@ def measure_recall_loss(
 def _per_atom_scores(results: dict) -> Dict[str, float]:
     """Flatten ``factuality_score_per_atom`` to ``{atom_id: score}``.
 
-    The field is a list of single-key dicts, ``[{var: {"score", "support"}}, ...]``.
+    Delegates to the shared extractor, which also handles the ``marginals`` and
+    bare-mapping shapes.
     """
-    out: Dict[str, float] = {}
-    for entry in results.get("factuality_score_per_atom") or []:
-        for var, payload in entry.items():
-            out[var] = (
-                payload.get("score") if isinstance(payload, dict) else float(payload)
-            )
-    return out
+    from fact_reasoner.lcs.priors import atom_priors_from_results
+
+    return atom_priors_from_results(results)
 
 
 def sweep_threshold(

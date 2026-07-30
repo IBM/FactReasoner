@@ -19,11 +19,11 @@ import pytest
 
 from mellea.backends.model_ids import ModelIdentifier
 
-from fact_reasoner import models
 from fact_reasoner.models import (
     DEFAULT_MODEL_KEY,
     MODELS,
     UnifiedModel,
+    _norm_basename,
     is_known,
     list_models,
     resolve,
@@ -160,7 +160,15 @@ class TestDefaults:
         m = resolve(DEFAULT_MODEL_KEY)
         assert m.for_backend("ollama").ollama_name == "granite4:micro"
         assert isinstance(m.for_backend("vllm"), str) and m.for_backend("vllm")
-        assert m.rits is not None  # available on RITS too
+
+    def test_default_is_available_on_rits(self):
+        # Split from the ollama/vllm assertions above because the RITS half needs
+        # the IBM-internal `mellea_ibm` (the `rits` extra): `_rits_overlay`
+        # returns {} without it, so `.rits` is legitimately None and only the
+        # manual-override entries resolve. Skipped rather than asserted so the
+        # ollama/vllm coverage still runs on a base install.
+        pytest.importorskip("mellea_ibm")
+        assert resolve(DEFAULT_MODEL_KEY).rits is not None
 
     def test_default_has_no_openai_name(self):
         # This is *why* build_backend gives the "openai" kind its own default
@@ -174,8 +182,26 @@ class TestDefaults:
 class TestRitsOverlay:
     def test_manual_override_applied(self):
         # The mistral alias points at a RITS model that basename-matching cannot
-        # infer; the override table must supply it.
+        # infer; the override table must supply it. This one needs no `mellea_ibm`:
+        # `_RITS_OVERRIDES` is a static table consulted before the overlay.
         assert resolve("mistral").rits == "MISTRAL_LARGE_3_675B_2512"
 
     def test_auto_matched_granite_small(self):
+        # Basename auto-matching, unlike the override table, reads the RITS class
+        # catalog -- so it needs the `rits` extra installed.
+        pytest.importorskip("mellea_ibm")
         assert resolve("granite-4-0-h-small").rits == "GRANITE_4_H_SMALL"
+
+    def test_norm_basename_ignores_a_zero_patch_version(self):
+        """Mellea's ``granite-4.0-*`` must match RITS' ``granite-4-*``.
+
+        This is what makes the auto-match above possible, and it needs no
+        ``mellea_ibm``: without it the whole Granite 4.0 family normalizes to
+        ``granite40*`` and silently reports as unavailable on RITS.
+        """
+        assert _norm_basename("ibm-granite/granite-4.0-h-small") == (
+            _norm_basename("ibm-granite/granite-4-h-small")
+        )
+        # Only a ".0" patch is cosmetic; real minor versions stay distinct.
+        assert _norm_basename("granite-3.3-8b") != _norm_basename("granite-3-8b")
+        assert _norm_basename("llama-3.1-8b") != _norm_basename("llama-3-8b")

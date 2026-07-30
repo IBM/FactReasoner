@@ -34,7 +34,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         prog="fact-reasoner",
         description="Run a factuality assessor (FactReasoner or a baseline) over "
         "a single query/response or a dataset, with an Ollama, RITS, local vLLM, "
-        "or hosted frontier (OpenAI / Claude) backend.",
+        "or hosted frontier (OpenAI / Claude) backend. To score how well a "
+        "response hangs together (its logical coherence) rather than whether its "
+        "claims are supported, see the `fact-reasoner-lcs` command.",
     )
 
     # --- Pipeline ---
@@ -214,7 +216,35 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     r.add_argument("--cache-dir", default=None, help="Retriever cache directory.")
     r.add_argument("--top-k", type=int, default=3, help="Top-k contexts per atom.")
 
-    # --- Backend ---
+    _add_backend_args(parser)
+
+    # --- Input (single vs file) ---
+    i = parser.add_argument_group("input")
+    i.add_argument("--query", default=None, help="Single-mode: the input query.")
+    i.add_argument("--response", default=None, help="Single-mode: the response.")
+    i.add_argument("--topic", default=None, help="Single-mode: optional topic hint.")
+    i.add_argument("--input-file", default=None, help="File-mode: input jsonl dataset.")
+    i.add_argument("--output-dir", default=None, help="File-mode: output directory.")
+    i.add_argument("--dataset-name", default=None, help="File-mode: dataset label.")
+
+    # --- Output ---
+    parser.add_argument(
+        "--output-file",
+        default=None,
+        help="Single-mode: write the results dict to this JSON file (else print).",
+    )
+    return parser
+
+
+def _add_backend_args(parser: argparse.ArgumentParser) -> None:
+    """Add the shared backend/model argument group to a parser.
+
+    Extracted so the coherence entry point (``fact_reasoner.lcs.cli``) selects and
+    configures a backend with exactly the same flags and semantics as this one.
+
+    Args:
+        parser: The parser to add the ``backend`` argument group to.
+    """
     b = parser.add_argument_group("backend")
     b.add_argument(
         "--backend",
@@ -263,23 +293,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--gpu-memory-utilization", type=float, default=0.90, help="vLLM GPU mem frac."
     )
     b.add_argument("--max-model-len", type=int, default=None, help="vLLM max ctx len.")
-
-    # --- Input (single vs file) ---
-    i = parser.add_argument_group("input")
-    i.add_argument("--query", default=None, help="Single-mode: the input query.")
-    i.add_argument("--response", default=None, help="Single-mode: the response.")
-    i.add_argument("--topic", default=None, help="Single-mode: optional topic hint.")
-    i.add_argument("--input-file", default=None, help="File-mode: input jsonl dataset.")
-    i.add_argument("--output-dir", default=None, help="File-mode: output directory.")
-    i.add_argument("--dataset-name", default=None, help="File-mode: dataset label.")
-
-    # --- Output ---
-    parser.add_argument(
-        "--output-file",
-        default=None,
-        help="Single-mode: write the results dict to this JSON file (else print).",
-    )
-    return parser
 
 
 @contextlib.contextmanager

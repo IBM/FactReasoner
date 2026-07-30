@@ -19,7 +19,7 @@ import json
 import os
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fact_reasoner.lcs.lcs_scorer import LCSScorer
 from fact_reasoner.lcs.relation_miner import RelationMiner
@@ -27,7 +27,6 @@ from fact_reasoner.lcs.relation_miner import RelationMiner
 from fact_reasoner.experiments.config import ExperimentConfig, ModelSpec
 from fact_reasoner.experiments.dataset import load_examples
 from fact_reasoner.experiments.mock import (
-    brute_force_run_merlin,
     dry_run_patches,
     make_mock_backend,
 )

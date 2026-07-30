@@ -35,7 +35,16 @@ miner = RelationMiner(backend, pair_policy="all_pairs")
 # Mining is always response-grounded: pass the atoms AND the response they came from.
 result = miner.mine_from_atoms(atoms, ex["response"])
 scores = LCSScorer(merlin_path).score(result)
+
+# Several readouts at once share the base inference runs (6 Merlin calls, not 12):
+all_scores = LCSScorer(merlin_path).score_all(result)
 ```
+
+The scorer's per-atom priors default to a flat 0.5, so the score above is coherence
+alone. To prime each atom with its factuality posterior instead — the two-stage
+model — pass `node_priors={atom_id: q_i}`, or use `CoherencePipeline` with a
+`FactReasonerPriorProvider`, which also reuses the factuality run's atoms so the
+response is atomized once. See `docs/examples/lcs/ex_lcs_two_stage.md`.
 
 ## Files
 

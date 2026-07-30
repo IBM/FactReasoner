@@ -34,8 +34,24 @@
 # (d) needs a second reference network, all built here from the fact graph reusing
 # ``factors.build_markov_network``. This scorer only reads / augments the MRF; it
 # does not define or duplicate the factuality scoring in ``assessor.py``.
+#
+# PER-ATOM PRIORS. Every readout resolves its unary priors through
+# ``_node_priors``, which takes (1) an explicit ``node_priors`` argument, else
+# (2) the atom's own probability on the fact-graph node (what the miner baked in),
+# else (3) the uniform ``result.config["prior"]``. This is what lets the
+# factuality pipeline's posterior marginals become the coherence MRF's priors
+# (see ``lcs.priors`` / ``lcs.pipeline``): the augmented readouts (b)-(d) REBUILD
+# the network from the fact graph, so without a single resolved prior set they
+# would silently fall back to a uniform prior while (a) used the real one -- and
+# (d) would normalize a real-prior log Z against a uniform-prior ceiling.
+#
+# INFERENCE SHARING. ``score(method=...)`` answers one readout; ``score_all`` answers
+# several while running the base MAR and the base PR only ONCE. Per-method calls cost
+# 12 Merlin invocations for all four readouts (each re-running the shared base pair);
+# ``score_all`` costs the irreducible 6.
 
 import math
+from collections.abc import Sequence
 from typing import Any
 
 from fact_reasoner.fact_graph import Edge, FactGraph, Node
@@ -99,8 +115,13 @@ class LCSScorer:
         method: str = "mean_marginal",
         prior: float | None = None,
         reified_prior: float = 0.5,
+        node_priors: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         """Compute the LCS and diagnostics for a mining result.
+
+        A single-readout projection of :meth:`score_all`. When several readouts
+        are wanted, call :meth:`score_all` instead -- it shares the base
+        inference runs rather than repeating them per method.
 
         Args:
             result: The :class:`MiningResult` from ``RelationMiner``.
@@ -109,11 +130,15 @@ class LCSScorer:
                 method's score is also stored under its own key; the other
                 alternative keys are ``None`` unless that method was selected
                 (they each need extra inference, so they are computed on demand).
-            prior: The atom prior ``pi`` used to count "atoms dragged below their
-                prior". Defaults to the prior recorded in ``result.config``
-                (falling back to 0.5).
+            prior: A uniform atom prior override, used both for the unary factors
+                and as the reference for "atoms dragged below their prior".
+                Defaults to the per-atom priors resolved by :meth:`_node_priors`.
             reified_prior: The Bernoulli prior ``rho`` on the reified coherence
                 node ``R`` (deep-dive default 0.5); used only by ``method="reified"``.
+            node_priors: Explicit per-atom priors ``{atom_id: pi_i}``, the highest
+                precedence prior source (see the module docstring). Atoms absent
+                from the mapping fall back to their fact-graph node probability,
+                then to the uniform ``result.config["prior"]``.
 
         Returns:
             A dict with:
@@ -124,13 +149,13 @@ class LCSScorer:
                 alternative scores, populated when selected (else ``None``).
               * ``"marginals"``: ``{atom_id: P(a_i=1)}`` from the base network.
               * ``"num_atoms"``, ``"num_below_prior"``, ``"avg_norm_entropy"``.
+              * ``"node_priors"``: the resolved per-atom priors actually used.
               * ``"log_z"``: base-network log partition (always computed).
               * ``"log_z_max"``: contradiction-free (ceiling) log partition (only
                 for ``method="log_partition"``, else ``None``).
-              * ``"log_z_min"``: floor log partition -- the same edge skeleton
-                with every contradiction factor saturated to probability 1
-                (entailment/equivalence untouched); the maximally-incoherent
-                reference (only for ``method="log_partition"``, else ``None``).
+              * ``"log_z_min"``: floor log partition -- the base network's MAP
+                world mass, a provable lower bound on ``log Z`` (only for
+                ``method="log_partition"``, else ``None``).
 
         Raises:
             ValueError: If ``method`` is not one of ``LCS_METHODS``.
@@ -139,14 +164,67 @@ class LCSScorer:
             raise ValueError(
                 f"Unknown LCS method: {method!r} (expected one of {list(LCS_METHODS)})."
             )
+        out = self.score_all(
+            result,
+            methods=(method,),
+            prior=prior,
+            reified_prior=reified_prior,
+            node_priors=node_priors,
+        )
+        out["method"] = method
+        out["lcs"] = out[method] if out[method] is not None else 0.0
+        return out
+
+    def score_all(
+        self,
+        result: MiningResult,
+        *,
+        methods: Sequence[str] = LCS_METHODS,
+        prior: float | None = None,
+        reified_prior: float = 0.5,
+        node_priors: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Compute several LCS readouts, sharing the base inference runs.
+
+        All four readouts sit on the same base network, and each needs its
+        marginals (for the per-atom diagnostics) and its ``log Z``. Running them
+        one at a time via :meth:`score` therefore repeats one MAR and one PR per
+        method -- 12 Merlin invocations for all four. This runs the shared pair
+        once and adds only each method's own extra inference, for the irreducible
+        6: base MAR, base PR, the consistency U-chain MAR, the reified-R MAR, the
+        contradiction-free ceiling PR, and the base MAP floor.
+
+        Args:
+            result: The :class:`MiningResult` from ``RelationMiner``.
+            methods: Which readouts to compute (default: all of ``LCS_METHODS``).
+                Unrequested readout keys are ``None``.
+            prior: A uniform atom prior override (see :meth:`score`).
+            reified_prior: The Bernoulli prior ``rho`` on the reified node ``R``.
+            node_priors: Explicit per-atom priors (see :meth:`score`).
+
+        Returns:
+            The same dict as :meth:`score`, with one populated key per requested
+            method. ``"method"`` is the first requested method and ``"lcs"`` its
+            score, so the return is also a valid single-readout result.
+
+        Raises:
+            ValueError: If ``methods`` is empty or names an unknown readout.
+        """
+        methods = tuple(methods)
+        if not methods:
+            raise ValueError("methods must name at least one LCS readout.")
+        unknown = [m for m in methods if m not in LCS_METHODS]
+        if unknown:
+            raise ValueError(
+                f"Unknown LCS method(s): {unknown!r} "
+                f"(expected from {list(LCS_METHODS)})."
+            )
 
         atoms = result.atoms
         n = len(atoms)
-        if prior is None:
-            prior = float(result.config.get("prior", 0.5))
 
         out: dict[str, Any] = {
-            "method": method,
+            "method": methods[0],
             "lcs": 0.0,
             "mean_marginal": 0.0,
             "consistency": None,
@@ -156,6 +234,7 @@ class LCSScorer:
             "num_atoms": n,
             "num_below_prior": 0,
             "avg_norm_entropy": 0.0,
+            "node_priors": {},
             "log_z": None,
             "log_z_max": None,
             "log_z_min": None,
@@ -163,37 +242,42 @@ class LCSScorer:
         if n == 0:
             return out
 
-        # Base MAR run: mean-marginal + per-atom diagnostics (always computed).
-        marginals = self._marginals(result.markov_network, sorted(atoms, key=_atom_sort_key))
+        # One resolved prior set drives every network built below, so the base,
+        # the augmented variants and the log-Z references cannot disagree.
+        priors = self._node_priors(result, node_priors, uniform=prior)
+        out["node_priors"] = priors
+        base = self._base_network(result, priors)
+
+        # -- the two shared base runs (once, however many methods were asked for).
+        marginals = self._marginals(base, sorted(atoms, key=_atom_sort_key))
         out["marginals"] = marginals
         support = list(marginals.values())
         out["mean_marginal"] = sum(support) / len(support) if support else 0.0
-        out["num_below_prior"] = sum(1 for q in support if q < prior)
+        # "Below prior" means below the atom's OWN prior, which generalizes the
+        # uniform-prior reading without changing it.
+        out["num_below_prior"] = sum(
+            1 for aid, q in marginals.items() if q < priors.get(aid, 0.5)
+        )
         out["avg_norm_entropy"] = (
             sum(_binary_entropy(q) for q in support) / len(support) if support else 0.0
         )
+        out["log_z"] = self._log_z(base)
 
-        # Base log Z is a cheap PR run and a useful contradiction-sensitivity gauge.
-        out["log_z"] = self._log_z(result.markov_network)
-
-        # Compute the selected method's headline (mean-marginal already in hand).
-        if method == "mean_marginal":
-            out["lcs"] = out["mean_marginal"]
-        elif method == "consistency":
-            out["consistency"] = self._consistency_probability(result)
-            out["lcs"] = out["consistency"]
-        elif method == "reified":
-            out["reified"] = self._reified_coherence(result, reified_prior)
-            out["lcs"] = out["reified"]
-        elif method == "log_partition":
+        # -- per-method extras.
+        if "consistency" in methods:
+            out["consistency"] = self._consistency_probability(result, priors)
+        if "reified" in methods:
+            out["reified"] = self._reified_coherence(result, reified_prior, priors)
+        if "log_partition" in methods:
             norm, log_z_max, log_z_min = self._normalized_log_partition(
-                result, out["log_z"]
+                result, out["log_z"], priors
             )
             out["log_partition"] = norm
             out["log_z_max"] = log_z_max
             out["log_z_min"] = log_z_min
-            out["lcs"] = norm
 
+        headline = out[methods[0]]
+        out["lcs"] = headline if headline is not None else 0.0
         return out
 
     # -- inference helpers ---------------------------------------------------
@@ -246,7 +330,9 @@ class LCSScorer:
 
     # -- (b) consistency probability -----------------------------------------
 
-    def _consistency_probability(self, result: MiningResult) -> float:
+    def _consistency_probability(
+        self, result: MiningResult, priors: dict[str, float] | None = None
+    ) -> float:
         """P( no CONFLICT edge is jointly active ) — deep-dive Eq. 5.
 
         A conflict coupling is a ``contradiction`` OR an ``exclusive`` (both
@@ -266,7 +352,7 @@ class LCSScorer:
         if not contradictions:
             return 1.0
 
-        network = self._base_network(result)
+        network = self._base_network(result, priors)
 
         # One AND aux var per conflict edge: u_r = (s AND t).
         u_vars: list[str] = []
@@ -293,7 +379,12 @@ class LCSScorer:
 
     # -- (c) reified coherence node ------------------------------------------
 
-    def _reified_coherence(self, result: MiningResult, rho: float) -> float:
+    def _reified_coherence(
+        self,
+        result: MiningResult,
+        rho: float,
+        priors: dict[str, float] | None = None,
+    ) -> float:
         """P(R=1) for the reified coherence node — deep-dive Eqs. 6-7.
 
         Adds a binary node ``R`` with Bernoulli prior ``rho`` and, per relation, a
@@ -305,7 +396,7 @@ class LCSScorer:
             # No relations => R is decoupled; its marginal is just its prior.
             return rho
 
-        network = self._base_network(result)
+        network = self._base_network(result, priors)
         node_R = f"{_AUX}R"
         # R's Bernoulli prior factor [1-rho, rho].
         network.add_factor([node_R], [2], [1.0 - rho, rho])
@@ -322,7 +413,10 @@ class LCSScorer:
     # -- (d) normalized log-partition ----------------------------------------
 
     def _normalized_log_partition(
-        self, result: MiningResult, log_z: float | None
+        self,
+        result: MiningResult,
+        log_z: float | None,
+        priors: dict[str, float] | None = None,
     ) -> (Any):
         """(log Z - log Zmin)/(log Zmax - log Zmin) — deep-dive Eq. 8, graded.
 
@@ -348,11 +442,17 @@ class LCSScorer:
         ``1.0`` = base is as coherent as the skeleton allows; ``0.0`` = base is at
         its own single-world floor (fully saturated conflict). Returns
         ``(normalized, log_z_max, log_z_min)``.
+
+        All three quantities are computed on networks built from the SAME resolved
+        per-atom priors. That matters once the priors are non-uniform: normalizing
+        a real-prior ``log Z`` against a uniform-prior ceiling (or floor) would
+        compare two different models.
         """
         if log_z is None:
             return None, None, None
 
-        priors = self._node_priors(result)
+        if priors is None:
+            priors = self._node_priors(result)
 
         cf_graph = _contradiction_free_graph(result.fact_graph)
         cf_network = build_markov_network(
@@ -361,7 +461,9 @@ class LCSScorer:
         log_z_max = self._log_z(cf_network)
 
         # Zmin = MAP world mass of the BASE network (provable lower bound on log Z).
-        log_z_min = self._log_map(result.markov_network)
+        # Rebuilt from the same priors as the base PR above, so the floor bounds the
+        # value it is compared against rather than a differently-primed network.
+        log_z_min = self._log_map(self._base_network(result, priors))
 
         if log_z_max is None or log_z_min is None:
             return None, log_z_max, log_z_min
@@ -379,20 +481,74 @@ class LCSScorer:
 
     # -- network construction helpers ----------------------------------------
 
-    def _node_priors(self, result: MiningResult) -> dict[str, float]:
-        """The per-atom priors used when (re)building a network from the graph."""
-        prior = float(result.config.get("prior", 0.5))
-        return {aid: prior for aid in result.atoms}
+    def _node_priors(
+        self,
+        result: MiningResult,
+        node_priors: dict[str, float] | None = None,
+        *,
+        uniform: float | None = None,
+    ) -> dict[str, float]:
+        """Resolve the per-atom priors used when (re)building a network.
 
-    def _base_network(self, result: MiningResult) -> MarkovNetwork:
+        Per atom, the first source that has a value wins:
+
+          1. an explicit ``node_priors`` entry -- what the factuality stage
+             supplies (see ``lcs.priors``);
+          2. the atom's own ``probability`` on the fact-graph node, i.e. whatever
+             the miner baked in (``RelationMiner`` writes its own prior there);
+          3. the uniform ``result.config["prior"]`` (default 0.5).
+
+        A ``uniform`` argument overrides every atom, which is how the public
+        ``prior=`` kwarg keeps working.
+
+        Because the miner writes the SAME value to both the fact-graph nodes and
+        ``config["prior"]``, sources (2) and (3) agree in the uniform case and the
+        resolved mapping is identical to the pre-per-atom-priors behaviour.
+
+        Args:
+            result: The mining result whose fact graph and config are read.
+            node_priors: Highest-precedence explicit priors, keyed by atom id.
+            uniform: A single prior applied to every atom, overriding all sources.
+
+        Returns:
+            ``{atom_id: prior}`` covering every atom in ``result.atoms``.
+        """
+        if uniform is not None:
+            return {aid: float(uniform) for aid in result.atoms}
+
+        fallback = float(result.config.get("prior", 0.5))
+        node_probability = {
+            node.id: node.probability for node in result.fact_graph.get_nodes()
+        }
+
+        resolved: dict[str, float] = {}
+        for aid in result.atoms:
+            if node_priors is not None and aid in node_priors:
+                resolved[aid] = float(node_priors[aid])
+            elif aid in node_probability:
+                resolved[aid] = float(node_probability[aid])
+            else:
+                resolved[aid] = fallback
+        return resolved
+
+    def _base_network(
+        self, result: MiningResult, priors: dict[str, float] | None = None
+    ) -> MarkovNetwork:
         """Rebuild the base coherence MRF from the fact graph.
 
         Rebuilding (rather than mutating ``result.markov_network``) gives a fresh
         network the derived variables can be appended to without disturbing the
-        mining result.
+        mining result, and applies the resolved per-atom priors.
+
+        Args:
+            result: The mining result holding the fact graph.
+            priors: The resolved per-atom priors; resolved from ``result`` when
+                omitted.
         """
+        if priors is None:
+            priors = self._node_priors(result)
         return build_markov_network(
-            result.fact_graph, use_priors=True, node_priors=self._node_priors(result)
+            result.fact_graph, use_priors=True, node_priors=priors
         )
 
 
