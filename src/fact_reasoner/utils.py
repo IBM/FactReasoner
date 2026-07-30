@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +12,167 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
-import numpy as np
+import re
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 import requests
 import tqdm
-import os
-import re
-import random
-import torch
-import transformers
-
-from typing import List, Union, Dict, Any
-
 
 LOOP_BUDGET = 5
+
+# Throttling defaults for batched LLM generation. The rate limit protects
+# against provider rate-limit (429) errors, while the concurrency ceiling bounds
+# the number of in-flight requests (and thus open sockets) at any given time.
+MAX_REQUESTS_PER_MINUTE = 1500
+MAX_CONCURRENT_REQUESTS = 32
+
+
+class AsyncRateLimiter:
+    """Token-bucket rate limiter for asyncio.
+
+    Allows at most ``rate`` acquisitions per ``period`` seconds, smoothing bursts
+    by refilling tokens continuously rather than in fixed windows. Safe to share
+    across concurrent coroutines running on the same event loop.
+    """
+
+    def __init__(self, rate: int, period: float = 60.0):
+        """
+        Args:
+            rate: int
+                Maximum number of acquisitions allowed per ``period`` seconds.
+            period: float
+                The length of the rate-limiting window, in seconds.
+        """
+        if rate <= 0:
+            raise ValueError("rate must be a positive integer")
+        if period <= 0:
+            raise ValueError("period must be a positive number of seconds")
+
+        self._rate = rate
+        self._period = period
+        self._allowance = float(rate)  # available tokens
+        self._last = None  # lazily initialized to the event-loop clock on first use
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        """Block until a token is available, then consume it."""
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            if self._last is None:
+                self._last = now
+
+            # Refill tokens proportionally to the elapsed time.
+            self._allowance += (now - self._last) * (self._rate / self._period)
+            self._last = now
+            if self._allowance > self._rate:
+                self._allowance = float(self._rate)  # never accumulate beyond capacity
+
+            if self._allowance < 1.0:
+                # Not enough budget yet; sleep until a single token is available.
+                sleep_for = (1.0 - self._allowance) * (self._period / self._rate)
+                await asyncio.sleep(sleep_for)
+                # We slept exactly long enough to earn and consume one token.
+                # Advance the clock past the sleep so the next caller does not
+                # re-credit the elapsed sleep time as additional tokens.
+                self._allowance = 0.0
+                self._last = asyncio.get_event_loop().time()
+            else:
+                self._allowance -= 1.0
+
+
+async def run_throttled(
+    factory: Callable[[Any], Awaitable[Any]],
+    items: list[Any],
+    *,
+    max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+    rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+    on_progress: Callable[[], None] | None = None,
+) -> list[Any]:
+    """Run one coroutine per item with bounded concurrency and rate limiting.
+
+    A fresh coroutine is created for each item via ``factory`` right before it
+    runs, so the rate limiter gates *when* each generation starts. Every item is
+    awaited independently: if one raises, the exception is captured and returned
+    in place instead of propagating, so a single failure never drops the
+    remaining results.
+
+    Args:
+        factory: Callable[[item], Awaitable]
+            Builds a fresh coroutine for a single item. Called once per item.
+        items: List[Any]
+            The inputs to process.
+        max_concurrency: int
+            Maximum number of coroutines running at any given time.
+        rate_per_minute: int
+            Maximum number of coroutines started per minute.
+        on_progress: Optional[Callable[[], None]]
+            If given, called once (with no arguments) each time an item's
+            coroutine completes — succeeds or fails. Fires in completion order,
+            not input order, so it is suitable for driving a progress bar. Must
+            not block.
+
+    Returns:
+        List[Any]: Results positionally aligned with ``items``. For any item
+        whose coroutine raised, the corresponding entry is the ``Exception``
+        object (never reordered, never dropped).
+    """
+    limiter = AsyncRateLimiter(rate_per_minute)
+    sem = asyncio.Semaphore(max_concurrency)
+
+    async def _one(item: Any) -> Any:
+        async with sem:
+            await limiter.acquire()
+            try:
+                return await factory(item)
+            except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
+                return e
+            finally:
+                if on_progress is not None:
+                    on_progress()
+
+    tasks = [asyncio.create_task(_one(item)) for item in items]
+    # _one never raises, so gather returns one result per item in order.
+    return await asyncio.gather(*tasks)
+
+
+async def gather_with_progress(
+    coros: list[Awaitable[Any]],
+    *,
+    on_progress: Callable[[], None] | None = None,
+) -> list[Any]:
+    """Await already-built coroutines concurrently, with a per-completion hook.
+
+    Like :func:`asyncio.gather` (results are returned in **input order**), but
+    calls ``on_progress`` once as each coroutine completes — so a progress bar
+    advances as work finishes rather than all at once at the barrier. Unlike
+    :func:`run_throttled`, this takes pre-built coroutines (no factory / rate
+    limiting): use it to add progress to an existing ``asyncio.gather`` call.
+
+    Args:
+        coros: The coroutines/awaitables to run concurrently.
+        on_progress: If given, called with no arguments each time one completes
+            (in completion order, not input order). Must not block. Exceptions
+            propagate as they would from ``asyncio.gather`` (default behavior).
+
+    Returns:
+        Results positionally aligned with ``coros``.
+    """
+
+    async def _indexed(index: int, coro: Awaitable[Any]):
+        result = await coro
+        if on_progress is not None:
+            on_progress()
+        return index, result
+
+    tasks = [asyncio.ensure_future(_indexed(i, c)) for i, c in enumerate(coros)]
+    results: list[Any] = [None] * len(tasks)
+    for completed in asyncio.as_completed(tasks):
+        index, result = await completed
+        results[index] = result
+    return results
 
 
 class dotdict(dict):
@@ -37,36 +183,8 @@ class dotdict(dict):
     __delattr__ = dict.__delitem__
 
 
-# GPU related utils
-def get_freer_gpu():
-    os.system("nvidia-smi -q -d Memory |grep -A6 GPU|grep Free >tmp_smi")
-    memory_available = [
-        int(x.split()[2]) + 5 * i
-        for i, x in enumerate(open("tmp_smi", "r").readlines())
-    ]
-    os.remove("tmp_smi")
-    return np.argmax(memory_available)
-
-
-def select_freer_gpu():
-    freer_gpu = str(get_freer_gpu())
-    print("Will use GPU: %s" % (freer_gpu))
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "" + freer_gpu
-    return freer_gpu
-
-
-# Set the random seed globally
-def set_seed(seed: int):
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    transformers.set_seed(seed)
-
-
 # String manipulation utils
-def join_segments(*args: Union[str, List[str]], separator: str = "\n\n\n") -> str:
+def join_segments(*args: str | list[str], separator: str = "\n\n\n") -> str:
     """Joins an unspecified number of strings using the separator."""
     all_segments = []
 
@@ -93,9 +211,8 @@ def punctuation_only_inside_quotes(text):
 
     # check each comma and semicolon
     for i, char in enumerate(text):
-        if char in [",", ";"]:
-            if not is_inside_quotes(i):
-                return False  # found punctuation outside quotes
+        if char in [",", ";"] and not is_inside_quotes(i):
+            return False  # found punctuation outside quotes
     return True
 
 
@@ -110,21 +227,23 @@ def extract_first_square_brackets(input_string: str) -> str:
 
 
 def extract_last_square_brackets(input_string: str) -> str:
-    """Extracts the last NLI label from square brackets in the input string.
+    """Extracts the contents of the LAST string between square brackets.
 
-    Matches 'neutral', 'entailment', or 'contradiction' (case-insensitive),
-    tolerating trailing punctuation inside the brackets.
+    Symmetric counterpart to :func:`extract_first_square_brackets`: returns the
+    raw contents of the last ``[...]`` pair, with surrounding whitespace and any
+    trailing punctuation stripped (so labels like ``[entailment.]`` normalize to
+    ``entailment``).
+
+    If no brackets are present, falls back to scanning for a bare NLI label word
+    (``neutral``/``entailment``/``contradiction``) so the NLI path stays robust
+    when the LLM drops the brackets entirely.
     """
-    matches = re.findall(
-        r"\[\s*(neutral|entailment|contradiction)\s*[.!?]?\s*\]",
-        input_string,
-        flags=re.IGNORECASE,
-    )
-    if matches:
-        return matches[-1].lower()
+    raw_result = re.findall(r"\[.*?\]", input_string, flags=re.DOTALL)
+    if raw_result:
+        return raw_result[-1][1:-1].strip().rstrip(".!?").strip()
 
-    # Fallback: scan input for any bare label word (handles cases where
-    # the LLM drops the brackets entirely)
+    # Fallback: scan input for any bare NLI label word (handles cases where
+    # the LLM drops the brackets entirely).
     words = re.findall(
         r"\b(neutral|entailment|contradiction)\b", input_string, flags=re.IGNORECASE
     )
@@ -132,6 +251,70 @@ def extract_last_square_brackets(input_string: str) -> str:
         return words[-1].lower()
 
     return ""
+
+
+# Matches a JSON-style NLI verdict `"label": "<value>"` (tolerant of surrounding
+# prose, code fences and extra keys). Group 1 is the label value.
+_NLI_JSON_LABEL_RE = re.compile(r'"label"\s*:\s*"([^"]+)"')
+
+
+def extract_nli_label_and_span(
+    input_string: str,
+) -> tuple[str, tuple[int, int] | None]:
+    """Extract the NLI label and the character span of the label text.
+
+    Auto-detects two output formats, in priority order:
+
+    1. **JSON** — a ``{"label": "<value>"}`` object (or a bare ``"label": "..."``
+       pair), tolerant of code fences, surrounding prose and extra keys. The last
+       occurrence wins. The returned span covers the ``<value>`` text.
+    2. **Brackets** — the last ``[...]`` pair (matching
+       :func:`extract_last_square_brackets`). The span covers the bracket
+       *interior*.
+    3. **Bare word** — a bare ``neutral``/``entailment``/``contradiction`` word
+       (last occurrence). The span covers that word.
+
+    The span lets callers (e.g. the NLI logprobs probability) align token-level
+    logprobs to exactly the label text this function reports, so the label and
+    its probability can never disagree.
+
+    Args:
+        input_string: The raw model output text.
+
+    Returns:
+        ``(label, span)`` where ``label`` is lower-cased and stripped (``""`` if
+        none found), and ``span`` is a ``(start, end)`` char range into
+        ``input_string`` for the label text (``None`` if no label found).
+    """
+    # 1. JSON: {"label": "..."} — last match wins.
+    json_matches = list(_NLI_JSON_LABEL_RE.finditer(input_string))
+    if json_matches:
+        m = json_matches[-1]
+        return m.group(1).strip().lower(), m.span(1)
+
+    # 2. Brackets: last [...] pair; span is the interior.
+    bracket_matches = list(re.finditer(r"\[.*?\]", input_string, flags=re.DOTALL))
+    if bracket_matches:
+        m = bracket_matches[-1]
+        start, end = m.span()
+        interior = input_string[start + 1 : end - 1]
+        # Mirror extract_last_square_brackets normalization for the label text.
+        label = interior.strip().rstrip(".!?").strip()
+        return label.lower(), (start + 1, end - 1)
+
+    # 3. Bare NLI label word — last occurrence.
+    word_matches = list(
+        re.finditer(
+            r"\b(neutral|entailment|contradiction)\b",
+            input_string,
+            flags=re.IGNORECASE,
+        )
+    )
+    if word_matches:
+        m = word_matches[-1]
+        return m.group(1).lower(), m.span(1)
+
+    return "", None
 
 
 def extract_last_wrapped_response(input_string: str) -> str:
@@ -155,29 +338,47 @@ def extract_first_code_block(input_string: str, ignore_language: bool = False) -
     return strip_string(match.group(1)) if match else ""
 
 
-def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
+def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
     """
-    Extract the log probabilities from the output metadata and compute the average log probability.
+    Extract the per-token log probabilities from the output metadata.
+
+    Returns the backend's token-level logprobs as a list of ``{"token", "logprob"}``
+    entries, normalized across the OpenAI / litellm / Bedrock response shapes.
+
+    Note: no tokens are dropped. Earlier versions stripped the last entry as an
+    "EOS" token, but OpenAI/vLLM ``content`` logprob arrays contain only emitted
+    content tokens (the stop is signaled by ``finish_reason``, not an extra
+    element), so blindly dropping the last entry deleted a real content token —
+    for NLI that was the token closing the ``[label]`` whose confidence is being
+    measured. Callers that want to ignore a trailing token must do so explicitly.
 
     Args:
         output: The output object containing the metadata with log probabilities.
 
     Returns:
-        A list of log probabilities extracted from the output.
+        A list of per-token logprob entries extracted from the output.
     """
 
     # handle different logprobs formats across backends
     logprobs_object = (
         output._meta.get("logprobs")
         or output._meta.get("chat_response", {}).get("logprobs")
-        or output._meta.get("oai_chat_response", {}).get("choices", [{}])[0].get("logprobs")
+        or output._meta.get("oai_chat_response", {})
+        .get("choices", [{}])[0]
+        .get("logprobs")
         or output._meta.get("litellm_chat_response", {}).get("logprobs")
-        or (output._meta.get("litellm_chat_response", {}) if isinstance(output._meta.get("litellm_chat_response"), dict) else {}).get("choices", [{}])[0].get("logprobs")
+        or (
+            output._meta.get("litellm_chat_response", {})
+            if isinstance(output._meta.get("litellm_chat_response"), dict)
+            else {}
+        )
+        .get("choices", [{}])[0]
+        .get("logprobs")
     )
 
-    assert (
-        logprobs_object is not None
-    ), "logprobs missing from response. Ensure the backend supports logprobs."
+    assert logprobs_object is not None, (
+        "logprobs missing from response. Ensure the backend supports logprobs."
+    )
 
     # handle openai/litllm logprobs format (dict with 'content' key) vs other backends (list of logprobs)
     if isinstance(logprobs_object, dict):
@@ -188,10 +389,9 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
         logprobs_object = logprobs_object["content"]
 
     if not isinstance(logprobs_object, list):
-
         # If logprobs is not a list, it may be a ChoiceLogprobs object from litellm. Try to extract logprobs from it and massage into the format expected by the _get_probability() functions in Summarizer and NLI extractor  (list of dicts with 'token' and 'logprob' keys).
         try:
-            from litellm.types.utils import ChoiceLogprobs
+            from litellm.types.utils import ChoiceLogprobs  # type: ignore
 
             if isinstance(logprobs_object, ChoiceLogprobs):
                 # logprobs_object = [
@@ -203,8 +403,7 @@ def extract_logprobs_from_output(output: Dict[str, Any]) -> List[Any]:
             raise ValueError(
                 "Unable to extract logprobs: logprobs is not a recognized format (one of: list, dict with 'content' key) and litellm is not installed to validate possible litellm.types.utils.ChoiceLogprobs format. Check backend response format."
             )
-    return logprobs_object[:-1]  # drop last token (EOS)
-
+    return logprobs_object
 
 
 def batcher(iterator, batch_size=4, progress=False):
@@ -311,7 +510,7 @@ def normalize_ws(text: str) -> str:
 
 
 def validate_json_code_block(
-    input_string: str, required_keys: List[str] = None
+    input_string: str, required_keys: list[str] | None = None
 ) -> bool:
     """
     Checks if the input string is a valid JSON dictionary.
@@ -327,7 +526,6 @@ def validate_json_code_block(
         then also checks if it is a dictionary and contains the required keys.
     """
     try:
-
         # Remove markdown fences if present
         cleaned = strip_code_fences(input_string)
         cleaned = normalize_ws(cleaned)
@@ -359,7 +557,4 @@ def validate_markdown_code_block(input_string: str) -> bool:
         bool: True if valid markdown code block, False otherwise.
     """
 
-    if input_string.strip().startswith("```") and input_string.strip().endswith("```"):
-        return True
-    else:
-        return False
+    return bool(input_string.strip().startswith("```") and input_string.strip().endswith("```"))

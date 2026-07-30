@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,22 +14,6 @@
 
 # FactCorrector pipeline
 
-import json
-import math
-import os
-import time
-import subprocess
-import uuid
-import logging
-
-from typing import Any, Dict
-
-from pgmpy.factors.discrete import DiscreteFactor
-from pgmpy.global_vars import logger
-from pgmpy.models import MarkovNetwork
-from pgmpy.readwrite import UAIWriter
-from mellea.backends import ModelOption
-from mellea.core import FancyLogger
 
 class FactCorrector:
     def __init__(self):

@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,19 +14,21 @@
 
 # Context summarization using LLMs
 
-import math
 import asyncio
+import math
+from typing import Any
+
 import mellea.stdlib.functional as mfuncs
-
-from typing import Any, Dict, List
 from mellea.backends import Backend
-from mellea.backends import ModelOption
+from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
-from mellea.core import ModelOutputThunk
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
 
-from fact_reasoner.utils import LOOP_BUDGET, extract_logprobs_from_output
+from fact_reasoner.utils import (
+    LOOP_BUDGET,
+    extract_logprobs_from_output,
+    run_throttled,
+)
 
 INSTRUCTION_WITHOUT_REF = """
 You are tasked with summarising a long paragraph into a shorter, more concise version. 
@@ -163,6 +164,7 @@ class ContextSummarizer:
     def __init__(
         self,
         backend: Backend,
+        show_progress: bool = False,
     ):
         """
         Initialize the ContextSummarizer.
@@ -170,8 +172,9 @@ class ContextSummarizer:
         Args:
             backend: str
                 The Mellea backend to use for LLM interaction.
-            with_reference: str
-                The reference paragraph that the context will be summarized to.
+            show_progress: bool
+                If True, ``run_batch`` shows a ``tqdm`` progress bar that advances
+                as each context summary completes. Default False.
         """
 
         # Safety checks
@@ -179,6 +182,7 @@ class ContextSummarizer:
             raise ValueError(
                 "Mellea backend is None. Please provide a valid Mellea backend."
             )
+        self.show_progress = show_progress
 
         # Initialize the extractor
         self.backend = backend
@@ -187,7 +191,7 @@ class ContextSummarizer:
         print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
@@ -201,7 +205,11 @@ class ContextSummarizer:
             float: The average log probability of the generated tokens.
         """
 
-        logprobs = extract_logprobs_from_output(output)
+        try:
+            logprobs = extract_logprobs_from_output(output)
+        except Exception as e:  # noqa: BLE001
+            print(f"[Summarizer] Failed to extract logprobs: {e}")
+            return 0.0
 
         avg_logprob = (
             sum(lp["logprob"] for lp in logprobs) / len(logprobs)
@@ -211,7 +219,7 @@ class ContextSummarizer:
 
         return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
 
-    def run(self, contexts: List[str], atom_text: str = None) -> List[Dict[str, Any]]:
+    def run(self, contexts: list[str], atom_text = None) -> list[dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
 
@@ -231,8 +239,8 @@ class ContextSummarizer:
             return future.result()
 
     async def run_batch(
-        self, contexts: List[str], atom_text: str = None
-    ) -> List[Dict[str, Any]]:
+        self, contexts: list[str], atom_text = None
+    ) -> list[dict[str, Any]]:
         """
         Summarize a list of contexts with respect to an atomic unit.
 
@@ -250,11 +258,11 @@ class ContextSummarizer:
             INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
         )
 
-        # Perform the instruction with validation
-        results = []
-        coroutines = []
-        for context in contexts:
-            coroutine = mfuncs.ainstruct(
+        # Build a fresh coroutine per context. run_throttled applies bounded
+        # concurrency plus a per-minute rate limit, and captures per-item
+        # exceptions so a single backend failure does not drop the rest.
+        def factory(context: str):
+            return mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -267,11 +275,31 @@ class ContextSummarizer:
                     "top_logprobs": 5,
                 },
             )
-            coroutines.append(coroutine)
 
-        results = []
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
-        for output in outputs:
+        print(f"[Summarizer] Running throttled batch of {len(contexts)} requests ...")
+        bar = None
+        on_progress = None
+        if self.show_progress and contexts:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(contexts), desc="Summarizing", unit="ctx")
+            on_progress = bar.update
+        try:
+            outputs = await run_throttled(factory, contexts, on_progress=on_progress)
+        finally:
+            if bar is not None:
+                bar.close()
+
+        # Results are positionally aligned with `contexts`; failures map to an
+        # empty summary so callers can zip(contexts, results) safely.
+        results: list[dict[str, Any]] = []
+        for context, output in zip(contexts, outputs):
+            if isinstance(output, Exception) or not getattr(output, "success", False):
+                if isinstance(output, Exception):
+                    print(f"[Summarizer] Batch item failed: {output}")
+                results.append({"context": context, "summary": "", "probability": 0.0})
+                continue
+
             cleaned = str(output).strip()
             results.append(
                 {

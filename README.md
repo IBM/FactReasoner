@@ -1,7 +1,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.5.7-red.svg)](https://github.com/IBM/FactReasoner)
-![Static Badge](https://img.shields.io/badge/mellea-0.4.0-blue?style=flat)
+[![Version](https://img.shields.io/badge/version-0.8.0-red.svg)](https://github.com/IBM/FactReasoner)
+![Static Badge](https://img.shields.io/badge/mellea-0.6.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
 # FactReasoner
@@ -60,7 +60,7 @@ FactReasoner addresses hallucination detection through a principled five-stage p
 
 2. **Decontextualization (Reviser)**: Atoms are revised to be standalone by resolving pronouns (e.g., "he", "she", "it"), demonstrative references (e.g., "this", "that"), unknown entities, and incomplete names. This ensures each atom can be verified without additional context.
 
-3. **Context Retrieval (Retriever)**: For each atom, relevant evidence is gathered from external knowledge sources. FactReasoner supports multiple retrieval backends:
+3. **Context Retrieval (SourceRetriever)**: For each atom, relevant evidence is gathered from external knowledge sources. FactReasoner supports multiple retrieval backends:
    - **Wikipedia**: Using LangChain's WikipediaRetriever
    - **Google Search**: Via Serper API with optional full-page content extraction
    - **ChromaDB**: Custom vector stores with semantic search
@@ -69,6 +69,12 @@ FactReasoner addresses hallucination detection through a principled five-stage p
    - **Entailment**: The context supports/implies the atom
    - **Contradiction**: The context contradicts the atom
    - **Neutral**: The context neither supports nor contradicts the atom
+
+   Each relationship carries a probability that becomes the strength of the corresponding edge in the Markov Network. Two methods are available for estimating it (`--nli-method`):
+   - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM / OpenAI).
+   - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama** and for **Claude via Anthropic's OpenAI-compatible endpoint**, neither of which exposes logprobs. No extra install needed.
+
+   The number of NLI calls is the dominant cost of a run; see [`--nli-mode fast`](#nli-cost-control-advanced) for how to reduce it.
 
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
    - **Nodes** represent atoms and contexts as binary random variables
@@ -79,13 +85,19 @@ FactReasoner addresses hallucination detection through a principled five-stage p
 
 ### Pipeline Versions
 
-FactReasoner supports three configurations based on how atom-context relationships are modeled:
+FactReasoner supports three graph configurations, based on how atom-context
+relationships are modeled, each selected with `--pipeline-version`:
 
-| Version | Relationships | Description |
-|---------|---------------|-------------|
-| **FR1** | Atom ↔ Own Contexts | Each atom is connected only to its `k` retrieved contexts. Simplest model with localized reasoning. |
-| **FR2** | Atom ↔ All Contexts | Duplicate contexts are removed, and each atom is connected to all `m` unique contexts. Enables cross-atom evidence sharing. |
-| **FR3** | FR2 + Context ↔ Context | Adds context-to-context relationships, allowing the model to reason about consistency between different evidence sources. |
+| Version | Flag | Relationships | Description |
+|---------|------|---------------|-------------|
+| **FR1** | `v1` | Atom ↔ Own Contexts | Each atom is connected only to its `k` retrieved contexts. Simplest model with localized reasoning. |
+| **FR2** | `v2` *(default)* | Atom ↔ All Contexts | Duplicate contexts are removed, and each atom is connected to all `m` unique contexts. Enables cross-atom evidence sharing. |
+| **FR3** | `v3` | FR2 + Context ↔ Context | Adds context-to-context relationships, allowing the model to reason about consistency between different evidence sources. |
+
+The version fixes the **graph shape**. How many NLI candidate pairs are scored
+*within* that shape is an independent axis, chosen by
+[`--nli-mode`](#nli-cost-control-advanced) — so any version can be run cheaply
+without changing the network structure.
 
 ### Why Probabilistic Reasoning?
 
@@ -102,6 +114,8 @@ Traditional factuality methods (like FactScore) make independent binary decision
 - **Multiple Knowledge Sources**: Support for Wikipedia, Google Search API, and ChromaDB vector stores
 - **Baseline Implementations**: Includes FactScore and VeriScore methods for comparison
 - **Modular Architecture**: Each component (atomizer, retriever, NLI, summarizer) can be configured independently
+- **Backend-agnostic NLI Uncertainty**: NLI relation probabilities can be estimated from token logprobs or via SIMBA-UQ self-consistency, enabling logprob-free backends such as Ollama and Claude
+- **Frontier Model Support**: Run any component against OpenAI or Claude through a single `"openai"` backend kind, with no provider-specific SDK
 - **Async Support**: Batch processing with asynchronous LLM calls for efficiency
 - **Caching**: SQLite-based caching for search API results
 
@@ -110,6 +124,16 @@ Traditional factuality methods (like FactScore) make independent binary decision
 ### From PyPi
 ```bash
 uv pip install fact_reasoner
+```
+
+The default install is self-contained: the **Ollama** backend (via `mellea`), the
+Google / Wikipedia / ChromaDB retrievers, SIMBA-UQ NLI uncertainty estimation, and
+the embedding similarity gate behind `--nli-mode fast`. Only backend-specific pieces
+are optional extras:
+
+```bash
+uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
+uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
 ```
 
 ### From Source
@@ -122,10 +146,21 @@ uv sync
 ```
 
 ### Internal IBM Usage
-For internal access to IBM RITS backends, install `mellea-ibm` as follows:
+The `rits` extra depends on `mellea-ibm`, which is an IBM-internal package not
+published to PyPI. Install it from its git source (requires access):
 ```bash
 pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ```
+
+### Backend / extras matrix
+
+| Backend / feature | Install | Notes |
+|-------------------|---------|-------|
+| Ollama (local)    | default | Works out of the box via `mellea`. |
+| vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
+| vLLM local server | `[vllm]` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
+| OpenAI / Claude   | default | Hosted frontier models via `mellea`'s `OpenAIBackend`. **No extra dependency** — Claude is reached over Anthropic's OpenAI-compatible endpoint, so the `anthropic` SDK is not required. Needs `OPENAI_API_KEY`. |
+| RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 
 ### Dependencies
 
@@ -133,6 +168,13 @@ FactReasoner requires:
 - Python >= 3.11
 - [`Merlin`](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
 - [`Mellea`](https://pypi.org/project/mellea/) - LLM interaction library
+
+Note that the base install pulls `sentence-transformers` (and therefore PyTorch),
+which is a large download on a fresh environment. It is a base rather than optional
+dependency for two reasons: `fact_reasoner.uncertainty` imports `numpy` at module
+scope on the eager import path, so even `fact-reasoner --help` needs it; and the
+embedding similarity gate backs `--nli-mode fast`, whose token-Jaccard fallback
+measurably loses real relations.
 
 ### Environment Variables
 
@@ -144,67 +186,494 @@ export SERPER_API_KEY=your_serper_api_key
 
 # Internal IBM inference service
 export RITS_API_KEY=your_RITS_api_key
+
+# vLLM (OpenAI-compatible) backend endpoint and key (optional):
+export VLLM_BASE_URL=http://localhost:8000/v1
+export VLLM_API_KEY=EMPTY
+
+# Hosted frontier models (--backend openai). For Claude, put your *Anthropic*
+# key here: the OpenAI SDK is what makes the call.
+export OPENAI_API_KEY=your_openai_or_anthropic_api_key
+export OPENAI_BASE_URL=https://api.openai.com/v1   # optional; see below for Claude
 ```
+
+### Choosing a Backend
+
+FactReasoner components take a generic Mellea `Backend`. The helper
+`fact_reasoner.build_backend(kind, ...)` constructs one of four backends:
+
+| `kind`     | Backend                     | Notes |
+|------------|-----------------------------|-------|
+| `"rits"`   | `RITSBackend`               | Remote IBM RITS service (requires `mellea-ibm` and `RITS_API_KEY`). |
+| `"ollama"` | `OllamaModelBackend`        | Local Ollama server (`http://localhost:11434`; model pulled on first use). |
+| `"vllm"`   | `OpenAIBackend`             | A [vLLM](https://docs.vllm.ai) server exposing an OpenAI-compatible API. |
+| `"openai"` | `OpenAIBackend`             | A hosted frontier model over the OpenAI API: OpenAI itself by default, or **Claude** via Anthropic's OpenAI-compatible endpoint. `base_url` selects the provider. |
+
+**Using a vLLM backend.** Launch vLLM with an explicit served model name, e.g.:
+
+```bash
+vllm serve meta-llama/Llama-3.3-70B-Instruct \
+    --served-model-name llama-3.3-70b --port 8000
+```
+
+Then build the backend (the served model name is required; the endpoint and key
+fall back to the `VLLM_BASE_URL` / `VLLM_API_KEY` environment variables):
+
+```python
+from fact_reasoner import build_backend
+
+backend = build_backend(
+    "vllm",
+    model_id="llama-3.3-70b",              # must match --served-model-name
+    base_url="http://localhost:8000/v1",   # or set VLLM_BASE_URL
+)
+```
+
+**Using a frontier model (OpenAI or Claude).** The `"openai"` kind talks to a
+hosted model over the OpenAI API. The endpoint — not the kind — selects the
+provider, because both speak the same wire protocol:
+
+```python
+from fact_reasoner import build_backend
+
+# OpenAI (default endpoint; key from OPENAI_API_KEY)
+backend = build_backend("openai")                      # defaults to gpt-5.1
+backend = build_backend("openai", model_id="gpt-4o")
+
+# Claude, via Anthropic's OpenAI-compatibility endpoint.
+# Put your Anthropic key in OPENAI_API_KEY (or pass api_key=...).
+backend = build_backend(
+    "openai",
+    model_id="claude-opus-5",
+    base_url="https://api.anthropic.com/v1/",
+)
+```
+
+Pass the provider's own model id (`gpt-4o`, `claude-opus-5`); these are not in the
+unified model catalog and are forwarded verbatim. API keys are read from the
+environment rather than accepted as CLI flags, since command lines are visible to
+other processes on the host.
+
+> **Limitations of Anthropic's compatibility layer.** Anthropic documents this
+> endpoint as a way to *test and compare* models, not as a production solution, and
+> it ignores two things FactReasoner relies on:
+>
+> - **`response_format`** — structured outputs are not schema-enforced, so
+>   component responses may occasionally fail to parse.
+> - **`logprobs`** — returned empty, so `--nli-method logprobs` would yield
+>   all-neutral NLI relations. **Use `--nli-method simbauq`** (SIMBA-UQ
+>   self-consistency), which works on any backend.
+>
+> It also ignores tool `strict`, `seed`, presence/frequency penalties and
+> `reasoning_effort`, clamps `temperature` to `[0,1]`, and requires `n=1`.
+> FactReasoner prints a warning when it detects this endpoint. Real OpenAI
+> supports both `response_format` and `logprobs`, so neither caveat applies there.
+
+The example scripts under `docs/examples/` accept a
+`--backend {rits,ollama,vllm,openai}` flag (with `--served-model` / `--base-url`
+for vLLM, and `--base-url` for Claude).
+
+## Running assessments (`fact-reasoner` CLI)
+
+Installing the package provides a **`fact-reasoner`** console command that runs
+any factuality assessor (FactReasoner or a baseline) with any backend, over
+either a single query/response pair or a jsonl dataset. (If you're running from a
+source checkout without installing, use `python -m fact_reasoner.cli` in place of
+`fact-reasoner`.)
+
+See all options with:
+
+```bash
+fact-reasoner --help
+```
+
+### Input modes
+
+The runner works in one of two mutually-exclusive modes.
+
+**1. Single query/response** — atomize the response, retrieve contexts, and
+score it on the fly. Prints the results dict to stdout, or writes JSON with
+`--output-file`:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --query "Tell me a bio of Lanny Flaherty" \
+    --response "Lanny Flaherty is an American actor born in 1949 ..." \
+    --topic "Lanny Flaherty" \
+    --merlin-path /path/to/merlin \
+    --output-file result.json
+```
+
+**2. Dataset file** — a `.jsonl` where each line already contains atoms and
+contexts (see [Input Format](#input-format-json)). Writes a **resumable** jsonl
+to `--output-dir` (re-running skips inputs already present in the output):
+
+```bash
+fact-reasoner \
+    --pipeline factscore --backend rits --model-id llama3 \
+    --input-file data/example.jsonl --output-dir results/ \
+    --dataset-name mydata
+```
+
+### Choosing the assessor (`--pipeline`)
+
+| Value | Assessor | Notes |
+|-------|----------|-------|
+| `factreasoner` (default) | Probabilistic FactReasoner | Requires `--merlin-path`. Version via `--pipeline-version` (default `v2`) — see below. |
+| `factscore` | FactScore baseline | — |
+| `veriscore` | VeriScore baseline | — |
+| `factverify` | FactVerify baseline | — |
+
+### Choosing the FactReasoner version (`--pipeline-version`)
+
+The version selects which relations enter the Markov Network:
+
+| Value | Relations | Duplicate contexts |
+|-------|-----------|--------------------|
+| `v1` | atom–context | kept |
+| `v2` *(default)* | atom–context | removed |
+| `v3` | atom–context **+** context–context | removed |
+
+This is the **graph shape** only. How many NLI candidate pairs get scored within
+that shape is an orthogonal axis — see [`--nli-mode`](#nli-cost-control-advanced) —
+so all six `{v1,v2,v3} × {all_pairs,fast}` combinations are available.
+
+**Why cost is a separate axis.** NLI relation extraction dominates the cost of a
+FactReasoner run: one LLM call per candidate pair, which is `A × C` for the
+atom–context phase and `C × (C−1)` for context–context. Because contexts are
+retrieved *per atom* (`C ≈ A × top_k`), that is quadratic in the number of atoms
+for `v2` and effectively cubic for `v3` — which is exactly why you may want a
+cheaper pair set without giving up `v3`'s richer graph.
+
+### Choosing the backend (`--backend`)
+
+| Value | How to point it at a model |
+|-------|----------------------------|
+| `ollama` (default) | `--model-id` = Ollama model name (needs a running Ollama server). |
+| `rits` | `--model-id` = shortcut (`llama3`, `granite4`, `mistral`, `gpt-oss`); needs `mellea-ibm` + `RITS_API_KEY`. |
+| `vllm` | `--served-model` + either `--model` (start a local server) or `--base-url` (connect to a running one) — see [below](#serving-a-local-model-on-a-gpu-cluster-lsf). |
+| `openai` | `--model-id` = provider model id (`gpt-4o`, `claude-opus-5`); needs `OPENAI_API_KEY`. Add `--base-url https://api.anthropic.com/v1/` for Claude — then also pass `--nli-method simbauq`, since that endpoint returns no logprobs. |
+
+### Common options
+
+| Option | Meaning |
+|--------|---------|
+| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`). |
+| `--top-k` | Contexts retrieved per atom (default 3). |
+| `--cache-dir` | Retriever cache directory. |
+| `--use-summarizer` | Summarize contexts (FactReasoner only). |
+| `--use-priors` | Use atom/context priors (FactReasoner only). |
+| `--use-query-builder` | Generate search queries with the QueryBuilder. |
+| `--output-file` | Single mode: write the results dict as JSON (else print). |
+| `--list-models` | Print the available unified model ids (and aliases) and exit. |
+| `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
+
+### SIMBA-UQ options (`--nli-method simbauq`)
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-similarity-metric {rouge,jaccard,sbert,difflib,levenshtein}` | How samples are compared when scoring consensus (default `rouge`). |
+| `--nli-confidence-method {aggregation,classifier}` | How sample confidence is scored. `aggregation` (default) is data-free; `classifier` uses a trained model. |
+| `--nli-classifier-path` | Trained SIMBA-UQ classifier (joblib) from `scripts/train_simbauq_nli.py`. Required with `--nli-confidence-method classifier`. |
+
+### NLI cost control (advanced)
+
+**`--nli-mode` is the headline knob** — see [Basic Usage](#basic-usage) for the
+copy-paste `all_pairs` / `fast` examples. This section is for going further:
+everything below `--nli-mode` in the table is a finer-grained override, and each
+`--nli-*` flag **overrides** whichever preset `--nli-mode` selected, so you can start
+from a mode and adjust one feature at a time.
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `all_pairs`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
+| `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score — **one knob**, where `--nli-mode` is a bundle. `all_pairs` scores every enumerated pair; `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. So `--nli-pair-policy provenance` is *weaker* than `--nli-mode fast`, which also turns on dedup, cascade and merged phases. |
+| `--nli-gate-threshold` | Similarity at or above which a pair survives the gate (default `0.20`, calibrated for the embedding backend). Deliberately low: a false prune silently weakens an atom's evidence, a false keep only costs money. |
+| `--nli-neighbor-window` | For `provenance`, how many atoms either side of an owning atom are also compared against a context (default `1`). |
+| `--nli-dedup-near-duplicates` / `--nli-dedup-threshold` | Collapse near-duplicate contexts before mining (default threshold `0.92`). Both dominant cost terms are super-linear in the context count, so this has quadratic leverage. |
+| `--nli-ctx-ctx-cascade` | Score one direction per context pair, mirroring only where the reverse can change the reconciled outcome. |
+| `--nli-merge-phases` | Issue the atom–context and first context–context batches as one fan-out. Latency only — the call count is unchanged. |
+| `--nli-cache-dir` | Cross-run NLI verdict cache. Score-neutral (a hit returns the verdict the model already produced), so re-scoring the same data costs no LLM calls. |
+
+`--nli-merge-phases` and `--nli-cache-dir` are score-neutral and safe to combine
+with an `all_pairs` run. Everything else prunes or collapses pairs and so relies on
+the embedding similarity gate — see the accuracy note below.
+
+> ⚠️ **`fast` trades recall for cost, and the trade is workload-dependent.**
+>
+> The prefilter's similarity gate uses `sentence-transformers` (a base dependency).
+> If the embedding model fails to load — offline, corrupt cache, incomplete install
+> — the gate degrades to token Jaccard and prints a warning. **Do not ignore it:**
+> on a 20-atom narrative that fallback lost 22 of 72 real relations at *any*
+> threshold and moved the factuality score by 0.05, because lexical overlap misses
+> pairs related through entities and events rather than shared vocabulary.
+>
+> The saving is not a constant either. The same policy that prunes ~5× across
+> unrelated subtopics prunes only ~1.2× on a narrative where every atom shares
+> characters, since the cross-product there holds little genuine waste. And the
+> models are not deterministic, so a single run cannot establish recall — take the
+> worst case over several. Use `all_pairs` when you need bit-for-bit reproducibility.
+
+Example — `v3`'s full graph at a fraction of the LLM calls, with a warm cache:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --pipeline-version v3 --merlin-path /path/to/merlin \
+    --nli-mode fast --nli-cache-dir .cache/nli \
+    --query "Who was Albert Einstein?" --response "..."
+```
+
+Example — the two flags are different axes, so combining them is meaningful rather
+than contradictory: take `fast`'s dedup / cascade / merged-phase savings, but put the
+*pair policy* back to scoring every pair, so no atom loses evidence:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --pipeline-version v3 --merlin-path /path/to/merlin \
+    --nli-mode fast --nli-pair-policy all_pairs \
+    --query "Who was Albert Einstein?" --response "..."
+```
+
+### Programmatic use
+
+The CLI is a thin wrapper over `fact_reasoner.FactualityRunner`:
+
+```python
+from fact_reasoner import FactualityRunner, build_backend
+
+backend = build_backend("ollama")  # or "rits" / "vllm" / "openai"
+runner = FactualityRunner(
+    backend,
+    pipeline="factscore",          # or "factreasoner" (+ merlin_path=...), etc.
+    service_type="google",
+)
+
+# FactReasoner with the cheap NLI prefilter (same graph, far fewer LLM calls).
+# Every --nli-* flag has a matching keyword argument and overrides the preset.
+runner = FactualityRunner(
+    backend,
+    pipeline="factreasoner",
+    pipeline_version="v3",         # "v1" / "v2" / "v3" -- graph shape
+    nli_mode="fast",               # "all_pairs" (default) or "fast" -- pair cost
+    merlin_path="/path/to/merlin",
+    nli_cache_dir=".cache/nli",    # score-neutral; re-runs cost no LLM calls
+)
+
+# Single item -> results dict
+results = runner.assess(
+    query="Tell me a bio of Lanny Flaherty",
+    response="Lanny Flaherty is an American actor ...",
+    topic="Lanny Flaherty",
+)
+print(results["factuality_score"])
+
+# Dataset file -> list of results (also written to output_dir)
+all_results = runner.assess_file(
+    "data/example.jsonl", "results/", dataset_name="mydata", model_id="granite4",
+)
+```
+
+### Serving a local model on a GPU cluster (LSF)
+
+To run everything inside a single LSF job — start a local vLLM server from
+locally-available (or HuggingFace) weights, run a factuality assessor against
+it, then tear the server down — pass `--backend vllm` together with `--model`
+(a weights path or HF id). The `scripts/run_vllm.bsub` template does this:
+
+```bash
+fact-reasoner --backend vllm \
+    --model /path/to/granite-4.1-8b --served-model granite-4.1-8b \
+    --input-file data/example.jsonl --output-dir results/ \
+    --pipeline factreasoner --merlin-path /path/to/merlin
+```
+
+The server can be tuned with `--tensor-parallel-size` (defaults to the detected GPU
+count), `--gpu-memory-utilization` (default `0.90`) and `--max-model-len`.
+
+When `--backend vllm` is given with `--model`, the server lifecycle is managed by
+`fact_reasoner.VLLMServer` (a context manager): it auto-detects the
+tensor-parallel size from `CUDA_VISIBLE_DEVICES` (which LSF sets from the `-gpu`
+request; A100 or H100), waits for readiness, and always cleans up. Without
+`--model`, `--backend vllm` connects as a client to an existing server at
+`--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have the
+`vllm` extra installed (`pip install "fact_reasoner[vllm]"`), with GPU
+drivers/CUDA available.**
 
 ## Quick Start
 
 ### Basic Usage
 
+Two things to pick before you run anything:
+
+- **`--pipeline-version {v1,v2,v3}`** — the graph shape (default `v2`).
+- **`--nli-mode {all_pairs,fast}`** — how many NLI candidate pairs get scored
+  (default `all_pairs`). This is the main cost dial: NLI is the dominant expense of a
+  run, and `fast` prunes the pairs it scores while keeping the same graph. How much it
+  saves depends on the workload (measured between ~1.2× and ~5×).
+
+They are independent, so any version pairs with either mode.
+
+#### 1. The CLI (easiest)
+
+**`all_pairs` — score every candidate pair.** The default: highest fidelity, and what
+reproduces the published numbers.
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --nli-mode all_pairs \
+    --merlin-path /path/to/merlin \
+    --query "Tell me a bio of Albert Einstein" \
+    --response "Albert Einstein was born in 1879 in Ulm, Germany. He developed the theory of relativity." \
+    --topic "Albert Einstein"
+```
+
+**`fast` — same assessment, far fewer LLM calls.** Only one line differs:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --nli-mode fast \
+    --merlin-path /path/to/merlin \
+    --query "Tell me a bio of Albert Einstein" \
+    --response "Albert Einstein was born in 1879 in Ulm, Germany. He developed the theory of relativity." \
+    --topic "Albert Einstein"
+```
+
+Since `all_pairs` is the default, you can simply omit `--nli-mode` to get it — the
+first command above is explicit for contrast, not because the flag is required.
+
+**How to confirm `fast` took effect.** On `--pipeline factreasoner` it prints a
+one-line banner at startup:
+
+```
+[FactReasoner] NLI pair policy: provenance (cascade=True, near-dup dedup=True)
+```
+
+`all_pairs` prints nothing, since it is the default behavior.
+
+> `--nli-mode` applies to `--pipeline factreasoner` only. The baseline pipelines
+> (`factscore`, `veriscore`, `factverify`) do not build a pair-scored NLI graph, so
+> the flag is accepted but has no effect there.
+
+#### 2. In Python — `FactualityRunner`
+
+The same two modes, as a one-word switch:
+
 ```python
-from mellea.backends import ModelOption
-from mellea_ibm.rits import RITSBackend, RITS
+from fact_reasoner import FactualityRunner, build_backend
 
-from fact_reasoner import FactReasoner
-from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever, Retriever
-from fact_reasoner.core.summarizer import ContextSummarizer
-from fact_reasoner.core.nli import NLIExtractor
-from fact_reasoner.core.query_builder import QueryBuilder
-
-# Initialize the LLM backend
-backend = RITSBackend(
-    RITS.LLAMA_3_3_70B_INSTRUCT,
-    model_options={ModelOption.MAX_NEW_TOKENS: 4096}
+runner = FactualityRunner(
+    build_backend("ollama"),        # or "rits" / "vllm" / "openai"
+    pipeline="factreasoner",
+    merlin_path="/path/to/merlin",
+    nli_mode="all_pairs",          # <-- or "fast"; the only line that changes
+    nli_cache_dir=".cache/nli",    # optional: re-scoring the same data is free
 )
 
-# Create pipeline components
+results = runner.assess(
+    query="Tell me a bio of Albert Einstein",
+    response="Albert Einstein was born in 1879 in Ulm, Germany. "
+             "He developed the theory of relativity.",
+    topic="Albert Einstein",
+)
+print(f"Factuality score: {results['factuality_score']:.2%}")
+```
+
+#### 3. Which mode should I use?
+
+| Mode | Use it when | Trade-off |
+|------|-------------|-----------|
+| `all_pairs` *(default)* | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
+| `fast` | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
+
+Start with `fast` while developing, then confirm final numbers with `all_pairs`.
+
+To tune the individual knobs behind these presets — or to combine them, e.g. `fast`
+with the pair policy put back to `all_pairs` — see
+[NLI cost control](#nli-cost-control-advanced).
+
+### Advanced: manual component wiring
+
+> The CLI and `FactualityRunner` above wire everything for you, including correct
+> async handling and retriever construction. Use the lower-level building blocks
+> below only if you need custom component wiring.
+
+```python
+import asyncio
+
+from fact_reasoner import build_backend, FactReasoner
+from fact_reasoner.core.atomizer import Atomizer
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
+from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli_config import get_pair_config
+from fact_reasoner.core.query_builder import QueryBuilder
+
+# Initialize the LLM backend via the factory. Switch providers by changing the
+# first argument:
+#   build_backend("ollama")                              # local Ollama (default)
+#   build_backend("rits")                                # IBM RITS (default model)
+#   build_backend("vllm", model_id="granite-4.1-8b",
+#                 base_url="http://localhost:8000/v1")   # vLLM client
+#   build_backend("openai", model_id="gpt-4o")           # OpenAI
+#   build_backend("openai", model_id="claude-opus-5",
+#                 base_url="https://api.anthropic.com/v1/")  # Claude
+# A default of MAX_NEW_TOKENS=4096 is applied unless you pass model_options.
+backend = build_backend("ollama")
+
+# Create pipeline components. All components take the same Mellea backend.
 query_builder = QueryBuilder(backend)
 atom_extractor = Atomizer(backend)
 atom_reviser = Reviser(backend)
-retriever = Retriever(
+context_summarizer = ContextSummarizer(backend)
+nli_extractor = NLIExtractor(backend)
+
+# The Retriever fetches evidence; ContextRetriever wraps it for parallel,
+# per-atom retrieval (optionally summarizing each context).
+retriever = SourceRetriever(
     service_type="google",  # or "wikipedia", "chromadb"
     top_k=5,
     fetch_text=True,
     query_builder=query_builder,
-    num_workers=4
-)
-context_summarizer = ContextSummarizer(backend)
-context_retriever = ContextRetriever(
-    retriever=retriever,
     num_workers=4,
 )
-nli_extractor = NLIExtractor(backend)
+context_retriever = ContextRetriever(
+    retriever=retriever,
+    context_summarizer=context_summarizer,
+    num_workers=4,
+)
 
-# Create the FactReasoner pipeline
+# Create the FactReasoner pipeline.
+#
+# NOTE the API difference: this low-level class takes a pair-config *object*, not
+# the `nli_mode` name that the CLI and FactualityRunner accept. Passing
+# `nli_mode="fast"` here is a TypeError -- resolve the name yourself instead:
 pipeline = FactReasoner(
     atom_extractor=atom_extractor,
     atom_reviser=atom_reviser,
     context_retriever=context_retriever,
     context_summarizer=context_summarizer,
     nli_extractor=nli_extractor,
-    merlin_path="/path/to/merlin"
+    merlin_path="/path/to/merlin",
+    nli_pair_config=get_pair_config("all_pairs"),  # or "fast"
 )
 
-# Build and score
-pipeline.build(
-    query="Tell me about Albert Einstein",
-    response="Albert Einstein was born in 1879 in Ulm, Germany...",
-    topic="Albert Einstein",
-    revise_atoms=True,
-    summarize_contexts=False
+# Build the graphical model. FactReasoner.build is async, so await it (here via
+# asyncio.run). This atomizes the response, retrieves contexts, and runs NLI.
+asyncio.run(
+    pipeline.build(
+        query="Tell me about Albert Einstein",
+        response="Albert Einstein was born in 1879 in Ulm, Germany...",
+        topic="Albert Einstein",
+        revise_atoms=True,
+        summarize_contexts=False,
+    )
 )
 
+# score() returns (results, marginals); the baselines return just results.
 results, marginals = pipeline.score()
 print(f"Factuality Score: {results['factuality_score']:.2%}")
 ```
@@ -219,12 +688,14 @@ with open("data/example.json", "r") as f:
     data = json.load(f)
 
 pipeline.from_dict_with_contexts(data)
-pipeline.build(
-    has_atoms=True,
-    has_contexts=True,
-    revise_atoms=False,
-    rel_atom_context=True,
-    rel_context_context=False
+asyncio.run(
+    pipeline.build(
+        has_atoms=True,
+        has_contexts=True,
+        revise_atoms=False,
+        rel_atom_context=True,
+        rel_context_context=False,
+    )
 )
 
 results, marginals = pipeline.score()
@@ -285,22 +756,20 @@ LLM Response
 Factuality Score + Per-atom Marginals
 ```
 
-### Pipeline Versions
+### Pipeline Versions (reference)
 
-FactReasoner supports three configurations:
-
-| Version | Description |
-|---------|-------------|
-| **FR1** | Each atom connected only to its own retrieved contexts |
-| **FR2** | All atoms connected to all unique contexts (removes duplicates) |
-| **FR3** | FR2 + context-to-context relationships |
+FR1 / FR2 / FR3 map to `--pipeline-version v1` / `v2` / `v3`, and pair-scoring cost
+is chosen separately with `--nli-mode`. See
+[Pipeline Versions](#pipeline-versions) for the graph shapes and
+[NLI cost control](#nli-cost-control-advanced) for the cost axis — kept in one place
+so the two descriptions cannot drift.
 
 ## Context Retrieval Options
 
 ### Google Search (via Serper API)
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="google",
     top_k=5,
     cache_dir="/path/to/cache.db",  # SQLite cache for API results
@@ -312,7 +781,7 @@ retriever = Retriever(
 ### Wikipedia
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="wikipedia",
     top_k=3
 )
@@ -321,7 +790,7 @@ retriever = Retriever(
 ### ChromaDB Vector Store
 
 ```python
-retriever = Retriever(
+retriever = SourceRetriever(
     service_type="chromadb",
     collection_name="my_documents",
     persist_dir="/path/to/chroma_db",
@@ -429,6 +898,11 @@ FactReasoner/
 │   ├── __init__.py           # Package exports
 │   ├── assessor.py           # Main FactReasoner class
 │   ├── corrector.py          # FactCorrector (WIP)
+│   ├── runner.py             # FactualityRunner (single + dataset runner)
+│   ├── cli.py                # `fact-reasoner` console entrypoint
+│   ├── backends.py           # build_backend() factory (ollama/rits/vllm/openai)
+│   ├── serving.py            # VLLMServer (local vLLM server manager)
+│   ├── markov_network.py     # Markov network + UAI serialization
 │   ├── fact_graph.py         # Graph representation
 │   ├── search_api.py         # Google Search API wrapper
 │   ├── utils.py              # Utility functions
@@ -440,16 +914,15 @@ FactReasoner/
 │   │   ├── nli.py            # NLI extraction
 │   │   ├── query_builder.py  # Search query generation
 │   │   └── utils.py          # Core utilities
-│   ├── baselines/
-│   │   ├── factscore.py      # FactScore implementation
-│   │   ├── factverify.py     # FactVerify implementation
-│   │   └── veriscore.py      # VeriScore implementation
-│   └── eval/
-│       └── eval_dataset.py   # Dataset evaluation utilities
+│   └── baselines/
+│       ├── factscore.py      # FactScore implementation
+│       ├── factverify.py     # FactVerify implementation
+│       └── veriscore.py      # VeriScore implementation
+├── scripts/
+│   └── run_vllm.bsub         # LSF template (local vLLM + fact-reasoner)
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples
-│   │   ├── correctors/       # Corrector examples
 │   │   └── core/             # Core component examples
 │   └── papers/               # Papers
 ├── tests/                    # Unit tests
@@ -463,7 +936,8 @@ See the `docs/` directory for complete examples:
 
 | Example | Description |
 |---------|-------------|
-| `docs/examples/assessors/ex_factreasoner.py` | Full FactReasoner pipeline |
+| `docs/examples/assessors/ex_factreasoner_all_pairs.py` | Full FactReasoner pipeline, `all_pairs` NLI mode (highest fidelity) |
+| `docs/examples/assessors/ex_factreasoner_fast.py` | Full FactReasoner pipeline, `fast` NLI mode (fewer LLM calls) |
 | `docs/examples/assessors/ex_factscore.py` | FactScore baseline |
 | `docs/examples/assessors/ex_veriscore.py` | VeriScore baseline |
 | `docs/examples/core/ex_atomizer.py` | Standalone atomization |

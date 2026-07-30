@@ -15,10 +15,9 @@
 
 """Unit tests for fact_reasoner.search_api module."""
 
-import pytest
 import tempfile
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from fact_reasoner.search_api import SearchAPI
 
@@ -33,30 +32,20 @@ class TestSearchAPIInit:
             assert api.serper_key == "test_key"
 
     def test_init_with_cache(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
-            temp_path = f.name
-
-        try:
+        # SearchAPI treats cache_dir as a directory (it creates my_database.db
+        # inside it), so use a temp directory, not a temp file.
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
                 assert api.do_caching is True
-                assert api.cache_dir == temp_path
+                assert api.cache_dir == temp_dir
                 assert api.similarity_threshold == 90
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
     def test_init_custom_similarity_threshold(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path, similarity_threshold=80)
+                api = SearchAPI(cache_dir=temp_dir, similarity_threshold=80)
                 assert api.similarity_threshold == 80
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
 
 class TestSearchAPIGetSnippets:
@@ -71,12 +60,12 @@ class TestSearchAPIGetSnippets:
                     {
                         "title": "Test Title",
                         "snippet": "Test snippet text",
-                        "link": "https://example.com"
+                        "link": "https://example.com",
                     }
                 ]
             }
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert "test query" in results
@@ -91,7 +80,7 @@ class TestSearchAPIGetSnippets:
 
             mock_response = {"organic": []}
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert "test query" in results
@@ -108,7 +97,7 @@ class TestSearchAPIGetSnippets:
                     ]
                 }
 
-            with patch.object(api, 'get_search_res', side_effect=mock_search):
+            with patch.object(api, "get_search_res", side_effect=mock_search):
                 results = api.get_snippets(["query1", "query2"])
 
                 assert "query1" in results
@@ -121,18 +110,19 @@ class TestSearchAPICaching:
     """Tests for SearchAPI caching functionality."""
 
     def test_save_to_cache(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
 
                 response = {
                     "searchParameters": {"q": "test"},
                     "organic": [
-                        {"title": "Test", "snippet": "Snippet", "link": "http://test.com"}
-                    ]
+                        {
+                            "title": "Test",
+                            "snippet": "Snippet",
+                            "link": "http://test.com",
+                        }
+                    ],
                 }
 
                 # Save to cache
@@ -140,17 +130,11 @@ class TestSearchAPICaching:
 
                 # Verify it was saved (no exception raised)
                 assert True
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
     def test_save_empty_results_not_cached(self):
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
-            temp_path = f.name
-
-        try:
+        with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
-                api = SearchAPI(cache_dir=temp_path)
+                api = SearchAPI(cache_dir=temp_dir)
 
                 response = {"organic": []}
 
@@ -160,9 +144,6 @@ class TestSearchAPICaching:
                 # Try to retrieve - should be None
                 result = api._get_from_cache("test query")
                 assert result is None
-        finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
 
 
 class TestSearchAPIHelpers:
@@ -178,7 +159,7 @@ class TestSearchAPIHelpers:
                 ]
             }
 
-            with patch.object(api, 'get_search_res', return_value=mock_response):
+            with patch.object(api, "get_search_res", return_value=mock_response):
                 results = api.get_snippets(["test query"])
 
                 assert results["test query"][0]["title"] == "Title Only"

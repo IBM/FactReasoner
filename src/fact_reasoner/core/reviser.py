@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,18 +15,22 @@
 # Atomic fact decontextualization using LLMs
 
 import json
-import asyncio
-import mellea.stdlib.functional as mfuncs
+from typing import Any
 
-from typing import Any, Dict, List
+import mellea.stdlib.functional as mfuncs
 from mellea.backends import Backend
+from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
 
 # Local imports
-from fact_reasoner.utils import validate_json_code_block, strip_code_fences, LOOP_BUDGET
+from fact_reasoner.utils import (
+    LOOP_BUDGET,
+    run_throttled,
+    strip_code_fences,
+    validate_json_code_block,
+)
 
 INSTRUCTION_REVISER = """
 Instructions:
@@ -152,9 +155,9 @@ class Reviser:
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
-    def run(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    def run(self, units: list[str], response: str) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -167,37 +170,63 @@ class Reviser:
             List[str]: A dictionary containing the revised atomic unit.
         """
 
-        # Perform the instruction with validation
+        # Perform the instruction with validation. A backend/network error is
+        # raised out of mfuncs.instruct (validation failures instead come back
+        # as a result with success=False), so guard the whole generation and
+        # keep the result list positionally aligned with `units`.
         results = []
         for atom_text in units:
-            output = mfuncs.instruct(
-                INSTRUCTION_REVISER,
-                context=SimpleContext(),
-                backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must be a valid JSON code block.",
-                        validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(
-                                s, required_keys=["revised_unit", "rationale"]
-                            )
-                        ),
-                    )
-                ],
-                user_variables={"atomic_unit": atom_text, "response": response},
-                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True,
-            )
+            try:
+                output = mfuncs.instruct(
+                    INSTRUCTION_REVISER,
+                    context=SimpleContext(),
+                    backend=self.backend,
+                    requirements=[
+                        check(
+                            "The output must be a valid JSON code block.",
+                            validation_fn=simple_validate(
+                                lambda s: validate_json_code_block(
+                                    s, required_keys=["revised_unit", "rationale"]
+                                )
+                            ),
+                        )
+                    ],
+                    user_variables={"atomic_unit": atom_text, "response": response},
+                    strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
+                    return_sampling_results=True,
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"[Reviser] Generation failed: {e}")
+                results.append(self._fallback(atom_text))
+                continue
 
-            if output.success:
-                cleaned = strip_code_fences(str(output))
-                revised_unit = json.loads(cleaned)
-                revised_unit.update({"text": atom_text})
-                results.append(revised_unit)
+            results.append(self._parse_output(output, atom_text))
 
         return results
 
-    async def run_batch(self, units: List[str], response: str) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _fallback(atom_text: str) -> dict[str, Any]:
+        """Build a no-op revision result for a failed/unparsable atom."""
+        return {"revised_unit": atom_text, "rationale": "", "text": atom_text}
+
+    def _parse_output(self, output: Any, atom_text: str) -> dict[str, Any]:
+        """Map a single sampling result to a revised-unit dict.
+
+        On any failure (unsuccessful sampling or unparsable output) the original
+        atom is returned unchanged so downstream callers that read
+        ``result[i]["revised_unit"]`` positionally never crash.
+        """
+        if not getattr(output, "success", False):
+            return self._fallback(atom_text)
+        try:
+            revised_unit = json.loads(strip_code_fences(str(output)))
+            revised_unit.update({"text": atom_text})
+            return revised_unit
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[Reviser] Failed to parse output: {e}")
+            return self._fallback(atom_text)
+
+    async def run_batch(self, units: list[str], response: str) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -210,11 +239,11 @@ class Reviser:
             List[str]: A dictionary containing the revised atomic unit.
         """
 
-        # Perform the instruction with validation
-
-        coroutines = []
-        for atom_text in units:
-            coroutine = mfuncs.ainstruct(
+        # Build a fresh coroutine per atom. run_throttled applies bounded
+        # concurrency plus a per-minute rate limit, and captures per-item
+        # exceptions so a single backend failure does not drop the rest.
+        def factory(atom_text: str):
+            return mfuncs.ainstruct(
                 INSTRUCTION_REVISER,
                 context=SimpleContext(),
                 backend=self.backend,
@@ -232,16 +261,18 @@ class Reviser:
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
             )
-            coroutines.append(coroutine)
 
-        results = []
-        print(f"[Reviser] Awaiting for async execution ...")
-        outputs = await asyncio.gather(*(coroutines[i] for i in range(len(coroutines))))
-        for output in outputs:
-            if output.success:
-                cleaned = strip_code_fences(str(output))
-                revised_unit = json.loads(cleaned)
-                revised_unit.update({"text": atom_text})
-                results.append(revised_unit)
+        print(f"[Reviser] Running throttled batch of {len(units)} requests ...")
+        outputs = await run_throttled(factory, units)
+
+        # Results are positionally aligned with `units`; every atom yields one
+        # entry (a no-op revision on failure), so callers can index result[i].
+        results: list[dict[str, Any]] = []
+        for atom_text, output in zip(units, outputs):
+            if isinstance(output, Exception):
+                print(f"[Reviser] Batch item failed: {output}")
+                results.append(self._fallback(atom_text))
+                continue
+            results.append(self._parse_output(output, atom_text))
 
         return results

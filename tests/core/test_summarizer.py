@@ -15,6 +15,7 @@
 
 """Unit tests for fact_reasoner.core.summarizer module."""
 
+import math
 import pytest
 from unittest.mock import MagicMock, patch
 from fact_reasoner.core.summarizer import (
@@ -81,22 +82,28 @@ class TestContextSummarizerGetProbability:
 
         summarizer = ContextSummarizer(backend=mock_backend)
 
+        # Mirrors the real OpenAI backend shape: mellea stores
+        # ChatCompletion.model_dump() under "oai_chat_response", so logprobs
+        # live at oai_chat_response["choices"][0]["logprobs"]["content"].
         mock_output = MagicMock()
         mock_output._meta = {
             "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "Test", "logprob": -0.5},
-                        {"token": "summary", "logprob": -0.3},
-                        {"token": "<eos>", "logprob": -0.1},  # EOS token
-                    ]
-                }
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [
+                                {"token": "Test", "logprob": -0.5},
+                                {"token": "summary", "logprob": -0.3},
+                            ]
+                        }
+                    }
+                ]
             }
         }
 
         result = summarizer._get_probability(mock_output)
-        # exp((-0.5 + -0.3) / 2) = exp(-0.4) ≈ 0.67
-        assert 0 < result <= 1
+        # Averages all content tokens: exp((-0.5 + -0.3) / 2) = exp(-0.4) ≈ 0.67
+        assert result == pytest.approx(math.exp(-0.4))
 
     def test_get_probability_handles_empty(self):
         mock_backend = MagicMock()
@@ -107,120 +114,202 @@ class TestContextSummarizerGetProbability:
         mock_output = MagicMock()
         mock_output._meta = {
             "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "<eos>", "logprob": -0.1},  # Only EOS
-                    ]
-                }
+                "choices": [
+                    {
+                        "logprobs": {
+                            "content": [],  # no tokens
+                        }
+                    }
+                ]
             }
         }
 
         result = summarizer._get_probability(mock_output)
-        assert result == 0.0  # Infinite logprob returns 0
+        assert result == 0.0  # empty logprobs -> avg over 0 tokens -> 0.0
 
 
 class TestContextSummarizerRunBatch:
-    """Tests for ContextSummarizer.run_batch method."""
+    """Tests for ContextSummarizer.run_batch method.
+
+    These patch mfuncs.ainstruct with a real async function (run_batch now
+    routes through the throttled run_throttled helper rather than a bare
+    asyncio.gather) and stub _get_probability, which is exercised separately.
+    """
+
+    @staticmethod
+    def _mk_output(text: str, success: bool = True):
+        out = MagicMock()
+        out.success = success
+        out.result = MagicMock()
+        out.__str__ = lambda self: text
+        return out
 
     @pytest.mark.asyncio
     async def test_run_batch_with_atom_text(self):
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        mock_result = MagicMock()
-        mock_result.__str__ = lambda self: "This is a summary of the context."
-        mock_result._meta = {
-            "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "This", "logprob": -0.2},
-                        {"token": "<eos>", "logprob": -0.1},
-                    ]
-                }
-            }
-        }
-
-        mock_output = MagicMock()
-        mock_output.success = True
-        mock_output.result = mock_result
+        output = self._mk_output("This is a summary of the context.")
 
         async def mock_ainstruct(*args, **kwargs):
-            return mock_output
+            return output
 
-        with patch('src.fact_reasoner.core.summarizer.mfuncs.ainstruct', side_effect=mock_ainstruct):
-            with patch('asyncio.gather', return_value=[mock_output]):
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
+            with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
                 summarizer = ContextSummarizer(backend=mock_backend)
                 results = await summarizer.run_batch(
                     contexts=["Long context text here."],
-                    atom_text="Test atom about something."
+                    atom_text="Test atom about something.",
                 )
 
-                assert isinstance(results, list)
-                assert len(results) == 1
-                assert "summary" in results[0]
-                assert "probability" in results[0]
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert results[0]["summary"] == "This is a summary of the context."
+        assert results[0]["probability"] == 0.5
+        # Context is aligned to its input (fixes the loop-capture bug).
+        assert results[0]["context"] == "Long context text here."
 
     @pytest.mark.asyncio
     async def test_run_batch_without_atom_text(self):
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        mock_result = MagicMock()
-        mock_result.__str__ = lambda self: "General summary."
-        mock_result._meta = {
-            "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "General", "logprob": -0.2},
-                        {"token": "<eos>", "logprob": -0.1},
-                    ]
-                }
-            }
-        }
+        output = self._mk_output("General summary.")
 
-        mock_output = MagicMock()
-        mock_output.success = True
-        mock_output.result = mock_result
+        async def mock_ainstruct(*args, **kwargs):
+            return output
 
-        with patch('asyncio.gather', return_value=[mock_output]):
-            summarizer = ContextSummarizer(backend=mock_backend)
-            # When atom_text is None, should use INSTRUCTION_WITHOUT_REF
-            results = await summarizer.run_batch(
-                contexts=["Context to summarize."],
-                atom_text=None
-            )
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
+            with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
+                summarizer = ContextSummarizer(backend=mock_backend)
+                # When atom_text is None, should use INSTRUCTION_WITHOUT_REF
+                results = await summarizer.run_batch(
+                    contexts=["Context to summarize."], atom_text=None
+                )
 
-            assert len(results) == 1
+        assert len(results) == 1
 
     @pytest.mark.asyncio
     async def test_run_batch_handles_none_summary(self):
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        mock_result = MagicMock()
-        mock_result.__str__ = lambda self: "None"
-        mock_result._meta = {
-            "oai_chat_response": {
-                "logprobs": {
-                    "content": [
-                        {"token": "None", "logprob": -0.1},
-                        {"token": "<eos>", "logprob": -0.1},
-                    ]
-                }
-            }
-        }
+        output = self._mk_output("None")
 
-        mock_output = MagicMock()
-        mock_output.success = True
-        mock_output.result = mock_result
+        async def mock_ainstruct(*args, **kwargs):
+            return output
 
-        with patch('asyncio.gather', return_value=[mock_output]):
-            summarizer = ContextSummarizer(backend=mock_backend)
-            results = await summarizer.run_batch(
-                contexts=["Irrelevant context."],
-                atom_text="Unrelated atom."
-            )
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
+            with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
+                summarizer = ContextSummarizer(backend=mock_backend)
+                results = await summarizer.run_batch(
+                    contexts=["Irrelevant context."], atom_text="Unrelated atom."
+                )
 
-            assert len(results) == 1
-            # "None" should be converted to empty string
-            assert results[0]["summary"] == ""
+        assert len(results) == 1
+        # "None" should be converted to empty string
+        assert results[0]["summary"] == ""
+
+    @pytest.mark.asyncio
+    async def test_run_batch_single_failure_does_not_drop_others(self):
+        """One raised call maps to an empty summary; results stay aligned."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        good = self._mk_output("Good summary.")
+
+        async def mock_ainstruct(*args, **kwargs):
+            if kwargs["user_variables"]["context"] == "bad":
+                raise RuntimeError("boom")
+            return good
+
+        with patch(
+            "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+            side_effect=mock_ainstruct,
+        ):
+            with patch.object(ContextSummarizer, "_get_probability", return_value=0.5):
+                summarizer = ContextSummarizer(backend=mock_backend)
+                results = await summarizer.run_batch(
+                    contexts=["ok1", "bad", "ok2"], atom_text="atom"
+                )
+
+        assert len(results) == 3
+        assert results[0]["summary"] == "Good summary."
+        assert results[1]["summary"] == ""
+        assert results[1]["probability"] == 0.0
+        assert results[1]["context"] == "bad"
+        assert results[2]["summary"] == "Good summary."
+
+
+class TestContextSummarizerProgressBar:
+    """Tests for the show_progress bar over run_batch."""
+
+    @staticmethod
+    def _mk_output(text: str):
+        out = MagicMock()
+        out.success = True
+        out.result = MagicMock()
+        out.__str__ = lambda self: text
+        return out
+
+    def test_init_default_show_progress_false(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+        assert ContextSummarizer(backend=b).show_progress is False
+
+    @pytest.mark.asyncio
+    async def test_progress_bar_built_with_context_total(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+
+        async def mock_ainstruct(*args, **kwargs):
+            return self._mk_output("summary")
+
+        bar = MagicMock()
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+                side_effect=mock_ainstruct,
+            ):
+                with patch.object(
+                    ContextSummarizer, "_get_probability", return_value=0.5
+                ):
+                    summarizer = ContextSummarizer(backend=b, show_progress=True)
+                    results = await summarizer.run_batch(
+                        contexts=["c0", "c1", "c2"], atom_text="atom"
+                    )
+
+        assert len(results) == 3
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3
+        bar.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_bar_when_progress_disabled(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+
+        async def mock_ainstruct(*args, **kwargs):
+            return self._mk_output("summary")
+
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.core.summarizer.mfuncs.ainstruct",
+                side_effect=mock_ainstruct,
+            ):
+                with patch.object(
+                    ContextSummarizer, "_get_probability", return_value=0.5
+                ):
+                    summarizer = ContextSummarizer(backend=b)
+                    await summarizer.run_batch(contexts=["c0"], atom_text="atom")
+        tqdm_ctor.assert_not_called()

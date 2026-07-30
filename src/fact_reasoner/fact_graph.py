@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +16,9 @@
 
 import json
 from pathlib import Path
-from typing import List
-from tqdm import tqdm
+
 import networkx as nx
+from tqdm import tqdm
 
 
 class Node:
@@ -58,8 +57,10 @@ class Edge:
             target: str
                 The `to` node ID in the graph.
             type: str
-                The NLI relation type represented by the edge. Allowed values are:
-                ["entailment", "contradiction", "equivalence"].
+                The relation type represented by the edge. Allowed values are:
+                ["entailment", "contradiction", "equivalence", "exclusive",
+                "co_necessity"]. The last two are the Level-1 couplings added in
+                the revised coherence deep-dive (exactly-one / at-least-one).
             probability: float
                 The probability value associated with the NLI relation type.
             link: str
@@ -70,6 +71,8 @@ class Edge:
             "entailment",
             "contradiction",
             "equivalence",
+            "exclusive",
+            "co_necessity",
         ], f"Unknown relation type: {type}."
         assert link in [
             "context_atom",
@@ -94,9 +97,9 @@ class FactGraph:
 
     def __init__(
         self,
-        atoms: List = None,
-        contexts: List = None,
-        relations: List = None,
+        atoms: list | None = None,
+        contexts: list | None = None,
+        relations: list | None = None,
     ):
         """
         FactGraph constructor.
@@ -177,7 +180,7 @@ class FactGraph:
 
         with open(json_file, "r") as f:
             data = json.load(f)
-            assert "nodes" in data and "edges" in data, f"Uknown graph format"
+            assert "nodes" in data and "edges" in data, "Uknown graph format"
 
             self.nodes = {}
             for node in tqdm(data["nodes"], desc="Nodes"):
@@ -206,7 +209,7 @@ class FactGraph:
         Generate a networkx.DiGraph representation of the fact graph.
         """
         G = nx.DiGraph()
-        for _, node in self.nodes.items():
+        for node in self.nodes.values():
             if node.type == "atom":
                 G.add_node(node.id, color="green")
             else:
@@ -218,21 +221,21 @@ class FactGraph:
                     edge.source,
                     edge.target,
                     color="green",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
             elif edge.type == "contradiction":
                 G.add_edge(
                     edge.source,
                     edge.target,
                     color="red",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
             elif edge.type == "equivalence":
                 G.add_edge(
                     edge.source,
                     edge.target,
                     color="blue",
-                    label="{:.4g}".format(edge.probability),
+                    label=f"{edge.probability:.4g}",
                 )
 
         return G
@@ -269,7 +272,7 @@ class FactGraph:
 
     def dump(self):
         print("Nodes:")
-        for i, n in self.nodes.items():
+        for n in self.nodes.values():
             print(n)
         print("Edges:")
         for e in self.edges:
@@ -279,10 +282,9 @@ class FactGraph:
 
 
 if __name__ == "__main__":
-
     d = Path(__file__).resolve().parent.parent.parent
     filename = Path.joinpath(d, "examples", "simple.json")
     fg = FactGraph()
     fg.from_json(json_file=filename)
     fg.dump()
-    print(f"Done.")
+    print("Done.")

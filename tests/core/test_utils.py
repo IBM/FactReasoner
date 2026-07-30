@@ -25,6 +25,7 @@ from fact_reasoner.core.utils import (
     remove_duplicated_atoms,
     remove_duplicated_contexts,
     is_relevant_context,
+    _reconcile_ctx_pair,
 )
 
 
@@ -92,7 +93,7 @@ class TestContext:
             text="Context text",
             title="Title",
             link="https://example.com",
-            snippet="Snippet"
+            snippet="Snippet",
         )
         assert context.id == "c0"
         assert context.text == "Context text"
@@ -153,7 +154,7 @@ class TestContext:
             text="Text",
             title="Title",
             link="https://example.com",
-            snippet="Snippet"
+            snippet="Snippet",
         )
         json_data = context.to_json()
         assert json_data["id"] == "c0"
@@ -175,7 +176,7 @@ class TestRelation:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.source == context
         assert relation.target == atom
@@ -191,7 +192,7 @@ class TestRelation:
             target=atom,
             type="contradiction",
             probability=0.85,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.get_type() == "contradiction"
         assert relation.get_probability() == 0.85
@@ -204,7 +205,7 @@ class TestRelation:
             target=context2,
             type="equivalence",
             probability=0.95,
-            link="context_context"
+            link="context_context",
         )
         assert relation.type == "equivalence"
         assert relation.link == "context_context"
@@ -217,7 +218,7 @@ class TestRelation:
             target=atom,
             type="neutral",
             probability=0.5,
-            link="context_atom"
+            link="context_atom",
         )
         assert relation.type == "neutral"
 
@@ -230,7 +231,7 @@ class TestRelation:
                 target=atom,
                 type="invalid_type",
                 probability=0.5,
-                link="context_atom"
+                link="context_atom",
             )
 
     def test_relation_invalid_link(self):
@@ -242,7 +243,7 @@ class TestRelation:
                 target=atom,
                 type="entailment",
                 probability=0.5,
-                link="invalid_link"
+                link="invalid_link",
             )
 
     def test_relation_str(self):
@@ -253,7 +254,7 @@ class TestRelation:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         result = str(relation)
         assert "c0" in result
@@ -368,3 +369,73 @@ class TestIsRelevantContext:
     def test_irrelevant_atom_statement(self):
         context = "The atom statement cannot be verified."
         assert is_relevant_context(context) is False
+
+
+class TestReconcileCtxPair:
+    """Tests for _reconcile_ctx_pair (context-context direction reconciliation)."""
+
+    @staticmethod
+    def _ctx(cid):
+        return Context(id=cid, atom=None, text=f"text-{cid}", title="t", link="l", snippet="s")
+
+    def _rel(self, ci, cj, typ, prob):
+        return Relation(
+            source=ci, target=cj, type=typ, probability=prob, link="context_context"
+        )
+
+    def test_neutral_does_not_hide_entailment(self):
+        # Regression: a high-probability neutral in one direction must NOT hide a
+        # genuine entailment in the other (previously the entailment was dropped).
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 0.99)
+        r2 = self._rel(cj, ci, "entailment", 0.60)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "entailment"
+        assert out.get_probability() == pytest.approx(0.60)
+        # Orientation is the kept (entailment) direction.
+        assert out.source.id == "c1" and out.target.id == "c0"
+
+    def test_failed_call_neutral_one_does_not_hide_contradiction(self):
+        # A failed NLI call maps to neutral@1.0; it must not delete a real
+        # contradiction found in the other direction.
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 1.0)
+        r2 = self._rel(cj, ci, "contradiction", 0.70)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "contradiction"
+        assert out.get_probability() == pytest.approx(0.70)
+
+    def test_both_entailment_becomes_equivalence(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.80)
+        r2 = self._rel(cj, ci, "entailment", 0.90)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "equivalence"
+        # Keeps the stronger direction's probability.
+        assert out.get_probability() == pytest.approx(0.90)
+
+    def test_both_neutral_stays_neutral(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "neutral", 0.60)
+        r2 = self._rel(cj, ci, "neutral", 0.70)
+        out = _reconcile_ctx_pair(r1, r2)
+        # Caller drops neutrals; here we just confirm it stays neutral.
+        assert out.get_type() == "neutral"
+
+    def test_both_non_neutral_keeps_higher_probability(self):
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.60)
+        r2 = self._rel(cj, ci, "contradiction", 0.90)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "contradiction"
+        assert out.get_probability() == pytest.approx(0.90)
+
+    def test_one_non_neutral_kept_regardless_of_probability(self):
+        # Even if the neutral direction has a lower probability, the non-neutral
+        # one is kept (meaning-first, not probability-first).
+        ci, cj = self._ctx("c0"), self._ctx("c1")
+        r1 = self._rel(ci, cj, "entailment", 0.30)
+        r2 = self._rel(cj, ci, "neutral", 0.10)
+        out = _reconcile_ctx_pair(r1, r2)
+        assert out.get_type() == "entailment"
+        assert out.get_probability() == pytest.approx(0.30)

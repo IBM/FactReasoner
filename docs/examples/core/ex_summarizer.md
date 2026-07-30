@@ -10,33 +10,48 @@ This example shows how to use the `ContextSummarizer` core component to summariz
 
 ## Prerequisites
 
-- A configured Mellea RITS backend (requires `mellea` and `mellea_ibm` packages)
+One of the following Mellea backends, selected with the `--backend` flag:
+
+- **RITS** (default) — a configured remote IBM RITS backend (requires the `mellea` and `mellea_ibm` packages plus RITS credentials/config).
+- **Ollama** — a local [Ollama](https://ollama.com) server running at `http://localhost:11434` (requires the `mellea` package; the model is pulled automatically on first use).
 
 ## Key Components
 
 - **`ContextSummarizer`** — Summarizes context passages using an LLM backend
-- **`with_reference`** — Flag controlling whether summaries are generated relative to an atomic claim
-- **`run(contexts, atom)`** — Summarizes a list of contexts, optionally relative to a given atom
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server, `openai` → `OpenAIBackend` for a hosted frontier model: OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`)
+- **`run_batch(contexts, atom_text)`** — Summarizes a list of contexts concurrently (throttled and failure-resilient). Passing an `atom_text` summarizes each context relative to that claim; passing `None` summarizes independently.
 
 ## How It Works
 
-The script demonstrates two modes controlled by the `with_ref` flag:
+Whether summaries are generated relative to a reference atom is controlled by the `atom_text` argument to `run_batch` (not by a constructor flag). The example exposes this via the `--with-reference` command-line flag:
 
-**With reference (`with_ref=True`):**
+1. Create a Mellea backend selected via `--backend` (RITS by default; also `ollama`, `vllm`, or `openai` for a hosted frontier model). When `--served-model` is omitted, every backend resolves the same shared default model, Granite 4 Micro.
+2. Instantiate the `ContextSummarizer` with the backend.
+
+**With reference (`--with-reference`):**
 1. Define an atomic claim (e.g., "The city council has approved new regulations for electric scooters.").
-2. Provide a list of contexts — including relevant, partially relevant, and irrelevant passages.
-3. Call `summarizer.run(contexts, atom)` to summarize each context relative to the claim.
+2. Provide a list of contexts — including relevant, partially relevant, empty, and irrelevant passages.
+3. Call `asyncio.run(summarizer.run_batch(contexts, atom))` to summarize each context relative to the claim.
 4. Each result contains the original context, its summary, and a relevance probability.
 
-**Without reference (`with_ref=False`):**
+**Without reference (default):**
 1. Provide a single context passage.
-2. Call `summarizer.run([context], None)` to summarize independently.
+2. Call `asyncio.run(summarizer.run_batch([context], None))` to summarize independently.
 3. Each result contains the context, its summary, and a probability score.
 
 ## Usage
 
-```python
+Run with the default RITS backend (no reference):
+
+```bash
 python docs/examples/core/ex_summarizer.py
+```
+
+Summarize relative to a reference atom, or use a local Ollama server:
+
+```bash
+python docs/examples/core/ex_summarizer.py --with-reference
+python docs/examples/core/ex_summarizer.py --backend ollama
 ```
 
 ## Output

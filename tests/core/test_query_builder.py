@@ -68,9 +68,14 @@ class TestQueryBuilderRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '```\n"Einstein" theory of relativity fact check\n```'
+        mock_output.__str__ = lambda self: (
+            '```\n"Einstein" theory of relativity fact check\n```'
+        )
 
-        with patch('src.fact_reasoner.core.query_builder.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.query_builder.mfuncs.instruct",
+            return_value=mock_output,
+        ):
             qb = QueryBuilder(backend=mock_backend)
             result = qb.run("Einstein developed the theory of relativity.")
 
@@ -85,7 +90,10 @@ class TestQueryBuilderRun:
         mock_output = MagicMock()
         mock_output.success = False
 
-        with patch('src.fact_reasoner.core.query_builder.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.query_builder.mfuncs.instruct",
+            return_value=mock_output,
+        ):
             qb = QueryBuilder(backend=mock_backend)
             original_text = "Original statement text"
             result = qb.run(original_text)
@@ -99,9 +107,12 @@ class TestQueryBuilderRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '```\ntest query\n```'
+        mock_output.__str__ = lambda self: "```\ntest query\n```"
 
-        with patch('src.fact_reasoner.core.query_builder.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.query_builder.mfuncs.instruct",
+            return_value=mock_output,
+        ):
             qb = QueryBuilder(backend=mock_backend)
             result = qb.run("Test statement")
 
@@ -114,14 +125,34 @@ class TestQueryBuilderRun:
 
         mock_output = MagicMock()
         mock_output.success = True
-        mock_output.__str__ = lambda self: '''```
+        mock_output.__str__ = lambda self: (
+            """```
 "Apple foldable iPhone 2026" rumor OR announcement site:apple.com
-```'''
+```"""
+        )
 
-        with patch('src.fact_reasoner.core.query_builder.mfuncs.instruct', return_value=mock_output):
+        with patch(
+            "src.fact_reasoner.core.query_builder.mfuncs.instruct",
+            return_value=mock_output,
+        ):
             qb = QueryBuilder(backend=mock_backend)
             result = qb.run("Apple will release a foldable iPhone in 2026")
 
             assert "Apple" in result
             assert "foldable" in result
             assert "OR" in result
+
+    def test_run_returns_original_on_generation_exception(self):
+        """A backend/network error during generation must not crash run()."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        with patch(
+            "src.fact_reasoner.core.query_builder.mfuncs.instruct",
+            side_effect=RuntimeError("backend exploded"),
+        ):
+            qb = QueryBuilder(backend=mock_backend)
+            original_text = "Original statement text"
+            result = qb.run(original_text)
+
+            assert result == original_text

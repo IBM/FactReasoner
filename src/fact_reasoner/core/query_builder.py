@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +15,14 @@
 # Query builder for atoms to retrieve results from Google and/or Wikipedia
 
 import mellea.stdlib.functional as mfuncs
-
 from mellea.backends import Backend
+from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
-from mellea.core import FancyLogger
 
 # Local imports
-from fact_reasoner.utils import validate_markdown_code_block, strip_code_fences
+from fact_reasoner.utils import strip_code_fences, validate_markdown_code_block
 
 INSTRUCTION_QUERY_BUILDER = """
 Instructions:
@@ -105,7 +103,7 @@ class QueryBuilder:
         print(f"[QueryBuilder] Using Mellea backend: {self.backend.model_id}")
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def run(self, text: str) -> str:
         """
@@ -118,27 +116,37 @@ class QueryBuilder:
             dict: A dictionary containing the query string.
         """
 
-        # Perform the instruction with validation
-        output = mfuncs.instruct(
-            INSTRUCTION_QUERY_BUILDER,
-            context=SimpleContext(),
-            backend=self.backend,
-            requirements=[
-                check(
-                    "The output must be wrapped with markdown code fences.",
-                    validation_fn=simple_validate(
-                        lambda s: validate_markdown_code_block(s)
-                    ),
-                )
-            ],
-            user_variables={"statement_text": text},
-            strategy=RejectionSamplingStrategy(loop_budget=3),
-            return_sampling_results=True,
-        )
+        # Perform the instruction with validation. A backend/network error is
+        # raised out of mfuncs.instruct (validation failures instead come back
+        # as a result with success=False), so guard the whole generation and
+        # fall back to the original text.
+        try:
+            output = mfuncs.instruct(
+                INSTRUCTION_QUERY_BUILDER,
+                context=SimpleContext(),
+                backend=self.backend,
+                requirements=[
+                    check(
+                        "The output must be wrapped with markdown code fences.",
+                        validation_fn=simple_validate(
+                            lambda s: validate_markdown_code_block(s)
+                        ),
+                    )
+                ],
+                user_variables={"statement_text": text},
+                strategy=RejectionSamplingStrategy(loop_budget=3),
+                return_sampling_results=True,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[QueryBuilder] Generation failed: {e}")
+            return text  # the original text
 
-        # The output is a validated JSON string; parse it
-        if output.success:
-            cleaned = strip_code_fences(str(output))
-            return cleaned
-        else:
+        if not output.success:
+            return text  # the original text
+
+        # The output is a validated query wrapped in code fences; strip them.
+        try:
+            return strip_code_fences(str(output))
+        except Exception as e:  # noqa: BLE001
+            print(f"[QueryBuilder] Failed to parse output: {e}")
             return text  # the original text

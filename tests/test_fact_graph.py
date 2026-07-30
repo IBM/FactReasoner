@@ -64,7 +64,7 @@ class TestEdge:
             target="a0",
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         assert edge.source == "c0"
         assert edge.target == "a0"
@@ -78,7 +78,7 @@ class TestEdge:
             target="a0",
             type="contradiction",
             probability=0.85,
-            link="context_atom"
+            link="context_atom",
         )
         assert edge.type == "contradiction"
 
@@ -88,7 +88,7 @@ class TestEdge:
             target="c1",
             type="equivalence",
             probability=0.95,
-            link="context_context"
+            link="context_context",
         )
         assert edge.type == "equivalence"
         assert edge.link == "context_context"
@@ -100,7 +100,7 @@ class TestEdge:
                 target="a0",
                 type="neutral",  # neutral is not allowed in Edge
                 probability=0.5,
-                link="context_atom"
+                link="context_atom",
             )
 
     def test_edge_invalid_link(self):
@@ -110,7 +110,7 @@ class TestEdge:
                 target="a0",
                 type="entailment",
                 probability=0.5,
-                link="invalid_link"
+                link="invalid_link",
             )
 
     def test_edge_str(self):
@@ -119,7 +119,7 @@ class TestEdge:
             target="a0",
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         result = str(edge)
         assert "c0" in result
@@ -163,7 +163,7 @@ class TestFactGraph:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         graph = FactGraph(atoms=[atom], contexts=[context], relations=[relation])
 
@@ -189,7 +189,7 @@ class TestFactGraph:
             target="a0",
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         graph.add_edge(edge)
         assert len(graph.get_edges()) == 1
@@ -206,12 +206,12 @@ class TestFactGraph:
                     "to": "a0",
                     "relation": "entailment",
                     "probability": 0.85,
-                    "link": "context_atom"
+                    "link": "context_atom",
                 }
-            ]
+            ],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(json_data, f)
             temp_path = f.name
 
@@ -236,7 +236,7 @@ class TestFactGraph:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         graph = FactGraph(atoms=[atom], contexts=[context], relations=[relation])
 
@@ -266,7 +266,7 @@ class TestFactGraph:
             target=atom,
             type="entailment",
             probability=0.9,
-            link="context_atom"
+            link="context_atom",
         )
         graph = FactGraph(atoms=[atom], contexts=[context], relations=[rel_entail])
         digraph = graph.as_digraph()

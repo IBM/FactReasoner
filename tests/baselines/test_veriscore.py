@@ -15,8 +15,7 @@
 
 """Unit tests for fact_reasoner.baselines.veriscore module."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from fact_reasoner.baselines.veriscore import VeriScore, INSTRUCTION_VERISCORE
 
 
@@ -45,7 +44,7 @@ class TestVeriScoreInit:
             backend=mock_backend,
             atom_extractor=mock_atomizer,
             atom_reviser=mock_reviser,
-            context_retriever=mock_retriever
+            context_retriever=mock_retriever,
         )
 
         assert scorer.atom_extractor == mock_atomizer
@@ -186,7 +185,7 @@ class TestVeriScoreFromDict:
                     "text": "Einstein was a physicist.",
                     "original": "Einstein was a physicist.",
                     "label": "S",
-                    "contexts": ["c0"]
+                    "contexts": ["c0"],
                 }
             ],
             "contexts": [
@@ -195,9 +194,9 @@ class TestVeriScoreFromDict:
                     "title": "Einstein Wikipedia",
                     "text": "Albert Einstein was a theoretical physicist.",
                     "snippet": "German physicist",
-                    "link": "https://example.com"
+                    "link": "https://example.com",
                 }
-            ]
+            ],
         }
 
         scorer.from_dict_with_contexts(data)
@@ -222,13 +221,13 @@ class TestVeriScoreFromDict:
                     "id": "a0",
                     "text": "Atom text",
                     "original": "Original",
-                    "contexts": ["c0", "c1"]
+                    "contexts": ["c0", "c1"],
                 }
             ],
             "contexts": [
                 {"id": "c0", "title": "Title 0", "text": "Text 0"},
                 {"id": "c1", "title": "Title 1", "text": "Text 1"},
-            ]
+            ],
         }
 
         scorer.from_dict_with_contexts(data)
@@ -260,3 +259,62 @@ class TestVeriScoreToJson:
         assert result["input"] == "Test query"
         assert result["output"] == "Test response"
         assert result["topic"] == "Test topic"
+
+
+class TestVeriScoreProgressBar:
+    """Tests for the show_progress bar over predict_atom_labels."""
+
+    @staticmethod
+    def _scorer(show_progress):
+        b = MagicMock()
+        b.model_id = "test-model"
+        s = VeriScore(backend=b, show_progress=show_progress)
+        from fact_reasoner.core.base import Atom
+
+        s.atoms = {f"a{i}": Atom(id=f"a{i}", text=f"atom {i}") for i in range(3)}
+        return s
+
+    def test_init_default_show_progress_false(self):
+        b = MagicMock()
+        b.model_id = "test-model"
+        assert VeriScore(backend=b).show_progress is False
+
+    def test_progress_bar_built_with_atom_total(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[Supported]")
+
+        bar = MagicMock()
+        scorer = self._scorer(show_progress=True)
+        with patch("tqdm.tqdm", return_value=bar) as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.veriscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                labels, _ = asyncio.run(scorer.predict_atom_labels())
+
+        assert len(labels) == 3
+        tqdm_ctor.assert_called_once()
+        assert tqdm_ctor.call_args.kwargs["total"] == 3
+        assert bar.update.call_count == 3
+        bar.close.assert_called_once()
+
+    def test_no_bar_when_progress_disabled(self):
+        import asyncio
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        async def fake_ainstruct(*args, **kwargs):
+            return SimpleNamespace(result="[Supported]")
+
+        scorer = self._scorer(show_progress=False)
+        with patch("tqdm.tqdm") as tqdm_ctor:
+            with patch(
+                "src.fact_reasoner.baselines.veriscore.mfuncs.ainstruct",
+                side_effect=fake_ainstruct,
+            ):
+                asyncio.run(scorer.predict_atom_labels())
+        tqdm_ctor.assert_not_called()

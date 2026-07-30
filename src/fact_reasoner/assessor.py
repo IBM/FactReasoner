@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright 2023-present the International Business Machines.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,35 +15,31 @@
 # FactReasoner pipeline
 
 import json
-import math
-import os
-import time
-import subprocess
-import uuid
 import logging
+import math
+import time
+from collections.abc import Callable
+from typing import Any
 
-from typing import Any, Dict
-
-from pgmpy.factors.discrete import DiscreteFactor
-from pgmpy.global_vars import logger
-from pgmpy.models import MarkovNetwork
-from pgmpy.readwrite import UAIWriter
-from mellea.core import FancyLogger
+from mellea.core import MelleaLogger
 
 # Local imports
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.reviser import Reviser
-from fact_reasoner.core.retriever import ContextRetriever
-from fact_reasoner.core.summarizer import ContextSummarizer
-from fact_reasoner.core.nli import NLIExtractor
-from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.core.base import (
-    PRIOR_PROB_ATOM,
-    PRIOR_PROB_CONTEXT,
     Atom,
     Context,
     Relation,
 )
+from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli_cache import NLIVerdictCache
+from fact_reasoner.core.nli_config import FAITHFUL as NLI_FAITHFUL
+from fact_reasoner.core.nli_pairs import (
+    dedup_contexts_near,
+    prune_dangling_context_refs,
+)
+from fact_reasoner.core.retriever import ContextRetriever
+from fact_reasoner.core.reviser import Reviser
+from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.utils import (
     build_atoms,
     build_contexts,
@@ -53,11 +48,22 @@ from fact_reasoner.core.utils import (
     remove_duplicated_atoms,
     remove_duplicated_contexts,
 )
+from fact_reasoner.fact_graph import FactGraph
+from fact_reasoner.factors import (
+    build_markov_network as _build_markov_network_shared,
+)
+from fact_reasoner.factors import (
+    edge_factor_values as _edge_factor_values_shared,
+)
+from fact_reasoner.factors import (
+    pairwise_prior as _pairwise_prior_shared,
+)
+from fact_reasoner.inference import run_merlin as _run_merlin_shared
 
 # Set logging levels
-# pgmpy set the root logger to INFO -- changed it to WARNING
 logging.getLogger("httpx").setLevel(logging.ERROR)
-logger.setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 
 class FactReasoner:
@@ -68,9 +74,11 @@ class FactReasoner:
         nli_extractor: NLIExtractor = None,
         context_retriever: ContextRetriever = None,
         context_summarizer: ContextSummarizer = None,
-        merlin_path: str = None,
+        merlin_path: str | None = None,
         use_priors: bool = True,
-        early_exit_evaluator: callable = None,
+        early_exit_evaluator: Callable | None = None,
+        nli_pair_config=None,
+        nli_cache_dir: str | None = None,
     ):
         """
         Initialize the FactReasoner pipeline.
@@ -91,13 +99,23 @@ class FactReasoner:
             use_priors: bool
                 Flag indicating that atom and context priors are used in the factor definition.
             early_exit_evaluator: callable
-                A callable that, if provided, allows early exit from the reasoning process. Eg: a single call to the Granite Guardian 3.2 5b sft detect model. Should match the following signature:
+                A callable that, if provided, allows early exit from the reasoning process.
+                Eg: a single call to the Granite Guardian 3.2 5b sft detect model.
+                Should match the following signature:
 
                 def early_exit_evaluator(
                     context: str,
                     response: str
                 ) -> Dict{"continue_pipeline_execution": bool, **additional_items}:
                         ...
+            nli_pair_config: NLIPairConfig
+                Which NLI candidate pairs to score, and how. Defaults to
+                `FAITHFUL`, which enumerates every pair exactly as the original
+                implementation did.
+            nli_cache_dir: str
+                Directory for the cross-run NLI verdict cache. None disables it.
+                Caching returns previously computed verdicts, so it changes cost
+                and never results.
         """
 
         # Initialize FactReasoner
@@ -117,7 +135,7 @@ class FactReasoner:
         self.merlin_path = merlin_path
 
         # Safety checks
-        assert self.merlin_path is not None, f"Path to `merlin` cannot be None."
+        assert self.merlin_path is not None, "Path to `merlin` cannot be None."
 
         print(f"[FactReasoner] Using merlin at: {self.merlin_path}")
         print(f"[FactReasoner] Using atom/context priors: {self.use_priors}")
@@ -130,6 +148,26 @@ class FactReasoner:
         self.num_summarized_contexts = 0
         self.timing = {}
 
+        # NLI relation-extraction cost control. The default reproduces the
+        # original all-pairs behavior; `nli_stats` records what was scored versus
+        # pruned so a run reports its own saving.
+        self.nli_pair_config = (
+            nli_pair_config if nli_pair_config is not None else NLI_FAITHFUL
+        )
+        self.nli_stats = {}
+        self.nli_cache = (
+            NLIVerdictCache(nli_cache_dir) if nli_cache_dir else None
+        )
+        if self.nli_cache is not None:
+            print(f"[FactReasoner] Using NLI verdict cache at: {nli_cache_dir}")
+        if not self.nli_pair_config.is_faithful:
+            print(
+                "[FactReasoner] NLI pair policy: "
+                f"{self.nli_pair_config.policy} "
+                f"(cascade={self.nli_pair_config.ctx_ctx_single_direction_cascade}, "
+                f"near-dup dedup={self.nli_pair_config.dedup_near_duplicates})"
+            )
+
         # The fact graph and probabilistic model (Markov Network)
         self.fact_graph = None
         self.markov_network = None
@@ -138,7 +176,7 @@ class FactReasoner:
         self.labels_human = None
 
         # Disable Mellea logging
-        FancyLogger.get_logger().setLevel(FancyLogger.ERROR)
+        MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
     def from_fact_graph(self, fact_graph: FactGraph):
         """
@@ -190,7 +228,7 @@ class FactReasoner:
 
     def from_dict_with_contexts(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ):
         """
         Initialize FactReasoner from a dict containing both atoms and contexts.
@@ -204,7 +242,7 @@ class FactReasoner:
         self.response = data["output"]
         self.topic = data.get("topic", None)
 
-        print(f"[FactReasoner] Reading the atoms ...")
+        print("[FactReasoner] Reading the atoms ...")
         gold_labels = []
         atom_ids = []
         self.atoms = {}
@@ -223,13 +261,13 @@ class FactReasoner:
             atom2contexts[aid] = contexts
 
         print(f"[FactReasoner] Atoms found: {len(self.atoms.keys())}")
-        for _, atom in self.atoms.items():
+        for _, atom in self.atoms.items():  # noqa: PERF102
             print(f"[FactReasoner] {atom}")
 
         self.labels_human = dict(zip(atom_ids, gold_labels))
         print(f"[FactReasoner] Labels found: {self.labels_human}")
 
-        print(f"[FactReasoner] Reading the contexts ...")
+        print("[FactReasoner] Reading the contexts ...")
         for context_dict in data["contexts"]:
             cid = context_dict["id"]
             title = context_dict["title"]
@@ -255,9 +293,9 @@ class FactReasoner:
 
     async def build(
         self,
-        query: str = None,
-        response: str = None,
-        topic: str = None,
+        query: str | None = None,
+        response: str | None = None,
+        topic: str | None = None,
         has_atoms: bool = False,
         has_contexts: bool = False,
         revise_atoms: bool = False,
@@ -310,47 +348,51 @@ class FactReasoner:
         self.summarize_contexts = summarize_contexts  # default is False
 
         # Safety checks
-        assert self.nli_extractor is not None, f"The NLI extractor must be created."
+        assert self.nli_extractor is not None, "The NLI extractor must be created."
 
-        print(f"[FactReasoner] Building the pipeline ...")
+        print("[FactReasoner] Building the pipeline ...")
         _build_start = time.perf_counter()
 
         # Build the atoms
-        if has_atoms == False:
-            print(f"[FactReasoner] Extracting the atoms ...")
+        if not has_atoms:
+            print("[FactReasoner] Extracting the atoms ...")
 
-            assert (
-                self.atom_extractor is not None
-            ), f"The atom extractor must be created."
+            assert self.atom_extractor is not None, (
+                "The atom extractor must be created."
+            )
 
             _t = time.perf_counter()
             self.atoms = build_atoms(
                 response=self.response, atom_extractor=self.atom_extractor
             )
             self.timing["atom_extraction"] = time.perf_counter() - _t
-            print(f"[FactReasoner][TIMING] Atom extraction: {self.timing['atom_extraction']:.4f}s")
+            print(
+                f"[FactReasoner][TIMING] Atom extraction: {self.timing['atom_extraction']:.4f}s"
+            )
             self.revise_atoms = True  # revise the atoms if newly created
             print(f"[FactReasoner] Extracted {len(self.atoms)} atoms.")
-            for aid in self.atoms.keys():
+            for aid in self.atoms:
                 print(f"[FactReasoner] {self.atoms[aid]}")
 
         # Safety checks
-        assert (
-            len(self.atoms) > 0
-        ), f"The atoms must be initialized before running the pipeline."
+        assert len(self.atoms) > 0, (
+            "The atoms must be initialized before running the pipeline."
+        )
 
         # Revise the atoms
         if self.revise_atoms:
-            print(f"[FactReasoner] Revising the atoms ...")
-            assert self.atom_reviser is not None, f"The atom reviser must be created."
+            print("[FactReasoner] Revising the atoms ...")
+            assert self.atom_reviser is not None, "The atom reviser must be created."
 
-            assert self.response is not None, f"The atom reviser requires a response."
+            assert self.response is not None, "The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             _t = time.perf_counter()
             result = self.atom_reviser.run(old_atoms, self.response)
             self.timing["atom_revision"] = time.perf_counter() - _t
-            print(f"[FactReasoner][TIMING] Atom revision: {self.timing['atom_revision']:.4f}s")
+            print(
+                f"[FactReasoner][TIMING] Atom revision: {self.timing['atom_revision']:.4f}s"
+            )
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])
@@ -361,7 +403,7 @@ class FactReasoner:
         print(f"[FactReasoner] Created {len(self.atoms)} unique atoms.")
 
         # Build the contexts (per atom)
-        if has_contexts == False:  # check if contexts already in file
+        if not has_contexts:  # check if contexts already in file
             _t = time.perf_counter()
             self.contexts = build_contexts(
                 atoms=self.atoms,
@@ -370,16 +412,18 @@ class FactReasoner:
                 use_fast_retriever=use_fast_retriever,
             )
             self.timing["context_retrieval"] = time.perf_counter() - _t
-            print(f"[FactReasoner][TIMING] Context retrieval: {self.timing['context_retrieval']:.4f}s")
+            print(
+                f"[FactReasoner][TIMING] Context retrieval: {self.timing['context_retrieval']:.4f}s"
+            )
 
         # For tracking purposes
         self.num_retrieved_contexts = len(self.contexts.keys())
         print(f"[FactReasoner] Retrieved {self.num_retrieved_contexts} contexts.")
 
         # Safety checks
-        assert (
-            len(self.contexts.keys()) > 0 or not has_contexts
-        ), f"Contexts must be initialized if `has_contexts` is True!"
+        assert len(self.contexts.keys()) > 0 or not has_contexts, (
+            "Contexts must be initialized if `has_contexts` is True!"
+        )
 
         # Remove duplicated contexts
         if remove_duplicates:
@@ -392,7 +436,7 @@ class FactReasoner:
 
         # Summarize the retrieved contexts (if any)
         if self.summarize_contexts:
-            print(f"[FactReasoner] Summarizing the contexts ...")
+            print("[FactReasoner] Summarizing the contexts ...")
             _t_summarize = time.perf_counter()
 
             # Summarize contexts for atoms
@@ -405,13 +449,12 @@ class FactReasoner:
                     )
 
                     # Safety checks
-                    assert len(results) == len(
-                        contexts
-                    ), f"The number of summaries must be equal to the number of contexts."
+                    assert len(results) == len(contexts), (
+                        "The number of summaries must be equal to the number of contexts."
+                    )
 
                     # Set the new syntheric summaries
                     for context_id, result in zip(contexts_ids, results):
-
                         is_relevant = is_relevant_context(result["summary"])
                         if result["summary"] != "" and is_relevant:
                             self.contexts[context_id].set_synthetic_summary(
@@ -430,7 +473,9 @@ class FactReasoner:
                         f"[FactReasoner] Created {len(results)} summarized contexts for atom {atom_id}."
                     )
             self.timing["context_summarization_atoms"] = time.perf_counter() - _t
-            print(f"[FactReasoner][TIMING] Context summarization (atoms): {self.timing['context_summarization_atoms']:.4f}s")
+            print(
+                f"[FactReasoner][TIMING] Context summarization (atoms): {self.timing['context_summarization_atoms']:.4f}s"
+            )
 
             # Summarize contexts for question
             c_qs = {
@@ -445,12 +490,11 @@ class FactReasoner:
                     [context.get_text() for context in contexts], self.query
                 )
 
-                assert len(results) == len(
-                    contexts
-                ), f"The number of summaries must be equal to the number of contexts."
+                assert len(results) == len(contexts), (
+                    "The number of summaries must be equal to the number of contexts."
+                )
 
                 for context_id, result in zip(contexts_ids, results):
-
                     is_relevant = is_relevant_context(result["summary"])
                     if result["summary"] != "" and is_relevant:
                         self.contexts[context_id].set_synthetic_summary(
@@ -468,15 +512,32 @@ class FactReasoner:
                     f"[FactReasoner] Created {len(results)} summarized contexts for the question."
                 )
                 self.timing["context_summarization_question"] = time.perf_counter() - _t
-                print(f"[FactReasoner][TIMING] Context summarization (question): {self.timing['context_summarization_question']:.4f}s")
+                print(
+                    f"[FactReasoner][TIMING] Context summarization (question): {self.timing['context_summarization_question']:.4f}s"
+                )
+
+            # Contexts judged irrelevant are dropped above, but the atoms that
+            # retrieved them are not all cleaned: the per-atom branch clears only
+            # the one owning atom (so a context shared by several atoms leaves
+            # references behind) and the query branch clears none. Sweep once here
+            # so no atom points at a context that no longer exists.
+            _dangling = prune_dangling_context_refs(self.atoms, self.contexts)
+            if _dangling:
+                print(
+                    f"[FactReasoner] Pruned {_dangling} stale context reference(s)."
+                )
 
             # For tracking purposes
             self.num_summarized_contexts = len(self.contexts.keys())
             print(
                 f"[FactReasoner] Created {self.num_summarized_contexts} summarized contexts."
             )
-            self.timing["context_summarization_total"] = time.perf_counter() - _t_summarize
-            print(f"[FactReasoner][TIMING] Context summarization (total): {self.timing['context_summarization_total']:.4f}s")
+            self.timing["context_summarization_total"] = (
+                time.perf_counter() - _t_summarize
+            )
+            print(
+                f"[FactReasoner][TIMING] Context summarization (total): {self.timing['context_summarization_total']:.4f}s"
+            )
 
             # Remove duplicated contexts that have the same summary (if any)
             if remove_duplicates:
@@ -486,6 +547,29 @@ class FactReasoner:
                 print(
                     f"[FactReasoner] Created {len(self.contexts.keys())} unique summarized contexts."
                 )
+
+        # Collapse near-duplicate contexts. Run after summarization on purpose:
+        # summaries are short and synthetic, so near-duplicate detection on them is
+        # both cheaper and more accurate than on raw pages. Because both dominant
+        # NLI cost terms are super-linear in the number of contexts, this has
+        # quadratic leverage on the call count.
+        if self.nli_pair_config.dedup_near_duplicates and len(self.contexts) > 1:
+            _t = time.perf_counter()
+            self.contexts, self.atoms, dedup_stats = dedup_contexts_near(
+                self.contexts,
+                self.atoms,
+                threshold=self.nli_pair_config.dedup_threshold,
+                use_summary=self.summarize_contexts,
+                embedding_model=self.nli_pair_config.embedding_model,
+            )
+            self.nli_stats["dedup"] = dedup_stats
+            self.timing["context_near_dedup"] = time.perf_counter() - _t
+            print(
+                f"[FactReasoner] Near-duplicate dedup: "
+                f"{dedup_stats['contexts_before']} -> {dedup_stats['contexts_after']} "
+                f"contexts ({dedup_stats['collapsed']} collapsed, "
+                f"{dedup_stats['owners_merged']} owners merged)."
+            )
 
         # If the user submits the override early exit flag then this method
         # will be set to None
@@ -506,7 +590,9 @@ class FactReasoner:
                 response=self.response.strip(),
             )
             self.timing["early_exit_evaluation"] = time.perf_counter() - _t
-            print(f"[FactReasoner][TIMING] Early exit evaluation: {self.timing['early_exit_evaluation']:.4f}s")
+            print(
+                f"[FactReasoner][TIMING] Early exit evaluation: {self.timing['early_exit_evaluation']:.4f}s"
+            )
 
             # set default choice to `True` so that full pipeline is executed
             # if `continue_pipeline_execution` is absent from the early exit evaluation dict
@@ -519,7 +605,9 @@ class FactReasoner:
                     "[FactReasoner] Early exit condition met, exiting reasoning pipeline, returning early exit evaluator output."
                 )
                 self.timing["build_total"] = time.perf_counter() - _build_start
-                print(f"[FactReasoner][TIMING] build() total (early exit): {self.timing['build_total']:.4f}s")
+                print(
+                    f"[FactReasoner][TIMING] build() total (early exit): {self.timing['build_total']:.4f}s"
+                )
                 return
 
             print(
@@ -536,23 +624,36 @@ class FactReasoner:
             contexts_per_atom_only=contexts_per_atom_only,
             nli_extractor=self.nli_extractor,
             use_summarized_contexts=self.summarize_contexts,
+            pair_config=self.nli_pair_config,
+            stats=self.nli_stats,
+            cache=self.nli_cache,
         )
         self.timing["nli_relation_extraction"] = time.perf_counter() - _t
-        print(f"[FactReasoner][TIMING] NLI relation extraction: {self.timing['nli_relation_extraction']:.4f}s")
+        print(
+            f"[FactReasoner][TIMING] NLI relation extraction: {self.timing['nli_relation_extraction']:.4f}s"
+        )
+        # Per-phase sub-timings, so the two phases can be compared directly.
+        for _phase in ("atom_context", "context_context"):
+            if _phase in self.nli_stats:
+                self.timing[f"nli_{_phase}"] = self.nli_stats[_phase].get("seconds")
 
         # Build the fact graph and Markov network
-        print(f"[FactReasoner] Building the graphical model ...")
+        print("[FactReasoner] Building the graphical model ...")
         _t = time.perf_counter()
         self._build_fact_graph()
         self._build_markov_network()
         self.timing["graphical_model_construction"] = time.perf_counter() - _t
-        print(f"[FactReasoner][TIMING] Graphical model construction: {self.timing['graphical_model_construction']:.4f}s")
+        print(
+            f"[FactReasoner][TIMING] Graphical model construction: {self.timing['graphical_model_construction']:.4f}s"
+        )
 
         self.timing["build_total"] = time.perf_counter() - _build_start
-        print(f"[FactReasoner][TIMING] build() total: {self.timing['build_total']:.4f}s")
-        print(f"[FactReasoner] Pipeline instance created.")
+        print(
+            f"[FactReasoner][TIMING] build() total: {self.timing['build_total']:.4f}s"
+        )
+        print("[FactReasoner] Pipeline instance created.")
 
-    def to_json(self, json_file_path: str = None) -> Dict[str, Any]:
+    def to_json(self, json_file_path: str | None = None) -> dict[str, Any]:
         """
         Save the FactReasoner instance to a JSON file.
 
@@ -570,9 +671,9 @@ class FactReasoner:
 
         # Write the atoms
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
@@ -602,203 +703,73 @@ class FactReasoner:
             relations=self.relations,
         )
 
+    @staticmethod
+    def _pairwise_prior(link: str) -> float:
+        """Return the source-node prior for a pairwise factor given its link type.
+
+        Thin wrapper over :func:`fact_reasoner.factors.pairwise_prior`.
+
+        Args:
+            link: The edge link type ("context_atom", "context_context", or
+                "atom_atom").
+
+        Returns:
+            The prior probability of the source node being true.
+        """
+        return _pairwise_prior_shared(link)
+
+    def _edge_factor_values(self, edge) -> list[float]:
+        """Compute the flattened pairwise factor table for a fact-graph edge.
+
+        Thin wrapper over :func:`fact_reasoner.factors.edge_factor_values`,
+        passing this assessor's ``use_priors`` setting.
+
+        Args:
+            edge: A fact-graph edge with ``type``, ``link`` and ``probability``.
+
+        Returns:
+            The four factor values for the pairwise factor.
+        """
+        return _edge_factor_values_shared(edge, use_priors=self.use_priors)
+
     def _build_markov_network(self):
         """
         Create the Markov Network corresponding to the FactGraph.
+
+        Delegates to :func:`fact_reasoner.factors.build_markov_network`.
 
         Return:
             A MarkovNetwork encoding of the problem.
         """
 
-        assert self.fact_graph is not None, f"The FactGraph must be built."
+        assert self.fact_graph is not None, "The FactGraph must be built."
 
-        # Create an empty Markov Network
-        self.markov_network = MarkovNetwork()
-
-        # Create the variables corresponding to the nodes in the fact graph
-        print(f"[Building the Markov network...]")
-        for node in self.fact_graph.get_nodes():
-            x = node.id
-            self.markov_network.add_node(x)
-            if node.type == "context":
-                prob = node.probability  # PRIOR_PROB_CONTEXT
-                factor = DiscreteFactor(
-                    variables=[x], cardinality=[2], values=[1.0 - prob, prob]
-                )
-                self.markov_network.add_factors(factor)
-                print(f"Adding context variable {x} with discrete factor (prior)")
-            elif node.type == "atom":
-                prob = node.probability  # PRIOR_PROB_ATOM
-                factor = DiscreteFactor(
-                    variables=[x], cardinality=[2], values=[1.0 - prob, prob]
-                )
-                self.markov_network.add_factors(factor)
-                print(f"Adding atom variable {x} with discrete factor (prior)")
-            else:
-                raise ValueError(f"Unknown node type: {node.type}")
-
-        # Create the factors corresponding to the edges in the fact graph
-        for edge in self.fact_graph.get_edges():
-            x, y = edge.source, edge.target
-            self.markov_network.add_edge(x, y)
-            if edge.type == "entailment":  # add factor X -> Y
-                prob = edge.probability
-                if self.use_priors:
-                    if edge.link == "context_atom":
-                        values = [
-                            1.0 - PRIOR_PROB_ATOM,
-                            PRIOR_PROB_ATOM,
-                            1.0 - prob,
-                            prob,
-                        ]
-                    elif edge.link == "context_context":
-                        values = [
-                            1.0 - PRIOR_PROB_CONTEXT,
-                            PRIOR_PROB_CONTEXT,
-                            1.0 - prob,
-                            prob,
-                        ]
-                    elif edge.link == "atom_atom":
-                        values = [
-                            1.0 - PRIOR_PROB_ATOM,
-                            PRIOR_PROB_ATOM,
-                            1.0 - prob,
-                            prob,
-                        ]
-                    else:
-                        raise ValueError(f"Unknown link type: {edge.link}")
-                else:
-                    values = [prob, prob, 1.0 - prob, prob]
-
-                # Create the factor
-                factor = DiscreteFactor(
-                    variables=[x, y],
-                    cardinality=[2, 2],
-                    values=values,  # [prob, prob, 1.0 - prob, prob]
-                )
-                self.markov_network.add_factors(factor)
-                print(f"Adding edge {x} - {y} with discrete factor (entailment)")
-            elif edge.type == "contradiction":  # add factor X -> !Y
-                prob = edge.probability
-                if self.use_priors:
-                    if edge.link == "context_atom":
-                        values = [
-                            1.0 - PRIOR_PROB_ATOM,
-                            PRIOR_PROB_ATOM,
-                            prob,
-                            1.0 - prob,
-                        ]
-                    elif edge.link == "context_context":
-                        values = [
-                            1.0 - PRIOR_PROB_CONTEXT,
-                            PRIOR_PROB_CONTEXT,
-                            prob,
-                            1.0 - prob,
-                        ]
-                    elif edge.link == "atom_atom":
-                        values = [
-                            1.0 - PRIOR_PROB_ATOM,
-                            PRIOR_PROB_ATOM,
-                            prob,
-                            1.0 - prob,
-                        ]
-                    else:
-                        raise ValueError(f"Unknown link type: {edge.link}")
-                else:
-                    values = [prob, prob, prob, 1.0 - prob]
-
-                factor = DiscreteFactor(
-                    variables=[x, y],
-                    cardinality=[2, 2],
-                    values=values,  # [prob, prob, prob, 1.0 - prob]
-                )
-                self.markov_network.add_factors(factor)
-                print(f"Adding edge {x} - {y} with discrete factor (contradiction)")
-            elif edge.type == "equivalence":
-                prob = edge.probability
-                factor = DiscreteFactor(
-                    variables=[x, y],
-                    cardinality=[2, 2],
-                    values=[prob, 1.0 - prob, 1.0 - prob, prob],
-                )
-                self.markov_network.add_factors(factor)
-                print(f"Adding edge {x} - {y} with discrete factor (equivalence)")
-
-        # Output the content of the network
-        print("[Markov network created.]")
+        logger.debug("Building the Markov network ...")
+        self.markov_network = _build_markov_network_shared(
+            self.fact_graph, use_priors=self.use_priors
+        )
+        logger.debug("Markov network created.")
 
     def run_merlin(self):
         """
-        Run inference with merlin (executable)
+        Run inference with merlin (executable).
+
+        Delegates to :func:`fact_reasoner.inference.run_merlin` (MAR task),
+        restricting the returned marginals to the atom variables.
         """
 
         # Prepare the query variables (i.e., atoms)
         query_variables = [var for var in sorted(self.atoms.keys())]
 
-        # Dump the markov network to a temporary file
-        net_id = str(uuid.uuid1())
-        input_filename = f"markov_network_{net_id}.uai"
-        writer = UAIWriter(self.markov_network)
-        writer.write_uai(input_filename)
+        result = _run_merlin_shared(
+            self.markov_network,
+            self.merlin_path,
+            task="MAR",
+            query_variables=query_variables,
+        )
+        return result["marginals"]
 
-        # Get the variable name to index mapping {0: ('a0', '2'), 1: ('a1', '2')}
-        vars_mapping = {}
-        variables = sorted(writer.domain.items(), key=lambda x: (x[1], x[0]))
-        for i, var in enumerate(variables):
-            vars_mapping[i] = var[0]
-
-        # Run merlin as a subprocess and collect the results
-        exefile = self.merlin_path
-        output_format = "json"
-        output_file = f"output_{net_id}"
-        algorithm = "wmb"
-        task = "MAR"
-
-        args = [
-            exefile,
-            "--input-file",
-            input_filename,
-            "--task",
-            task,
-            "--ibound",
-            "6",
-            "--algorithm",
-            algorithm,
-            "--output-format",
-            output_format,
-            "--output-file",
-            output_file,
-        ]
-
-        proc = subprocess.run(args)
-
-        print(f"[Merlin] return code: {proc.returncode}")
-        output_filename = f"{output_file}.{task}.{output_format}"
-        with open(output_filename) as f:
-            results = json.load(f)
-
-        marginals = []
-        all_marginals = []
-        for marginal in results["marginals"]:
-            var_index = marginal["variable"]
-            var_name = vars_mapping[var_index]
-            all_marginals.append(
-                dict(variable=var_name, probabilities=marginal["probabilities"])
-            )
-            if var_name in query_variables:
-                probs = marginal["probabilities"]
-                marginals.append({"variable": var_name, "probabilities": probs})
-
-        # Cleanup -- delete input_filename and output_filename
-        if os.path.exists(input_filename):
-            os.remove(input_filename)
-        if os.path.exists(output_filename):
-            os.remove(output_filename)
-
-        print(f"[Merlin] All Marginals:\n{all_marginals}")
-        return marginals
-
-    def score(self) -> Dict[str, Any]:
+    def score(self) -> dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts
         retrieved for each of the atom in the answer.
@@ -814,12 +785,41 @@ class FactReasoner:
         """
 
         # Safety checks
-        if len(self.atoms.keys()) == 0:
-            print("WARNING: no atoms have been identified!")
         if len(self.contexts.keys()) == 0:
             print("WARNING: no contexts have been retrieved!")
         if len(self.relations) == 0:
             print("WARNING: no relationships have been identified!")
+
+        # Without atoms all the factuality metrics are undefined (they divide by
+        # the number of atoms), so return a well-defined empty result instead of
+        # crashing with a ZeroDivisionError.
+        if len(self.atoms) == 0:
+            print("WARNING: no atoms have been identified!")
+            results = {
+                "factuality_score_per_atom": [],
+                "factuality_score": 0.0,
+                "recall_k": 0.0,
+                "f1_k": 0.0,
+                "num_atoms": 0,
+                "num_contexts": len(self.contexts),
+                "num_true_atoms": 0,
+                "num_false_atoms": 0,
+                "num_uniform_atoms": 0,
+                "entropy": 0.0,
+                "norm_entropy": 0.0,
+                "avg_entropy": 0.0,
+                "avg_norm_entropy": 0.0,
+                "avg_prob": 0.0,
+                "avg_logprob": 0.0,
+                "avg_explogprob": 0.0,
+                "marginals": [],
+                "predictions": {},
+                "topic": self.topic,
+                "query": self.query,
+                "response": self.response,
+                "elapsed_time": time.perf_counter() - self.start_time,
+            }
+            return results, []
 
         assert self.fact_graph is not None
         assert self.markov_network is not None
@@ -833,11 +833,9 @@ class FactReasoner:
         avg_logprob = 0.0
         entropy = 0.0
         norm_entropy = 0.0
-        avg_norm_entropy = 0.0
         labels = {}
         probabilities = {}
         fscore_per_atom = []
-        elapsed_time = time.perf_counter() - self.start_time  # total elapsed time
         for marginal in marginals:
             var = marginal["variable"]
             probs = marginal["probabilities"]
@@ -869,21 +867,22 @@ class FactReasoner:
             ) / math.log(2.0)
 
         # For now, return a dict with the posterior marginals of the atoms
-        avg_logprob /= len(self.atoms)
-        avg_prob /= len(self.atoms)
-        avg_entropy = entropy / len(self.atoms)
-        avg_norm_entropy = norm_entropy / len(self.atoms)
-        fscore = num_true_atoms / len(self.atoms)
+        num_atoms = len(self.atoms)
+        avg_logprob /= num_atoms
+        avg_prob /= num_atoms
+        avg_entropy = entropy / num_atoms
+        avg_norm_entropy = norm_entropy / num_atoms
 
         # Precision, R@K and F1@K
-        fscore = float(num_true_atoms) / float(len(self.atoms))
-        K = int(len(self.atoms) / 2)  # K is assumed to be half
+        fscore = float(num_true_atoms) / float(num_atoms)
+        K = int(num_atoms / 2)  # K is assumed to be half
         # ensure that K is at least 1 to avoid division by zero when there is only one atom (since int(0.5) would be 0)
         K = max(K, 1)
         recall_k = min(float(num_true_atoms / K), 1.0)
-        try:
+        # fscore + recall_k == 0 exactly when there are no true atoms.
+        if fscore + recall_k > 0.0:
             f1k = 2 * fscore * recall_k / (fscore + recall_k)
-        except Exception as _:
+        else:
             f1k = 0.0
 
         # Elapsed time
@@ -908,6 +907,10 @@ class FactReasoner:
         results["avg_explogprob"] = math.exp(avg_logprob)
         results["marginals"] = marginals
         results["predictions"] = labels
+        # Carry the NLI cost report into the scored output, so a whole evaluation
+        # sweep can be analyzed for call counts after the fact.
+        if self.nli_stats:
+            results["nli_stats"] = self.nli_stats
         print(f"[FactReasoner] Predictions: {labels}")
 
         # Remove duplicate atoms in self.labels_human
@@ -915,7 +918,7 @@ class FactReasoner:
             self.labels_human = {
                 k: v
                 for i, (k, v) in enumerate(self.labels_human.items())
-                if k in self.atoms.keys()
+                if k in self.atoms
                 and k not in list(self.labels_human.keys())[:i]
             }
 
@@ -928,9 +931,8 @@ class FactReasoner:
             num_true_negative = 0
             num_false_positive = 0
             num_false_negative = 0
-            for aid, l in self.labels_human.items():
-
-                if l == "S":
+            for aid, gold_label in self.labels_human.items():
+                if gold_label == "S":
                     avg_brier += (probabilities[aid] - 1.0) * (probabilities[aid] - 1.0)
                     true_atoms += 1
                     if labels[aid] == "S":
@@ -967,7 +969,7 @@ class FactReasoner:
 
         return results, marginals
 
-    def pipeline_to_json(self, json_file_path: str = None):
+    def pipeline_to_json(self, json_file_path: str | None = None):
         """
         Save the pipeline instance to a JSON file.
         """
@@ -980,9 +982,9 @@ class FactReasoner:
         data["contexts"] = []
 
         for aid, atom in self.atoms.items():
-            atom_data = dict(
-                id=aid, text=atom.get_text(), contexts=list(atom.get_contexts().keys())
-            )
+            atom_data = {
+                "id": aid, "text": atom.get_text(), "contexts": list(atom.get_contexts().keys())
+            }
             if atom.get_label() is not None:
                 atom_data["label"] = atom.get_label()
             data["atoms"].append(atom_data)
@@ -992,6 +994,8 @@ class FactReasoner:
             data["early_exit_evaluation"] = self.early_exit_evaluation
         if self.timing:
             data["timing"] = self.timing
+        if self.nli_stats:
+            data["nli_stats"] = self.nli_stats
 
         if json_file_path:
             with open(json_file_path, "w") as f:

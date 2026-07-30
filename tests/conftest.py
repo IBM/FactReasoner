@@ -44,7 +44,7 @@ def sample_context(sample_atom):
         text="Albert Einstein was born on March 14, 1879, in Ulm, Germany.",
         title="Albert Einstein - Wikipedia",
         link="https://en.wikipedia.org/wiki/Albert_Einstein",
-        snippet="German-born theoretical physicist"
+        snippet="German-born theoretical physicist",
     )
 
 
@@ -56,7 +56,7 @@ def sample_relation(sample_context, sample_atom):
         target=sample_atom,
         type="entailment",
         probability=0.9,
-        link="context_atom"
+        link="context_atom",
     )
 
 
@@ -78,19 +78,19 @@ def sample_contexts_dict(sample_atoms_dict):
             id="c_a0_0",
             atom=sample_atoms_dict["a0"],
             text="Einstein was born in Ulm, Germany.",
-            title="Einstein Bio"
+            title="Einstein Bio",
         ),
         "c_a0_1": Context(
             id="c_a0_1",
             atom=sample_atoms_dict["a0"],
             text="Einstein was a German physicist.",
-            title="Einstein Wikipedia"
+            title="Einstein Wikipedia",
         ),
         "c_a1_0": Context(
             id="c_a1_0",
             atom=sample_atoms_dict["a1"],
             text="Einstein won the Nobel Prize in 1921.",
-            title="Nobel Prize"
+            title="Nobel Prize",
         ),
     }
 
@@ -114,15 +114,15 @@ def sample_json_data():
                 "text": "Albert Einstein was German-born.",
                 "original": "Albert Einstein was a German-born theoretical physicist.",
                 "label": "S",
-                "contexts": ["c_a0_0"]
+                "contexts": ["c_a0_0"],
             },
             {
                 "id": "a1",
                 "text": "Albert Einstein won the Nobel Prize in 1921.",
                 "original": "He won the Nobel Prize in 1921.",
                 "label": "S",
-                "contexts": ["c_a1_0"]
-            }
+                "contexts": ["c_a1_0"],
+            },
         ],
         "contexts": [
             {
@@ -130,16 +130,16 @@ def sample_json_data():
                 "title": "Albert Einstein - Wikipedia",
                 "text": "Albert Einstein was born in Ulm, Germany, on March 14, 1879.",
                 "snippet": "German-born theoretical physicist",
-                "link": "https://en.wikipedia.org/wiki/Albert_Einstein"
+                "link": "https://en.wikipedia.org/wiki/Albert_Einstein",
             },
             {
                 "id": "c_a1_0",
                 "title": "Nobel Prize in Physics 1921",
                 "text": "The Nobel Prize in Physics 1921 was awarded to Albert Einstein.",
                 "snippet": "Nobel Prize winner",
-                "link": "https://nobelprize.org/einstein"
-            }
-        ]
+                "link": "https://nobelprize.org/einstein",
+            },
+        ],
     }
 
 
@@ -152,7 +152,7 @@ def mock_atomizer(mock_backend):
     atomizer.backend = mock_backend
     atomizer.run.return_value = {
         "id1": "First atomic unit.",
-        "id2": "Second atomic unit."
+        "id2": "Second atomic unit.",
     }
     return atomizer
 
@@ -166,27 +166,23 @@ def mock_reviser(mock_backend):
     reviser.backend = mock_backend
     reviser.run.return_value = [
         {"revised_unit": "Revised first unit.", "rationale": "No changes."},
-        {"revised_unit": "Revised second unit.", "rationale": "Resolved pronoun."}
+        {"revised_unit": "Revised second unit.", "rationale": "Resolved pronoun."},
     ]
     return reviser
 
 
 @pytest.fixture
 def mock_retriever():
-    """Create a mock ContextRetriever for testing."""
+    """Create a mock ContextRetriever for testing.
+
+    ``ContextRetriever`` is the parallel wrapper exposing ``retrieve_all`` (the
+    single-query ``query`` method lives on ``SourceRetriever``), so the mock is
+    specced and stubbed against that interface.
+    """
     from src.fact_reasoner.core.retriever import ContextRetriever
 
     retriever = MagicMock(spec=ContextRetriever)
-    retriever.service_type = "wikipedia"
-    retriever.top_k = 3
-    retriever.query.return_value = [
-        {
-            "title": "Test Document",
-            "text": "This is test content for retrieval.",
-            "snippet": "Test snippet",
-            "link": "https://example.com"
-        }
-    ]
+    retriever.retrieve_all.return_value = {}
     return retriever
 
 
@@ -198,6 +194,58 @@ def mock_nli_extractor(mock_backend):
     nli = MagicMock(spec=NLIExtractor)
     nli.backend = mock_backend
     nli.run.return_value = {"label": "entailment", "probability": 0.9}
+    return nli
+
+
+@pytest.fixture
+def mock_nli_batch(mock_backend):
+    """Create a mock NLIExtractor whose ``run_batch`` is exercised and recorded.
+
+    ``mock_nli_extractor`` stubs only ``run``, but ``predict_nli_relationships``
+    calls ``run_batch``, so it cannot be used to test the relation-building path.
+
+    Two details are load-bearing:
+
+    * ``run_batch`` is a plain ``async def`` rather than an ``AsyncMock``. Under
+      ``asyncio_mode = auto`` a test already runs inside an event loop, so
+      ``predict_nli_relationships`` takes its ThreadPoolExecutor branch and awaits
+      the coroutine on a *different* loop -- which an AsyncMock bound to the
+      test's loop would not survive.
+    * The returned list must be aligned to the input length, since the caller
+      zips results against the pair list positionally.
+
+    Set ``nli.verdicts[(premise, hypothesis)]`` to control individual verdicts;
+    anything unset falls back to ``nli.default_verdict``. Every batch is appended
+    to ``nli.calls`` so tests can assert exact call counts.
+
+    The spec is imported as ``fact_reasoner.core.nli`` -- the same module path the
+    code under test uses -- because ``src.fact_reasoner.core.nli`` loads a second,
+    distinct module object whose class would fail the ``isinstance`` guard in
+    ``predict_nli_relationships``.
+    """
+    from fact_reasoner.core.nli import NLIExtractor
+
+    nli = MagicMock(spec=NLIExtractor)
+    nli.backend = mock_backend
+    nli.model_id = "mock-model"
+    nli.nli_method = "logprobs"
+    nli.calls = []
+    nli.verdicts = {}
+    nli.default_verdict = {"label": "neutral", "probability": 0.9}
+
+    async def run_batch(premises, hypotheses):
+        nli.calls.append((list(premises), list(hypotheses)))
+        return [
+            dict(nli.verdicts.get((p, h), nli.default_verdict))
+            for p, h in zip(premises, hypotheses)
+        ]
+
+    nli.run_batch = run_batch
+
+    def total_calls():
+        return sum(len(premises) for premises, _ in nli.calls)
+
+    nli.total_calls = total_calls
     return nli
 
 
