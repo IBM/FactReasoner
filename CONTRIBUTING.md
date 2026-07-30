@@ -91,7 +91,7 @@ uv run pytest
 | `src/fact_reasoner/core` | Pipeline components: Atomizer, Reviser, SourceRetriever, Summarizer, NLI, QueryBuilder |
 | `src/fact_reasoner/baselines` | Baseline methods: FactScore, VeriScore, FactVerify |
 | `src/fact_reasoner/eval` | Dataset evaluation utilities |
-| `docs/examples` | Runnable examples (assessors, correctors, core components) |
+| `docs/examples` | Runnable examples (assessors, core components) |
 | `docs/papers` | Related papers |
 | `tests/` | Unit tests (mirrors `src/` layout) |
 | `data/` | Sample data files |

@@ -17,6 +17,7 @@ One of the following Mellea backends, selected with the `--backend` flag:
 - **Ollama** (default) — a local [Ollama](https://ollama.com) server running at `http://localhost:11434` (requires the `mellea` package; the model is pulled automatically on first use).
 - **RITS** — a configured remote IBM RITS backend (requires the `mellea` and `mellea_ibm` packages plus RITS credentials/config).
 - **vLLM** — a vLLM OpenAI-compatible server (pass `--served-model` and optionally `--base-url`).
+- **OpenAI / Claude** (`--backend openai`) — a hosted frontier model over the OpenAI API. Defaults to OpenAI; add `--base-url https://api.anthropic.com/v1/` with a `claude-*` `--served-model` to use Claude. SIMBA-UQ is a good fit here: that compatibility endpoint returns no logprobs, so `--nli-method logprobs` would yield all-neutral relations.
 
 No extra install is needed: `rouge-score` (for the default `rouge` metric) and `sentence-transformers` / `scikit-learn` (for the `sbert` metric) are base dependencies.
 

@@ -18,14 +18,14 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`ContextSummarizer`** — Summarizes context passages using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server, `openai` → `OpenAIBackend` for a hosted frontier model: OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`)
 - **`run_batch(contexts, atom_text)`** — Summarizes a list of contexts concurrently (throttled and failure-resilient). Passing an `atom_text` summarizes each context relative to that claim; passing `None` summarizes independently.
 
 ## How It Works
 
 Whether summaries are generated relative to a reference atom is controlled by the `atom_text` argument to `run_batch` (not by a constructor flag). The example exposes this via the `--with-reference` command-line flag:
 
-1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
+1. Create a Mellea backend selected via `--backend` (RITS by default; also `ollama`, `vllm`, or `openai` for a hosted frontier model). When `--served-model` is omitted, every backend resolves the same shared default model, Granite 4 Micro.
 2. Instantiate the `ContextSummarizer` with the backend.
 
 **With reference (`--with-reference`):**

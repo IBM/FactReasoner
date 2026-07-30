@@ -1,6 +1,6 @@
 # FactVerify Example
 
-Demonstrates how to run the FactVerify baseline pipeline on an inline query/response pair.
+Demonstrates how to run the FactVerify baseline pipeline, on either an inline query/response pair or a file of precomputed atoms and contexts.
 
 **Source:** [`docs/examples/assessors/ex_factverify.py`](examples/assessors/ex_factverify.py)
 
@@ -12,8 +12,8 @@ Use this when you want a factuality assessment based on search result snippets r
 
 ## Prerequisites
 
-- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server or `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server.
-- Google search API access for the `ContextRetriever`
+- A configured Mellea backend. The default is RITS (requires `mellea` and `mellea_ibm` packages); alternatively pass `--backend ollama` for a local Ollama server, `--backend vllm --served-model <name>` for a vLLM OpenAI-compatible server, or `--backend openai` for a hosted frontier model (OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`).
+- Google search API access (`SERPER_API_KEY`) for the `ContextRetriever` — only in the inline-response mode, which retrieves contexts. Not needed with `--input-file`.
 
 ## Key Components
 
@@ -25,22 +25,49 @@ Use this when you want a factuality assessment based on search result snippets r
 
 ## How It Works
 
-1. Define a query, response, and topic inline.
-2. Create the selected Mellea backend via `build_backend()` (defaults to RITS with LLaMA 3.3 70B Instruct; override with `--backend`).
+1. Pick the input mode — the two are mutually exclusive:
+   - **`--input-file [<json>]`** — load precomputed atoms and contexts with
+     `pipeline.from_dict_with_contexts(data)`. Pass the flag with no value to
+     use the bundled `flaherty_google.json`.
+   - **`--response` (or the built-in default)** — assess a response from scratch,
+     with `--query` / `--topic` for the surrounding context.
+2. Create the selected Mellea backend via `build_backend()` (defaults to RITS with Granite 4 Micro; override with `--backend`).
 3. Instantiate core components. Note that `ContextRetriever` is configured with `fetch_text=False`, meaning only search snippets are used (no full page retrieval).
 4. Create the `FactVerify` pipeline with the backend and components.
-5. Call `pipeline.build()` with:
-   - `has_atoms=False` / `has_contexts=False` — generate everything from scratch.
-   - `revise_atoms=True` — revise ambiguous atoms.
+5. Call `pipeline.build()` with flags matching the chosen mode:
+   - **inline:** `has_atoms=False`, `has_contexts=False`, `revise_atoms=True` —
+     atoms and contexts are generated from scratch.
+   - **`--input-file`:** `has_atoms=True`, `has_contexts=True`,
+     `revise_atoms=False` — nothing is re-derived, so no retrieval or
+     atomization calls are made.
 6. Call `pipeline.score()` to get factuality results.
 7. Save the output to `factverify_output.json`.
 
 ## Usage
 
-Run with the default RITS backend:
+Run with the default RITS backend, assessing the built-in example response:
 
 ```bash
 python docs/examples/assessors/ex_factverify.py
+```
+
+Score precomputed atoms and contexts instead — no retrieval, so no
+`SERPER_API_KEY` needed. Pass `--input-file` with no value to use the bundled
+`flaherty_google.json`, or give it your own file:
+
+```bash
+python docs/examples/assessors/ex_factverify.py --input-file
+
+python docs/examples/assessors/ex_factverify.py --input-file /path/to/my_data.json
+```
+
+Assess your own response:
+
+```bash
+python docs/examples/assessors/ex_factverify.py \
+    --query "Who was Albert Einstein?" \
+    --response "Albert Einstein was born in 1879 in Ulm, Germany." \
+    --topic "Albert Einstein"
 ```
 
 Or run against a local Ollama server:
@@ -49,6 +76,28 @@ Or run against a local Ollama server:
 python docs/examples/assessors/ex_factverify.py --backend ollama
 ```
 
+Against a vLLM server, `--served-model` is required (it must match the server's `--served-model-name`); `--base-url` defaults to the `VLLM_BASE_URL` env var, then `http://localhost:8000/v1`:
+
+```bash
+python docs/examples/assessors/ex_factverify.py \
+    --backend vllm --served-model granite-4.1-8b \
+    --base-url http://localhost:8000/v1
+```
+
+Against a hosted frontier model — OpenAI, or Claude via Anthropic's OpenAI-compatible endpoint (put your Anthropic key in `OPENAI_API_KEY`):
+
+```bash
+python docs/examples/assessors/ex_factverify.py --backend openai --served-model gpt-4o
+
+python docs/examples/assessors/ex_factverify.py \
+    --backend openai --served-model claude-opus-5 \
+    --base-url https://api.anthropic.com/v1/
+```
+
 ## Output
 
-The script prints the FactVerify results (per-atom factuality judgments) and writes a `factverify_output.json` file containing the full pipeline state and results.
+During the run the pipeline prints its progress — each extracted atom, the unique-atom count, and the number of retrieved contexts — followed by the FactVerify results (per-atom factuality judgments) and the predicted labels.
+
+With `--input-file`, the loaded atoms, contexts and any gold labels are printed too, and because the bundled files carry gold labels, `score()` additionally reports how the predictions compare against them. The inline mode has no gold labels, so it cannot produce that comparison.
+
+The full pipeline state and results are written to `factverify_output.json` beside the script; override the path with `--output-file`.

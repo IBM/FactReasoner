@@ -5,14 +5,17 @@
 # First train and save a classifier with scripts/train_simbauq_nli.py, e.g.:
 #
 #   python scripts/train_simbauq_nli.py --stage all \
-#     --nli-data /Users/radu/tmp/raw_nli/train_balanced.json --num-pairs 900 \
+#     --nli-data /path/to/train_balanced.json --num-pairs 900 \
 #     --backend ollama --similarity-metric rouge \
 #     --samples artifacts/simbauq_nli_samples.jsonl \
 #     --out artifacts/simbauq_nli_clf.joblib
 #
 # Then run this example, pointing --classifier-path at the saved .joblib. The
 # temperature schedule / n-per-temp / similarity metric MUST match what the
-# classifier was trained with (the extractor validates the feature dimension).
+# classifier was trained with. Note the extractor only validates the feature
+# *dimension* (len(temperatures) * n_per_temp - 1), which catches a mismatched
+# schedule but NOT a mismatched similarity metric -- that silently yields
+# garbage features, so double-check it yourself.
 
 import argparse
 

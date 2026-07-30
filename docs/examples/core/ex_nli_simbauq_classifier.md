@@ -16,7 +16,7 @@ This example loads a classifier trained by `scripts/train_simbauq_nli.py` and us
 ## Prerequisites
 
 - No extra install: `scikit-learn` and `joblib` (training/loading the classifier) and `rouge-score` (the default metric) are base dependencies.
-- A Mellea backend (`--backend`, defaults to Ollama; see [`ex_nli_simbauq`](ex_nli_simbauq.md) for backend details).
+- A Mellea backend (`--backend {rits,ollama,vllm,openai}`, defaults to Ollama; `openai` covers hosted frontier models, including Claude via `--base-url https://api.anthropic.com/v1/`). See [`ex_nli_simbauq`](ex_nli_simbauq.md) for backend details.
 - A **trained classifier**. Produce one from labeled `{premise, hypothesis, label}` NLI data:
 
   ```bash
@@ -33,7 +33,12 @@ This example loads a classifier trained by `scripts/train_simbauq_nli.py` and us
 
 1. Build a Mellea backend via `--backend`.
 2. Construct an `NLIExtractor` with `nli_method="simbauq"`, `simbauq_confidence_method="classifier"`, and `simbauq_classifier_path=<saved .joblib>`.
-3. The extractor loads the classifier and **validates its feature dimension** against `len(temperatures) * n_per_temp - 1`. A classifier trained under a different temperature schedule / `n_per_temp` fails fast with a clear error — so the example's `--similarity-metric` and (if you override them) temperature settings must match training.
+3. The extractor loads the classifier and **validates its feature dimension** against `len(temperatures) * n_per_temp - 1`. A classifier trained under a different temperature schedule / `n_per_temp` therefore fails fast with a clear error.
+
+   > ⚠️ That check is dimension-only, so it does **not** catch a mismatched
+   > `--similarity-metric`: the feature vector is the same length whichever metric
+   > produced it, so a mismatch silently yields meaningless confidences rather than an
+   > error. Make sure the metric matches training yourself.
 4. `nli.run(premise, hypothesis)` samples across temperatures, scores each sample with the classifier, and returns the winning sample's label and its `P(correct)` as the probability.
 
 ## Usage

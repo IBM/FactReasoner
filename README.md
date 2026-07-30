@@ -379,9 +379,11 @@ cheaper pair set without giving up `v3`'s richer graph.
 
 ### NLI cost control (advanced)
 
-**`--nli-mode` is the headline knob**; everything below it is a finer-grained
-override. Each `--nli-*` flag **overrides** whichever preset `--nli-mode` selected,
-so you can start from a mode and adjust one feature at a time.
+**`--nli-mode` is the headline knob** — see [Basic Usage](#basic-usage) for the
+copy-paste `all_pairs` / `fast` examples. This section is for going further:
+everything below `--nli-mode` in the table is a finer-grained override, and each
+`--nli-*` flag **overrides** whichever preset `--nli-mode` selected, so you can start
+from a mode and adjust one feature at a time.
 
 | Option | Meaning |
 |--------|---------|
@@ -500,12 +502,103 @@ drivers/CUDA available.**
 
 ## Quick Start
 
-> For most uses, the [`fact-reasoner` CLI](#running-assessments-fact-reasoner-cli)
-> or `FactualityRunner` is the easiest way to run an assessment. The example
-> below shows the lower-level building blocks if you need to wire the pipeline
-> manually.
-
 ### Basic Usage
+
+Two things to pick before you run anything:
+
+- **`--pipeline-version {v1,v2,v3}`** — the graph shape (default `v2`).
+- **`--nli-mode {all_pairs,fast}`** — how many NLI candidate pairs get scored
+  (default `all_pairs`). This is the main cost dial: NLI is the dominant expense of a
+  run, and `fast` prunes the pairs it scores while keeping the same graph. How much it
+  saves depends on the workload (measured between ~1.2× and ~5×).
+
+They are independent, so any version pairs with either mode.
+
+#### 1. The CLI (easiest)
+
+**`all_pairs` — score every candidate pair.** The default: highest fidelity, and what
+reproduces the published numbers.
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --nli-mode all_pairs \
+    --merlin-path /path/to/merlin \
+    --query "Tell me a bio of Albert Einstein" \
+    --response "Albert Einstein was born in 1879 in Ulm, Germany. He developed the theory of relativity." \
+    --topic "Albert Einstein"
+```
+
+**`fast` — same assessment, far fewer LLM calls.** Only one line differs:
+
+```bash
+fact-reasoner \
+    --pipeline factreasoner --backend ollama \
+    --nli-mode fast \
+    --merlin-path /path/to/merlin \
+    --query "Tell me a bio of Albert Einstein" \
+    --response "Albert Einstein was born in 1879 in Ulm, Germany. He developed the theory of relativity." \
+    --topic "Albert Einstein"
+```
+
+Since `all_pairs` is the default, you can simply omit `--nli-mode` to get it — the
+first command above is explicit for contrast, not because the flag is required.
+
+**How to confirm `fast` took effect.** On `--pipeline factreasoner` it prints a
+one-line banner at startup:
+
+```
+[FactReasoner] NLI pair policy: provenance (cascade=True, near-dup dedup=True)
+```
+
+`all_pairs` prints nothing, since it is the default behavior.
+
+> `--nli-mode` applies to `--pipeline factreasoner` only. The baseline pipelines
+> (`factscore`, `veriscore`, `factverify`) do not build a pair-scored NLI graph, so
+> the flag is accepted but has no effect there.
+
+#### 2. In Python — `FactualityRunner`
+
+The same two modes, as a one-word switch:
+
+```python
+from fact_reasoner import FactualityRunner, build_backend
+
+runner = FactualityRunner(
+    build_backend("ollama"),        # or "rits" / "vllm" / "openai"
+    pipeline="factreasoner",
+    merlin_path="/path/to/merlin",
+    nli_mode="all_pairs",          # <-- or "fast"; the only line that changes
+    nli_cache_dir=".cache/nli",    # optional: re-scoring the same data is free
+)
+
+results = runner.assess(
+    query="Tell me a bio of Albert Einstein",
+    response="Albert Einstein was born in 1879 in Ulm, Germany. "
+             "He developed the theory of relativity.",
+    topic="Albert Einstein",
+)
+print(f"Factuality score: {results['factuality_score']:.2%}")
+```
+
+#### 3. Which mode should I use?
+
+| Mode | Use it when | Trade-off |
+|------|-------------|-----------|
+| `all_pairs` *(default)* | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
+| `fast` | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
+
+Start with `fast` while developing, then confirm final numbers with `all_pairs`.
+
+To tune the individual knobs behind these presets — or to combine them, e.g. `fast`
+with the pair policy put back to `all_pairs` — see
+[NLI cost control](#nli-cost-control-advanced).
+
+### Advanced: manual component wiring
+
+> The CLI and `FactualityRunner` above wire everything for you, including correct
+> async handling and retriever construction. Use the lower-level building blocks
+> below only if you need custom component wiring.
 
 ```python
 import asyncio
@@ -516,6 +609,7 @@ from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.nli_config import get_pair_config
 from fact_reasoner.core.query_builder import QueryBuilder
 
 # Initialize the LLM backend via the factory. Switch providers by changing the
@@ -552,7 +646,11 @@ context_retriever = ContextRetriever(
     num_workers=4,
 )
 
-# Create the FactReasoner pipeline
+# Create the FactReasoner pipeline.
+#
+# NOTE the API difference: this low-level class takes a pair-config *object*, not
+# the `nli_mode` name that the CLI and FactualityRunner accept. Passing
+# `nli_mode="fast"` here is a TypeError -- resolve the name yourself instead:
 pipeline = FactReasoner(
     atom_extractor=atom_extractor,
     atom_reviser=atom_reviser,
@@ -560,6 +658,7 @@ pipeline = FactReasoner(
     context_summarizer=context_summarizer,
     nli_extractor=nli_extractor,
     merlin_path="/path/to/merlin",
+    nli_pair_config=get_pair_config("all_pairs"),  # or "fast"
 )
 
 # Build the graphical model. FactReasoner.build is async, so await it (here via
@@ -578,10 +677,6 @@ asyncio.run(
 results, marginals = pipeline.score()
 print(f"Factuality Score: {results['factuality_score']:.2%}")
 ```
-
-> **Tip:** the `FactualityRunner` / `fact-reasoner` CLI wires all of the above for
-> you (correct async handling and retriever construction included). Prefer it
-> unless you need custom component wiring.
 
 ### Loading from Pre-processed Data
 
@@ -828,7 +923,6 @@ FactReasoner/
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples
-│   │   ├── correctors/       # Corrector examples
 │   │   └── core/             # Core component examples
 │   └── papers/               # Papers
 ├── tests/                    # Unit tests
@@ -842,7 +936,8 @@ See the `docs/` directory for complete examples:
 
 | Example | Description |
 |---------|-------------|
-| `docs/examples/assessors/ex_factreasoner.py` | Full FactReasoner pipeline |
+| `docs/examples/assessors/ex_factreasoner_all_pairs.py` | Full FactReasoner pipeline, `all_pairs` NLI mode (highest fidelity) |
+| `docs/examples/assessors/ex_factreasoner_fast.py` | Full FactReasoner pipeline, `fast` NLI mode (fewer LLM calls) |
 | `docs/examples/assessors/ex_factscore.py` | FactScore baseline |
 | `docs/examples/assessors/ex_veriscore.py` | VeriScore baseline |
 | `docs/examples/core/ex_atomizer.py` | Standalone atomization |

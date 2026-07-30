@@ -18,13 +18,13 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`Atomizer`** — Extracts atomic factual units from a text response using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server, `openai` → `OpenAIBackend` for a hosted frontier model: OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`)
 - **`run()`** — Processes a single response synchronously. Backend/network errors and unparsable output are caught and return an empty dict rather than raising.
 - **`run_batch()`** — Processes multiple responses concurrently with **bounded concurrency** and a **per-minute rate limit** (default 1500 requests/min). It is failure-resilient: a single failed request does not drop the others, and the returned list is positionally aligned with the input list.
 
 ## How It Works
 
-1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
+1. Create a Mellea backend selected via `--backend` (RITS by default; also `ollama`, `vllm`, or `openai` for a hosted frontier model). When `--served-model` is omitted, every backend resolves the same shared default model, Granite 4 Micro.
 2. Instantiate the `Atomizer` with the backend.
 3. Define a sample response about the Apollo 14 mission.
 4. **Single processing:** Call `atomizer.run(response)` to extract atomic claims. The result is a dictionary mapping atom indices to their text. If generation fails or the output cannot be parsed, an empty dict is returned.

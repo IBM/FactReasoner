@@ -20,13 +20,13 @@ Plus Google search API access.
 ## Key Components
 
 - **`SourceRetriever`** — Retrieves supporting contexts from a single backend source (e.g. the web via search APIs)
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server), used by the query builder
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server, `openai` → `OpenAIBackend` for a hosted frontier model: OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`), used by the query builder
 - **`QueryBuilder`** — Generates search-optimized queries (used internally by the retriever)
 - **`query(text)`** — Executes a search query and returns a list of context objects
 
 ## How It Works
 
-1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
+1. Create a Mellea backend selected via `--backend` (RITS by default; also `ollama`, `vllm`, or `openai` for a hosted frontier model). When `--served-model` is omitted, every backend resolves the same shared default model, Granite 4 Micro.
 2. Instantiate a `QueryBuilder` for query optimization.
 3. Create a `SourceRetriever` configured with:
    - `top_k=10` — return up to 10 results
@@ -54,4 +54,4 @@ python docs/examples/core/ex_retriever.py --backend ollama
 
 The script prints:
 - The total number of retrieved contexts
-- Each context object (containing the text, source URL, and metadata)
+- Each retrieved passage, printed as a plain dict with exactly four keys: `title`, `text`, `snippet` and `link`

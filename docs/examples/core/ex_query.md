@@ -18,12 +18,12 @@ One of the following Mellea backends, selected with the `--backend` flag:
 ## Key Components
 
 - **`QueryBuilder`** — Generates search-optimized queries from input text using an LLM backend
-- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server)
+- **`build_backend()`** — Constructs the selected Mellea backend (`rits` → `RITSBackend`, `ollama` → `OllamaModelBackend`, `vllm` → `OpenAIBackend` pointed at a vLLM server, `openai` → `OpenAIBackend` for a hosted frontier model: OpenAI, or Claude via `--base-url https://api.anthropic.com/v1/`)
 - **`run(text)`** — Transforms a single text input into a search query (falls back to the original text if generation fails)
 
 ## How It Works
 
-1. Create a Mellea backend selected via `--backend`: RITS with LLaMA 3.3 70B Instruct (default), or a local Ollama backend with Granite 4 Micro.
+1. Create a Mellea backend selected via `--backend` (RITS by default; also `ollama`, `vllm`, or `openai` for a hosted frontier model). When `--served-model` is omitted, every backend resolves the same shared default model, Granite 4 Micro.
 2. Instantiate the `QueryBuilder` with the backend.
 3. Define an input text — `"rootstock for honey crisp apples in wayne county, ny"`.
 4. Call `qb.run(text)` to generate the search query.
