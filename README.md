@@ -500,3 +500,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on [GitHub](https://github.com/IBM/FactReasoner).
+
+## ConTrust: credibility-weighted context priors
+
+Contexts can be weighted by the credibility of their source instead of a fixed
+prior. See [docs/CONTRUST.md](docs/CONTRUST.md).
