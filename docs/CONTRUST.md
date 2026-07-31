@@ -55,16 +55,9 @@ and each source's record is updated afterwards. Runtime ≈ 18 min for a
 
 ## Scope and limitations
 
-- **MBFC covers news outlets only.** On a run over an actor biography, 38 of 40
-  retrieved contexts (IMDb, Letterboxd, Playbill, Wikipedia) were unrated and
-  all took the 0.50 fallback — credibility weighting is inert there. It changes
-  outcomes where sources are rated *and* disagree.
-- **Weighting can reweigh disagreement, not create it.** Claims refuted only by
-  omission (a fabricated film credit) retrieve no contradicting text, so no
-  system in this family catches them.
 - **β saturates** once a source has ~2 observations, so settled sources are
-  uniformly 30% prior / 70% learned record.
-- **The prior is US/English-centric**, inheriting MBFC's coverage.
+  uniformly 30% prior / 70% learned record. Can be tuned for a better dataset.
+- **The prior is US/English-centric**, inheriting MBFC's coverage. Has room for improvement when it comes to generating a prior score.
 
 ## Evaluation
 
