@@ -36,6 +36,7 @@ from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
 from fact_reasoner.lcs.pipeline import COHERENCE_FORMULATIONS
 from fact_reasoner.lcs.relation_miner import STRENGTH_METHODS
+from fact_reasoner.lcs.runner import CoherenceRunner, atom_texts_from_item
 
 # Where the atom priors come from.
 PRIOR_SOURCE_CHOICES = ("none", "factreasoner", "file")
@@ -67,11 +68,31 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     i.add_argument("--query", default=None, help="The query the response answers.")
     i.add_argument("--topic", default=None, help="Optional topic hint.")
+    i.add_argument(
+        "--input-file",
+        default=None,
+        help="Dataset mode: a jsonl file of items that already carry atoms and "
+        "contexts (as the factuality pipeline writes them). Nothing is atomized "
+        "or retrieved; results are written incrementally to --output-dir and "
+        "already-processed inputs are skipped, so the run is resumable.",
+    )
+    i.add_argument(
+        "--output-dir",
+        default=None,
+        help="Dataset mode: directory for the output jsonl.",
+    )
+    i.add_argument(
+        "--dataset-name",
+        default=None,
+        help="Dataset mode: dataset label used in the output filename.",
+    )
 
     # --- Scoring ---
     s = parser.add_argument_group("scoring")
     s.add_argument(
-        "--merlin-path", default=None, required=False,
+        "--merlin-path",
+        default=None,
+        required=False,
         help="Path to Merlin (required: the MRF is solved with it).",
     )
     s.add_argument(
@@ -203,12 +224,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--progress-bar", action="store_true", help="Show a mining progress bar."
     )
 
-    _add_backend_args(parser)
+    # RITS by default here (unlike the factuality command's ollama): the default
+    # relation-strength estimator reads logprobs, which ollama does not expose.
+    _add_backend_args(parser, default_kind="rits")
 
     parser.add_argument(
         "--output-file",
         default=None,
-        help="Write the full result to this JSON file (else print a summary).",
+        help="Single mode: write the full result to this JSON file (else print a "
+        "summary).",
     )
     return parser
 
@@ -271,68 +295,51 @@ def _read_response(args) -> tuple[str, list[str] | None]:
             raise SystemExit(f"--response-file is not valid JSON: {e}.") from e
         response = payload.get("response") or payload.get("output")
         if not response:
-            raise SystemExit(
-                f"{path!r} has no 'response'/'output' field to score."
-            )
-        atoms = payload.get("atoms")
-        atom_texts = None
-        if isinstance(atoms, list) and atoms:
-            atom_texts = [
-                a["text"] if isinstance(a, dict) else str(a)
-                for a in atoms
-                if not isinstance(a, dict) or a.get("text")
-            ]
-        return response, atom_texts
+            raise SystemExit(f"{path!r} has no 'response'/'output' field to score.")
+        return response, atom_texts_from_item(payload)
 
     if not raw.strip():
         raise SystemExit(f"--response-file is empty: {path!r}.")
     return raw, None
 
 
-def _build_prior_provider(args, backend):
-    """Build the prior provider selected by ``--priors``.
+def _build_runner(args, backend, methods: tuple[str, ...]) -> CoherenceRunner:
+    """Build the :class:`CoherenceRunner` the parsed arguments describe.
 
     Args:
         args: The parsed arguments.
-        backend: The Mellea backend (needed for the live factuality stage).
+        backend: The Mellea backend.
+        methods: The resolved LCS readouts.
 
     Returns:
-        A :class:`~fact_reasoner.lcs.priors.PriorProvider`, or None for uniform.
-
-    Raises:
-        SystemExit: If a required argument for the selected source is missing.
+        The runner.
     """
-    if args.priors == "none":
-        return None
-
-    if args.priors == "file":
-        if not args.priors_file:
-            raise SystemExit("--priors file requires --priors-file.")
-        if not os.path.exists(args.priors_file):
-            raise SystemExit(f"--priors-file not found: {args.priors_file!r}.")
-        from fact_reasoner.lcs.priors import PrecomputedPriorProvider
-
-        return PrecomputedPriorProvider(args.priors_file)
-
-    # factreasoner: a live factuality run supplies the posteriors (and its atoms).
-    from fact_reasoner.lcs.priors import FactReasonerPriorProvider
-    from fact_reasoner.runner import FactualityRunner
-
-    runner = FactualityRunner(
+    return CoherenceRunner(
         backend,
+        merlin_path=args.merlin_path,
+        methods=methods,
+        formulation=args.formulation,
+        reified_prior=args.reified_prior,
+        ibound=args.ibound,
+        on_low_coverage=args.on_low_coverage,
+        prior_source=args.priors,
+        priors_file=args.priors_file,
         pipeline_version=args.pipeline_version,
         service_type=args.service_type,
         cache_dir=args.cache_dir,
         top_k=args.top_k,
-        use_priors=True,
         use_summarizer=args.use_summarizer,
-        merlin_path=args.merlin_path,
-        nli_method=args.nli_method,
         nli_mode=args.nli_mode,
         nli_cache_dir=args.nli_cache_dir,
+        nli_method=args.nli_method,
+        strength_method=args.strength_method,
+        strength_samples=args.strength_samples,
+        pair_policy=args.pair_policy,
+        window=args.window,
+        gate=args.gate,
+        revise_atoms=args.revise_atoms,
         show_progress=args.progress_bar,
     )
-    return FactReasonerPriorProvider(runner=runner)
 
 
 def main() -> None:
@@ -340,47 +347,45 @@ def main() -> None:
 
     if not args.merlin_path:
         raise SystemExit("--merlin-path is required (the MRF is solved with Merlin).")
+
+    file_mode = bool(args.input_file)
+    if file_mode and (args.response or args.response_file):
+        raise SystemExit(
+            "Provide either --input-file (dataset mode) or "
+            "--response/--response-file (single mode), not both."
+        )
+    if file_mode and not args.output_dir:
+        raise SystemExit("--input-file requires --output-dir.")
+    if file_mode and not os.path.exists(args.input_file):
+        raise SystemExit(f"--input-file not found: {args.input_file!r}.")
+    if args.priors == "file":
+        if not args.priors_file:
+            raise SystemExit("--priors file requires --priors-file.")
+        if not os.path.exists(args.priors_file):
+            raise SystemExit(f"--priors-file not found: {args.priors_file!r}.")
+
     methods = _resolve_methods(args.methods)
-    response, atom_texts = _read_response(args)
+    # Validated before the backend is built (and before any credentials are
+    # needed), so a bad flag combination fails fast.
+    response, atom_texts = (None, None) if file_mode else _read_response(args)
 
     with _backend_context(args) as backend:
-        from fact_reasoner.core.atomizer import Atomizer
-        from fact_reasoner.core.reviser import Reviser
-        from fact_reasoner.lcs.pipeline import CoherencePipeline
-        from fact_reasoner.lcs.relation_miner import RelationMiner
+        runner = _build_runner(args, backend, methods)
 
-        miner = RelationMiner(
-            backend,
-            nli_method=args.nli_method,
-            atomizer=Atomizer(backend),
-            reviser=Reviser(backend) if args.revise_atoms else None,
-            pair_policy=args.pair_policy,
-            window=args.window,
-            gate=args.gate,
-            strength_method=args.strength_method,
-            strength_samples=args.strength_samples,
-            show_progress=args.progress_bar,
-        )
-        pipeline = CoherencePipeline(
-            miner=miner,
-            merlin_path=args.merlin_path,
-            formulation=args.formulation,
-            prior_provider=_build_prior_provider(args, backend),
-            methods=methods,
-            reified_prior=args.reified_prior,
-            on_low_coverage=args.on_low_coverage,
-        )
-
-        if atom_texts:
-            # The input file already carries atoms: mine those rather than
-            # re-atomizing, then score under the requested priors.
-            mining = miner.mine_from_atoms(atom_texts, response)
-            atom_priors = pipeline.prior_provider.priors_for(
-                response=response, query=args.query, topic=args.topic
+        if file_mode:
+            runner.assess_file(
+                args.input_file,
+                args.output_dir,
+                dataset_name=args.dataset_name,
+                model_id=args.model_id,
             )
-            result = pipeline.run_from_mining(mining, priors=atom_priors)
-        else:
-            result = pipeline.run(response, query=args.query, topic=args.topic)
+            return
+
+        # When the input file already carries atoms, those are mined rather than
+        # re-atomizing the response.
+        result = runner.assess(
+            args.query or "", response, topic=args.topic, atom_texts=atom_texts
+        )
 
     if args.output_file:
         with open(args.output_file, "w") as f:

@@ -451,3 +451,235 @@ class TestNliModeAndVersion:
         )
         assert kwargs["nli_mode"] == "fast"
         assert kwargs["nli_pair_policy"] == "all_pairs"
+
+
+def _run_lcs(argv):
+    from fact_reasoner.lcs import cli as lcs_cli
+
+    with patch("sys.argv", ["fact-reasoner-lcs", *argv]):
+        lcs_cli.main()
+
+
+class TestLCSCliValidation:
+    """The coherence entrypoint's own flag surface (fact-reasoner-lcs)."""
+
+    def test_merlin_path_required(self):
+        with pytest.raises(SystemExit, match="--merlin-path is required"):
+            _run_lcs(["--response", "r"])
+
+    def test_no_input_mode_errors(self):
+        with pytest.raises(SystemExit, match="exactly one of --response"):
+            _run_lcs(["--merlin-path", "/m"])
+
+    def test_both_input_modes_error(self, tmp_path):
+        data = tmp_path / "d.jsonl"
+        data.write_text("{}\n")
+        with pytest.raises(SystemExit, match="not both"):
+            _run_lcs(
+                [
+                    "--merlin-path",
+                    "/m",
+                    "--response",
+                    "r",
+                    "--input-file",
+                    str(data),
+                    "--output-dir",
+                    str(tmp_path),
+                ]
+            )
+
+    def test_input_file_requires_output_dir(self, tmp_path):
+        data = tmp_path / "d.jsonl"
+        data.write_text("{}\n")
+        with pytest.raises(SystemExit, match="requires --output-dir"):
+            _run_lcs(["--merlin-path", "/m", "--input-file", str(data)])
+
+    def test_missing_input_file_errors(self, tmp_path):
+        with pytest.raises(SystemExit, match="--input-file not found"):
+            _run_lcs(
+                [
+                    "--merlin-path",
+                    "/m",
+                    "--input-file",
+                    str(tmp_path / "nope.jsonl"),
+                    "--output-dir",
+                    str(tmp_path),
+                ]
+            )
+
+    def test_priors_file_source_requires_a_path(self):
+        with pytest.raises(SystemExit, match="requires --priors-file"):
+            _run_lcs(["--merlin-path", "/m", "--response", "r", "--priors", "file"])
+
+    def test_missing_priors_file_errors(self, tmp_path):
+        with pytest.raises(SystemExit, match="--priors-file not found"):
+            _run_lcs(
+                [
+                    "--merlin-path",
+                    "/m",
+                    "--response",
+                    "r",
+                    "--priors",
+                    "file",
+                    "--priors-file",
+                    str(tmp_path / "nope.json"),
+                ]
+            )
+
+    def test_unknown_method_rejected(self):
+        with pytest.raises(SystemExit, match="Unknown --methods"):
+            _run_lcs(["--merlin-path", "/m", "--response", "r", "--methods", "bogus"])
+
+
+class TestLCSCliBackendDefault:
+    """The coherence command defaults to RITS; the factuality one stays on ollama."""
+
+    def _parser(self):
+        from fact_reasoner.lcs import cli as lcs_cli
+
+        return lcs_cli._build_arg_parser()
+
+    def test_lcs_defaults_to_rits(self):
+        args = self._parser().parse_args(["--merlin-path", "/m", "--response", "r"])
+        assert args.backend == "rits"
+
+    def test_factuality_default_is_unchanged(self):
+        # _add_backend_args is shared, so the LCS override must not leak here.
+        assert cli._build_arg_parser().parse_args([]).backend == "ollama"
+
+    def test_lcs_backend_choices_are_the_full_set(self):
+        action = next(
+            a for a in self._parser()._actions if "--backend" in a.option_strings
+        )
+        assert set(action.choices) == {"ollama", "rits", "vllm", "openai"}
+
+
+class TestLCSCliRunnerWiring:
+    """The CLI is a thin shell: every flag must reach the CoherenceRunner."""
+
+    def _run_and_capture(self, extra_argv, *, response="r"):
+        from fact_reasoner.lcs import cli as lcs_cli
+
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = MagicMock()
+        with (
+            patch.object(lcs_cli, "CoherenceRunner", return_value=fake_runner) as ctor,
+            patch.object(lcs_cli, "_backend_context") as ctx,
+        ):
+            ctx.return_value.__enter__.return_value = object()
+            _run_lcs(["--merlin-path", "/m", "--response", response, *extra_argv])
+        return ctor.call_args.kwargs, fake_runner
+
+    def test_defaults_reach_the_runner(self):
+        kwargs, _runner = self._run_and_capture([])
+        assert kwargs["merlin_path"] == "/m"
+        assert kwargs["methods"] == ("mean_marginal",)
+        assert kwargs["formulation"] == "mrf"
+        assert kwargs["prior_source"] == "none"
+        assert kwargs["pair_policy"] == "windowed"
+        assert kwargs["nli_mode"] == "fast"
+
+    def test_ibound_reaches_the_runner(self):
+        # It was parsed and silently dropped before the runner existed.
+        kwargs, _runner = self._run_and_capture(["--ibound", "11"])
+        assert kwargs["ibound"] == 11
+
+    def test_methods_all_expands(self):
+        from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
+
+        kwargs, _runner = self._run_and_capture(["--methods", "all"])
+        assert kwargs["methods"] == tuple(LCS_METHODS)
+
+    def test_prior_source_and_file_are_forwarded(self, tmp_path):
+        path = tmp_path / "p.json"
+        path.write_text("{}")
+        kwargs, _runner = self._run_and_capture(
+            ["--priors", "file", "--priors-file", str(path)]
+        )
+        assert kwargs["prior_source"] == "file"
+        assert kwargs["priors_file"] == str(path)
+
+    def test_mining_flags_are_forwarded(self):
+        kwargs, _runner = self._run_and_capture(
+            [
+                "--pair-policy",
+                "all_pairs",
+                "--window",
+                "6",
+                "--gate",
+                "none",
+                "--strength-method",
+                "verbalized",
+                "--nli-method",
+                "simbauq",
+                "--revise-atoms",
+            ]
+        )
+        assert kwargs["pair_policy"] == "all_pairs"
+        assert kwargs["window"] == 6
+        assert kwargs["gate"] == "none"
+        assert kwargs["strength_method"] == "verbalized"
+        assert kwargs["nli_method"] == "simbauq"
+        assert kwargs["revise_atoms"] is True
+
+    def test_single_mode_calls_assess(self):
+        _kwargs, runner = self._run_and_capture(["--query", "q", "--topic", "t"])
+        runner.assess.assert_called_once()
+        args, kwargs = runner.assess.call_args
+        assert args[0] == "q"
+        assert args[1] == "r"
+        assert kwargs["topic"] == "t"
+        assert kwargs["atom_texts"] is None
+        runner.assess_file.assert_not_called()
+
+    def test_response_file_atoms_are_mined_directly(self, tmp_path):
+        import json as _json
+
+        from fact_reasoner.lcs import cli as lcs_cli
+
+        path = tmp_path / "item.json"
+        path.write_text(
+            _json.dumps({"response": "The text.", "atoms": [{"text": "One."}]})
+        )
+        fake_runner = MagicMock()
+        with (
+            patch.object(lcs_cli, "CoherenceRunner", return_value=fake_runner),
+            patch.object(lcs_cli, "_backend_context") as ctx,
+        ):
+            ctx.return_value.__enter__.return_value = object()
+            _run_lcs(["--merlin-path", "/m", "--response-file", str(path)])
+
+        assert fake_runner.assess.call_args.kwargs["atom_texts"] == ["One."]
+
+    def test_file_mode_calls_assess_file(self, tmp_path):
+        from fact_reasoner.lcs import cli as lcs_cli
+
+        data = tmp_path / "d.jsonl"
+        data.write_text("{}\n")
+        out_dir = tmp_path / "out"
+        fake_runner = MagicMock()
+        with (
+            patch.object(lcs_cli, "CoherenceRunner", return_value=fake_runner),
+            patch.object(lcs_cli, "_backend_context") as ctx,
+        ):
+            ctx.return_value.__enter__.return_value = object()
+            _run_lcs(
+                [
+                    "--merlin-path",
+                    "/m",
+                    "--input-file",
+                    str(data),
+                    "--output-dir",
+                    str(out_dir),
+                    "--dataset-name",
+                    "demo",
+                    "--model-id",
+                    "granite4",
+                ]
+            )
+
+        fake_runner.assess_file.assert_called_once()
+        args, kwargs = fake_runner.assess_file.call_args
+        assert args == (str(data), str(out_dir))
+        assert kwargs == {"dataset_name": "demo", "model_id": "granite4"}
+        fake_runner.assess.assert_not_called()

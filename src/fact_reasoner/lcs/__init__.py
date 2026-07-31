@@ -71,6 +71,31 @@ once per stage. Priors can also come from a saved factuality run
 (``PrecomputedPriorProvider("results.json")``) or a plain mapping -- both cost no
 LLM calls -- and ``mine_and_score(..., priors=...)`` takes any of these forms.
 
+The runner
+----------
+
+``CoherenceRunner`` is the layer above that pipeline: it owns the backend and the
+shared components, builds the factuality stage itself, and adds a resumable
+dataset sweep. Factuality priors are its default, so the two-stage model above is
+what you get out of the box::
+
+    from fact_reasoner.lcs import CoherenceRunner
+
+    runner = CoherenceRunner.from_backend_kind("rits", merlin_path=merlin_path)
+    runner.assess(query, response).describe()
+
+    # A jsonl dataset of items that already carry atoms and contexts: nothing is
+    # atomized or retrieved, results are written incrementally, and re-running
+    # skips whatever finished.
+    runner.assess_file("data.jsonl", "results/", dataset_name="demo",
+                       model_id="llama-3-3-70b")
+
+Pass ``prior_source="none"`` for coherence alone, or ``"file"`` with
+``priors_file=`` to replay a saved factuality run. ``from_backend_kind`` builds any
+backend ``build_backend`` supports (``"rits"`` by default); with ``"ollama"`` -- or
+Claude via the OpenAI-compatibility endpoint -- pass ``nli_method="simbauq"``,
+since neither returns usable logprobs.
+
 ``formulation="mln"`` selects the Markov-logic model of
 ``docs/ideation/coherence_mln_deepdive.pdf``; its closed-form pairwise fragment is
 implemented (and verified to reproduce the MRF exactly), but scoring it raises
@@ -114,6 +139,12 @@ from fact_reasoner.lcs.relation_miner import (
     MiningResult,
     RelationMiner,
 )
+from fact_reasoner.lcs.runner import (
+    COHERENCE_PRIOR_SOURCES,
+    DEFAULT_BACKEND_KIND,
+    CoherenceRunner,
+    atom_texts_from_item,
+)
 from fact_reasoner.lcs.strength import (
     IdentityCalibrator,
     PlattCalibrator,
@@ -139,6 +170,11 @@ __all__ = [
     "LCSScorer",
     "LCS_METHODS",
     "mine_and_score",
+    # The runner: one object over a single response or a jsonl dataset.
+    "CoherenceRunner",
+    "COHERENCE_PRIOR_SOURCES",
+    "DEFAULT_BACKEND_KIND",
+    "atom_texts_from_item",
     # Two-stage pipeline: factuality priors + a coherence model.
     "CoherencePipeline",
     "CoherenceResult",
@@ -236,9 +272,7 @@ def mine_and_score(
     Raises:
         ValueError: If atoms are passed without a ``response``.
     """
-    miner = RelationMiner(
-        backend, atomizer=atomizer, reviser=reviser, **miner_kwargs
-    )
+    miner = RelationMiner(backend, atomizer=atomizer, reviser=reviser, **miner_kwargs)
     if isinstance(response_or_atoms, str):
         source_response = response_or_atoms
         result = miner.mine_from_response(response_or_atoms)
@@ -254,9 +288,7 @@ def mine_and_score(
     scorer_kwargs = dict(scorer_kwargs or {})
     node_priors = None
     if priors is not None:
-        atom_priors = coerce_prior_provider(priors).priors_for(
-            response=source_response
-        )
+        atom_priors = coerce_prior_provider(priors).priors_for(response=source_response)
         node_priors, _coverage = atom_priors.resolve(result.atoms)
 
     if formulation == "mrf":

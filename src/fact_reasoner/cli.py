@@ -236,7 +236,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _add_backend_args(parser: argparse.ArgumentParser) -> None:
+def _add_backend_args(
+    parser: argparse.ArgumentParser, *, default_kind: str = "ollama"
+) -> None:
     """Add the shared backend/model argument group to a parser.
 
     Extracted so the coherence entry point (``fact_reasoner.lcs.cli``) selects and
@@ -244,15 +246,19 @@ def _add_backend_args(parser: argparse.ArgumentParser) -> None:
 
     Args:
         parser: The parser to add the ``backend`` argument group to.
+        default_kind: Which backend ``--backend`` defaults to. This command
+            defaults to ``"ollama"`` (no credentials needed); the coherence
+            command defaults to ``"rits"``, whose logprobs its default relation
+            strength estimator needs.
     """
     b = parser.add_argument_group("backend")
     b.add_argument(
         "--backend",
-        default="ollama",
+        default=default_kind,
         choices=["ollama", "rits", "vllm", "openai"],
-        help="Backend to use (default: ollama). 'openai' is a hosted frontier "
-        "model: OpenAI itself, or Claude via Anthropic's OpenAI-compatible "
-        "endpoint (see --base-url).",
+        help=f"Backend to use (default: {default_kind}). 'openai' is a hosted "
+        "frontier model: OpenAI itself, or Claude via Anthropic's "
+        "OpenAI-compatible endpoint (see --base-url).",
     )
     b.add_argument(
         "--model-id",

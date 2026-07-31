@@ -5,6 +5,7 @@ from .backends import build_backend
 from .corrector import FactCorrector
 from .fact_graph import FactGraph
 from .lcs import (
+    CoherenceRunner,
     LCSScorer,
     MinedRelation,
     MiningResult,
@@ -40,6 +41,7 @@ __all__ = [
     "MinedRelation",
     "MiningResult",
     "LCSScorer",
+    "CoherenceRunner",
     "mine_and_score",
     "MODELS",
     "UnifiedModel",
