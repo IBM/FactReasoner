@@ -691,7 +691,11 @@ For a \emph{graded, graph-level} score the same choice is disqualifying, for thr
 \begin{itemize}[leftmargin=*,nosep]
   \item \textbf{Relation validity: 55\% valid / 45\% invalid.} A \emph{valid} relation is one
         the text genuinely draws and that genuinely holds; \emph{invalid} covers wrong sense,
-        reversed direction, a factually false endpoint, or a spurious link.
+        reversed direction, a factually false endpoint, or a spurious link. This is the
+        \emph{corpus-level} target; P3 asks each family for an explicit 6-of-10 count rather
+        than a percentage, because live models given ``55\%'' over a variable relation count
+        rounded to a convenient fraction instead. $6/10=0.60$ sits inside the admission band,
+        so the balance is preserved while the instruction becomes countable.
   \item \textbf{Rung level:} every 5-rung family contains exactly one fully coherent rung and
         one maximally perturbed rung, so 20\% of items sit near the ceiling and 20\% near the
         floor \emph{by construction}. This is what makes ceiling/floor calibration --- and
@@ -1835,7 +1839,7 @@ rather than to an accident of claim phrasing.
 
 \subsection{P3 --- relation plan generation}
 
-\promptsig{P3 --- relation plan generation 	extnormal{(the architectural departure, Section~\ref{sec:p3rationale})}}{\texttt{[QUESTION\_PLACEHOLDER]}, \texttt{[CLAIMS\_PLACEHOLDER]} (P2s tagged list).}{One JSON object: \texttt{atoms} (with \texttt{pos}), \texttt{relations} (sense, strength band, validity, error kind, resolver), \texttt{non\_relations}.}{Schema-valid; every pair within 4 positions or sharing a named entity (instr.~4); $\geq1$ each of Alternative, Disjunction, Restatement, Concession and Precedence/Succession (instr.~5); 55/45 valid/invalid (instr.~8).}
+\promptsig{P3 --- relation plan generation \textnormal{(the architectural departure, Section~\ref{sec:p3rationale})}}{\texttt{[QUESTION\_PLACEHOLDER]}, \texttt{[CLAIMS\_PLACEHOLDER]} (P2s tagged list).}{One JSON object: \texttt{atoms} (with \texttt{pos}), \texttt{relations} (sense, strength band, validity, error kind, resolver), \texttt{non\_relations}.}{Schema-valid; $\geq1$ each of Alternative, Disjunction, Restatement, Concession and Precedence/Succession (instr.~5); 6 valid / 4 invalid of 10 relations (instr.~8). Locality (instr.~4) is \emph{recorded, not enforced} here --- see R2.}
 
 This replaces \textsc{LoReFact}'s logical-statement stage (their Table 13). Their stage emits
 prose and requires that ``each logical statement must contain a logical error'', which is what
@@ -1847,12 +1851,16 @@ Instructions:
 1. You are given a QUESTION and a tagged list of ATOMIC CLAIMS. Produce a
    RELATION PLAN: a machine-readable graph of the logical relations a response
    should draw between those claims.
-2. Select 14-18 claims to use, and assign each a POSITION index 1..N giving the
-   order in which the response will assert it. Every selected claim keeps its
+2. Select 14-18 claims to use. Aim for 16. Number them with FRESH consecutive
+   positions: the first claim you assert is pos 1, the next pos 2, and so on
+   with NO gaps and NO repeats, ending at pos N where N is how many you
+   selected. Do NOT carry over the numbering of the input list - if you pick the
+   3rd, 7th and 12th claims they become pos 1, 2 and 3. The position is the
+   order the response will assert the claim in. Every selected claim keeps its
    text EXACTLY as given. Do NOT introduce information not in the claims, and
    do NOT alter the claims.
-3. Plan 8-12 RELATIONS. Each relation connects exactly two selected claims and
-   has a SENSE, one of: Cause-Effect, Effect-Cause, Evidence, Condition,
+3. Plan EXACTLY 10 RELATIONS. Each relation connects exactly two selected claims
+   and has a SENSE, one of: Cause-Effect, Effect-Cause, Evidence, Condition,
    Restatement, Instantiation, Contrast, Concession, Alternative, Disjunction,
    Precedence, Succession.
    - Cause-Effect: source causes target. Effect-Cause: source is the effect,
@@ -1869,9 +1877,11 @@ Instructions:
      claims here.
    - Precedence / Succession: ordered in time with NO truth dependence -
      neither claim being true or false says anything about the other.
-4. Every relation's two claims must be within 4 POSITIONS of each other, OR
-   must share a named entity appearing in both claim texts. This keeps the
-   graph recoverable from the response by a local reader.
+4. Keep relations LOCAL: prefer pairs within 4 POSITIONS of each other, so the
+   graph stays recoverable from the response by a local reader. A longer-range
+   pair is acceptable when the two claim texts share a named entity, and a few
+   long-range links (for instance a closing claim answering the opening one) are
+   fine. Order the positions so that related claims sit near each other.
 5. The plan must include AT LEAST ONE relation of each of these senses:
    Alternative, Disjunction, Restatement, Concession, and one of
    Precedence/Succession.
@@ -1882,24 +1892,69 @@ Instructions:
    (0.60-0.84), or weak (0.35-0.59) - how strongly the source determines the
    target under that sense. Restatement relations are always strong.
 8. Give each relation an intended VALIDITY: valid if the relation genuinely
-   holds between the claims as stated; invalid if it does not. Plan 55% valid
-   and 45% invalid. For each invalid relation give an ERROR_KIND, one of:
-   wrong_sense, wrong_direction, false_endpoint, spurious.
-9. Also list 4-6 NON-RELATIONS: pairs of selected claims within 4 positions of
-   each other between which the response must draw NO logical dependence.
-   These are the distractors a relation miner must correctly label None.
-10. Output a single JSON object in a code block, exactly in this schema, and
-    nothing else:
+   holds between the claims as stated; invalid if it does not. Of your 10
+   relations, mark EXACTLY 6 "valid" and EXACTLY 4 "invalid" - count them before
+   you emit, and do not compute a percentage. For each invalid relation give an
+   ERROR_KIND, one of: wrong_sense, wrong_direction, false_endpoint, spurious.
+9. Also list 4-6 NON-RELATIONS (aim for 5): pairs of selected claims within 4
+   positions of each other between which the response must draw NO logical
+   dependence. These are the distractors a relation miner must correctly label
+   None. A non-relation pair must NOT also appear in your relations list, in
+   either direction - the two lists are disjoint.
+10. Output a single JSON object in a code block and nothing else. Below is a
+    COMPLETE, correctly-shaped example - copy its structure exactly, not its
+    text. It has 14 atoms numbered 1..14 with no gaps, 10 relations (6 valid, 4
+    invalid), all five required senses, and 5 non-relations disjoint from the
+    relations:
 
 ```json
 {
-  "atoms": [{"pos": 1, "text": "...", "factual": true}],
-  "relations": [
-    {"source_pos": 1, "target_pos": 3, "sense": "Cause-Effect",
-     "strength_band": "strong", "validity": "valid",
-     "error_kind": null, "resolved": null, "resolver_pos": null}
+  "atoms": [
+    {"pos": 1, "text": "<claim text>"}, {"pos": 2, "text": "<claim text>"},
+    {"pos": 3, "text": "<claim text>"}, {"pos": 4, "text": "<claim text>"},
+    {"pos": 5, "text": "<claim text>"}, {"pos": 6, "text": "<claim text>"},
+    {"pos": 7, "text": "<claim text>"}, {"pos": 8, "text": "<claim text>"},
+    {"pos": 9, "text": "<claim text>"}, {"pos": 10, "text": "<claim text>"},
+    {"pos": 11, "text": "<claim text>"}, {"pos": 12, "text": "<claim text>"},
+    {"pos": 13, "text": "<claim text>"}, {"pos": 14, "text": "<claim text>"}
   ],
-  "non_relations": [{"source_pos": 2, "target_pos": 5}]
+  "relations": [
+    {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 2, "target_pos": 3, "sense": "Evidence",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 3, "target_pos": 4, "sense": "Restatement",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 5, "target_pos": 6, "sense": "Alternative",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 7, "target_pos": 8, "sense": "Disjunction",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 9, "target_pos": 10, "sense": "Concession",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": true, "resolver_pos": 11},
+    {"source_pos": 11, "target_pos": 12, "sense": "Precedence",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "wrong_sense", "resolved": null, "resolver_pos": null},
+    {"source_pos": 12, "target_pos": 13, "sense": "Cause-Effect",
+     "strength_band": "moderate", "validity": "invalid",
+     "error_kind": "wrong_direction", "resolved": null, "resolver_pos": null},
+    {"source_pos": 13, "target_pos": 14, "sense": "Contrast",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "spurious", "resolved": null, "resolver_pos": null},
+    {"source_pos": 4, "target_pos": 6, "sense": "Instantiation",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "false_endpoint", "resolved": null, "resolver_pos": null}
+  ],
+  "non_relations": [
+    {"source_pos": 1, "target_pos": 4}, {"source_pos": 2, "target_pos": 5},
+    {"source_pos": 6, "target_pos": 9}, {"source_pos": 8, "target_pos": 11},
+    {"source_pos": 10, "target_pos": 13}
+  ]
 }
 ```
 
@@ -1910,13 +1965,29 @@ RELATION PLAN:
 \end{verbatim}
 \end{small}
 
-Instruction 4 is the recoverability constraint and exists because of R2
+Instruction 4 \emph{biases} generation toward recoverability and exists because of R2
 (Section~\ref{sec:risks}): the default candidate policy is \texttt{gated} with
 \texttt{window=4}, so a planned edge whose endpoints are farther apart and which fails both the
 similarity gate and the discourse-adjacency check is \emph{unmineable by construction} and
-cannot be a fair miner error. Instruction 5 guarantees per-item coverage of the
-no-prior-gold facets. Instruction 9 is what makes the over-connection rate measurable at
-all.
+cannot be a fair miner error. It is deliberately \textbf{not} an admission gate --- R2 assigns
+the authoritative check to build time, where the real candidate selector runs on the
+\emph{realized} text and records \texttt{window\_admission} per edge, and the metrics then
+exclude out-of-window gold and report the structural-miss rate separately. Enforcing it twice
+was measurably harmful: on the first live runs it was the largest single cause of plan-stage
+rejection, and the edges it caught were mostly a closing claim referring back to the opening
+one, which is ordinary discourse structure rather than an error. Instruction 5 guarantees
+per-item coverage of the no-prior-gold facets. Instruction 9 is what makes the over-connection
+rate measurable at all.
+
+Instructions 2, 8 and 9 are worded against the failure modes observed on live models rather
+than for brevity. Positions are described as \emph{fresh consecutive} integers because the
+parser requires $1..N$ with no gaps and a model that reuses the input list's numbering fails
+immediately; instruction 8 states an explicit count (6 valid, 4 invalid of 10) because
+``55\%\ valid'' over a variable 8--12 relations invited models to round to a convenient
+fraction --- one returned exactly $3/4$ on four families out of five; and instruction 9 states
+the relation/non-relation disjointness that the parser has always enforced silently. The
+corpus-level 55/45 balance of Section~\ref{sec:balance} is unchanged in intent: 6-of-10 is
+$0.60$, comfortably inside the admissible band.
 
 \subsection{P4 --- response generation}
 
@@ -1927,9 +1998,14 @@ all.
 Instructions:
 1. You are given a QUESTION and a RELATION PLAN in JSON. Write a RESPONSE that
    answers the question and realizes the plan exactly.
-2. Assert every planned atom, in the plan's POSITION order, preserving each
-   atom's factual content. You may adjust surface wording for fluency but must
-   not change what is asserted, and must not merge two atoms into one clause.
+2. Assert every planned atom EXACTLY ONCE, in the plan's POSITION order,
+   preserving each atom's factual content. Do not restate an atom you have
+   already asserted in order to attach a later relation to it - refer back with
+   a pronoun or a short noun phrase instead. You may adjust surface wording for
+   fluency but must not change what is asserted. Never let one atom absorb
+   another: each must stay separately true or false. Joining two atoms with a
+   connective is fine and often required - "either X or Y" and "although X, Y"
+   both assert two atoms and are exactly what instruction 3 asks for.
 3. Realize every planned RELATION so a careful reader could recover it from the
    text alone, using language appropriate to its sense:
    - Cause-Effect / Effect-Cause: "caused", "led to", "resulted from", "because"
@@ -1948,19 +2024,26 @@ Instructions:
      clear the ordering carries NO causal or inferential force. Do NOT write
      "and therefore" or "which led to" around these.
 4. For each planned NON-RELATION, assert both atoms but draw no dependence
-   between them. Separate them clearly - use "Separately,", "In an unrelated
-   matter,", or place them in different paragraphs. Do not let a connective
-   bridge them.
+   between them. Separate them by DISTANCE and PARAGRAPHING, not by a marker:
+   put other material between them, or place them in different paragraphs, and
+   simply use no connective. Do NOT announce the absence of a link - phrases
+   like "In an unrelated matter", "Separately", or "On a different note" read as
+   stitched-together annotation rather than prose and will be marked down.
 5. For a resolved Concession, assert the resolver atom after both endpoints and
    present it as settling the tension.
-6. Use precise and formal language, avoiding vague generalizations and
-   rhetorical fillers. Exhibit clear logical organization. No fewer than 500
-   words.
+6. Write it as a continuous expository answer to the QUESTION - an argument a
+   domain expert would publish, organized into 3-5 paragraphs, in which the
+   planned relations are simply how the argument hangs together. Do NOT walk the
+   plan relation by relation: a reader must not be able to tell that a plan
+   exists. Use precise and formal language, avoiding vague generalizations and
+   rhetorical fillers. Aim for 550-650 words; below 500 is too short.
 7. Do NOT mention the relation plan, the senses, the strength bands, the
    validity labels, or the fact that some content is incorrect. Do NOT hedge
-   with "assume", "might", "allegedly", "supposedly", or "reportedly" around
-   planned-invalid relations - assert them in the same register as the valid
-   ones. Do NOT add headings, bullet lists, or annotations.
+   with "assume", "might", "possibly", "allegedly", "supposedly", "reportedly",
+   or "it is claimed" ANYWHERE in the response - not only around
+   planned-invalid relations, which must be asserted in the same register as
+   the valid ones. In particular, realize a Disjunction as "one or both", never
+   "and possibly both". Do NOT add headings, bullet lists, or annotations.
 8. Wrap the RESPONSE in a code block.
 
 Your Task:
@@ -1973,10 +2056,39 @@ RESPONSE:
 Instruction 3's per-sense vocabulary is what makes the gold graph recoverable; the explicit
 exhaustiveness requirement for Alternative and Disjunction is what makes the
 \cCon/\cExc/\cCoN\ distinction present \emph{in the text} rather than only in the annotation.
-Instruction 7 is the anti-leakage clause, verified by V3. Its second half matters more than it
-looks: if the generator hedges around planned-invalid relations, a miner can detect invalidity
-from register alone and the benchmark measures hedge-detection instead of reasoning ---
-\textsc{LoReFact} guards the same risk in their Table 13 instruction 5.
+
+\paragraph{Coordination is not a coverage failure.}
+\label{sec:p4rationale}
+A coupling defined over the \emph{joint} truth values of two atoms cannot be realized without a
+construction that scopes over both: ``either $X$ or $Y$'' for Alternative, ``at least one of
+$X$ or $Y$'' for Disjunction, ``although $X$, $Y$'' for Concession. Instruction 3 therefore
+\emph{requires} two atoms to share a clause complex, and since Alternative, Disjunction,
+Restatement and Concession are exactly the senses instruction 5 of \textsc{p3} makes mandatory,
+every family contains at least one such pair by construction. An earlier wording of instruction 2
+forbade merging ``two atoms into one clause'' and V4 defined \texttt{merged} as content ``fused
+into a clause that also asserts another atom'', which made the two instructions unsatisfiable
+together: on the first live runs, 12 of 14 non-\texttt{asserted} flags fell on an endpoint of one
+of these senses, and generators were rejected for obeying the prompt. Both now turn on
+\emph{separability} rather than clause count: an atom is \texttt{merged} only when it can no
+longer be negated on its own, and two atoms joined by a connective are both \texttt{asserted}.
+The 100\% coverage bar is unchanged.
+Instruction 7 is the anti-leakage clause, verified by V3 --- but only after both were brought
+into agreement, because V3's definition was for a time \emph{broader} than instruction 7 and
+reproduced the same contradiction one gate over. Instruction 7 names the plan, the senses, the
+strength bands and the validity labels; V3 additionally flagged ``any span \dots\ referring to
+\emph{claims}, \emph{atoms}, \emph{statements}'' and ``any label, tag, index'', which catches
+both the coordinations instruction 3 mandates and ordinary scholarly usage of ``claim'' or
+``outcome'' about the subject matter. On the first live runs this rejected every Claude family
+with 16 and 9 leakage spans, all of them instruction-3 compliance. V3's leakage clause now reads
+narrowly and exempts those constructions explicitly, exactly as V4's \texttt{merged} was
+narrowed above. Its second half matters more than it looks: if the generator hedges around
+planned-invalid relations, a miner can detect invalidity from register alone and the benchmark
+measures hedge-detection instead of reasoning --- \textsc{LoReFact} guards the same risk in
+their Table 13 instruction 5. That half also has to be stated \emph{symmetrically}: V3 flags a
+hedge anywhere in the response, so instruction 7 must forbid the same word list anywhere rather
+than only around invalid relations. It previously omitted ``possibly'' and ``it is claimed'',
+and a generator following instruction 3's suggested Disjunction wording drifted from ``one or
+both'' to ``and possibly both'' --- graded against a list it had never been given.
 
 \subsection{P5 --- parameterized perturbation}
 
@@ -2039,7 +2151,7 @@ edit is no longer factor-neutral and the test is void.
 
 \subsection{V1 --- round-trip relation recovery}
 
-\promptsig{V1 --- round-trip relation recovery 	extnormal{(the load-bearing gate)}}{\texttt{[RESPONSE\_PLACEHOLDER]}, \texttt{[ATOMS\_PLACEHOLDER]}. \textbf{The plan is deliberately withheld.}}{A JSON list of recovered relations: source, target, sense, coupling, strength band, resolution.}{\textbf{Admission:} a majority of the committee must recover $\geq$80\% of planned relations with the correct coupling and $\geq$70\% with the correct sense. Unrecovered edges are dropped or the item regenerated --- never kept as gold.}
+\promptsig{V1 --- round-trip relation recovery \textnormal{(the load-bearing gate)}}{\texttt{[RESPONSE\_PLACEHOLDER]}, \texttt{[ATOMS\_PLACEHOLDER]} --- a mapping keyed $1..N$ by atom position, so endpoints are nameable without the plan. \textbf{The plan is deliberately withheld.}}{A JSON list of recovered relations: source, target, sense, coupling, strength band, resolution.}{\textbf{Admission:} a majority of the committee must recover $\geq$80\% of planned relations with the correct coupling and $\geq$70\% with the correct sense. Unrecovered edges are dropped or the item regenerated --- never kept as gold.}
 
 The acceptance gate. An independent model, shown the response and its atoms but \emph{not} the
 plan, re-derives the relation graph; an item enters the benchmark only if its planned graph is
@@ -2047,9 +2159,15 @@ actually recoverable.
 
 \begin{small}
 \begin{verbatim}
-Let's define a function named recover_relations(response: str, atoms: list[str]).
-Given a RESPONSE and the list of ATOMS drawn from it, the function returns the
+Let's define a function named recover_relations(response: str,
+atoms: dict[str, str]).
+Given a RESPONSE and the ATOMS drawn from it, the function returns the
 list of logical relations the response ITSELF draws between those atoms.
+
+ATOMS maps an atom's NUMBER to its text, numbered from 1. Use those numbers, as
+integers, to identify atoms in your output: if the relation holds between the
+atoms numbered "3" and "7", emit source 3 and target 7. Never renumber them and
+never count from zero.
 
 For each ORDERED pair (i, j) that the response actually relates, emit one object:
   {"source": i, "target": j,
@@ -2070,6 +2188,11 @@ Rules:
 - Use "Disjunction" only when the response rules out both claims being false.
 - Use "Precedence" or "Succession" only when the ordering carries no truth
   dependence; set their coupling to "none".
+- "coupling" is not an independent choice: it must be the coupling that the
+  "sense" you chose compiles to. Cause-Effect, Effect-Cause, Evidence,
+  Condition and Instantiation are "entailment"; Restatement is "equivalence";
+  Contrast and Concession are "contradiction"; Alternative is "exclusive";
+  Disjunction is "co_necessity"; Precedence and Succession are "none".
 - Pairs the response leaves unrelated must be omitted entirely.
 
 The function returns a JSON list. Note that your response will be passed to the
@@ -2084,6 +2207,21 @@ $\geq 80\%$ of its planned relations with the correct \emph{coupling} and $\geq 
 correct \emph{sense}. Unrecovered edges are dropped from gold or the item is regenerated ---
 \textbf{never} retained as unrecoverable gold, which would penalize a correct miner for
 failing to read something that is not in the text.
+
+\paragraph{Coupling recall is computed by compiling the recovered sense.} Both rates are read off
+the recovered \emph{sense}: coupling recall compares $\mathrm{COMPILE}[\textnormal{recovered}]$
+against $\mathrm{COMPILE}[\textnormal{planned}]$ rather than reading the model's self-reported
+\texttt{coupling} field. \textsc{compile} is the authority for that mapping everywhere else --- the
+builder asserts gold cannot contradict it (Section~\ref{sec:schema}) and the plan parser rejects a
+relation whose named coupling disagrees with its sense --- so a free-choice label cannot outvote the
+sense it is derived from. This is also what makes coupling the \emph{coarser} judgment its higher
+threshold assumes: a model that answers Evidence where the plan said Cause-Effect misses the sense
+but still earns coupling credit, since both compile to \cEnt. That asymmetry is why $0.80 > 0.70$
+here, why the reported recalls run $0.88$ against $0.75$, and what licenses grading lossily
+migrated seed edges on coupling alone (Section~\ref{sec:seed}). Grading the self-reported field
+instead makes a \emph{perfect} recovery fail whenever the model labels its coupling
+non-canonically --- returning \texttt{entailment} beside a correctly recovered Concession scores
+sense $1.00$ and coupling $0.00$.
 
 \subsection{V2 --- exhaustiveness adjudication}
 
@@ -2140,8 +2278,17 @@ The function audits a generated response and returns a JSON object:
 - fluency, formality, organization: 5 = indistinguishable from expert human
   prose; 1 = badly degraded.
 - leakage: any span revealing the response was generated from an annotation
-  plan - naming a relation type or sense, referring to "claims", "atoms",
-  "statements", or a plan; any label, tag, index, or bracketed marker.
+  plan. Read this NARROWLY: naming a relation type or sense; naming the plan,
+  the strength bands, or the validity labels; referring to "claims", "atoms" or
+  "statements" as the objects the text was assembled from; or any label, tag,
+  numeric index, or bracketed marker. Do NOT flag a connective or coordination
+  that merely realizes a relation - "either X or Y", "at least one of X or Y",
+  "the two cannot both be true, and one of them must hold", "although X, Y",
+  "before", "after", or an explicit statement that an ordering carries no
+  causal or inferential force. A writer is REQUIRED to use those, and a
+  coupling over two claims' joint truth cannot be expressed without one. Do NOT
+  flag ordinary scholarly vocabulary used about the subject matter, such as
+  "claim", "outcome", "reading", "account" or "finding".
 - hedging: any span using "assume", "might", "possibly", "allegedly",
   "supposedly", "reportedly", or "it is claimed", which would signal to a
   reader which content is unreliable.
@@ -2157,9 +2304,31 @@ check_response(response="[RESPONSE_PLACEHOLDER]")
 
 Gate: all three scores $\geq 4$, and \texttt{leakage} and \texttt{hedging} both empty.
 
+\paragraph{Leakage is read narrowly, and the spans are recorded.} A coupling over two claims'
+joint truth cannot be realized without a construction that scopes over both
+(Section~\ref{sec:p4rationale}), so the connectives P4 instruction 3 \emph{mandates} are not
+evidence of a plan --- they are evidence the writer complied. Leakage therefore means naming the
+apparatus (a sense, the plan, a band, a validity label, a tag or index), not using the discourse
+markers the apparatus requires; and ``claim'', ``outcome'' or ``reading'' used about the subject
+matter is ordinary scholarly English. \texttt{hedging} is deliberately \emph{not} narrowed: a
+hedge is detectable from register alone and is the risk instruction 7 exists to prevent. Because
+a bare count is undiagnosable --- ``leakage: 16'' reads as leaky prose when every span was a
+mandated coordination --- the rejection record now carries a bounded sample of the span
+\emph{text}. \texttt{artifacts} is recorded on the same footing but never gated: enumerated
+structure and template phrasing are quality signals rather than admission criteria.
+
+\paragraph{The auditor should not be the generator.} V3 is a single-rater judgment, and
+Section~\ref{sec:agreement} excludes the model that ran P3/P4 from an item's committee (R3,
+self-generation bias). Measured on the first live runs, that exclusion matters more for V3 than
+for any other validator: the same deepseek response scored $5/5/5$ with zero leakage under its
+own auditor and $3/4/4$ with six leakage spans under a Claude auditor. The strict auditor was the
+more accurate one --- it alone caught a genuine ``possibly'' hedge --- so the divergence is not
+noise to be averaged away but a reason to fix which model audits. Note that resolving the auditor
+by name is insufficient where a committee entry shares the generator's underlying model id.
+
 \subsection{V4 --- atom coverage and realized positions}
 
-\promptsig{V4 --- atom coverage and realized positions}{\texttt{[RESPONSE\_PLACEHOLDER]}, \texttt{[ATOMS\_PLACEHOLDER]}.}{Per atom: status (\texttt{asserted}/\texttt{altered}/\texttt{missing}/\texttt{merged}), span, and sentence \texttt{position}.}{100\% \texttt{asserted}. The \texttt{position} output re-verifies \textsc{p3}s window constraint against the realized text (Section~\ref{sec:risks}, R2).}
+\promptsig{V4 --- atom coverage and realized positions}{\texttt{[RESPONSE\_PLACEHOLDER]}, \texttt{[ATOMS\_PLACEHOLDER]}.}{Per atom: status (\texttt{asserted}/\texttt{altered}/\texttt{missing}/\texttt{merged}), span, and sentence \texttt{position}.}{100\% \texttt{asserted}. Two atoms joined by a connective are \emph{both} asserted --- \texttt{merged} is reserved for genuine loss of content (Section~\ref{sec:p4rationale} note). The \texttt{position} output re-verifies \textsc{p3}s window constraint against the realized text (Section~\ref{sec:risks}, R2).}
 
 \begin{small}
 \begin{verbatim}
@@ -2176,8 +2345,13 @@ JSON list of objects:
 - "altered": the response asserts something related but changes the atom's
   content (a different number, date, entity, or polarity).
 - "missing": the response does not assert the atom.
-- "merged": the atom's content is fused into a clause that also asserts another
-  atom, so the two cannot be separated.
+- "merged": the atom's content has been absorbed into another atom's, so it is no
+  longer separately assertable - you could not negate this atom alone and leave
+  the other standing. Reserve this for genuine loss of content.
+  Two atoms joined by a connective are NOT merged: "either X or Y", "at least one
+  of X or Y", "although X, Y", "X, whereas Y", and "X; that is, Y" each assert
+  BOTH atoms, because each remains independently true or false. Mark both
+  "asserted", with the span covering the part that asserts each one.
 
 Return the JSON list only. Note that your response will be passed to the python
 interpreter, SO NO OTHER WORDS!
