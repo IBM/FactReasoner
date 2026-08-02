@@ -11,13 +11,12 @@
         "Alternative",
         "Cause-Effect",
         "Concession",
-        "Condition",
         "Contrast",
         "Disjunction",
         "Evidence",
         "Instantiation",
-        "Precedence",
-        "Restatement"
+        "Restatement",
+        "Succession"
       ],
       "detail": ""
     },
@@ -27,18 +26,18 @@
       "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
       "observed": [
         [
-          10,
-          17,
-          7
+          13,
+          3,
+          10
         ]
       ],
-      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(10, 17, 7)]"
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(13, 3, 10)]"
     },
     {
       "gate": "plan.validity_split",
       "passed": true,
       "threshold": "0.55 +/- 0.15",
-      "observed": 0.6,
+      "observed": 0.667,
       "detail": ""
     },
     {
@@ -49,40 +48,35 @@
         "sense": 0.7
       },
       "observed": {
-        "coupling": 0.3,
-        "sense": 0.4,
+        "coupling": 0.417,
+        "sense": 0.333,
         "matched_pairs": [
           [
-            2,
+            4,
+            2
+          ],
+          [
+            5,
             3
+          ],
+          [
+            7,
+            8
           ],
           [
             14,
             15
           ],
           [
-            8,
-            9
-          ],
-          [
-            10,
-            17
-          ],
-          [
-            12,
-            13
+            2,
+            3
           ]
         ],
         "recovered_pairs": [
           [
             1,
-            2,
-            "Instantiation"
-          ],
-          [
-            2,
-            3,
-            "Contrast"
+            4,
+            "Evidence"
           ],
           [
             4,
@@ -90,53 +84,73 @@
             "Evidence"
           ],
           [
+            4,
+            3,
+            "Contrast"
+          ],
+          [
             5,
-            2,
+            3,
             "Evidence"
           ],
           [
+            5,
             6,
-            2,
+            "Contrast"
+          ],
+          [
+            6,
+            3,
             "Evidence"
           ],
           [
             7,
-            2,
-            "Evidence"
+            8,
+            "Alternative"
           ],
           [
-            8,
             9,
-            "Cause-Effect"
+            8,
+            "Instantiation"
           ],
           [
             10,
-            17,
+            8,
+            "Instantiation"
+          ],
+          [
+            11,
+            2,
             "Evidence"
           ],
           [
             12,
-            13,
-            "Condition"
+            11,
+            "Evidence"
           ],
           [
             14,
             15,
-            "Disjunction"
+            "Restatement"
           ],
           [
-            16,
-            2,
-            "Evidence"
-          ],
-          [
-            17,
-            18,
+            9,
+            13,
             "Contrast"
           ],
           [
-            11,
-            18,
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            16,
+            5,
+            "Evidence"
+          ],
+          [
+            16,
+            6,
             "Evidence"
           ]
         ],
@@ -144,75 +158,141 @@
           [
             1,
             2,
-            "Restatement"
-          ],
-          [
-            2,
-            3,
-            "Alternative"
-          ],
-          [
-            4,
-            5,
             "Instantiation"
           ],
           [
+            1,
+            3,
+            "Instantiation"
+          ],
+          [
+            4,
+            2,
+            "Evidence"
+          ],
+          [
             5,
-            6,
-            "Precedence"
+            3,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
           ],
           [
             14,
             15,
-            "Disjunction"
-          ],
-          [
-            17,
-            18,
-            "Concession"
-          ],
-          [
-            8,
-            9,
-            "Cause-Effect"
-          ],
-          [
-            10,
-            17,
-            "Evidence"
-          ],
-          [
-            12,
-            13,
-            "Condition"
+            "Restatement"
           ],
           [
             6,
-            7,
+            5,
+            "Concession"
+          ],
+          [
+            15,
+            14,
+            "Succession"
+          ],
+          [
+            11,
+            12,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            3,
+            "Evidence"
+          ],
+          [
+            2,
+            3,
             "Contrast"
           ]
         ]
       },
-      "detail": "recovery too low: coupling 0.30 (need 0.8), sense 0.40 (need 0.7); matched 5/10 planned pair(s)"
+      "detail": "recovery too low: coupling 0.42 (need 0.8), sense 0.33 (need 0.7); matched 5/12 planned pair(s)"
     },
     {
       "gate": "V3.scores",
       "passed": true,
-      "threshold": ">= 4",
+      "threshold": ">= 4 (majority of 3 auditor(s))",
       "observed": {
-        "fluency": 5,
-        "formality": 5,
-        "organization": 5
+        "votes": {
+          "llama-4-mkv-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "llama-3.3-70b-instruct": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "gpt-oss-120b-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
       },
       "detail": ""
     },
     {
       "gate": "V3.spans",
-      "passed": true,
-      "threshold": "empty",
+      "passed": false,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
       "observed": {
-        "leakage": 0,
-        "hedging": 0
+        "votes": {
+          "llama-4-mkv-a100": {},
+          "llama-3.3-70b-instruct": {
+            "hedging": 3
+          },
+          "gpt-oss-120b-a100": {
+            "hedging": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 2
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "llama-3.3-70b-instruct": {
+            "hedging": [
+              "might",
+              "possibly",
+              "it is contested"
+            ]
+          },
+          "gpt-oss-120b-a100": {
+            "hedging": [
+              "might involve"
+            ]
+          }
+        }
+      },
+      "detail": "a majority flagged {'hedging': '2/3'}: {'llama-3.3-70b-instruct': {'hedging': 3}, 'gpt-oss-120b-a100': {'hedging': 1}}"
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "llama-4-mkv-a100": 0,
+          "llama-3.3-70b-instruct": 0,
+          "gpt-oss-120b-a100": 0
+        },
+        "spans": {}
       },
       "detail": ""
     },
@@ -220,9 +300,9 @@
       "gate": "V4",
       "passed": false,
       "threshold": 1.0,
-      "observed": 0.889,
-      "detail": "2 atom(s) not asserted: [(10, 'altered'), (17, 'altered')]"
+      "observed": 0.875,
+      "detail": "2 atom(s) not asserted: [(15, 'merged'), (16, 'altered')]"
     }
   ],
-  "reason": "V1: recovery too low: coupling 0.30 (need 0.8), sense 0.40 (need 0.7); matched 5/10 planned pair(s); V4: 2 atom(s) not asserted: [(10, 'altered'), (17, 'altered')]"
+  "reason": "V1: recovery too low: coupling 0.42 (need 0.8), sense 0.33 (need 0.7); matched 5/12 planned pair(s); V3.spans: a majority flagged {'hedging': '2/3'}: {'llama-3.3-70b-instruct': {'hedging': 3}, 'gpt-oss-120b-a100': {'hedging': 1}}; V4: 2 atom(s) not asserted: [(15, 'merged'), (16, 'altered')]"
 }

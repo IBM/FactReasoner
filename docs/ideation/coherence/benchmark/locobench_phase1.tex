@@ -2035,15 +2035,17 @@ Instructions:
    domain expert would publish, organized into 3-5 paragraphs, in which the
    planned relations are simply how the argument hangs together. Do NOT walk the
    plan relation by relation: a reader must not be able to tell that a plan
-   exists. Use precise and formal language, avoiding vague generalizations and
-   rhetorical fillers. Aim for 550-650 words; below 500 is too short.
+   exists. Restate a subject to carry an argument forward ("the radiocarbon
+   date", "that attribution"), never the earlier sentence as a step ("the
+   finding just reported", "the provision just stated", "the ordering just
+   described"). Use precise and formal language, avoiding vague generalizations
+   and rhetorical fillers. Aim for 550-650 words; below 500 is too short.
 7. Do NOT mention the relation plan, the senses, the strength bands, the
    validity labels, or the fact that some content is incorrect. Do NOT hedge
-   with "assume", "might", "possibly", "allegedly", "supposedly", "reportedly",
-   or "it is claimed" ANYWHERE in the response - not only around
-   planned-invalid relations, which must be asserted in the same register as
-   the valid ones. In particular, realize a Disjunction as "one or both", never
-   "and possibly both". Do NOT add headings, bullet lists, or annotations.
+   with "assume", "might", "possibly", "allegedly", "supposedly",
+   "reportedly", or "it is claimed" around planned-invalid relations - assert
+   them in the same register as the valid ones. Do NOT add headings, bullet
+   lists, or annotations.
 8. Wrap the RESPONSE in a code block.
 
 Your Task:
@@ -2084,11 +2086,19 @@ narrowly and exempts those constructions explicitly, exactly as V4's \texttt{mer
 narrowed above. Its second half matters more than it looks: if the generator hedges around
 planned-invalid relations, a miner can detect invalidity from register alone and the benchmark
 measures hedge-detection instead of reasoning --- \textsc{LoReFact} guards the same risk in
-their Table 13 instruction 5. That half also has to be stated \emph{symmetrically}: V3 flags a
-hedge anywhere in the response, so instruction 7 must forbid the same word list anywhere rather
-than only around invalid relations. It previously omitted ``possibly'' and ``it is claimed'',
-and a generator following instruction 3's suggested Disjunction wording drifted from ``one or
-both'' to ``and possibly both'' --- graded against a list it had never been given.
+their Table 13 instruction 5. That half also has to name the same \emph{words} V3 checks: it
+previously omitted ``possibly'' and ``it is claimed'', and a generator following instruction 3's
+suggested Disjunction wording drifted from ``one or both'' to ``and possibly both'' --- graded
+against a list it had never been given. The two words were added; the \emph{scope} was not.
+Widening the clause from ``around planned-invalid relations'' to ``anywhere in the response'' is
+the obvious next step and it is a trap: it collapses output length. Measured on one family, with
+everything else held fixed and the result deterministic across repeats --- 581 words under the
+original wording, 637 with the word list widened, 308 once ``ANYWHERE'' was added, and 144 once a
+further sentence prohibited a specific phrasing. Each additional prohibition bought a shorter
+answer until the response fell below instruction 6's 500-word floor and P4 failed outright. The
+residual mismatch is therefore deliberate: V3 may flag a hedge that instruction 7 did not
+strictly forbid, and that is preferable to a prompt whose prohibitions suppress the prose they
+are meant to discipline.
 
 \subsection{P5 --- parameterized perturbation}
 
@@ -2317,14 +2327,43 @@ mandated coordination --- the rejection record now carries a bounded sample of t
 \emph{text}. \texttt{artifacts} is recorded on the same footing but never gated: enumerated
 structure and template phrasing are quality signals rather than admission criteria.
 
-\paragraph{The auditor should not be the generator.} V3 is a single-rater judgment, and
+\paragraph{The auditor is not the generator.} V3 is a single-rater judgment, and
 Section~\ref{sec:agreement} excludes the model that ran P3/P4 from an item's committee (R3,
-self-generation bias). Measured on the first live runs, that exclusion matters more for V3 than
-for any other validator: the same deepseek response scored $5/5/5$ with zero leakage under its
-own auditor and $3/4/4$ with six leakage spans under a Claude auditor. The strict auditor was the
-more accurate one --- it alone caught a genuine ``possibly'' hedge --- so the divergence is not
-noise to be averaged away but a reason to fix which model audits. Note that resolving the auditor
-by name is insufficient where a committee entry shares the generator's underlying model id.
+self-generation bias). That exclusion matters more for V3 than for any other validator, and it is
+enforced rather than assumed: the run resolves a per-generator auditor and V3 executes on it.
+Measured on the first live runs, the same deepseek response scored $5/5/5$ with zero leakage under
+its own auditor and $3/4/4$ with six leakage spans under a Claude auditor. The strict auditor was
+the more accurate one --- it alone caught a genuine ``possibly'' hedge --- so the divergence is not
+noise to be averaged away. The effect survived the leakage narrowing and is the reason the
+exclusion is now wired: on identical prose with the identical narrowed prompt, a self-auditing
+deepseek flagged five coordinations the prompt names \emph{verbatim} as exempt, where a distinct
+auditor flagged one real span naming a sense. A weak self-auditor does not merely add noise --- it
+rejects items for compliance.
+
+Two details are load-bearing. Eligibility is decided by \texttt{model\_id}, not by name: a
+committee may legitimately list one model under several labels for the agreement statistics, and a
+by-name check then returns the generator and the self-audit persists silently --- which is exactly
+what the Claude committee's first entry did. And when no distinct auditor can be resolved or built,
+the run \emph{warns and degrades} rather than aborting, because a self-audit is a weaker result and
+not an invalid one; trading a whole corpus for a provenance caveat would be the wrong exchange.
+
+\paragraph{V3 votes; one rater does not decide.} Excluding the generator is necessary but not
+sufficient, because V3's judgments diverge across models far more than the other validators' do.
+Measured on one response, identical prose and identical prompt: \textsc{opus-5} found $0$ leakage
+spans, \textsc{sonnet-4.6} found $5$, \textsc{opus-4.8} $0$, \textsc{opus-4.7} $0$. Resolving a
+single auditor therefore made admission depend on \emph{committee ordering} --- and the model that
+happened to sit first was the lone outlier, which rejected the family. V3 now runs on every eligible
+auditor and a facet rejects only on a strict majority (\texttt{v3\_rule}), matching the rules already
+declared for \textsc{v1} (majority) and \textsc{v2} (unanimity).
+
+Each facet votes \emph{separately} rather than voting on the verdict as a whole. On the panel above
+the same four auditors agreed unanimously on one hedging span while splitting $1$--$3$ on leakage;
+pooling the two would have let the agreed hedge carry the disputed leakage into the rejection reason
+and hidden the disagreement. Every auditor's vote is recorded, so a lone dissenter stays visible ---
+distinguishing ``every model saw it'' from ``one model did'' is the point of voting, and it is also
+the evidence needed to decide later whether a facet belongs in the gate at all. Voting additionally
+absorbs the boundary instability seen in repeat audits of a single family, whose \texttt{organization}
+score came back $3,3,4$ against a floor of $4$.
 
 \subsection{V4 --- atom coverage and realized positions}
 

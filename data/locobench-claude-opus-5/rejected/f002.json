@@ -11,7 +11,6 @@
         "Alternative",
         "Cause-Effect",
         "Concession",
-        "Condition",
         "Contrast",
         "Disjunction",
         "Evidence",
@@ -32,206 +31,266 @@
       "gate": "plan.validity_split",
       "passed": true,
       "threshold": "0.55 +/- 0.15",
-      "observed": 0.7,
+      "observed": 0.6,
       "detail": ""
     },
     {
       "gate": "V1",
-      "passed": false,
+      "passed": true,
       "threshold": {
         "coupling": 0.8,
         "sense": 0.7
       },
       "observed": {
-        "coupling": 0.7,
-        "sense": 1.0,
+        "coupling": 0.9,
+        "sense": 0.9,
         "matched_pairs": [
+          [
+            1,
+            2
+          ],
           [
             5,
             6
           ],
           [
-            7,
-            8
-          ],
-          [
-            9,
+            6,
             7
           ],
           [
+            8,
+            9
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            10,
+            8
+          ],
+          [
             11,
-            10
+            12
           ],
           [
             12,
             13
           ],
           [
-            13,
-            11
-          ],
-          [
             15,
             16
-          ],
-          [
-            17,
-            16
-          ],
-          [
-            14,
-            18
-          ],
-          [
-            2,
-            4
           ]
         ],
         "recovered_pairs": [
           [
+            1,
             2,
-            4,
-            "Condition"
+            "Cause-Effect"
           ],
           [
             5,
             6,
-            "Contrast"
-          ],
-          [
-            9,
-            7,
-            "Cause-Effect"
-          ],
-          [
-            7,
-            8,
             "Instantiation"
           ],
           [
-            11,
+            6,
+            4,
+            "Concession"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            8,
+            9,
+            "Restatement"
+          ],
+          [
             10,
-            "Evidence"
+            8,
+            "Cause-Effect"
+          ],
+          [
+            11,
+            12,
+            "Precedence"
           ],
           [
             12,
             13,
-            "Disjunction"
+            "Evidence"
           ],
           [
             13,
+            14,
+            "Alternative"
+          ],
+          [
             11,
-            "Restatement"
+            15,
+            "Instantiation"
           ],
           [
             15,
             16,
-            "Alternative"
-          ],
-          [
-            14,
-            18,
-            "Precedence"
-          ],
-          [
-            18,
-            16,
-            "Evidence"
-          ],
-          [
-            17,
-            16,
-            "Concession"
-          ],
-          [
-            17,
-            18,
             "Contrast"
           ]
         ],
         "planned_pairs": [
           [
-            5,
-            6,
-            "Contrast"
+            1,
+            2,
+            "Cause-Effect"
           ],
           [
-            7,
-            8,
+            5,
+            6,
             "Instantiation"
           ],
           [
-            9,
+            6,
             7,
+            "Disjunction"
+          ],
+          [
+            4,
+            6,
+            "Concession"
+          ],
+          [
+            8,
+            9,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            10,
+            8,
             "Cause-Effect"
           ],
           [
             11,
-            10,
-            "Evidence"
+            12,
+            "Precedence"
           ],
           [
             12,
             13,
-            "Disjunction"
-          ],
-          [
-            13,
-            11,
-            "Restatement"
+            "Evidence"
           ],
           [
             15,
             16,
-            "Alternative"
-          ],
-          [
-            17,
-            16,
-            "Concession"
-          ],
-          [
-            14,
-            18,
-            "Precedence"
-          ],
-          [
-            2,
-            4,
-            "Condition"
+            "Contrast"
           ]
         ]
       },
-      "detail": "recovery too low: coupling 0.70 (need 0.8), sense 1.00 (need 0.7); matched 10/10 planned pair(s)"
+      "detail": ""
     },
     {
       "gate": "V3.scores",
-      "passed": false,
-      "threshold": ">= 4",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
       "observed": {
-        "fluency": 3,
-        "formality": 5,
-        "organization": 3
+        "votes": {
+          "b-sonnet46": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 4
+          },
+          "c-opus48": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "d-opus47": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
       },
-      "detail": "below floor: {'fluency': 3, 'organization': 3}"
+      "detail": ""
     },
     {
       "gate": "V3.spans",
       "passed": false,
-      "threshold": "empty",
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
       "observed": {
-        "leakage": 9,
-        "hedging": 2
+        "votes": {
+          "b-sonnet46": {
+            "leakage": 1
+          },
+          "c-opus48": {
+            "hedging": 1
+          },
+          "d-opus47": {
+            "hedging": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 2
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "b-sonnet46": {
+            "leakage": [
+              "the two descriptions cannot both be true, and one of them must hold"
+            ]
+          },
+          "c-opus48": {
+            "hedging": [
+              "possibly both"
+            ]
+          },
+          "d-opus47": {
+            "hedging": [
+              "possibly"
+            ]
+          }
+        }
       },
-      "detail": "non-empty span list(s): {'leakage': 9, 'hedging': 2}"
+      "detail": "a majority flagged {'hedging': '2/3'}: {'b-sonnet46': {'leakage': 1}, 'c-opus48': {'hedging': 1}, 'd-opus47': {'hedging': 1}}"
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "b-sonnet46": 2,
+          "c-opus48": 1,
+          "d-opus47": 0
+        },
+        "spans": {
+          "b-sonnet46": [
+            "an ordering of the two mechanisms in the exposition that implies nothing about either",
+            "At least one radiocarbon determination from the abandonment horizon was rejected as an outlier. Either the complete set "
+          ],
+          "c-opus48": [
+            "The systematic downward bias produced by intrusive contamination indicates that every radiocarbon determination from the"
+          ]
+        }
+      },
+      "detail": ""
     },
     {
       "gate": "V4",
-      "passed": false,
+      "passed": true,
       "threshold": 1.0,
-      "observed": 0.944,
-      "detail": "1 atom(s) not asserted: [(13, 'merged')]"
+      "observed": 1.0,
+      "detail": ""
     }
   ],
-  "reason": "V1: recovery too low: coupling 0.70 (need 0.8), sense 1.00 (need 0.7); matched 10/10 planned pair(s); V3.scores: below floor: {'fluency': 3, 'organization': 3}; V3.spans: non-empty span list(s): {'leakage': 9, 'hedging': 2}; V4: 1 atom(s) not asserted: [(13, 'merged')]"
+  "reason": "V3.spans: a majority flagged {'hedging': '2/3'}: {'b-sonnet46': {'leakage': 1}, 'c-opus48': {'hedging': 1}, 'd-opus47': {'hedging': 1}}"
 }

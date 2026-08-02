@@ -300,15 +300,17 @@ Instructions:
    domain expert would publish, organized into 3-5 paragraphs, in which the
    planned relations are simply how the argument hangs together. Do NOT walk the
    plan relation by relation: a reader must not be able to tell that a plan
-   exists. Use precise and formal language, avoiding vague generalizations and
-   rhetorical fillers. Aim for 550-650 words; below 500 is too short.
+   exists. Restate a subject to carry an argument forward ("the radiocarbon
+   date", "that attribution"), never the earlier sentence as a step ("the
+   finding just reported", "the provision just stated", "the ordering just
+   described"). Use precise and formal language, avoiding vague generalizations
+   and rhetorical fillers. Aim for 550-650 words; below 500 is too short.
 7. Do NOT mention the relation plan, the senses, the strength bands, the
    validity labels, or the fact that some content is incorrect. Do NOT hedge
-   with "assume", "might", "possibly", "allegedly", "supposedly", "reportedly",
-   or "it is claimed" ANYWHERE in the response - not only around
-   planned-invalid relations, which must be asserted in the same register as
-   the valid ones. In particular, realize a Disjunction as "one or both", never
-   "and possibly both". Do NOT add headings, bullet lists, or annotations.
+   with "assume", "might", "possibly", "allegedly", "supposedly",
+   "reportedly", or "it is claimed" around planned-invalid relations - assert
+   them in the same register as the valid ones. Do NOT add headings, bullet
+   lists, or annotations.
 8. Wrap the RESPONSE in a code block.
 
 Your Task:

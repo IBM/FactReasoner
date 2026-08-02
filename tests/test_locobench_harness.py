@@ -36,7 +36,15 @@ import os
 
 import pytest
 
-from fact_reasoner.locobench import mock, parse, perturb, prompts, topics, validate
+from fact_reasoner.locobench import (
+    mock,
+    parse,
+    perturb,
+    pipeline,
+    prompts,
+    topics,
+    validate,
+)
 from fact_reasoner.locobench.cli import _build_generators, _interleave, _slots
 from fact_reasoner.locobench.config import (
     Capabilities,
@@ -850,6 +858,38 @@ class TestLivePathCallShape:
         assert rec["requirements"]
         assert rec["strategy"] is not None
 
+    def test_an_output_ceiling_is_always_requested(self, monkeypatch):
+        """Without it the gateway truncates P4 and the failure is silently misattributed.
+
+        P4 asks for 550-650 words. The IBM gateway grants 4096 completion tokens by
+        default and then returns ``finish_reason: "length"`` with the prose stopped
+        mid-sentence and no closing fence -- which the parser rejects for being under the
+        500-word floor, surfacing as ``P4: SamplingFailed``. That is indistinguishable
+        from a model that will not follow instructions, and it killed three of four
+        families on one live run. Measured on one prompt: default -> 4096 tokens,
+        ``length``, 1114 chars; max 16000 -> ``stop``, 4779 tokens, 4033 chars.
+        """
+        from mellea.backends.model_options import ModelOption
+
+        rec = {}
+        _fake_live(monkeypatch, _CANNED, record=rec)
+        build_llm(ModelRef("m", "m", "rits"), _dry_cfg())(prompts.PROMPTS["P4"])
+        opts = rec["model_options"]
+        assert opts.get(ModelOption.MAX_NEW_TOKENS), (
+            "every live call must request an output ceiling; the backend default "
+            "truncates P4 mid-sentence and the parser blames the model"
+        )
+        assert opts[ModelOption.MAX_NEW_TOKENS] > 4096
+
+    def test_a_model_may_override_the_output_ceiling(self, monkeypatch):
+        from mellea.backends.model_options import ModelOption
+
+        rec = {}
+        _fake_live(monkeypatch, _CANNED, record=rec)
+        model = ModelRef("m", "m", "rits", model_options={"max_new_tokens": 999})
+        build_llm(model, _dry_cfg())(prompts.PROMPTS["P4"])
+        assert rec["model_options"][ModelOption.MAX_NEW_TOKENS] == 999
+
     def test_the_requirement_names_the_prompt_it_guards(self, monkeypatch):
         rec = {}
         _fake_live(monkeypatch, _CANNED, record=rec)
@@ -1137,6 +1177,247 @@ class TestBackendValidation:
     def test_an_empty_retry_ladder_is_rejected(self):
         with pytest.raises(ValueError, match="non-empty"):
             _dry_cfg(retry_temperatures=[]).validate()
+
+
+class TestV3AuditorExclusion:
+    """R3: the model that ran P3/P4 must not audit its own prose.
+
+    `resolved_auditor` existed, was documented as "the single model that runs V3", and had
+    zero callers -- so V3 ran on the generator's own caller. Measured consequence: on
+    identical prose with the identical narrowed prompt, a self-auditing deepseek flagged 5
+    coordinations the prompt names verbatim as exempt, where a distinct auditor flagged 1
+    real span naming a sense. A weak self-auditor rejects items for compliance.
+    """
+
+    def _cfg(self, **kw):
+        return GenConfig(
+            generators=[ModelRef("gen", "vendor/model-a", "rits")],
+            committee=[
+                # A legitimate config shape: the same underlying model listed under a
+                # different label for the agreement statistics.
+                ModelRef("alias-of-gen", "vendor/model-a", "rits"),
+                ModelRef("other", "vendor/model-b", "rits"),
+            ],
+            **kw,
+        )
+
+    def test_exclusion_is_by_model_id_not_by_name(self):
+        cfg = self._cfg()
+        gen = cfg.generators[0]
+        aud = cfg.resolved_auditor(gen)
+        assert aud is not None
+        # A by-name check would have returned "alias-of-gen" and self-audited in silence.
+        assert aud.name == "other"
+        assert aud.model_id != gen.model_id
+
+    def test_a_configured_auditor_matching_the_generator_is_refused(self):
+        cfg = self._cfg(auditor=ModelRef("explicit", "vendor/model-a", "rits"))
+        # Same model id as the generator, so it is not an independent judgment.
+        assert cfg.resolved_auditor(cfg.generators[0]) is None
+
+    def test_no_eligible_committee_member_yields_none(self):
+        cfg = GenConfig(
+            generators=[ModelRef("gen", "vendor/model-a", "rits")],
+            committee=[ModelRef("alias", "vendor/model-a", "rits")],
+        )
+        # None rather than a raise: the caller decides to warn and degrade, because a
+        # self-audit is a weaker result and not an invalid one.
+        assert cfg.resolved_auditor(cfg.generators[0]) is None
+
+    def test_v3_runs_on_the_auditor_when_one_is_given(self, monkeypatch):
+        seen = []
+
+        def _mk(tag):
+            def _llm(rendered, *, attempt=0):
+                seen.append((tag, which_prompt(rendered)))
+                return _CANNED[which_prompt(rendered)]
+
+            return _llm
+
+        v = pipeline._validate_response(
+            _Caller(_mk("gen"), attempts=1),
+            "prose",
+            {"atoms": [], "relations": []},
+            [],
+            auditors=[("aud", _Caller(_mk("aud"), attempts=1))],
+        )
+        assert v is not None
+        by_prompt = {pid: tag for tag, pid in seen}
+        assert by_prompt.get("V3") == "aud", "V3 must run on the auditor"
+        assert by_prompt.get("V1") == "gen", "V1 stays on the generator's caller"
+        assert by_prompt.get("V4") == "gen"
+
+    def test_every_panel_member_audits(self):
+        seen = []
+
+        def _mk(tag):
+            def _llm(rendered, *, attempt=0):
+                pid = which_prompt(rendered)
+                if pid == "V3":
+                    seen.append(tag)
+                return _CANNED[pid]
+
+            return _llm
+
+        pipeline._validate_response(
+            _Caller(_mk("gen"), attempts=1),
+            "prose",
+            {"atoms": [], "relations": []},
+            [],
+            auditors=[
+                ("a", _Caller(_mk("a"), attempts=1)),
+                ("b", _Caller(_mk("b"), attempts=1)),
+                ("c", _Caller(_mk("c"), attempts=1)),
+            ],
+        )
+        assert sorted(seen) == ["a", "b", "c"]
+
+    def test_the_panel_dedupes_by_model_id(self):
+        # Two labels for one model would let it vote twice and defeat the majority.
+        cfg = GenConfig(
+            generators=[ModelRef("gen", "vendor/model-a", "rits")],
+            committee=[
+                ModelRef("dup1", "vendor/model-b", "rits"),
+                ModelRef("dup2", "vendor/model-b", "rits"),
+                ModelRef("other", "vendor/model-c", "rits"),
+            ],
+        )
+        ids = [m.model_id for m in cfg.eligible_auditors(cfg.generators[0])]
+        assert ids == ["vendor/model-b", "vendor/model-c"]
+
+    def test_an_explicit_auditor_overrides_the_panel(self):
+        cfg = GenConfig(
+            generators=[ModelRef("gen", "vendor/model-a", "rits")],
+            committee=[ModelRef("x", "vendor/model-b", "rits")],
+            auditor=ModelRef("chosen", "vendor/model-z", "rits"),
+        )
+        panel = cfg.eligible_auditors(cfg.generators[0])
+        assert [m.name for m in panel] == ["chosen"]
+
+    def test_v3_falls_back_to_the_generator_when_no_auditor(self, monkeypatch):
+        seen = []
+
+        def _llm(rendered, *, attempt=0):
+            seen.append(which_prompt(rendered))
+            return _CANNED[which_prompt(rendered)]
+
+        pipeline._validate_response(
+            _Caller(_llm, attempts=1), "prose", {"atoms": [], "relations": []}, []
+        )
+        # Degrades rather than crashing: still audits, just not independently.
+        assert "V3" in seen
+
+
+class TestV3MajorityVote:
+    """A single V3 rater must not decide admission; its judgments diverge too much.
+
+    Measured on one response, identical prose and identical prompt: opus-5 found 0 leakage
+    spans, sonnet-4-6 found **5**, opus-4-8 found 0, opus-4-7 found 0. The harness had been
+    resolving one auditor and picking whichever model sat first in committee order, so
+    admission turned on that accident -- and the arbitrary pick was the lone outlier. All
+    four agreed on one hedging span, which is what a true positive looks like here.
+    """
+
+    def _a(self, **kw):
+        base = {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 4,
+            "leakage": [],
+            "hedging": [],
+            "artifacts": [],
+        }
+        base.update(kw)
+        return base
+
+    def test_a_lone_dissenter_does_not_reject(self):
+        clean = self._a()
+        outlier = self._a(leakage=["at least one of two diagnostics"])
+        v = validate.gate_audit_panel(
+            [("opus-5", clean), ("sonnet-4-6", outlier), ("opus-4-8", clean)]
+        )
+        spans = next(g for g in v.results if g.gate == "V3.spans")
+        assert spans.passed
+        # The dissent is still recorded -- suppressing it would hide a real disagreement.
+        assert spans.observed["n_flagging_per_kind"]["leakage"] == 1
+        assert "sonnet-4-6" in spans.observed["spans"]
+
+    def test_a_majority_still_rejects(self):
+        leaky = self._a(leakage=["naming the sense Concession"])
+        v = validate.gate_audit_panel([("a", leaky), ("b", leaky), ("c", self._a())])
+        assert not next(g for g in v.results if g.gate == "V3.spans").passed
+
+    def test_span_kinds_are_voted_separately(self):
+        # The measured shape: leakage split 1-of-3, hedging unanimous. Pooling them would
+        # let the agreed hedge carry the disputed leakage into the rejection reason.
+        hedged = self._a(hedging=["might seem"])
+        both = self._a(leakage=["at least one of"], hedging=["might seem"])
+        v = validate.gate_audit_panel([("a", hedged), ("b", both), ("c", hedged)])
+        spans = next(g for g in v.results if g.gate == "V3.spans")
+        assert not spans.passed, (
+            "the unanimous hedge is a true positive and must reject"
+        )
+        per_kind = spans.observed["n_flagging_per_kind"]
+        assert per_kind == {"leakage": 1, "hedging": 3}
+        # Only hedging is named as the REJECTING facet; leakage still appears in the
+        # per-auditor vote dump, which is the transparency the votes exist for.
+        rejecting = spans.detail.split(":")[0]
+        assert "hedging" in rejecting
+        assert "leakage" not in rejecting
+
+    def test_scores_are_voted_too(self):
+        low = self._a(organization=3)
+        # One low score out of three does not reject -- which is the boundary-flapping
+        # case: repeat audits of one family scored organization [3, 3, 4].
+        assert validate.gate_audit_panel(
+            [("a", low), ("b", self._a()), ("c", self._a())]
+        ).passed
+        assert not validate.gate_audit_panel(
+            [("a", low), ("b", low), ("c", self._a())]
+        ).passed
+
+    def test_a_single_auditor_behaves_like_the_old_gate(self):
+        assert validate.gate_audit_panel([("solo", self._a())]).passed
+        assert not validate.gate_audit_panel(
+            [("solo", self._a(leakage=["the relation plan"]))]
+        ).passed
+
+    def test_no_audits_is_a_harness_failure_not_a_verdict(self):
+        v = validate.gate_audit_panel([])
+        assert not v.passed
+        assert "no audit output" in v.results[0].detail
+
+    def test_the_rule_is_declared_in_thresholds(self):
+        assert validate.THRESHOLDS["v3_rule"] == "majority"
+
+
+class TestP4BackReferencing:
+    """P4 must not narrate its own earlier sentences as plan steps.
+
+    Measured live: a Claude family was rejected for leakage on "the superpositional
+    ordering just described", "the general downweighting provision just stated" and "the
+    outlier flag just reported". Those are the writer walking the plan item by item, which
+    instruction 6 already forbade in the abstract -- the auditor was right, so the fix is
+    in P4 rather than in V3's exemption list.
+    """
+
+    def test_instruction_six_names_the_pattern_concretely(self):
+        p4 = prompts.PROMPTS["P4"]
+        assert "just reported" in p4
+        assert "just stated" in p4
+        assert "never" in p4
+
+    def test_the_guidance_is_phrased_as_a_substitution(self):
+        # Prohibitions measurably cost output length (see
+        # TestV3LeakageSemantics.test_p4_does_not_widen_the_hedge_scope), so this names an
+        # acceptable alternative rather than adding another "do NOT" clause.
+        p4 = prompts.PROMPTS["P4"]
+        assert "Restate a subject to carry an argument forward" in p4
+
+    def test_the_instruction_count_is_unchanged(self):
+        import re
+
+        assert len(re.findall(r"(?m)^\d+\. ", prompts.PROMPTS["P4"])) == 8
 
 
 class TestGeneratorBuildFailures:
@@ -2015,6 +2296,23 @@ class TestV3LeakageSemantics:
         assert checked <= warned, (
             f"V3 checks but P4 never warns about: {checked - warned}"
         )
+
+    def test_p4_does_not_widen_the_hedge_scope(self):
+        """Aligning the word lists is safe; widening the SCOPE collapses output length.
+
+        Measured on one family with everything else fixed, deterministic across repeats:
+        581 words under the original wording, 637 with the word list widened, **308** once
+        "ANYWHERE in the response" was added, and **144** once a further sentence banned a
+        specific phrasing. Each extra prohibition bought a shorter answer until the prose
+        fell under instruction 6's 500-word floor and P4 failed outright -- three of four
+        families died there. The residual mismatch (V3 may flag a hedge instruction 7 did
+        not strictly forbid) is deliberate and preferable.
+        """
+        p4 = prompts.PROMPTS["P4"]
+        assert "ANYWHERE in the response" not in p4
+        assert 'never\n   "and possibly both"' not in p4
+        # The scoping phrase that keeps the clause short must survive.
+        assert "around planned-invalid relations" in p4
 
     def test_the_gate_records_span_text_not_just_counts(self):
         # "leakage: 16" is undiagnosable -- it reads as leaky prose when every span was a

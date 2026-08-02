@@ -51,6 +51,7 @@ THRESHOLDS: dict[str, Any] = {
     "v2_exclusive": "unanimity",  # to assign an `exclusive` gold label
     "v3_min_score": 4,  # fluency / formality / organization, on 1..5
     "v3_empty_spans": ("leakage", "hedging"),  # must be empty; artifacts recorded only
+    "v3_rule": "majority",  # of the auditors must fail a facet for it to reject
     "v4_coverage": 1.00,  # every atom `asserted`
     # -- plan structure (P3) --
     "n_claims": (14, 18),
@@ -554,6 +555,124 @@ def gate_audit(audit: dict[str, Any]) -> Verdict:
                 "spans": [str(s)[:_SPAN_CHARS] for s in arts[:_SPAN_SAMPLE]],
             },
             detail=f"{len(arts)} artifact span(s) recorded" if arts else "",
+        )
+    )
+    return v
+
+
+def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
+    """Apply the V3 gate over several auditors, rejecting only on a majority.
+
+    A single rater must not decide admission here, because V3's judgments diverge far more
+    across models than the other validators' do. Measured on one response, identical prose
+    and identical prompt: ``opus-5`` 0 leakage spans, ``sonnet-4-6`` **5**, ``opus-4-8`` 0,
+    ``opus-4-7`` 0 -- and the harness had been picking whichever model happened to sit first
+    in committee order. Three of four agreed; the arbitrary pick was the outlier, and it
+    rejected the family. All four agreed on one hedging span, which is what a true positive
+    looks like under this scheme.
+
+    Each facet is voted separately rather than voting on the whole verdict, so a real
+    leakage span still rejects even when the scores are unanimous and vice versa.
+
+    Args:
+        audits: ``(auditor name, parsed V3 output)`` pairs. A single entry degrades to the
+            same behaviour as :func:`gate_audit`, so a one-model config still works.
+
+    Returns:
+        The verdict, with every auditor's vote recorded in ``observed`` -- a lone dissenter
+        is otherwise invisible, and distinguishing "everyone saw it" from "one model did"
+        is the whole point of voting.
+    """
+    v = Verdict()
+    if not audits:
+        return v.add(GateResult("V3", False, detail="no audit output"))
+
+    floor = THRESHOLDS["v3_min_score"]
+    keys = ("fluency", "formality", "organization")
+    n = len(audits)
+    needed = n // 2 + 1  # strict majority
+
+    low_votes = {
+        name: {k: a.get(k) for k in keys if (a.get(k) or 0) < floor}
+        for name, a in audits
+    }
+    n_low = sum(1 for d in low_votes.values() if d)
+    v.add(
+        GateResult(
+            "V3.scores",
+            n_low < needed,
+            threshold=f">= {floor} (majority of {n} auditor(s))",
+            observed={
+                "votes": {name: {k: a.get(k) for k in keys} for name, a in audits},
+                "n_below_floor": n_low,
+                "needed_to_reject": needed,
+            },
+            detail=(
+                f"{n_low}/{n} auditor(s) scored below the floor: "
+                f"{ {k: d for k, d in low_votes.items() if d} }"
+            )
+            if n_low >= needed
+            else "",
+        )
+    )
+
+    span_keys = THRESHOLDS["v3_empty_spans"]
+    dirty_votes = {
+        name: {k: len(a.get(k) or []) for k in span_keys if a.get(k)}
+        for name, a in audits
+    }
+    # Vote PER SPAN KIND, not on "flagged anything". Leakage and hedging are independent
+    # failure modes with different reliability: the measured panel agreed unanimously on one
+    # hedge while splitting 1-3 on leakage, so pooling them would let the unanimous hedge
+    # carry the disputed leakage into a rejection and hide the disagreement entirely.
+    per_kind = {k: sum(1 for d in dirty_votes.values() if d.get(k)) for k in span_keys}
+    rejecting = {k: c for k, c in per_kind.items() if c >= needed}
+    v.add(
+        GateResult(
+            "V3.spans",
+            not rejecting,
+            threshold=f"empty (majority of {n} auditor(s), per span kind)",
+            observed={
+                "votes": dirty_votes,
+                "n_flagging_per_kind": per_kind,
+                "needed_to_reject": needed,
+                "spans": {
+                    name: {
+                        k: [
+                            str(s)[:_SPAN_CHARS]
+                            for s in (a.get(k) or [])[:_SPAN_SAMPLE]
+                        ]
+                        for k in span_keys
+                        if a.get(k)
+                    }
+                    for name, a in audits
+                    if any(a.get(k) for k in span_keys)
+                },
+            },
+            detail=(
+                f"a majority flagged { {k: f'{c}/{n}' for k, c in rejecting.items()} }: "
+                f"{ {k: d for k, d in dirty_votes.items() if d} }"
+            )
+            if rejecting
+            else "",
+        )
+    )
+
+    arts = {name: (a.get("artifacts") or []) for name, a in audits}
+    v.add(
+        GateResult(
+            "V3.artifacts",
+            True,  # observation only, as in the single-auditor path
+            threshold="recorded, not enforced",
+            observed={
+                "counts": {name: len(x) for name, x in arts.items()},
+                "spans": {
+                    name: [str(s)[:_SPAN_CHARS] for s in x[:_SPAN_SAMPLE]]
+                    for name, x in arts.items()
+                    if x
+                },
+            },
+            detail="",
         )
     )
     return v

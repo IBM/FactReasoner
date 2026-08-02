@@ -480,11 +480,62 @@ class GenConfig:
         """
         return replace(self, **{k: v for k, v in kwargs.items() if v is not None})
 
-    def resolved_auditor(self) -> ModelRef | None:
-        """The V3 auditor: the configured one, else the first committee model."""
+    def resolved_auditor(self, generator: ModelRef | None = None) -> ModelRef | None:
+        """The V3 auditor: the configured one, else the first eligible committee model.
+
+        Eligibility means *not the generator*, compared by ``model_id`` rather than by
+        ``name``. Phase 1 Section 5.3 excludes the model that ran P3/P4 from an item's
+        validation (R3, self-generation bias), and a name comparison does not enforce that:
+        a committee may legitimately list the same underlying model under a different label
+        for the agreement statistics, in which case a by-name check returns the generator
+        and the self-audit persists silently. Measured on the Claude config, whose
+        committee's first entry is ``a-opus5`` -> ``aws/claude-opus-5``, the generator's own
+        model id.
+
+        Args:
+            generator: The model that ran P3/P4 for this item, excluded from the result.
+
+        Returns:
+            The auditor, or None when no distinct model is available -- the caller decides
+            whether to warn and fall back or to abort, because a self-audit is a weaker
+            result rather than an invalid one.
+        """
+        panel = self.eligible_auditors(generator)
+        return panel[0] if panel else None
+
+    def eligible_auditors(self, generator: ModelRef | None = None) -> list[ModelRef]:
+        """Every model that may audit this item, generator excluded by ``model_id``.
+
+        V3 votes rather than deferring to one rater, because a single rater is not a stable
+        judgment: measured on one response with identical prose and prompt, ``opus-5`` found
+        0 leakage spans, ``sonnet-4-6`` 5, ``opus-4-8`` 0 and ``opus-4-7`` 0. Picking one
+        auditor made admission depend on committee ordering.
+
+        An explicitly configured ``auditor`` still wins outright -- naming one is a
+        deliberate choice to override the panel.
+
+        Args:
+            generator: The model that ran P3/P4, excluded from the result.
+
+        Returns:
+            The eligible auditors, possibly empty. Deduplicated by ``model_id``, since two
+            labels for one model would let it vote twice and defeat the point of a majority.
+        """
+        gen_id = generator.model_id if generator is not None else None
         if self.auditor is not None:
-            return self.auditor
-        return self.committee[0] if self.committee else None
+            if gen_id is not None and self.auditor.model_id == gen_id:
+                return []
+            return [self.auditor]
+        out: list[ModelRef] = []
+        seen: set[str] = set()
+        for m in self.committee:
+            if gen_id is not None and m.model_id == gen_id:
+                continue
+            if m.model_id in seen:
+                continue
+            seen.add(m.model_id)
+            out.append(m)
+        return out
 
 
 def load_config(path: str | None) -> GenConfig:

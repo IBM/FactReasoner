@@ -350,6 +350,67 @@ def _build_generators(cfg: GenConfig) -> dict[str, Any]:
     return built
 
 
+def _build_auditors(cfg: GenConfig) -> dict[str, list[tuple[str, Any]]]:
+    """Build the V3 auditor PANEL for each generator, excluding self-audits.
+
+    Keyed per generator because eligibility depends on who generated: R3 excludes the model
+    that ran P3/P4 from validating its own item, so the same committee can yield different
+    panels for different generators.
+
+    A panel rather than one model, because a single V3 rater is not a stable judgment.
+    Measured on one response with identical prose and prompt: ``opus-5`` 0 leakage spans,
+    ``sonnet-4-6`` 5, ``opus-4-8`` 0, ``opus-4-7`` 0 -- and resolving one auditor picked
+    whichever model sat first in committee order, so admission turned on that accident.
+    Three of four agreed; the arbitrary pick was the outlier.
+
+    Unlike :func:`_build_generators`, a failure here degrades rather than aborts. A
+    self-audit is a weaker result, not an invalid one -- the item still passes every gate --
+    so refusing to run would trade a whole corpus for a provenance caveat. It is reported
+    loudly instead, because self-auditing silently produced the leakage false positives that
+    rejected every Claude family.
+
+    Args:
+        cfg: The run config.
+
+    Returns:
+        ``{generator name: [(auditor name, callable), ...]}``, omitting generators for which
+        no distinct auditor could be built.
+    """
+    built: dict[str, list[tuple[str, Any]]] = {}
+    for gen in cfg.generators:
+        eligible = [m for m in cfg.eligible_auditors(gen)]
+        if not eligible:
+            print(
+                f"[locobench] WARNING: no auditor distinct from generator {gen.name!r} "
+                f"({gen.model_id}); V3 will audit its own prose. Phase 1 R3 excludes the "
+                "generating model from validation -- add an `auditor` to the config, or a "
+                "committee entry with a different model_id."
+            )
+            continue
+        panel: list[tuple[str, Any]] = []
+        for aud in eligible:
+            try:
+                panel.append((aud.name, build_llm(aud, cfg)))
+            except Exception as e:  # noqa: BLE001 -- degrade, reported
+                print(
+                    f"[locobench] WARNING: auditor {aud.name!r} could not be built "
+                    f"({type(e).__name__}: {e}); dropped from {gen.name!r}'s V3 panel."
+                )
+        if panel:
+            built[gen.name] = panel
+            names = ", ".join(n for n, _ in panel)
+            print(
+                f"[locobench] V3 panel for {gen.name!r} ({len(panel)} auditor(s), reject "
+                f"on majority): {names}"
+            )
+        else:
+            print(
+                f"[locobench] WARNING: no auditor for {gen.name!r} could be built; V3 "
+                "falls back to the generator, which self-audits."
+            )
+    return built
+
+
 def main() -> None:
     args = _build_parser().parse_args()
     cfg = _resolve(args)
@@ -369,10 +430,12 @@ def main() -> None:
     holder: dict[str, Any] = {}
     llm = None
     llms: dict[str, Any] = {}
+    auditors: dict[str, Any] = {}
     if cfg.dry_run:
         llm = make_mock_llm(cfg, plan_holder=holder)
     else:
         llms = _build_generators(cfg)
+        auditors = _build_auditors(cfg)
 
     n_ok = n_bad = 0
     for i, (fid, topic, fam) in enumerate(todo):
@@ -400,6 +463,7 @@ def main() -> None:
             llm=call,
             generator=gen.name,
             resume_from=(prev.artifacts if prev else None),
+            auditor_llms=None if cfg.dry_run else auditors.get(gen.name),
         )
 
         if res.admitted:

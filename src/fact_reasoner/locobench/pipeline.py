@@ -71,6 +71,13 @@ from fact_reasoner.locobench.validate import Verdict
 # remains a valid LLM; the cost is that the parameter types are unchecked.
 LLM = Callable[..., str]
 
+# The output ceiling requested for every live call. P4's floor is 500 words and its target
+# 550-650, which needs well over the 4096 completion tokens the IBM gateway grants by
+# default -- and a model that hits the cap returns `finish_reason: "length"` with prose
+# stopped mid-sentence, which every parser here rejects for the wrong stated reason.
+# Override per model with `model_options: {"max_new_tokens": N}`.
+_MAX_OUTPUT_TOKENS = 16000
+
 
 class SamplingFailed(RuntimeError):
     """Rejection sampling exhausted its budget without satisfying the requirement.
@@ -517,6 +524,7 @@ def generate_family(
     llm: LLM | None = None,
     generator: str | None = None,
     resume_from: dict[str, Any] | None = None,
+    auditor_llms: list[tuple[str, LLM]] | None = None,
 ) -> FamilyResult:
     """Run one family through the stage machine.
 
@@ -530,6 +538,8 @@ def generate_family(
             item's committee (R3).
         resume_from: Artefacts from a previous partial attempt (``question``, ``claims``,
             ``plan``, ``response``), so a family with a validated plan does not re-plan.
+        auditor_llms: ``(name, callable)`` pairs for V3, per R3 generator exclusion. V3
+            rejects only on a majority. When None, V3 runs on ``llm`` and self-audits.
 
     Returns:
         The result. ``admitted`` is True only when all five items passed every gate.
@@ -543,6 +553,11 @@ def generate_family(
         family_id=family_id, canonical_topic=canonical_topic, family=family
     )
     caller = _Caller(llm, attempts=cfg.max_attempts)
+    audit_callers = (
+        [(n, _Caller(f, attempts=cfg.max_attempts)) for n, f in auditor_llms]
+        if auditor_llms
+        else None
+    )
     prior = dict(resume_from or {})
     t0 = time.perf_counter()
 
@@ -631,7 +646,9 @@ def generate_family(
             return res
 
     atom_texts = [a["text"] for a in sorted(plan["atoms"], key=lambda x: x["pos"])]
-    resp_verdict = _validate_response(caller, base, plan, atom_texts)
+    resp_verdict = _validate_response(
+        caller, base, plan, atom_texts, auditors=audit_callers
+    )
     res.verdict.results.extend(resp_verdict.results)
     if not resp_verdict.passed:
         res.stage = "respond"
@@ -790,7 +807,12 @@ def generate_family(
 
 
 def _validate_response(
-    caller: _Caller, response: str, plan: dict[str, Any], atom_texts: list[str]
+    caller: _Caller,
+    response: str,
+    plan: dict[str, Any],
+    atom_texts: list[str],
+    *,
+    auditors: list[tuple[str, _Caller]] | None = None,
 ) -> Verdict:
     """Run V1, V3 and V4 on a base response.
 
@@ -802,6 +824,10 @@ def _validate_response(
         response: The prose.
         plan: The plan it realizes.
         atom_texts: The planned atom texts, in position order.
+        auditors: ``(name, caller)`` pairs for V3, per R3 generator exclusion. V3 rejects
+            only on a majority of them, because its judgments diverge sharply across models.
+            Defaults to ``[("self", caller)]`` -- the model audits its own prose, a weaker
+            result, so the CLI warns when it cannot supply separate ones.
 
     Returns:
         The combined verdict.
@@ -828,10 +854,23 @@ def _validate_response(
         ).results
     )
 
-    aud, err = caller.ask("V3", parse.parse_audit, response=response)
-    if aud is None:
-        return v.add(validate.GateResult("V3", False, detail=err or "no audit output"))
-    v.results.extend(validate.gate_audit(aud).results)
+    # V3 on a DIFFERENT model where one is configured. A model auditing its own prose is
+    # both a spec violation (R3, self-generation bias) and, measured, the weaker judgment:
+    # on identical prose with the identical narrowed prompt, deepseek's own auditor flagged
+    # 5 leakage spans that the prompt names verbatim as exempt, while a Claude auditor
+    # flagged 1 -- a true positive naming a sense. The lenient self-auditor also passed
+    # prose that V1 and V4 independently scored worse.
+    panel = auditors or [("self", caller)]
+    audits: list[tuple[str, dict[str, Any]]] = []
+    for name, ac in panel:
+        aud, err = ac.ask("V3", parse.parse_audit, response=response)
+        if aud is not None:
+            audits.append((name, aud))
+    if not audits:
+        # Every auditor failed to produce parseable output, which is a harness/backend
+        # problem rather than a verdict about the prose.
+        return v.add(validate.GateResult("V3", False, detail="no audit output"))
+    v.results.extend(validate.gate_audit_panel(audits).results)
 
     cov, err = caller.ask(
         "V4", parse.parse_coverage, response=response, atoms=atoms_arg
@@ -968,6 +1007,20 @@ def build_llm(model: ModelRef, cfg: GenConfig) -> LLM:
         options: dict[Any, Any] = {}
         if temp is not None:
             options[ModelOption.TEMPERATURE] = temp
+        # An OUTPUT CEILING, because the default is not big enough for P4 and the failure
+        # is silent. P4 asks for 550-650 words; the IBM gateway defaults to 4096 completion
+        # tokens and returns `finish_reason: "length"` with prose cut off mid-sentence and
+        # no closing fence. Nothing in the harness saw the finish_reason, so it surfaced as
+        # `P4: SamplingFailed` -- indistinguishable from a model that would not follow
+        # instructions, and it killed three of four families on one run. Measured on the
+        # same prompt: default -> 4096 completion tokens, `length`, 1114 chars of prose;
+        # max 16000 -> `stop`, 4779 tokens, 4033 chars, complete. Applied to every prompt
+        # because the validators return JSON whose length scales with the atom count, and a
+        # truncated JSON array fails its parser the same silent way.
+        options.setdefault(
+            ModelOption.MAX_NEW_TOKENS,
+            (model.model_options or {}).get("max_new_tokens", _MAX_OUTPUT_TOKENS),
+        )
 
         async def _go() -> str:
             out = await mfuncs.ainstruct(
