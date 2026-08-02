@@ -88,8 +88,10 @@ Instructions:
        Example pair: "No one was harmed in the incident." / "Three people died
        in the incident."
    (d) 2 DISJUNCTIVE claims: a pair X, Y such that at least one must be true,
-       but both may be true simultaneously. Example: two independent checks, at
-       least one of which flagged a defect.
+       but both may be true simultaneously. Make each one a STATE OF THE WORLD,
+       not a finding or a check that reported something: "the alloy was
+       substituted" and "the batch was mislabelled", not "assay A flagged it"
+       and "assay B flagged it".
    (e) 2 EQUIVALENT claims: a pair X, Y asserting the same fact in different
        words, so that either one being true makes the other true.
 4. Additionally generate 2 HOLDING claims: sentences in which an authority
@@ -128,8 +130,8 @@ ATOMIC CLAIMS:
 - The blades were certified under a 1998 airworthiness standard. [incorrect]
 - No one was harmed in the incidents. [alt-pair-1]
 - Three passengers died in one of the failures. [alt-pair-2]
-- The vibration analysis flagged the defect. [disj-pair-1]
-- The metallurgical assay flagged the defect. [disj-pair-2]
+- The alloy supplied for the blades was substituted. [disj-pair-1]
+- The blade batch was mislabelled at the mill. [disj-pair-2]
 - The tribunal held that AeroParts was liable for the blade failures. [holding]
 - The accident report found the pilots not at fault. [holding]
 ```
@@ -266,11 +268,17 @@ Instructions:
 2. Assert every planned atom EXACTLY ONCE, in the plan's POSITION order,
    preserving each atom's factual content. Do not restate an atom you have
    already asserted in order to attach a later relation to it - refer back with
-   a pronoun or a short noun phrase instead. You may adjust surface wording for
-   fluency but must not change what is asserted. Never let one atom absorb
-   another: each must stay separately true or false. Joining two atoms with a
-   connective is fine and often required - "either X or Y" and "although X, Y"
-   both assert two atoms and are exactly what instruction 3 asks for.
+   a pronoun or a short noun phrase instead. Name that phrase after the thing
+   the atom is about, not after its status as a finding: "the primitive carpal
+   morphology" or "that wrist evidence", not "the analysis's flagging of
+   primitive traits"; "these two accounts" or "either possibility", not "the two
+   claims in circulation". A summary phrase covering both endpoints of one
+   connective is fine - "at least one of these must hold: X, or Y". You may
+   adjust surface wording for fluency but must not change what is asserted.
+   Never let one atom absorb another: each must stay separately true or false.
+   Joining two atoms with a connective is fine and often required - "either X or
+   Y" and "although X, Y" both assert two atoms and are exactly what instruction
+   3 asks for.
 3. Realize every planned RELATION so a careful reader could recover it from the
    text alone, using language appropriate to its sense:
    - Cause-Effect / Effect-Cause: "caused", "led to", "resulted from", "because"
@@ -284,7 +292,7 @@ Instructions:
      these accounts must be wrong", "the two cannot both be true, and one of
      them must hold"
    - Disjunction: make the at-least-one reading EXPLICIT - "at least one of",
-     "one or both"
+     "one or both", "perhaps both". Say "perhaps both", never "possibly both".
    - Precedence / Succession: "before", "after", "subsequently" - and make
      clear the ordering carries NO causal or inferential force. Do NOT write
      "and therefore" or "which led to" around these.

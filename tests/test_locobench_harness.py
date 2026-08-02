@@ -2201,7 +2201,9 @@ class TestV4MergedSemantics:
         # The old wording was "must not merge two atoms into one clause", which
         # contradicted instruction 3's mandated realizations.
         assert "must not merge two atoms into one clause" not in p4
-        assert "instruction 3" in p4
+        # Whitespace-normalized: the prompt wraps at 80 columns, so the phrase can straddle
+        # a line break without the meaning changing.
+        assert "instruction 3" in " ".join(p4.split())
 
     def test_a_merged_atom_still_fails_the_coverage_gate(self):
         # The narrowing must not turn the gate off: genuine absorption still rejects.
@@ -2355,10 +2357,172 @@ class TestV3LeakageSemantics:
         assert validate.THRESHOLDS["v3_empty_spans"] == ("leakage", "hedging")
 
 
-class TestPromptTexParity:
-    """The tex holds P3/P4/V1/V3/V4 verbatim; nothing guarded that until now."""
+class TestResponseGateIsRetryable:
+    """A V3/V4 rejection used to be terminal, which is why runs ended 0/2.
 
-    @pytest.mark.parametrize("pid", ["P3", "P4", "V1", "V3", "V4"])
+    `generate_family` returned as soon as `_validate_response` failed, and `max_attempts`
+    covered only *parse* failures -- so one leakage span cost a whole family with no
+    recovery, on prose that was otherwise good. V3 is measurably stochastic: repeat audits
+    of a single family returned leakage [0, 3, 0] and organization [3, 3, 4] against a
+    floor of 4. The gate is unchanged; the response is now re-asked, exactly as `_plan_ok`
+    already did for P3.
+    """
+
+    def _flaky_v3(self, cfg, *, leak_until):
+        """The dry-run mock, but V3 reports leakage until the given P4 attempt."""
+        holder = {}
+        base = make_mock_llm(cfg, plan_holder=holder)
+        state = {"p4": 0}
+
+        def llm(rendered, *, attempt=0):
+            pid = which_prompt(rendered)
+            if pid == "P4":
+                state["p4"] += 1
+            if pid == "V3" and state["p4"] <= leak_until:
+                return json.dumps(
+                    {
+                        "fluency": 5,
+                        "formality": 5,
+                        "organization": 5,
+                        "leakage": ["the relation plan"],
+                        "hedging": [],
+                        "artifacts": [],
+                    }
+                )
+            return base(rendered, attempt=attempt)
+
+        return llm, state
+
+    def test_a_leaking_response_is_re_asked(self):
+        cfg = _dry_cfg(max_attempts=3)
+        llm, state = self._flaky_v3(cfg, leak_until=99)  # never recovers
+        res = generate_family("f001", "Archaeology", "CONFLICT", cfg, llm=llm)
+        assert not res.admitted
+        assert res.stage == "respond"
+        # The whole point: the gate failure consumed attempts instead of being discarded.
+        assert state["p4"] == 3, f"P4 asked {state['p4']}x, expected max_attempts=3"
+        # And the prose the validators judged is still persisted for diagnosis.
+        assert res.artifacts.get("rejected_response")
+
+    def test_a_family_that_recovers_on_a_later_attempt_is_admitted(self):
+        # The property the retry exists for: a single unlucky flag is survivable.
+        cfg = _dry_cfg(max_attempts=3)
+        llm, state = self._flaky_v3(cfg, leak_until=1)  # clean from attempt 2
+        res = generate_family("f001", "Archaeology", "CONFLICT", cfg, llm=llm)
+        assert res.admitted, res.verdict.reason()
+        assert state["p4"] == 2
+
+    def test_an_admitted_family_validates_exactly_once(self):
+        # Guards against recomputing the verdict after `ask` returns, which would silently
+        # double every validator call (1 V1 + N V3 + 1 V4 per evaluation).
+        cfg = _dry_cfg(max_attempts=3)
+        seen = []
+        holder = {}
+        base = make_mock_llm(cfg, plan_holder=holder)
+
+        def llm(rendered, *, attempt=0):
+            pid = which_prompt(rendered)
+            if pid in ("V1", "V3", "V4"):
+                seen.append(pid)
+            return base(rendered, attempt=attempt)
+
+        res = generate_family("f001", "Archaeology", "CONFLICT", cfg, llm=llm)
+        assert res.admitted, res.verdict.reason()
+        assert seen.count("V1") == 1
+        assert seen.count("V3") == 1
+        assert seen.count("V4") == 1
+
+
+class TestAtomsAreWorldStatesNotFindings:
+    """The leakage P4 was rejected for originated in P2's own exemplar.
+
+    Claude f001 was rejected on unanimous 3/3 leakage, the top span being
+    "the analysis's flagging of traits incompatible with a modern human affected by
+    disease". That is a near-verbatim nominalization of the PLAN's atom 13, "The carpal
+    morphology analysis flagged traits incompatible with a modern human affected by
+    disease" -- and P4 instruction 2 requires preserving each atom's factual content, so
+    P4 had no world-object to name. It complied and leaked.
+
+    The atom shape came from P2 instruction 3(d), which taught the disjunctive pair as
+    "two independent checks, at least one of which flagged a defect" and exemplified it
+    with "The vibration analysis flagged the defect." / "The metallurgical assay flagged
+    the defect." Both live families obeyed.
+    """
+
+    def test_p2_no_longer_teaches_detection_procedure_pairs(self):
+        p2 = prompts.PROMPTS["P2"]
+        assert "flagged the defect" not in p2
+        assert "at least one of which flagged" not in p2
+        assert "STATE OF THE WORLD" in p2
+
+    def test_the_disjunctive_exemplars_are_world_states(self):
+        p2 = prompts.PROMPTS["P2"]
+        # Still a genuine disjunction (either may hold, both may hold), but neither atom
+        # is an act of detection, so P4 can refer to it without meta-vocabulary.
+        assert "[disj-pair-1]" in p2 and "[disj-pair-2]" in p2
+        # Only the exemplar CLAIM lines, not the tag-vocabulary line in instruction 4.
+        disj = [
+            ln
+            for ln in p2.split("\n")
+            if ln.lstrip().startswith("- ") and "[disj-pair-" in ln
+        ]
+        assert len(disj) == 2
+        for ln in disj:
+            assert "analysis" not in ln.lower()
+            assert "assay" not in ln.lower()
+            assert "flagged" not in ln.lower()
+
+    def test_p4_names_the_subject_matter_not_the_finding_status(self):
+        p4 = prompts.PROMPTS["P4"]
+        assert "not after its status as a finding" in p4
+        # The exact flagged phrasings, as the counter-examples. Whitespace-normalized
+        # because the prompt wraps them across lines.
+        flat = " ".join(p4.split())
+        assert "the analysis's flagging of primitive traits" in flat
+        assert "the two claims in circulation" in flat
+
+    def test_summary_phrases_over_both_endpoints_stay_allowed(self):
+        # "the two independent flags" was flagged by one auditor, but a plural summary head
+        # is the only compact way to scope one connective over two atoms -- banning it would
+        # break instruction 3's required "at least one of X or Y".
+        p4 = prompts.PROMPTS["P4"]
+        assert "A summary phrase covering both endpoints of one" in p4
+        assert "at least one of these must hold" in p4
+
+    def test_disjunction_has_a_legal_paraphrase(self):
+        # Both hedge rejections realized a Disjunction, across two generators and two runs:
+        # "and possibly both" (claude) and "might involve" (deepseek). Instruction 3 offered
+        # only "one or both", a bare quantifier fragment that does not attach to a clause,
+        # so fluent prose paraphrased it onto a banned word. Widening the ban was measured
+        # to swap "possibly" for "might"; supplying a legal alternative is the lever.
+        p4 = prompts.PROMPTS["P4"]
+        assert "perhaps both" in p4
+        for pid in ("P2", "P4", "V3"):
+            assert "perhaps" not in prompts.PROMPTS[pid].replace("perhaps both", ""), (
+                f"{pid} must not ban the paraphrase it now recommends"
+            )
+
+    def test_no_new_prohibitions_were_added(self):
+        # Measured: added prohibitions suppress output length (581 -> 308 -> 144 words,
+        # deterministic across repeats), and 144 fell under the 500-word floor. Both edits
+        # are substitutions, so the count must not grow.
+        import re
+
+        assert len(re.findall(r"Do NOT", prompts.PROMPTS["P4"])) == 6
+        assert len(re.findall(r"(?m)^\d+\. ", prompts.PROMPTS["P4"])) == 8
+
+
+class TestPromptTexParity:
+    """The tex holds all nine prompts verbatim; nothing guarded that until now.
+
+    Widened from five to nine after a P2 edit: all nine were already byte-identical, but
+    only P3/P4/V1/V3/V4 were checked, so editing P2 would have silently desynced the
+    document from the code.
+    """
+
+    @pytest.mark.parametrize(
+        "pid", ["P1", "P2", "P3", "P4", "P5", "V1", "V2", "V3", "V4"]
+    )
     def test_the_prompt_matches_the_phase_one_document(self, pid):
         tex = open(
             "docs/ideation/coherence/benchmark/locobench_phase1.tex", encoding="utf-8"

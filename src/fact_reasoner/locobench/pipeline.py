@@ -625,46 +625,82 @@ def generate_family(
 
     # ---- stage: respond (P4, then V1/V3/V4) ---------------------------------
     t1 = time.perf_counter()
+    atom_texts = [a["text"] for a in sorted(plan["atoms"], key=lambda x: x["pos"])]
     base = prior.get("response")
+    resp_verdict: Verdict | None = None
     if not base:
-        base, err = caller.ask(
-            "P4", parse.parse_response, question=question, plan=json.dumps(plan)
-        )
-        if not base:
-            res.verdict.add(
-                validate.GateResult("P4", False, detail=err or "no response")
+        # V1/V3/V4 run INSIDE the retry loop, mirroring `_plan_ok` above. Previously a
+        # response-stage verdict was terminal -- `max_attempts` covered only parse failures
+        # -- so a single leakage span cost a whole family with no recovery, which is why
+        # runs ended 0/2 even when one gate failed on otherwise-good prose. V3 in particular
+        # is stochastic: repeat audits of one family returned leakage [0, 3, 0] and
+        # organization [3, 3, 4] against a floor of 4. A retry makes an unlucky flag
+        # survivable; the gate is unchanged.
+        held: dict[str, Verdict] = {}
+
+        def _response_ok(candidate: str) -> str | None:
+            """The response gates, as a retryable check rather than a terminal verdict."""
+            verdict = _validate_response(
+                caller, candidate, plan, atom_texts, auditors=audit_callers
             )
+            # Kept so the accepted (or last rejected) verdict is REUSED below rather than
+            # recomputed. Re-running it would silently double the validator calls -- 1 V1 +
+            # N V3 + 1 V4 per evaluation, with N the panel size.
+            held["verdict"] = verdict
+            return None if verdict.passed else verdict.reason()
+
+        base, err = caller.ask(
+            "P4",
+            parse.parse_response,
+            check=_response_ok,
+            question=question,
+            plan=json.dumps(plan),
+        )
+        resp_verdict = held.get("verdict")
+        if err is not None or not base:
+            # Two distinct failures share this exit: the parser never produced prose, or it
+            # did and the gates rejected every attempt. The verdict distinguishes them.
+            if resp_verdict is not None:
+                res.verdict.results.extend(resp_verdict.results)
+            else:
+                res.verdict.add(
+                    validate.GateResult("P4", False, detail=err or "no response")
+                )
             res.stage = "respond"
             res.artifacts = {"question": question, "claims": claims, "plan": plan}
-            # `parse_response` returns None on failure, so the prose is only reachable via
-            # the caller's raw record. Keeping it is what makes a word-floor miss (or a
-            # JSON-wrapped payload) diagnosable instead of a bare number.
+            # Keep the prose the validators actually judged. Without it a V1/V3/V4 verdict
+            # ("recovery 0.00", "fluency 3", "9 leakage spans") names a number with no text
+            # behind it, which makes the failure undiagnosable and invites guessing at the
+            # cause. Stored under `rejected_response` rather than `response` so a later
+            # attempt regenerates it instead of resuming from prose that already failed.
+            if base:
+                res.artifacts["rejected_response"] = base
+            # `parse_response` returns None on a structural failure, so the prose is only
+            # reachable via the caller's raw record. Keeping it is what makes a word-floor
+            # miss (or a JSON-wrapped payload) diagnosable instead of a bare number.
             raw_p4 = caller.last_raw.get("P4")
-            if raw_p4:
+            if raw_p4 and not base:
                 res.artifacts["rejected_response_raw"] = raw_p4
             res.calls = caller.counts
             return res
 
-    atom_texts = [a["text"] for a in sorted(plan["atoms"], key=lambda x: x["pos"])]
-    resp_verdict = _validate_response(
-        caller, base, plan, atom_texts, auditors=audit_callers
-    )
+    if resp_verdict is None:
+        # Resumed from a stored response, so the gates have not run against it.
+        resp_verdict = _validate_response(
+            caller, base, plan, atom_texts, auditors=audit_callers
+        )
+        if not resp_verdict.passed:
+            res.verdict.results.extend(resp_verdict.results)
+            res.stage = "respond"
+            res.artifacts = {
+                "question": question,
+                "claims": claims,
+                "plan": plan,
+                "rejected_response": base,
+            }
+            res.calls = caller.counts
+            return res
     res.verdict.results.extend(resp_verdict.results)
-    if not resp_verdict.passed:
-        res.stage = "respond"
-        # Keep the prose the validators actually judged. Without it a V1/V3/V4 verdict
-        # ("recovery 0.00", "fluency 3", "9 leakage spans") names a number with no text
-        # behind it, which makes the failure undiagnosable and invites guessing at the
-        # cause. Stored under `rejected_response` rather than `response` so a later
-        # attempt regenerates it instead of resuming from prose that already failed.
-        res.artifacts = {
-            "question": question,
-            "claims": claims,
-            "plan": plan,
-            "rejected_response": base,
-        }
-        res.calls = caller.counts
-        return res
     res.timing["respond"] = round(time.perf_counter() - t1, 3)
 
     # ---- stage: perturb (P5 per non-base rung) ------------------------------
