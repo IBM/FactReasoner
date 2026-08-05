@@ -147,7 +147,7 @@ Instructions:
 1. You are given a QUESTION and a tagged list of ATOMIC CLAIMS. Produce a
    RELATION PLAN: a machine-readable graph of the logical relations a response
    should draw between those claims.
-2. Select 14-18 claims to use. Aim for 16. Number them with FRESH consecutive
+2. Select 14-16 claims to use. Aim for 15. Number them with FRESH consecutive
    positions: the first claim you assert is pos 1, the next pos 2, and so on
    with NO gaps and NO repeats, ending at pos N where N is how many you
    selected. Do NOT carry over the numbering of the input list - if you pick the
@@ -156,7 +156,10 @@ Instructions:
    text EXACTLY as given. Do NOT introduce information not in the claims, and
    do NOT alter the claims.
 3. Plan EXACTLY 10 RELATIONS. Each relation connects exactly two selected claims
-   and has a SENSE, one of: Cause-Effect, Effect-Cause, Evidence, Condition,
+   and has a SENSE. Every relation must join a DIFFERENT pair of claims: once two
+   claims are related, that pair is used up and must not appear again in the
+   relations list, in either direction. The SENSE is one of: Cause-Effect,
+   Effect-Cause, Evidence, Condition,
    Restatement, Instantiation, Contrast, Concession, Alternative, Disjunction,
    Precedence, Succession.
    - Cause-Effect: source causes target. Effect-Cause: source is the effect,
@@ -275,6 +278,12 @@ Instructions:
    claims in circulation". A summary phrase covering both endpoints of one
    connective is fine - "at least one of these must hold: X, or Y". You may
    adjust surface wording for fluency but must not change what is asserted.
+   Quantifiers, determiners, numbers, dates, polarity and modals are CONTENT,
+   not wording: keep "all", "only", "no", "some", "each", "never" and every
+   figure exactly as the atom has them. "All tools were crafted by a single
+   culture" may become "every one of the tools came from a single culture", but
+   never "the tools were crafted by a single culture" - dropping "All" weakens
+   the claim and counts as changing it.
    Never let one atom absorb another: each must stay separately true or false.
    Joining two atoms with a connective is fine and often required - "either X or
    Y" and "although X, Y" both assert two atoms and are exactly what instruction
@@ -293,9 +302,18 @@ Instructions:
      them must hold"
    - Disjunction: make the at-least-one reading EXPLICIT - "at least one of",
      "one or both", "perhaps both". Say "perhaps both", never "possibly both".
-   - Precedence / Succession: "before", "after", "subsequently" - and make
-     clear the ordering carries NO causal or inferential force. Do NOT write
-     "and therefore" or "which led to" around these.
+     A bare "X, or Y" is NOT enough for either of these two senses: on its own it
+     leaves a reader unable to tell whether both claims could hold, which is the
+     only thing separating Alternative from Disjunction. Every such pair needs its
+     marker - "either X or Y" when exactly one holds, "at least one of X or Y,
+     perhaps both" when both may.
+   - Precedence / Succession: state the sequence EXPLICITLY in one sentence
+     joining both claims - "before", "after", "subsequently", "earlier than",
+     "which postdates" - while keeping the ordering purely chronological, so a
+     reader sees only when things happened and infers nothing from it. Write
+     "X, which predates Y" or "Y came after X", not "X and therefore Y".
+     Asserting the two claims in separate sentences leaves this relation
+     unrealized: an ordering a reader cannot see is the same as no ordering.
 4. For each planned NON-RELATION, assert both atoms but draw no dependence
    between them. Separate them by DISTANCE and PARAGRAPHING, not by a marker:
    put other material between them, or place them in different paragraphs, and
@@ -312,14 +330,19 @@ Instructions:
    date", "that attribution"), never the earlier sentence as a step ("the
    finding just reported", "the provision just stated", "the ordering just
    described"). Use precise and formal language, avoiding vague generalizations
-   and rhetorical fillers. Aim for 550-650 words; below 500 is too short.
+   and rhetorical fillers. Aim for 550-650 words. The 500-word floor is a hard
+   requirement checked by an automated reader, which rejects a shorter answer
+   outright however good it is, so give each atom and each relation the space to
+   be argued rather than compressing them into a summary.
 7. Do NOT mention the relation plan, the senses, the strength bands, the
    validity labels, or the fact that some content is incorrect. Do NOT hedge
    with "assume", "might", "possibly", "allegedly", "supposedly",
    "reportedly", or "it is claimed" around planned-invalid relations - assert
    them in the same register as the valid ones. Do NOT add headings, bullet
    lists, or annotations.
-8. Wrap the RESPONSE in a code block.
+8. Wrap the RESPONSE in a code block whose contents are the prose itself, as you
+   would publish it. The block holds the answer, not a JSON object or any other
+   payload with the prose inside a field.
 
 Your Task:
 QUESTION: [QUESTION_PLACEHOLDER]
@@ -400,11 +423,37 @@ Rules:
 - Emit a relation ONLY if the response itself draws that connection, as written
   or as a clear step in the author's argument. Do not emit a relation that is
   merely plausible in general.
+- Pick the MOST SPECIFIC sense the text supports, never the most general one.
+  Five senses compile to "entailment", and "Evidence" is the broadest of them,
+  so it is the easy wrong answer: use it only for evidential support ("indicates",
+  "confirms", "as shown by", "suggests"). Prefer "Cause-Effect" when the text says
+  one thing brought the other about ("caused", "led to", "resulted in",
+  "because"), "Effect-Cause" when that runs the other way ("resulted from",
+  "is explained by"), "Condition" for "if", "provided that", "only when", and
+  "Instantiation" when one claim is an INSTANCE of the other, i.e. a specific
+  case of a general statement ("for example", "specifically", "such as").
 - Use "Alternative" only when the two claims cannot both be true AND cannot both
-  be false. Use "Contrast" when they merely cannot both be true.
-- Use "Disjunction" only when the response rules out both claims being false.
+  be false. Use "Contrast" when they merely cannot both be true - look for "by
+  contrast", "whereas", "on the other hand", or two claims set against each other
+  without either being conceded.
+- Use "Concession" when the text grants a tension and then overrides it -
+  "although", "despite", "even though", "notwithstanding", or a clause that admits
+  one claim while asserting the other anyway. A concessive marker attaching two
+  claims IS a relation between them, even when the concession sits in a
+  subordinate clause rather than its own sentence.
+- Use "Disjunction" only when the response rules out both claims being false
+  ("at least one of", "one or both", "perhaps both").
 - Use "Precedence" or "Succession" only when the ordering carries no truth
-  dependence; set their coupling to "none".
+  dependence; set their coupling to "none". These ARE relations and must be
+  emitted: "before", "after", "subsequently", "earlier", "later", or an explicit
+  statement that a sequence carries no causal or inferential force. Read such a
+  pair as "Precedence" when the source comes first in time and "Succession" when
+  it comes second. Do not silently upgrade one to "Cause-Effect" or "Evidence"
+  because the two events sit next to each other in an argument.
+- Relate a pair only ONCE unless the response genuinely draws two different
+  connections between them. Emitting many relations does not make the recovery
+  more complete; a pair the response merely mentions in the same paragraph is not
+  related.
 - "coupling" is not an independent choice: it must be the coupling that the
   "sense" you chose compiles to. Cause-Effect, Effect-Cause, Evidence,
   Condition and Instantiation are "entailment"; Restatement is "equivalence";
@@ -462,15 +511,22 @@ The function audits a generated response and returns a JSON object:
   "statements" as the objects the text was assembled from; or any label, tag,
   numeric index, or bracketed marker. Do NOT flag a connective or coordination
   that merely realizes a relation - "either X or Y", "at least one of X or Y",
+  "at least one of these was true", "perhaps both",
   "the two cannot both be true, and one of them must hold", "although X, Y",
-  "before", "after", or an explicit statement that an ordering carries no
-  causal or inferential force. A writer is REQUIRED to use those, and a
-  coupling over two claims' joint truth cannot be expressed without one. Do NOT
+  "before", "after", "as indicated by", "as shown by", "which indicates", or an
+  explicit statement that an ordering carries no causal or inferential force. A
+  writer is REQUIRED to use those, and a coupling over two claims' joint truth
+  cannot be expressed without one. Every span you report must be QUOTED VERBATIM
+  from the response; if you cannot copy it out of the text, it is not there and
+  must not be reported. Do NOT
   flag ordinary scholarly vocabulary used about the subject matter, such as
   "claim", "outcome", "reading", "account" or "finding".
-- hedging: any span using "assume", "might", "possibly", "allegedly",
-  "supposedly", "reportedly", or "it is claimed", which would signal to a
-  reader which content is unreliable.
+- hedging: a span using one of these EXACT words: "assume", "might",
+  "possibly", "allegedly", "supposedly", "reportedly", "it is claimed". The list
+  is CLOSED - quote the word you found, and flag nothing that does not contain
+  one of them. Uncertainty a writer is REQUIRED to express is not hedging: "at
+  least one of X or Y, perhaps both" and "either X or Y" state the logical
+  strength of a relation, not doubt about the content, so do NOT flag them.
 - artifacts: enumerated list structure, headings, repeated template phrasing, or
   a sentence that reads as a stitched-together claim rather than prose.
 

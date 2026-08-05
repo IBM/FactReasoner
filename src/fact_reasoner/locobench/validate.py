@@ -54,7 +54,7 @@ THRESHOLDS: dict[str, Any] = {
     "v3_rule": "majority",  # of the auditors must fail a facet for it to reject
     "v4_coverage": 1.00,  # every atom `asserted`
     # -- plan structure (P3) --
-    "n_claims": (14, 18),
+    "n_claims": (14, 16),  # a dead copy of parse.N_CLAIMS_RANGE; keep them in step
     "n_relations": (8, 12),
     "n_non_relations": (4, 6),
     "validity_split": 0.55,  # target fraction valid
@@ -316,25 +316,68 @@ def _shares_entity(a: str, b: str) -> bool:
 # ----------------------------------------------------------------------------
 
 
-def _pair_key(source: Any, target: Any, sense: str) -> tuple[Any, ...]:
-    """The comparison key for one relation: directed unless the sense is symmetric.
+def _pair_key(source: Any, target: Any, sense: str = "") -> tuple[Any, ...]:
+    """The IDENTITY of one relation: which two atoms it holds between, order-insensitive.
 
-    A ``frozenset`` for every sense -- which is what this used to be -- made the match
-    blind to direction, so ``wrong_direction`` (a first-class ``error_kind`` in P3
-    instruction 8) scored as a hit on the pair. It also collapsed self-loops and silently
-    overwrote when V1 emitted both (i, j) and (j, i). Directed senses now compare in
-    order; genuinely undirected ones (Alternative, Disjunction, Restatement, ...) keep the
-    order-insensitive comparison they need.
+    Deliberately sense-independent. Deriving the key space from the sense -- which the
+    previous version did, using ordered keys for directed senses and unordered for
+    symmetric ones -- meant a planned and a recovered relation over the *same two atoms*
+    could land in **different key spaces** whenever their senses disagreed in
+    directedness, so the pair was unmatchable and scored 0 on sense *and* 0 on coupling.
+    That is a category error: it counted "recovered with the wrong sense" as "not
+    recovered", which is exactly the distinction V1 exists to measure. Measured live:
+    gpt-oss-120b recovered a planned ``Concession(7, 12)`` as ``Contrast(7, 12)`` -- same
+    endpoints, and both senses compile to ``contradiction`` -- and earned nothing, because
+    ``Concession`` keys as ``("d", 7, 12)`` and ``Contrast`` as ``("u", "12", "7")``.
+
+    Direction is not discarded, it moves: :func:`gate_recovery` compares the endpoint
+    ORDER separately and withholds sense and coupling credit when a directed planned sense
+    was recovered reversed. So ``wrong_direction`` (a first-class ``error_kind`` in P3
+    instruction 8) still earns no credit -- it is now visible as a matched pair that failed
+    on direction rather than as an absence, which is strictly more diagnosable.
+
+    ``sense`` is accepted and ignored, so the existing call sites and any test that passes
+    it keep working.
+
+    Args:
+        source: The relation's source position.
+        target: The relation's target position.
+        sense: Unused; retained for call-site compatibility.
+
+    Returns:
+        A hashable key identifying the unordered atom pair.
+    """
+    # Stringified before sorting because a planned position is an int while a recovered one
+    # may be a numeric string, and mixed types are not orderable in Python 3.
+    return tuple(sorted((str(source), str(target))))
+
+
+def _is_reversed(planned: dict[str, Any], got: dict[str, Any]) -> bool:
+    """Whether a matched pair was recovered with its endpoints the wrong way round.
+
+    Only meaningful when the *planned* sense is directed: an undirected sense carries no
+    order, so neither ordering is wrong. The planned sense is the reference because it is
+    the ground truth being recovered against -- consulting the recovered sense instead
+    would let a model escape the direction check by mislabelling the sense as symmetric.
+
+    Args:
+        planned: A plan relation (``source_pos``/``target_pos``/``sense``).
+        got: The recovered relation matched to it (``source``/``target``).
+
+    Returns:
+        True if the planned sense is directed and the endpoints are swapped.
     """
     from fact_reasoner.locobench.taxonomy_bridge import is_directed
 
     try:
-        directed = is_directed(sense)
-    except ValueError:  # an unknown sense cannot match a planned edge anyway
-        directed = True
-    if directed:
-        return ("d", source, target)
-    return ("u", *sorted((str(source), str(target))))
+        if not is_directed(planned.get("sense", "")):
+            return False
+    except ValueError:
+        # An unknown planned sense cannot be classified. Treat it as directed, matching
+        # `_pair_key`'s historical conservative default, so a bogus sense cannot buy
+        # direction-blind credit.
+        pass
+    return str(got.get("source")) != str(planned["source_pos"])
 
 
 def _looks_zero_based(
@@ -424,17 +467,66 @@ def gate_recovery(
                 )
             )
 
-    rec_by_pair: dict[tuple[Any, ...], dict[str, Any]] = {}
+    # A LIST per pair, not one entry, and each recovered relation is consumed at most once.
+    # A plan may legitimately carry two relations over the same two atoms -- P3 admits it
+    # and a live plan did exactly that, pairing 10-11 as both `Alternative` and
+    # `Concession` -- so a dict keyed by pair silently dropped all but the last, and the
+    # survivor was then compared against *every* planned relation on that pair. Measured:
+    # a plan whose two same-pair relations were BOTH recovered with the exactly correct
+    # sense scored 0.5, not 1.0. (The previous sense-derived key masked this whenever the
+    # two senses happened to differ in directedness, which is why it went unnoticed.)
+    rec_by_pair: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for r in recovered:
-        rec_by_pair[_pair_key(r.get("source"), r.get("target"), r.get("sense", ""))] = r
+        rec_by_pair.setdefault(_pair_key(r.get("source"), r.get("target")), []).append(r)
+
+    def _quality(p: dict[str, Any], c: dict[str, Any]) -> tuple[bool, bool]:
+        """How well a recovered relation explains a planned one: (sense, direction)."""
+        return (c.get("sense") == p["sense"], not _is_reversed(p, c))
+
+    # Assign in QUALITY order, not plan order, because assignment is competitive: several
+    # planned relations can share one atom pair and contend for the same recovery. Greedy
+    # plan-order assignment mis-awards it -- measured on a live plan holding both
+    # `(1,2) Precedence` and `(2,1) Cause-Effect` against a single recovered
+    # `(2,1) Evidence`: `Precedence` came first, claimed it, and was scored REVERSED, while
+    # `Cause-Effect` -- which the recovery matched in direction and coupling class -- was
+    # left with nothing and scored as absent. Two relations were penalized for one defect.
+    # Best-first assignment gives the recovery to the relation it actually explains.
+    order = sorted(
+        range(len(planned)),
+        key=lambda i: max(
+            (
+                _quality(planned[i], c)
+                for c in rec_by_pair.get(
+                    _pair_key(planned[i]["source_pos"], planned[i]["target_pos"]), []
+                )
+            ),
+            default=(False, False),
+        ),
+        reverse=True,
+    )
 
     n_coupling = n_sense = 0
     matched: list[tuple[Any, Any]] = []
-    for p in planned:
-        got = rec_by_pair.get(_pair_key(p["source_pos"], p["target_pos"], p["sense"]))
-        if not got:
+    reversed_pairs: list[tuple[Any, Any, str]] = []
+    for i in order:
+        p = planned[i]
+        candidates = rec_by_pair.get(_pair_key(p["source_pos"], p["target_pos"]))
+        if not candidates:
             continue
+        got = max(candidates, key=lambda c: _quality(p, c))
+        candidates.remove(got)
         matched.append((p["source_pos"], p["target_pos"]))
+        # DIRECTION, graded here rather than baked into the key. The pair is identified by
+        # its endpoints; whether the prose got the direction right is part of *how well* it
+        # was recovered. A directed planned sense recovered with the endpoints swapped
+        # earns neither sense nor coupling credit -- reversing Evidence inverts which claim
+        # supports which, and reversing Precedence into Evidence turns a chronology into an
+        # inference. Undirected senses carry no order, so nothing is checked for them.
+        if _is_reversed(p, got):
+            reversed_pairs.append(
+                (p["source_pos"], p["target_pos"], p.get("sense", ""))
+            )
+            continue
         # Coupling recall COMPILES the recovered sense rather than reading the model's
         # own `coupling` field. COMPILE is the authority for that mapping everywhere else
         # -- `schema.py` asserts gold cannot contradict it and `parse.py` rejects a plan
@@ -472,6 +564,11 @@ def gate_recovery(
                 # The pairs, so "recovered nothing" and "matched the wrong key space" are
                 # distinguishable from the persisted record alone.
                 "matched_pairs": matched,
+                # Matched on endpoints but recovered backwards. Called out separately
+                # because it is a DIFFERENT defect from a missing relation and needs a
+                # different fix (P4 direction wording, not more coverage), and because it
+                # used to be indistinguishable from an absence.
+                "reversed_pairs": reversed_pairs,
                 "recovered_pairs": rec_pairs,
                 "planned_pairs": planned_pairs,
             },
@@ -479,7 +576,13 @@ def gate_recovery(
             if ok
             else f"recovery too low: coupling {r_coupling:.2f} (need {t_coupling}), "
             f"sense {r_sense:.2f} (need {t_sense}); matched "
-            f"{len(matched)}/{total} planned pair(s)",
+            f"{len(matched)}/{total} planned pair(s)"
+            + (
+                f"; {len(reversed_pairs)} recovered with reversed endpoints: "
+                f"{reversed_pairs[:4]}"
+                if reversed_pairs
+                else ""
+            ),
         )
     )
     return v

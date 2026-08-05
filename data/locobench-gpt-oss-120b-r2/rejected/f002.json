@@ -1,0 +1,264 @@
+{
+  "family_id": "f002",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          6,
+          11,
+          5
+        ],
+        [
+          5,
+          14,
+          9
+        ],
+        [
+          3,
+          15,
+          12
+        ]
+      ],
+      "detail": "3 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(6, 11, 5), (5, 14, 9), (3, 15, 12)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": false,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.4,
+        "sense": 0.4,
+        "matched_pairs": [
+          [
+            6,
+            11
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            5,
+            14
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            6,
+            11,
+            "Evidence"
+          ],
+          [
+            6,
+            12,
+            "Evidence"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            6,
+            17,
+            "Evidence"
+          ],
+          [
+            5,
+            14,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            2,
+            "Precedence"
+          ],
+          [
+            6,
+            11,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            5,
+            14,
+            "Concession"
+          ],
+          [
+            2,
+            1,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            6,
+            "Evidence"
+          ],
+          [
+            12,
+            11,
+            "Contrast"
+          ],
+          [
+            3,
+            15,
+            "Instantiation"
+          ]
+        ]
+      },
+      "detail": "recovery too low: coupling 0.40 (need 0.8), sense 0.40 (need 0.7); matched 4/10 planned pair(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "llama-3.3-70b-instruct": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "deepseek-v3.2": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {},
+          "llama-3.3-70b-instruct": {
+            "hedging": 3
+          },
+          "deepseek-v3.2": {
+            "leakage": 3
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 1
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "llama-3.3-70b-instruct": {
+            "hedging": [
+              "possibly",
+              "at least one of these must hold",
+              "the possibility of a sudden break"
+            ]
+          },
+          "deepseek-v3.2": {
+            "leakage": [
+              "\"at least one of these must hold\"",
+              "\"the stratigraphic layer containing bronze tools shows a sudden cultural break, or the typological style of the bronze t",
+              "\"The possibility of a sudden break points to an abrupt cultural influx, whereas the incorporation of earlier elements hi"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "llama-4-mkv-a100": 0,
+          "llama-3.3-70b-instruct": 4,
+          "deepseek-v3.2": 0
+        },
+        "spans": {
+          "llama-3.3-70b-instruct": [
+            "This deep chronological framework allows researchers to isolate cultural transitions with fine temporal resolution.",
+            "The settlement's habitation layers show no interruption in ceramic continuity across the bronze appearance.",
+            "Comparative studies of neighboring inland sites demonstrate a later emergence of bronze technology by several centuries.",
+            "The International Archaeological Committee held that the lead isotope evidence confirms foreign provenance for the coppe"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": false,
+      "threshold": 1.0,
+      "observed": 0.824,
+      "detail": "3 atom(s) not asserted: [(11, 'missing'), (12, 'missing'), (13, 'missing')]"
+    }
+  ],
+  "reason": "V1: recovery too low: coupling 0.40 (need 0.8), sense 0.40 (need 0.7); matched 4/10 planned pair(s); V4: 3 atom(s) not asserted: [(11, 'missing'), (12, 'missing'), (13, 'missing')]"
+}

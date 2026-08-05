@@ -1,0 +1,341 @@
+{
+  "family_id": "f001",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Condition",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement",
+        "Succession"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          1,
+          6,
+          5
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(1, 6, 5)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.9,
+        "sense": 0.9,
+        "matched_pairs": [
+          [
+            13,
+            14
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            2,
+            11
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            5,
+            1
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            9,
+            10
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            4,
+            5,
+            "Precedence"
+          ],
+          [
+            5,
+            1,
+            "Succession"
+          ],
+          [
+            1,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            3,
+            "Contrast"
+          ],
+          [
+            7,
+            8,
+            "Concession"
+          ],
+          [
+            9,
+            5,
+            "Condition"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
+          ],
+          [
+            2,
+            11,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            7,
+            3,
+            "Evidence"
+          ],
+          [
+            8,
+            7,
+            "Evidence"
+          ],
+          [
+            13,
+            14,
+            "Restatement"
+          ],
+          [
+            3,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            3,
+            8,
+            "Evidence"
+          ],
+          [
+            3,
+            5,
+            "Cause-Effect"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            13,
+            14,
+            "Restatement"
+          ],
+          [
+            9,
+            10,
+            "Alternative"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            7,
+            8,
+            "Concession"
+          ],
+          [
+            4,
+            5,
+            "Precedence"
+          ],
+          [
+            2,
+            11,
+            "Evidence"
+          ],
+          [
+            7,
+            3,
+            "Contrast"
+          ],
+          [
+            1,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            1,
+            "Succession"
+          ],
+          [
+            9,
+            5,
+            "Condition"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "llama-3.3-70b-instruct": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "deepseek-v3.2": {
+            "fluency": 4,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": false,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {
+            "leakage": 2,
+            "hedging": 2
+          },
+          "llama-3.3-70b-instruct": {},
+          "deepseek-v3.2": {
+            "leakage": 4,
+            "hedging": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 2,
+          "hedging": 2
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "llama-4-mkv-a100": {
+            "leakage": [
+              "either this or the earlier statement that they were manufactured after 6500\u202fBCE holds",
+              "at least one of these was true: large quantities of obsidian were imported to \u00c7atalh\u00f6y\u00fck, or large quantities of marine "
+            ],
+            "hedging": [
+              "If this is the case",
+              "perhaps both"
+            ]
+          },
+          "deepseek-v3.2": {
+            "leakage": [
+              "as indicated by the fact that",
+              "At least one of these was true:",
+              "either this or the earlier statement that they were manufactured after 6500\u202fBCE holds.",
+              "When the archaeological record is evaluated against the standard criteria\u2014frequency, material provenance, temporal corre"
+            ],
+            "hedging": [
+              "assume"
+            ]
+          }
+        }
+      },
+      "detail": "a majority flagged {'leakage': '2/3', 'hedging': '2/3'}: {'llama-4-mkv-a100': {'leakage': 2, 'hedging': 2}, 'deepseek-v3.2': {'leakage': 4, 'hedging': 1}}"
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "llama-4-mkv-a100": 2,
+          "llama-3.3-70b-instruct": 1,
+          "deepseek-v3.2": 5
+        },
+        "spans": {
+          "llama-4-mkv-a100": [
+            "either this or the earlier statement that they were manufactured after 6500\u202fBCE holds",
+            "at least one of these was true: large quantities of obsidian were imported to \u00c7atalh\u00f6y\u00fck, or large quantities of marine "
+          ],
+          "llama-3.3-70b-instruct": [
+            "The site contains the famous Mother Goddess figurine. That is, a female deity figurine is among the artifacts recovered "
+          ],
+          "deepseek-v3.2": [
+            "In the later phases, some burials included elaborate grave goods such as beads, figurines, and pigment. Obsidian artifac",
+            "This low frequency argues against a wholesale transformation of social organization; instead it points to a selective pr",
+            "If this is the case, then the radiocarbon dates place the emergence of elaborate burial offerings around 6800\u202fBCE.",
+            "Large quantities of obsidian were imported to \u00c7atalh\u00f6y\u00fck, as indicated by the fact that obsidian artifacts at the site d",
+            "That is, a female deity figurine is among the artifacts recovered from \u00c7atalh\u00f6y\u00fck."
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": 1.0,
+      "detail": ""
+    }
+  ],
+  "reason": "V3.spans: a majority flagged {'leakage': '2/3', 'hedging': '2/3'}: {'llama-4-mkv-a100': {'leakage': 2, 'hedging': 2}, 'deepseek-v3.2': {'leakage': 4, 'hedging': 1}}"
+}

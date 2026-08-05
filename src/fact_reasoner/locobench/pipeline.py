@@ -195,7 +195,10 @@ class _Caller:
                 local ("6 of 12 relations are valid, need 5-8") against output the model
                 already got structurally right, so feeding it back is worth more than any
                 number of blind resamples. Without it a semantically-wrong-but-parseable
-                plan consumed none of ``attempts`` and was simply discarded.
+                plan consumed none of ``attempts`` and was simply discarded. A check
+                complaint is fed back through :data:`_SEMANTIC_RETRY_NOTE` rather than the
+                parse note, so the model is asked to change the content and keep the
+                format rather than the reverse.
             **values: Placeholder values for :func:`prompts.fill`.
 
         Returns:
@@ -207,16 +210,23 @@ class _Caller:
         last = "no attempt made"
         last_value: Any = None
         prev_err: str | None = None
+        prev_semantic = False
         for i in range(self.attempts):
             self.counts[prompt_id] = self.counts.get(prompt_id, 0) + 1
             # Tell the model what was wrong with the last attempt. Appended after
             # rendering because `prompts.fill` admits only declared placeholders.
-            prompt = rendered if prev_err is None else rendered + _retry_note(prev_err)
+            prompt = (
+                rendered
+                if prev_err is None
+                else rendered + _retry_note(prev_err, semantic=prev_semantic)
+            )
             try:
                 raw = self._call(prompt, i)
             except Exception as e:  # a backend failure is a retryable condition
                 last = f"{type(e).__name__}: {e}"
                 prev_err = last
+                # A backend/sampling error is not a content complaint.
+                prev_semantic = False
                 # A sampling failure still knows what the model said; keep it so the
                 # caller can persist the near miss.
                 rejected = getattr(e, "rejected_output", "")
@@ -227,6 +237,7 @@ class _Caller:
             value, err = parser(raw)
             if err is not None:
                 last, prev_err = err, err
+                prev_semantic = False
                 continue
             if check is None:
                 return value, None
@@ -236,6 +247,9 @@ class _Caller:
             if reason is None:
                 return value, None
             last, prev_err = reason, reason
+            # The output WAS readable, so the next attempt must be told to change the
+            # content and keep the format -- the opposite of the parse-failure advice.
+            prev_semantic = True
         return last_value, last
 
 
@@ -284,33 +298,53 @@ _RETRY_NOTE = (
     "Emit only the output described above, in exactly the required format."
 )
 
+# The SEMANTIC counterpart, for a `check=` complaint rather than a parse failure. These
+# must be separate because the advice is opposite. Once the response-stage gates moved
+# inside the retry loop, a V1/V3/V4 or plan-gate reason was carried by the note above,
+# which told the model its output "could not be read" and to fix the FORMAT -- when the
+# format was already correct and the content was the problem. Measured consequence: a
+# deepseek family whose prose dropped the quantifier "All" from one atom was flagged by V4
+# three times and never repaired, because every retry asked it to reformat. Naming the
+# failure as a content failure is what makes the reason actionable.
+_SEMANTIC_RETRY_NOTE = (
+    "\n\nNOTE: your previous attempt was well-formed, but its content did not meet a "
+    "quality requirement.\n"
+    "Problem: {reason}\n"
+    "Keep the same output format and revise the content so this is fixed."
+)
 
-def _retry_note(reason: str) -> str:
-    """Render the retry feedback appended after a failed parse.
+
+def _retry_note(reason: str, *, semantic: bool = False) -> str:
+    """Render the retry feedback appended after a failed attempt.
 
     Args:
-        reason: The parser's error string.
+        reason: The parser's error string, or the failing check's complaint.
+        semantic: Whether the failure was a post-parse check rather than a parse. The
+            two get different advice: a parse failure needs the format corrected, a
+            check failure needs the content changed and the format left alone.
 
     Returns:
         The suffix to append to the rendered prompt.
     """
-    return _RETRY_NOTE.format(reason=reason)
+    template = _SEMANTIC_RETRY_NOTE if semantic else _RETRY_NOTE
+    return template.format(reason=reason)
 
 
 def _check_retry_note() -> None:
-    """Assert the retry note cannot be mistaken for any prompt.
+    """Assert neither retry note can be mistaken for any prompt.
 
     Raises:
-        RuntimeError: If the note contains a dispatch probe, which would make a retry
+        RuntimeError: If a note contains a dispatch probe, which would make a retry
             dispatch to the wrong prompt's parser and mock.
     """
-    note = _retry_note("example reason")
-    for pid, probe in _PROBES.items():
-        if probe in note:
-            raise RuntimeError(
-                f"the retry note contains {pid}'s dispatch probe ({probe!r}), so a retry "
-                "would be routed to the wrong prompt. Reword _RETRY_NOTE."
-            )
+    for semantic in (False, True):
+        note = _retry_note("example reason", semantic=semantic)
+        for pid, probe in _PROBES.items():
+            if probe in note:
+                raise RuntimeError(
+                    f"the retry note contains {pid}'s dispatch probe ({probe!r}), so a "
+                    "retry would be routed to the wrong prompt. Reword the note."
+                )
 
 
 # Checked at import, not inside make_mock_llm: the retry note is appended on the LIVE path

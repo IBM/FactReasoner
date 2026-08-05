@@ -112,8 +112,8 @@ item id and sets the manifest's `dataset` field, so corpora built with different
 distinguishable — the item id is the only field that survives a naive `cat *.jsonl`:
 
 ```bash
-locobench-generate --config configs/locobench_deepseek.json \
-  --dataset-name locobench-deepseek-v3.2   # -> ids like locobench-deepseek-v3.2-f001-r0
+locobench-generate --config configs/locobench_gptoss.json \
+  --dataset-name locobench-gpt-oss-120b   # -> ids like locobench-gpt-oss-120b-f001-r0
 ```
 
 Keep `n_families` at the real target (120) even for a small trial and use `limit` to cut it short:

@@ -243,6 +243,15 @@ class TestBuilderAssertion:
         with pytest.raises(SchemaError, match="both a relation and a non-relation"):
             validate_item(item)
 
+    def test_two_relations_over_one_pair_are_rejected(self):
+        # This branch had NO coverage, which is why the mismatch with `parse_plan` reached a
+        # live run: a plan carrying a duplicate pair cleared every gate and died here.
+        item = _valid_item()
+        dup = dict(item["relations"][0])
+        item["relations"] = item["relations"] + [dup]
+        with pytest.raises(SchemaError, match="duplicate relation"):
+            validate_item(item)
+
 
 class TestDefectOneEncoded:
     """``log_partition`` is invariant at rung 1->2, not increasing."""
@@ -432,6 +441,116 @@ class TestParsers:
     def test_response_below_the_word_floor_is_rejected(self):
         out, err = parse.parse_response("too short", min_words=500)
         assert out is None and "below the 500-word floor" in err
+
+
+class TestHedgesAreRejectionSampled:
+    """P4 and V3 disagree on hedge SCOPE, and the parser closes the gap for free.
+
+    P4 instruction 7 warns about the hedge words only "around planned-invalid relations";
+    V3 flags them anywhere. Measured on gpt-oss-120b r5 f001, whose ONLY remaining rejection
+    was `"possibly for body painting"` -- ordinary descriptive prose, so P4 permitted exactly
+    what V3 rejects, and both auditors correctly flagged it as a true positive.
+
+    Widening P4's scope is guarded against by `test_p4_does_not_widen_the_hedge_scope`,
+    because added prohibitions measurably suppressed output (581 -> 308 -> 144 words).
+    Checking in the parser needs no prompt change and costs nothing: `build_llm` installs the
+    parser as the Mellea rejection-sampling requirement, so the hedge is re-sampled inside
+    the same P4 call rather than surfacing as a V3 rejection after the whole audit panel ran.
+    """
+
+    def _prose(self, extra=""):
+        return "```\n" + " ".join(["word"] * 600) + " " + extra + "\n```"
+
+    @pytest.mark.parametrize("word", list(parse.HEDGE_WORDS))
+    def test_each_hedge_word_is_rejected(self, word):
+        out, err = parse.parse_response(self._prose(f"The finding {word} holds."))
+        assert out is None
+        assert word in err
+
+    def test_clean_prose_of_sufficient_length_passes(self):
+        out, err = parse.parse_response(self._prose("The finding holds."))
+        assert err is None and out
+
+    def test_the_mandated_disjunction_phrasing_is_not_a_hedge(self):
+        # P4 instruction 3 REQUIRES "perhaps both" for Disjunction. Rejecting it here would
+        # make the two prompts unsatisfiable together -- the eighth instance of that bug.
+        out, err = parse.parse_response(
+            self._prose("At least one of X or Y holds, perhaps both.")
+        )
+        assert err is None, err
+        assert out
+
+    @pytest.mark.parametrize(
+        "word", ["assumption", "mighty", "possibilities", "reported", "supposed"]
+    )
+    def test_words_merely_containing_a_hedge_are_not_flagged(self, word):
+        # Word-bounded: "reported" is not "reportedly", and "the assumption of" is ordinary
+        # scholarly prose. An unbounded scan would reject compliant text.
+        out, err = parse.parse_response(self._prose(f"The {word} of the site is clear."))
+        assert err is None, f"{word!r} was wrongly treated as a hedge: {err}"
+
+    def test_the_structural_complaints_are_reported_first(self):
+        # A short hedged response must report its LENGTH, not the hedge: fixing the hedge
+        # would not make it admissible, so the more fundamental complaint has to win.
+        out, err = parse.parse_response("```\nIt might hold.\n```")
+        assert out is None
+        assert "word floor" in err
+
+    def test_the_canonical_list_matches_what_the_prompts_recite(self):
+        # The three prompt strings that recite these words had no constant behind them.
+        v3, p4 = prompts.PROMPTS["V3"], prompts.PROMPTS["P4"]
+        for word in parse.HEDGE_WORDS:
+            assert f'"{word}"' in v3, f"V3 does not check {word!r}"
+            assert word in p4, f"P4 does not warn about {word!r}"
+
+
+class TestResponseMustBeBareProse:
+    """P4's code block holds prose; every other prompt's holds JSON.
+
+    Measured on a live deepseek-v3.2 run: P4 returned ```json {"response": "..."} ```.
+    Nothing rejected it -- the block is taken verbatim, and `ignore_language=True` strips
+    the ```json tag but not the object inside -- so a long-enough wrapped answer would
+    have entered the corpus with a literal `{"response": "` prefix and `\\n` escapes as
+    response text. It only surfaced because that answer was ALSO under the word floor.
+    """
+
+    def _wrapped(self, n_words):
+        body = " ".join(["word"] * n_words)
+        return '```json\n{"response": "' + body + '"}\n```'
+
+    def test_a_json_wrapped_block_is_rejected(self):
+        out, err = parse.parse_response(self._wrapped(600))
+        assert out is None
+        assert "not a JSON object" in err
+
+    def test_the_format_complaint_wins_over_the_word_floor(self):
+        # The wrapper is checked FIRST. With the order reversed, a short wrapped answer
+        # reports only its length and the format defect stays invisible -- which is
+        # precisely how this bug survived a live run.
+        out, err = parse.parse_response(self._wrapped(5))
+        assert out is None
+        assert "not a JSON object" in err
+        assert "word floor" not in err
+
+    def test_a_json_array_is_also_rejected(self):
+        out, err = parse.parse_response("```\n[1, 2, 3]\n```")
+        assert out is None and "not a JSON object" in err
+
+    def test_bare_prose_of_sufficient_length_still_passes(self):
+        prose = " ".join(["word"] * 600)
+        out, err = parse.parse_response(f"```\n{prose}\n```")
+        assert err is None
+        assert out.startswith("word")
+
+    def test_the_real_captured_failure_is_now_diagnosed_as_a_format_error(self):
+        # The exact payload from data/locobench-deepseek-v3.2 f002, reduced to its shape.
+        raw = (
+            '```json\n{\n  "response": "When an archaeologist encounters an artifact '
+            'assemblage lacking definitive textual evidence, the attribution is guided '
+            'by a multifaceted analytical framework."\n}\n```'
+        )
+        out, err = parse.parse_response(raw)
+        assert out is None and "not a JSON object" in err
 
 
 class TestGates:
@@ -1076,6 +1195,23 @@ class TestRetryNoteIsSafe:
     def test_dispatch_survives_the_appended_note(self, pid):
         assert which_prompt(prompts.PROMPTS[pid] + _retry_note("some reason")) == pid
 
+    @pytest.mark.parametrize("pid", sorted(prompts.PROMPTS))
+    def test_dispatch_survives_the_semantic_note(self, pid):
+        # There are two notes now, and `_check_retry_note` covers both -- but dispatch is
+        # what actually breaks if a note embeds a probe, so assert it for both.
+        note = _retry_note("a gate complaint", semantic=True)
+        assert which_prompt(prompts.PROMPTS[pid] + note) == pid
+
+    def test_the_two_notes_give_opposite_advice(self):
+        parse_note = _retry_note("bad json", semantic=False)
+        gate_note = _retry_note("V4: 1 atom(s) not asserted", semantic=True)
+        assert "could not be read" in parse_note
+        assert "could not be read" not in gate_note
+        assert "Keep the same output format" in gate_note
+        # Both must still carry the reason -- that is the whole point of the feedback.
+        assert "bad json" in parse_note
+        assert "V4: 1 atom(s) not asserted" in gate_note
+
     def test_p5s_parent_response_slice_survives_the_note(self):
         # The mock reconstructs the parent by slicing the rendered prompt; a suffix lands
         # after the RELATION PLAN marker, so the slice must still yield the parent.
@@ -1420,6 +1556,53 @@ class TestP4BackReferencing:
         assert len(re.findall(r"(?m)^\d+\. ", prompts.PROMPTS["P4"])) == 8
 
 
+class TestP4PreservesAtomContent:
+    """Quantifiers are content, not surface wording -- the V4 `altered` failure mode.
+
+    Measured live: deepseek realized the atom "All tools were crafted by a single,
+    innovative culture." as "...indicates they were crafted by a single, innovative
+    culture", dropping "All". V4 correctly flagged it `altered`, coverage came to 0.938
+    against a threshold of 1.00, and the family was lost. Instruction 2 permitted
+    "adjust surface wording for fluency" without ever saying a quantifier is not wording.
+    """
+
+    def test_instruction_two_names_quantifiers_as_content(self):
+        p4 = prompts.PROMPTS["P4"]
+        assert "are CONTENT" in p4
+        for word in ("Quantifiers", "determiners", "polarity", "modals"):
+            assert word in p4
+
+    def test_it_gives_the_measured_counter_example(self):
+        # A worked substitution, not an abstract rule: the observed failure was on exactly
+        # this shape, and the abstract rule ("must not change what is asserted") was
+        # already present and insufficient.
+        p4 = prompts.PROMPTS["P4"]
+        assert '"All tools were crafted by a single' in p4
+        assert "dropping" in p4 and "All" in p4
+
+    def test_the_word_floor_is_stated_as_hard(self):
+        # deepseek wrote 318 and 516 words against a 500 floor (Claude: 637, 659), so the
+        # floor is restated as a rejection rather than advice ("below 500 is too short").
+        p4 = prompts.PROMPTS["P4"]
+        assert "500-word floor is a hard" in p4
+        assert "rejects a shorter answer" in p4
+
+    def test_instruction_eight_asks_for_prose_not_json(self):
+        p4 = prompts.PROMPTS["P4"]
+        assert "not a JSON object" in p4
+
+    def test_no_new_prohibition_was_added(self):
+        # Prohibitions measurably collapse P4's output length (581 -> 308 -> 144 words in
+        # a recorded A/B), which is why all three edits above are phrased positively. The
+        # bound is an upper one, not an equality: going DOWN is the direction that
+        # measurement favours, and the Precedence rewrite removed one (see
+        # TestP4RealizesOrderingRelations).
+        import re
+
+        assert len(re.findall(r"Do NOT", prompts.PROMPTS["P4"])) <= 6
+        assert len(re.findall(r"(?m)^\d+\. ", prompts.PROMPTS["P4"])) == 8
+
+
 class TestGeneratorBuildFailures:
     """R3: the rotation carries the no-single-author claim, so a gap aborts the run."""
 
@@ -1584,6 +1767,33 @@ class TestModelInventory:
     def test_a_list_passed_to_load_config_names_the_fix(self, tmp_path):
         with pytest.raises(ValueError, match="model inventory"):
             load_config(str(self._inventory(tmp_path)))
+
+    @pytest.mark.parametrize(
+        "path",
+        ["configs/locobench_gptoss.json"],
+    )
+    def test_the_shipped_run_configs_are_valid(self, path):
+        # The real files: a rename in the inventory, or a committee that stops spanning
+        # three families, breaks a live run at startup. Cheaper to catch here.
+        cfg = load_config(path)
+        cfg.validate()  # raises on a bad committee, generator or merlin path
+        assert len(cfg.generators) == 1
+        gen = cfg.generators[0]
+        # Every RITS entry carries an explicit endpoint, so model_id is the raw served id.
+        assert gen.base_url and gen.model_id
+        # R3: the generator may not audit its own prose, and V3 votes, so a panel is
+        # needed rather than a single rater.
+        panel = cfg.eligible_auditors(gen)
+        assert len(panel) >= 3
+        assert all(m.model_id != gen.model_id for m in panel)
+
+    def test_the_gptoss_config_does_not_pin_temperature_zero(self):
+        # Measured: openai/gpt-oss-120b-a100 returns success=True at temperature 0.0 while
+        # emitting no bulleted claims, so P2's parser rejects every attempt and a capable
+        # model looks incapable. The ladder must start at None ("send no temperature").
+        cfg = load_config("configs/locobench_gptoss.json")
+        assert cfg.retry_temperatures[0] is None
+        assert 0.0 not in [t for t in cfg.retry_temperatures if t is not None]
 
     def test_unknown_fields_are_rejected(self, tmp_path):
         p = tmp_path / "bad.json"
@@ -1849,7 +2059,28 @@ class TestGateFailuresAreRepairable:
             claims="- a [correct]",
         )
         assert "only 4 of 10 relations are valid" in seen[1]
+        # A gate complaint must NOT be framed as an unreadable output. The output parsed
+        # fine; the content is wrong. Telling the model to fix the format instead is
+        # actively misleading -- a live deepseek family had one atom's quantifier dropped,
+        # was flagged by V4 on all three attempts, and never repaired it because every
+        # retry asked for a reformat.
+        assert "could not be read" not in seen[1]
+        assert "did not meet a quality requirement" in seen[1]
+        assert "Keep the same output format" in seen[1]
+
+    def test_a_parse_failure_still_asks_for_a_format_fix(self):
+        """The other branch keeps the original wording -- the advice is kind-specific."""
+        seen = []
+
+        def llm(rendered, *, attempt=0):
+            seen.append(rendered)
+            return "not a plan at all"
+
+        _Caller(llm, attempts=2).ask(
+            "P3", parse.parse_plan, question="q", claims="- a [correct]"
+        )
         assert "could not be read" in seen[1]
+        assert "did not meet a quality requirement" not in seen[1]
 
     def test_a_passing_check_short_circuits(self):
         calls = []
@@ -2079,7 +2310,7 @@ class TestV1IndexContract:
 class TestRecoveryDirection:
     """`wrong_direction` is a first-class error kind, so the match must see direction."""
 
-    def test_a_reversed_directed_sense_no_longer_counts(self):
+    def test_a_reversed_directed_sense_earns_no_credit(self):
         planned = [{"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect"}]
         reversed_rec = [
             {
@@ -2091,7 +2322,162 @@ class TestRecoveryDirection:
         ]
         v = validate.gate_recovery(planned, reversed_rec, n_atoms=5)
         assert not v.passed
-        assert v.results[0].observed["matched_pairs"] == []
+        obs = v.results[0].observed
+        # The credit is what matters, and it is zero on BOTH rates. The pair is now
+        # *matched* on its endpoints and reported as reversed, rather than vanishing --
+        # direction moved out of the identity key and into the grading, so that "recovered
+        # backwards" and "not recovered at all" are finally distinguishable.
+        assert obs["coupling"] == 0.0
+        assert obs["sense"] == 0.0
+        assert obs["reversed_pairs"] == [(1, 2, "Cause-Effect")]
+
+    def test_a_reversal_is_reported_separately_from_an_absence(self):
+        planned = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Evidence"},
+            {"source_pos": 3, "target_pos": 4, "sense": "Evidence"},
+        ]
+        # (1,2) recovered backwards; (3,4) not recovered at all.
+        rec = [{"source": 2, "target": 1, "sense": "Evidence", "coupling": "entailment"}]
+        obs = validate.gate_recovery(planned, rec, n_atoms=6).results[0].observed
+        assert obs["reversed_pairs"] == [(1, 2, "Evidence")]
+        assert obs["matched_pairs"] == [(1, 2)]  # (3,4) is absent, not reversed
+        assert obs["coupling"] == 0.0
+
+    def test_a_cross_directedness_sense_over_the_same_pair_is_matchable(self):
+        """The measured bug: same endpoints, adjacent sense, previously scored zero twice.
+
+        gpt-oss-120b recovered a planned ``Concession(7, 12)`` as ``Contrast(7, 12)``.
+        Both compile to ``contradiction``, so this is a sense miss that should still earn
+        coupling credit -- coupling is the coarser label, which is why its threshold is the
+        higher one. Instead the pair was unmatchable, because ``Concession`` is directed and
+        ``Contrast`` is not, so the two keys could never collide and the relation counted
+        as "not recovered".
+        """
+        planned = [{"source_pos": 7, "target_pos": 12, "sense": "Concession"}]
+        rec = [
+            {
+                "source": 7,
+                "target": 12,
+                "sense": "Contrast",
+                "coupling": "contradiction",
+            }
+        ]
+        obs = validate.gate_recovery(planned, rec, n_atoms=20).results[0].observed
+        assert obs["matched_pairs"] == [(7, 12)]
+        assert obs["coupling"] == 1.0, "same coupling class, so credit is earned"
+        assert obs["sense"] == 0.0, "but the sense is still wrong"
+
+    def test_the_pair_key_is_sense_independent(self):
+        # The property that makes the above work: identity is the unordered atom pair, so
+        # no two senses over the same endpoints can land in different key spaces.
+        assert validate._pair_key(1, 2, "Concession") == validate._pair_key(
+            1, 2, "Contrast"
+        )
+        assert validate._pair_key(1, 2, "Concession") == validate._pair_key(
+            2, 1, "Alternative"
+        )
+        assert validate._pair_key(1, 2) != validate._pair_key(1, 3)
+
+    def test_two_relations_over_one_pair_are_graded_independently(self):
+        """A dict keyed by pair dropped all but the last, then graded it against both.
+
+        Exposed by the pair-identity fix and pre-existing: a live plan carried 10-11 as
+        both `Alternative` and `Concession`. Because the two senses differ in directedness,
+        the old sense-derived key happened to keep them apart -- so a plan whose two
+        same-pair relations were BOTH recovered exactly would have scored 0.5, not 1.0, the
+        moment the key stopped depending on the sense.
+        """
+        planned = [
+            {"source_pos": 10, "target_pos": 11, "sense": "Alternative"},
+            {"source_pos": 10, "target_pos": 11, "sense": "Concession"},
+        ]
+        rec = [
+            {"source": 10, "target": 11, "sense": "Alternative"},
+            {"source": 10, "target": 11, "sense": "Concession"},
+        ]
+        obs = validate.gate_recovery(planned, rec).results[0].observed
+        assert obs["sense"] == 1.0
+        assert obs["coupling"] == 1.0
+
+    def test_one_recovery_cannot_satisfy_two_planned_relations(self):
+        # The other half of the same property: consumption is one-to-one, so a single
+        # recovery must not be credited twice.
+        planned = [
+            {"source_pos": 10, "target_pos": 11, "sense": "Alternative"},
+            {"source_pos": 10, "target_pos": 11, "sense": "Concession"},
+        ]
+        rec = [{"source": 10, "target": 11, "sense": "Alternative"}]
+        obs = validate.gate_recovery(planned, rec).results[0].observed
+        assert obs["sense"] == 0.5
+
+    def test_a_contended_recovery_goes_to_the_relation_it_explains(self):
+        """Assignment is competitive, so it must be best-first rather than plan-order.
+
+        Measured on a live plan holding BOTH `(1,2) Precedence` and `(2,1) Cause-Effect`
+        against one recovered `(2,1) Evidence`. In plan order `Precedence` claims it and is
+        scored reversed, while `Cause-Effect` -- which the recovery matches in direction and
+        in coupling class (both entailment) -- is left with nothing and scored absent. One
+        defect in the prose, two relations penalized.
+        """
+        planned = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Precedence"},
+            {"source_pos": 2, "target_pos": 1, "sense": "Cause-Effect"},
+        ]
+        rec = [{"source": 2, "target": 1, "sense": "Evidence"}]
+        obs = validate.gate_recovery(planned, rec).results[0].observed
+        # Cause-Effect(2,1) takes it: same direction, and Evidence compiles to entailment
+        # exactly as Cause-Effect does, so coupling credit is earned.
+        assert obs["coupling"] == 0.5
+        # And no spurious reversal is reported against Precedence.
+        assert obs["reversed_pairs"] == []
+
+    def test_plan_order_does_not_change_the_rates(self):
+        # The assignment must be order-independent, or the same prose scores differently
+        # depending on how P3 happened to list its relations.
+        a = {"source_pos": 1, "target_pos": 2, "sense": "Precedence"}
+        b = {"source_pos": 2, "target_pos": 1, "sense": "Cause-Effect"}
+        rec = [{"source": 2, "target": 1, "sense": "Evidence"}]
+        first = validate.gate_recovery([a, b], rec).results[0].observed
+        second = validate.gate_recovery([b, a], rec).results[0].observed
+        assert (first["coupling"], first["sense"]) == (
+            second["coupling"],
+            second["sense"],
+        )
+
+    def test_a_self_loop_is_not_collapsed(self):
+        # The original frozenset key collapsed self-loops; the replacement must not
+        # reintroduce that, so (1,1) stays distinct from any other pair.
+        assert validate._pair_key(1, 1) != validate._pair_key(1, 2)
+        obs = (
+            validate.gate_recovery(
+                [{"source_pos": 1, "target_pos": 1, "sense": "Evidence"}],
+                [{"source": 1, "target": 1, "sense": "Evidence"}],
+            )
+            .results[0]
+            .observed
+        )
+        assert obs["sense"] == 1.0
+
+    def test_both_directions_offered_does_not_overwrite(self):
+        # The other defect the frozenset key had: V1 emitting both (i,j) and (j,i) silently
+        # overwrote one. They are now both candidates, and the correct one is chosen.
+        planned = [{"source_pos": 1, "target_pos": 2, "sense": "Evidence"}]
+        rec = [
+            {"source": 2, "target": 1, "sense": "Evidence"},
+            {"source": 1, "target": 2, "sense": "Evidence"},
+        ]
+        obs = validate.gate_recovery(planned, rec).results[0].observed
+        assert obs["sense"] == 1.0
+        assert obs["reversed_pairs"] == []
+
+    def test_an_unknown_planned_sense_is_treated_as_directed(self):
+        # Conservative default, matching the old key's fallback: a bogus sense must not buy
+        # direction-blind credit.
+        planned = [{"source_pos": 1, "target_pos": 2, "sense": "NotASense"}]
+        rec = [{"source": 2, "target": 1, "sense": "NotASense", "coupling": "x"}]
+        obs = validate.gate_recovery(planned, rec, n_atoms=5).results[0].observed
+        assert obs["reversed_pairs"] == [(1, 2, "NotASense")]
+        assert obs["sense"] == 0.0
 
     def test_a_reversed_undirected_sense_still_counts(self):
         # Alternative is symmetric, so order carries no information.
@@ -2249,6 +2635,51 @@ class TestV3LeakageSemantics:
             "although X, Y",
         ):
             assert mandated in v3, f"V3 must name {mandated!r} as non-leakage"
+
+    def test_the_mandated_evidential_markers_are_exempted(self):
+        """P4's Evidence markers were mandated but never exempted from leakage.
+
+        Measured on gpt-oss r4 f001: deepseek's auditor flagged "as indicated by the fact
+        that" as leakage. P4 instruction 3 mandates "as indicated by" for Evidence, and the
+        exemption list covered the coordination senses but not the evidential ones.
+        """
+        v3 = prompts.PROMPTS["V3"]
+        for mandated in ("as indicated by", "as shown by", "perhaps both"):
+            assert mandated in v3, f"V3 must name {mandated!r} as non-leakage"
+
+    def test_the_hedge_list_is_declared_closed_and_exempts_required_uncertainty(self):
+        """Two auditors flagged "perhaps both" as hedging, which P4 mandates verbatim.
+
+        The hedging clause had NO exemption list at all -- unlike the leakage clause -- so a
+        construction the writer is required to use had nowhere to be excused. And one auditor
+        reported "assume" as a hedge span when that word does not occur anywhere in the
+        prose, so the clause also needed the quote-verbatim requirement.
+        """
+        v3 = prompts.PROMPTS["V3"]
+        assert "list\n  is CLOSED" in v3 or "is CLOSED" in v3
+        assert "perhaps both" in v3
+        assert "not hedging" in v3
+
+    def test_every_span_must_be_quotable(self):
+        # Two of the seven flagged spans in the measured run were FABRICATED -- not present
+        # in the response at all ("assume", and a paraphrased "either this or the earlier
+        # statement..."). A quote-verbatim requirement is the only lever the prompt has.
+        assert "QUOTED VERBATIM" in prompts.PROMPTS["V3"]
+
+    def test_the_hedge_words_still_match_p4s_warning_list(self):
+        # The pre-existing parity property: V3 may not check a word P4 never warned about.
+        v3, p4 = prompts.PROMPTS["V3"], prompts.PROMPTS["P4"]
+        for word in (
+            "assume",
+            "might",
+            "possibly",
+            "allegedly",
+            "supposedly",
+            "reportedly",
+            "it is claimed",
+        ):
+            assert f'"{word}"' in v3, f"V3 dropped {word!r}"
+            assert word in p4, f"P4 never warns about {word!r} but V3 checks it"
 
     def test_subject_matter_vocabulary_is_exempted(self):
         # The prose used "claim", "outcome" and "reading" about archaeology, not about the
@@ -2505,11 +2936,246 @@ class TestAtomsAreWorldStatesNotFindings:
     def test_no_new_prohibitions_were_added(self):
         # Measured: added prohibitions suppress output length (581 -> 308 -> 144 words,
         # deterministic across repeats), and 144 fell under the 500-word floor. Both edits
-        # are substitutions, so the count must not grow.
+        # are substitutions, so the count must not grow -- an upper bound, since removing
+        # one is the direction that measurement favours.
         import re
 
-        assert len(re.findall(r"Do NOT", prompts.PROMPTS["P4"])) == 6
+        assert len(re.findall(r"Do NOT", prompts.PROMPTS["P4"])) <= 6
         assert len(re.findall(r"(?m)^\d+\. ", prompts.PROMPTS["P4"])) == 8
+
+
+class TestOnePairOnePlannedRelation:
+    """The gold schema allows one relation per atom pair; the parser did not enforce it.
+
+    A stage-contract mismatch, not a model error. `schema.validate_item` rejects a duplicate
+    outright -- the Markov network builds one factor per pair, so two edges over the same
+    pair have no unambiguous factor table -- while `parse_plan` accepted it and P3 never
+    stated the rule. Measured live: a gpt-oss plan carried two relations over one pair,
+    cleared EVERY gate (plan, V1, V3, V4 and all seven P5 perturbations) and then died at
+    serialization with `duplicate relation a13->a14`, spending the whole family's work.
+    Enforcing it at the plan stage makes it a retryable parse complaint instead.
+    """
+
+    def _plan_with_duplicate(self, second_sense="Contrast"):
+        raw = mock.mock_plan("q", "c", 0)
+        plan, err = parse.parse_plan(raw)
+        assert err is None
+        dup = dict(plan["relations"][0])
+        dup["sense"] = second_sense
+        dup["validity"] = "valid"
+        dup["error_kind"] = None
+        dup["level1_coupling"] = None
+        return {**plan, "relations": plan["relations"] + [dup]}
+
+    def test_a_duplicate_pair_is_rejected_at_the_plan_stage(self):
+        txt = "```json\n" + json.dumps(self._plan_with_duplicate()) + "\n```"
+        value, err = parse.parse_plan(txt)
+        assert value is None
+        assert "two relations" in err
+        assert "at most one relation" in err
+
+    def test_the_check_is_direction_insensitive(self):
+        # (i,j) and (j,i) collide on the same factor, so order must not evade the check.
+        raw = mock.mock_plan("q", "c", 0)
+        plan, _ = parse.parse_plan(raw)
+        first = plan["relations"][0]
+        flipped = dict(first)
+        flipped["source_pos"], flipped["target_pos"] = (
+            first["target_pos"],
+            first["source_pos"],
+        )
+        flipped["sense"] = "Contrast"
+        flipped["validity"] = "valid"
+        flipped["error_kind"] = None
+        txt = "```json\n" + json.dumps(
+            {**plan, "relations": plan["relations"] + [flipped]}
+        ) + "\n```"
+        value, err = parse.parse_plan(txt)
+        assert value is None and "two relations" in err
+
+    def test_the_error_names_both_senses_so_the_retry_is_actionable(self):
+        txt = "```json\n" + json.dumps(self._plan_with_duplicate("Concession")) + "\n```"
+        _, err = parse.parse_plan(txt)
+        assert "Concession" in err
+
+    def test_p3_states_the_rule(self):
+        p3 = prompts.PROMPTS["P3"]
+        assert "must join a DIFFERENT pair of claims" in p3
+        assert "that pair is used up" in p3
+
+    def test_the_parser_and_the_schema_agree_on_this_rule(self):
+        """The invariant that was missing: both stages must reject the same plan.
+
+        Six defects in this harness have now had the same shape -- one stage mandates or
+        permits what another forbids. Asserting agreement directly is cheaper than
+        rediscovering it from a live rejection.
+        """
+        item = _valid_item()
+        item["relations"] = item["relations"] + [dict(item["relations"][0])]
+        with pytest.raises(SchemaError, match="duplicate relation"):
+            validate_item(item)
+        txt = "```json\n" + json.dumps(self._plan_with_duplicate()) + "\n```"
+        value, err = parse.parse_plan(txt)
+        assert value is None and err, "the parser must reject what the schema rejects"
+
+    def test_the_atom_range_stays_inside_p4s_length_capability(self):
+        """P4 compresses rather than expands as the atom count rises, so the ceiling matters.
+
+        Measured on gpt-oss-120b across three runs: 16 atoms -> 581 and 596 words
+        (~36 words/atom), 17 -> 516 and 543 (~31), 18 -> **293** (~16), which is under the
+        500-word floor and killed the family at `P4: SamplingFailed` with a structurally
+        perfect plan. The range's top was 18, i.e. it admitted a regime where P4 reliably
+        fails, and nothing in the benchmark needs it -- the corpus property that matters is
+        the relation graph, not the atom count.
+        """
+        assert parse.N_CLAIMS_RANGE == (14, 16)
+        # The two copies of this range desynchronize silently: `THRESHOLDS["n_claims"]` is
+        # read by nothing, so only a test couples them.
+        assert validate.THRESHOLDS["n_claims"] == parse.N_CLAIMS_RANGE
+
+    def test_p3_asks_for_less_than_the_parser_accepts(self):
+        # The deliberate asymmetry the repo already uses for relations (prompt says 10,
+        # parser takes 8-12): the model gets the easy centre plus slack, and the worked
+        # example's own count stays a valid independent witness.
+        p3 = prompts.PROMPTS["P3"]
+        lo, hi = parse.N_CLAIMS_RANGE
+        assert f"Select {lo}-{hi} claims" in p3
+        assert "Aim for 15" in p3
+        assert lo < 15 < hi or lo <= 15 <= hi
+
+    def test_the_rule_is_satisfiable_within_the_declared_ranges(self):
+        # Uniqueness must not make a conforming plan impossible: the pair budget has to
+        # cover the largest legal relation + non-relation count from the fewest legal atoms.
+        n_atoms = parse.N_CLAIMS_RANGE[0]
+        need = parse.N_RELATIONS_RANGE[1] + parse.N_NON_RELATIONS_RANGE[1]
+        assert n_atoms * (n_atoms - 1) // 2 >= need
+
+    def test_the_required_senses_draw_on_disjoint_claim_pairs(self):
+        # Alternative/Disjunction/Restatement are all mandatory, so if they shared a tagged
+        # pair the uniqueness rule would contradict instruction 5. P2 emits three disjoint
+        # pair families, so they cannot collide.
+        claims, err = parse.parse_claims(mock.mock_claims("q", 0))
+        assert err is None
+        tags = {c["tag"] for c in claims}
+        for family in ("alt-pair-1", "alt-pair-2", "disj-pair-1", "equiv-pair-1"):
+            assert family in tags
+
+    def test_the_mock_plan_and_p3s_worked_example_still_conform(self):
+        # Both are independent witnesses; if either carried a duplicate pair the new check
+        # would make the whole dry-run suite unrunnable.
+        plan, err = parse.parse_plan(mock.mock_plan("q", "c", 0))
+        assert err is None, err
+        pairs = [
+            (min(r["source_pos"], r["target_pos"]), max(r["source_pos"], r["target_pos"]))
+            for r in plan["relations"]
+        ]
+        assert len(pairs) == len(set(pairs))
+
+
+class TestP4RealizesOrderingRelations:
+    """Precedence was the one sense whose guidance was mostly a prohibition, and P4 dropped it.
+
+    Measured on gpt-oss-120b f001: a planned ``Precedence(1, 2)`` produced prose with **zero**
+    ordering cues -- both atoms asserted in separate paragraphs with no connective, exactly as
+    if they were a planned NON-relation. V1 then recovered none of the 2 planned
+    Precedence/Succession relations across both families, which reads as a V1 failure but was
+    really P4 never writing the relation down.
+
+    The cause is the shape of the instruction, not the model: every other sense in
+    instruction 3 lists surface cues, while Precedence listed cues *and then* a "Do NOT write
+    'and therefore'" clause. Given that added prohibitions measurably suppress output here,
+    writing no connective at all is the safest reading -- and produces an unrealizable
+    relation. Rewritten as a positive requirement plus a contrastive example.
+    """
+
+    def test_the_ordering_guidance_requires_one_joined_sentence(self):
+        p4 = prompts.PROMPTS["P4"]
+        assert "state the sequence EXPLICITLY in one sentence" in p4
+        assert "which predates" in p4
+
+    def test_it_says_separate_sentences_leave_it_unrealized(self):
+        # The actual observed failure mode, named so the writer recognizes it.
+        assert "separate sentences leaves this relation" in prompts.PROMPTS["P4"]
+
+    def test_a_bare_or_is_named_as_insufficient(self):
+        """Alternative and Disjunction are both mandatory and a bare "or" conflates them.
+
+        Measured on gpt-oss r3 f001: the prose contained **zero** occurrences of "either",
+        "at least one of", "one or both" and "perhaps both", realizing a planned Disjunction
+        as "X, or they relied heavily on Y". V1 read that as Alternative -- correctly, since
+        nothing in the sentence rules out both holding. The markers were already mandated;
+        what was missing was the reason they cannot be skipped.
+        """
+        p4 = prompts.PROMPTS["P4"]
+        assert 'A bare "X, or Y" is NOT enough' in p4
+        assert "separating Alternative from Disjunction" in p4
+
+    def test_the_prohibition_was_replaced_not_supplemented(self):
+        # A substitution: the "Do NOT write 'and therefore'" clause became the positive
+        # "not 'X and therefore Y'" contrast inside the example, so the count went DOWN.
+        import re
+
+        p4 = prompts.PROMPTS["P4"]
+        assert len(re.findall(r"Do NOT", p4)) <= 6
+        assert "and therefore" in p4, "the anti-pattern is still named, as a contrast"
+
+
+class TestV1PrefersTheSpecificSense:
+    """V1 over-labelled `Evidence` and never emitted Precedence or Instantiation.
+
+    Measured across both gpt-oss-120b families: **14 recovered `Evidence` against 3 planned**,
+    zero `Precedence` against 2 planned, zero `Instantiation` against 1, and 13 of 24
+    recovered relations were pairs the plan never related at all. Five senses compile to
+    `entailment` and `Evidence` is the broadest, so it was the default for anything
+    inferential; meanwhile Precedence/Succession were described only by what they must not
+    imply, and Instantiation had no guidance at all.
+    """
+
+    def test_it_warns_that_evidence_is_the_broad_default(self):
+        v1 = prompts.PROMPTS["V1"]
+        assert "MOST SPECIFIC sense" in v1
+        assert "broadest" in v1
+
+    def test_the_entailment_senses_get_distinguishing_cues(self):
+        v1 = prompts.PROMPTS["V1"]
+        for cue in ("led to", "resulted from", "provided that", "for example"):
+            assert cue in v1, f"V1 gives no surface cue for {cue!r}"
+
+    def test_ordering_senses_are_required_not_merely_permitted(self):
+        v1 = prompts.PROMPTS["V1"]
+        assert "These ARE relations and must be" in v1
+        for cue in ("subsequently", "earlier", "later"):
+            assert cue in v1
+
+    def test_it_discourages_inflating_the_relation_count(self):
+        # 12 recovered for a 10-relation plan, most of them spurious.
+        assert "Emitting many relations does not make" in prompts.PROMPTS["V1"]
+
+    def test_concession_has_its_own_cues(self):
+        """V1 had no cue for Concession at all, and duly missed one P4 wrote correctly.
+
+        Measured on gpt-oss r3 f001: P4 realized the planned `Concession(14,15)` as
+        "...+2 per mil, indicating a purely terrestrial diet, despite the limitation of
+        microwear" -- `despite` is a marker P4 mandates -- and V1 did not recover it. The
+        Contrast rule mentioned "without either being conceded", implying Concession exists,
+        while never saying what it looks like.
+        """
+        v1 = prompts.PROMPTS["V1"]
+        for cue in ("although", "despite", "even though"):
+            assert cue in v1, f"V1 gives no Concession cue {cue!r}"
+        # The subordinate-clause case is the one that was missed.
+        assert "subordinate clause" in v1
+
+    def test_the_compilation_map_still_agrees_with_the_taxonomy(self):
+        # The added cues name senses; the coupling map must still be the authority and must
+        # still be stated correctly for every sense V1 may emit.
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        v1 = prompts.PROMPTS["V1"]
+        for sense in ("Cause-Effect", "Evidence", "Condition", "Instantiation"):
+            assert coupling_for_sense(sense) == "entailment"
+            assert sense in v1
+        assert coupling_for_sense("Precedence") == "none"
 
 
 class TestPromptTexParity:

@@ -1,0 +1,289 @@
+{
+  "family_id": "f001",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Condition",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Restatement",
+        "Succession"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          10,
+          4,
+          6
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(10, 4, 6)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.667,
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": false,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.417,
+        "sense": 0.417,
+        "matched_pairs": [
+          [
+            2,
+            1
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            15,
+            16
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Evidence"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            7,
+            "Evidence"
+          ],
+          [
+            5,
+            8,
+            "Precedence"
+          ],
+          [
+            8,
+            9,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            17,
+            18,
+            "Contrast"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            2,
+            1,
+            "Contrast"
+          ],
+          [
+            4,
+            3,
+            "Condition"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            6,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            1,
+            18,
+            "Concession"
+          ],
+          [
+            8,
+            5,
+            "Succession"
+          ],
+          [
+            10,
+            4,
+            "Evidence"
+          ],
+          [
+            3,
+            1,
+            "Instantiation"
+          ],
+          [
+            6,
+            9,
+            "Contrast"
+          ]
+        ]
+      },
+      "detail": "recovery too low: coupling 0.42 (need 0.8), sense 0.42 (need 0.7); matched 5/12 planned pair(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "llama-3.3-70b-instruct": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "gpt-oss-120b-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {},
+          "llama-3.3-70b-instruct": {
+            "hedging": 4
+          },
+          "gpt-oss-120b-a100": {
+            "leakage": 3
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 1
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "llama-3.3-70b-instruct": {
+            "hedging": [
+              "This conclusion, however, must be reconciled with specific historical analyses.",
+              "a finding that tempers the broader, multi-causal model suggested by the review board's verdict.",
+              "It cannot be true both that no centralized state in the Andes ever engaged in warfare for expansion and that the Inca st",
+              "The causes for this collapse are not singular; at least one of two major factors must hold, and perhaps both occurred"
+            ]
+          },
+          "gpt-oss-120b-a100": {
+            "leakage": [
+              "the academic review board ultimately found that no single variable explains all cases of state formation in the region",
+              "the final synthesis report ruled that resource concentration was the primary driver of Inca centralization",
+              "the review board's verdict"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "llama-4-mkv-a100": 0,
+          "llama-3.3-70b-instruct": 4,
+          "gpt-oss-120b-a100": 0
+        },
+        "spans": {
+          "llama-3.3-70b-instruct": [
+            "This divergence cannot be attributed to a single, universal cause, as the academic review board ultimately found that no",
+            "The final synthesis report ruled that resource concentration was the primary driver of Inca centralization, a finding th",
+            "The organizational capacity for such projects stood in clear distinction to the local, kinship-based leadership typical ",
+            "Thus, while localized resource advantages and subsequent administrative innovations like the *mit'a* system were pivotal"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": false,
+      "threshold": 1.0,
+      "observed": 0.944,
+      "detail": "1 atom(s) not asserted: [(10, 'altered')]"
+    }
+  ],
+  "reason": "V1: recovery too low: coupling 0.42 (need 0.8), sense 0.42 (need 0.7); matched 5/12 planned pair(s); V4: 1 atom(s) not asserted: [(10, 'altered')]"
+}

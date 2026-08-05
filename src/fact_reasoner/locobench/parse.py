@@ -48,9 +48,39 @@ CLAIM_TAGS = (
 )
 
 # P3 structural bounds (Phase 1 P3 instructions 2, 3, 9).
-N_CLAIMS_RANGE = (14, 18)
+# Narrowed from (14, 18). P4's output length degrades as the atom count rises, because the
+# model compresses to fit rather than writing more: measured on gpt-oss-120b, 16 atoms gave
+# 581 and 596 words (~36 words/atom), 17 gave 516 and 543 (~31), and 18 gave **293** (~16) --
+# below the 500-word floor, so the family died at `P4: SamplingFailed` however good the plan
+# was. 18 atoms is a regime where P4 reliably breaks, and nothing in the benchmark needs it:
+# the corpus property that matters is the relation graph, not atom count, and P3's own worked
+# example uses 14. Keeping the floor at 14 preserves that example as an independent witness.
+N_CLAIMS_RANGE = (14, 16)
 N_RELATIONS_RANGE = (8, 12)
 N_NON_RELATIONS_RANGE = (4, 6)
+
+# The hedge words V3 flags, as the CANONICAL list -- the three prompt strings that recite it
+# (P2, P4 instruction 7, V3) previously had no constant behind them, so they could drift.
+#
+# Enforced by `parse_response` because P4 and V3 disagree on SCOPE and neither side should
+# move: P4 instruction 7 warns about these only "around planned-invalid relations", while V3
+# flags them anywhere. Measured on gpt-oss-120b, r5 f001: the sole remaining rejection was
+# `"possibly for body painting"` -- ordinary descriptive prose, so P4 permitted exactly what
+# V3 rejects, and both auditors correctly flagged it. Widening P4's scope is the obvious fix
+# and was tried before: it is guarded against by a test because added prohibitions measurably
+# suppressed output (581 -> 308 -> 144 words). Checking here instead costs nothing and needs
+# no prompt change -- the parser IS the rejection-sampling predicate (`build_llm` installs it
+# as the Mellea requirement), so a hedge is re-sampled inside the same P4 call, against
+# exactly the criterion V3 later applies.
+HEDGE_WORDS = (
+    "assume",
+    "might",
+    "possibly",
+    "allegedly",
+    "supposedly",
+    "reportedly",
+    "it is claimed",
+)
 
 STRENGTH_BANDS = {
     "strong": (0.85, 1.00),
@@ -260,6 +290,31 @@ def parse_plan(text: str) -> tuple[dict[str, Any] | None, str | None]:
         if r.get("resolved") and r.get("resolver_pos") not in positions:
             return None, f"resolved concession has no valid resolver_pos: {r!r}"
 
+    # At most ONE relation per atom pair, in either direction. The gold schema requires it
+    # (`schema.validate_item` rejects a duplicate outright) because the Markov network
+    # builds one factor per pair, so two edges over the same pair have no unambiguous
+    # factor table. The parser did not enforce it and P3 never stated it, which made this a
+    # stage-contract mismatch rather than a model error: a live gpt-oss plan carried two
+    # relations over one pair, passed every gate -- plan, V1, V3, V4 and all seven P5
+    # perturbations -- and then died at serialization with the whole family's work spent.
+    # Enforced here so it is caught at the plan stage, where `_Caller.ask` can feed the
+    # complaint back and re-plan, instead of terminally after the expensive stages.
+    # Direction-insensitive because the pair, not the ordered pair, is what indexes the
+    # factor: an (i,j) and a (j,i) edge collide just as surely.
+    seen_pairs: dict[tuple[int, int], str] = {}
+    for r in rels:
+        key = (
+            min(r["source_pos"], r["target_pos"]),
+            max(r["source_pos"], r["target_pos"]),
+        )
+        if key in seen_pairs:
+            return None, (
+                f"atoms {key[0]} and {key[1]} carry two relations "
+                f"({seen_pairs[key]!r} and {r['sense']!r}); each pair of atoms may take at "
+                "most one relation, in one direction"
+            )
+        seen_pairs[key] = r["sense"]
+
     nons = plan["non_relations"]
     lo, hi = N_NON_RELATIONS_RANGE
     if not lo <= len(nons) <= hi:
@@ -293,9 +348,42 @@ def parse_response(text: str, *, min_words: int = 500) -> tuple[str | None, str 
     resp = (block or text or "").strip()
     if not resp:
         return None, "empty response"
+    # P4 is the ONLY prompt whose code block holds prose rather than JSON -- P3 and P5
+    # both say "JSON object in a code block", so a model readily generalizes the wrong
+    # convention here and emits `{"response": "..."}`. Nothing caught that: the prose is
+    # taken verbatim, and `ignore_language=True` strips a ```json tag but not the object
+    # inside it, so a wrapped answer entered the corpus with a literal `{"response": "`
+    # prefix and `\n` escapes as response text. Measured on a live deepseek-v3.2 run,
+    # where it was masked by the word floor -- the answer was ALSO too short, so only the
+    # length was reported and the format defect stayed invisible. Hence this check comes
+    # BEFORE the word count: the wrapper is the more fundamental complaint, and naming it
+    # is what lets `_Caller.ask` feed back something the model can act on.
+    if resp[0] in "{[":
+        return None, (
+            "response must be the prose itself, not a JSON object wrapping it "
+            "(the code block holds the answer, not a payload)"
+        )
     n = len(resp.split())
     if n < min_words:
         return None, f"response is {n} words, below the {min_words}-word floor"
+    # Hedges last, so the structural complaints above are reported first and a hedge is never
+    # what a caller sees while the prose is also malformed or short.
+    hedges = sorted(
+        {
+            w
+            for w in HEDGE_WORDS
+            if re.search(rf"\b{re.escape(w)}\b", resp, re.IGNORECASE)
+        }
+    )
+    if hedges:
+        # Word-bounded on purpose: "perhaps both" is MANDATED by P4 instruction 3 for
+        # Disjunction, and an unbounded scan for "possibly" would also be wrong here anyway
+        # -- it is "and possibly both" that P4 steers away from, via "perhaps both".
+        return None, (
+            f"response hedges with {hedges}: state every planned relation in the same "
+            "confident register, whether or not it is sound, and use no hedging word "
+            "anywhere in the prose"
+        )
     return resp, None
 
 
@@ -476,6 +564,7 @@ PARSERS = {
 __all__ = [
     "CLAIM_TAGS",
     "ERROR_KINDS",
+    "HEDGE_WORDS",
     "N_CLAIMS_RANGE",
     "N_NON_RELATIONS_RANGE",
     "N_RELATIONS_RANGE",

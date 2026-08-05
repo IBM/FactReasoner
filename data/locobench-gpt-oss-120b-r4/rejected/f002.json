@@ -1,0 +1,257 @@
+{
+  "family_id": "f002",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Concession",
+        "Condition",
+        "Contrast",
+        "Disjunction",
+        "Effect-Cause",
+        "Evidence",
+        "Precedence",
+        "Restatement",
+        "Succession"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          13,
+          1,
+          12
+        ],
+        [
+          14,
+          7,
+          7
+        ],
+        [
+          15,
+          3,
+          12
+        ],
+        [
+          9,
+          4,
+          5
+        ]
+      ],
+      "detail": "4 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(13, 1, 12), (14, 7, 7), (15, 3, 12), (9, 4, 5)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": false,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.4,
+        "sense": 0.4,
+        "matched_pairs": [
+          [
+            7,
+            8
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            5,
+            6
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            1,
+            "Precedence"
+          ],
+          [
+            5,
+            6,
+            "Restatement"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            6,
+            8,
+            "Contrast"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            5,
+            6,
+            "Concession"
+          ],
+          [
+            2,
+            1,
+            "Precedence"
+          ],
+          [
+            13,
+            1,
+            "Condition"
+          ],
+          [
+            3,
+            4,
+            "Evidence"
+          ],
+          [
+            14,
+            7,
+            "Effect-Cause"
+          ],
+          [
+            15,
+            3,
+            "Succession"
+          ],
+          [
+            9,
+            4,
+            "Contrast"
+          ]
+        ]
+      },
+      "detail": "recovery too low: coupling 0.40 (need 0.8), sense 0.40 (need 0.7); matched 5/10 planned pair(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "llama-3.3-70b-instruct": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "deepseek-v3.2": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "llama-4-mkv-a100": {},
+          "llama-3.3-70b-instruct": {
+            "hedging": 2
+          },
+          "deepseek-v3.2": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 1
+        },
+        "needed_to_reject": 2,
+        "spans": {
+          "llama-3.3-70b-instruct": {
+            "hedging": [
+              "or it was brought by a migrating population from a distant region; either scenario must be considered",
+              "perhaps both"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "llama-4-mkv-a100": 0,
+          "llama-3.3-70b-instruct": 0,
+          "deepseek-v3.2": 0
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": 1.0,
+      "detail": ""
+    }
+  ],
+  "reason": "V1: recovery too low: coupling 0.40 (need 0.8), sense 0.40 (need 0.7); matched 5/10 planned pair(s)"
+}
