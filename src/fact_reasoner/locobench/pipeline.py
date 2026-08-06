@@ -38,9 +38,12 @@ from fact_reasoner.locobench import mock as _mock
 from fact_reasoner.locobench import parse, prompts, validate
 from fact_reasoner.locobench.config import GenConfig, ModelRef
 from fact_reasoner.locobench.perturb import (
+    EDGE_INVARIANT_CALLS,
+    apply_calls,
     ladder_for,
     ordering_constraints,
     plan_rungs,
+    plan_targets,
     readout_directions,
 )
 from fact_reasoner.locobench.schema import (
@@ -602,6 +605,47 @@ def _relations_from_plan(
     return out
 
 
+def _edge_set_signature(relations: list[dict[str, Any]]) -> tuple:
+    """An order-insensitive signature of everything about an edge set the MRF sees.
+
+    Two rungs with the same signature build the same coherence MRF, so no readout can
+    separate them -- which is what makes an equal-signature parent/child pair a defect
+    rather than a stylistic choice. Edge ids are deliberately excluded: a renumbered but
+    otherwise identical edge set is still identical to every readout.
+    """
+    return tuple(
+        sorted(
+            (
+                str(r.get("source_id")),
+                str(r.get("target_id")),
+                str(r.get("level2_sense")),
+                str(r.get("level1_coupling")),
+                tuple(r.get("strength_range") or ()),
+                bool(r.get("is_resolved_concession")),
+                str(r.get("resolver_atom_id")),
+            )
+            for r in relations
+        )
+    )
+
+
+def _spurious_pair_ids(
+    plan: dict[str, Any], atoms: list[dict[str, Any]]
+) -> tuple[str, str] | None:
+    """The atom pair a ``spurious_relation`` should link, as atom ids.
+
+    A declared non-relation is the plan's own statement that two atoms are unrelated, which
+    is exactly what makes a link between them spurious. Returns None when the plan declares
+    none, in which case P5 is asked for the operator without arguments and chooses.
+    """
+    by_pos = {a["pos"]: a["id"] for a in atoms}
+    for nr in plan.get("non_relations", []) or []:
+        src, trg = nr.get("source_pos"), nr.get("target_pos")
+        if src in by_pos and trg in by_pos:
+            return by_pos[src], by_pos[trg]
+    return None
+
+
 def generate_family(
     family_id: str,
     canonical_topic: str,
@@ -791,22 +835,65 @@ def generate_family(
     res.timing["respond"] = round(time.perf_counter() - t1, 3)
 
     # ---- stage: perturb (P5 per non-base rung) ------------------------------
+    #
+    # The gold edges are built BEFORE this stage, not after it, because a rung's
+    # perturbation has to name the edge it targets: `plan_targets` picks one edge per call
+    # from the base edge set, and the same target drives both the P5 text edit and the
+    # label transform. Building the edges afterwards is what left every rung carrying the
+    # base plan's relations (Defect 2).
     t2 = time.perf_counter()
     lad = ladder_for(family)
+    # `claims` carries P2's [correct]/[incorrect] tags, the only place the corpus's
+    # factuality exists -- P3's atom schema does not preserve it.
+    atoms = _atoms_from_plan(plan, claims)
+    base_relations = _relations_from_plan(plan, atoms, generator)
+    rung_targets = plan_targets(family, base_relations)
+    _by_pos = {a["pos"]: a["id"] for a in atoms}
+    base_non_relations = [
+        {
+            "source_id": _by_pos[nr["source_pos"]],
+            "target_id": _by_pos[nr["target_pos"]],
+            "position_distance": abs(nr["source_pos"] - nr["target_pos"]),
+        }
+        for nr in plan.get("non_relations", [])
+        if nr["source_pos"] in _by_pos and nr["target_pos"] in _by_pos
+    ]
+
     texts: dict[int, str] = {}
-    for rung in lad.rungs:
+    rung_relations: dict[int, list[dict[str, Any]]] = {}
+    rung_non_relations: dict[int, list[dict[str, Any]]] = {}
+    rung_edit_logs: dict[int, list[dict[str, Any]]] = {}
+    # Base rung first, so every derived rung can be compared against its parent's realized
+    # edge set. A ladder's base is not always index 0 (CHAIN and ORDER derive downward from
+    # rung 3, CONTROL from rung 2), so iterating in index order would leave the early rungs
+    # with no parent to check against.
+    for rung in sorted(lad.rungs, key=lambda r: (not r.is_base, r.index)):
         if rung.is_base:
             texts[rung.index] = base
+            rung_relations[rung.index] = [dict(r) for r in base_relations]
+            rung_non_relations[rung.index] = [dict(n) for n in base_non_relations]
+            rung_edit_logs[rung.index] = []
             continue
         current = base
         failed = None
-        for call in rung.calls:
+        targets = rung_targets.get(rung.index, [])
+        for i, call in enumerate(rung.calls):
+            target = targets[i] if i < len(targets) else ""
+            # `spurious_relation` adds an edge between two atoms, so it is parameterized
+            # by an atom pair rather than an existing edge id.
+            if call == "spurious_relation":
+                pair = _spurious_pair_ids(plan, atoms)
+                operator = (
+                    f"{call}({pair[0]}, {pair[1]})" if pair else f"{call}()"
+                )
+            else:
+                operator = f"{call}({target})" if target else f"{call}()"
             out, err = caller.ask(
                 "P5",
                 parse.parse_perturbation,
                 response=current,
                 plan=json.dumps(plan),
-                operator=f"{call}(r000)",
+                operator=operator,
             )
             if not out:
                 failed = err or f"{call} produced nothing"
@@ -836,25 +923,84 @@ def generate_family(
             res.calls = caller.counts
             return res
         texts[rung.index] = current
+        # The label-side counterpart of the text edit: this rung's gold relations are the
+        # base relations with this rung's own perturbations applied, targeting the same
+        # edges P5 was asked to edit.
+        (
+            rung_relations[rung.index],
+            rung_non_relations[rung.index],
+            rung_edit_logs[rung.index],
+        ) = apply_calls(
+            base_relations,
+            rung.calls,
+            targets=targets,
+            # In SCHEMA shape (atom ids), not the plan's positional shape, since
+            # `apply_calls` works on schema edges throughout.
+            non_relations=base_non_relations,
+            generator=generator,
+        )
+    # The edge sets of ADJACENT rungs must differ wherever the ladder asserts a coherence
+    # difference between them. This is Defect 2's residue at pair granularity: if rungs 3
+    # and 4 build the same MRF, no readout can separate them and the C1 assertion for the
+    # pair 3->4 cannot hold, however different each is from the base.
+    #
+    # Adjacency, not parentage, is the right relation to check: every CONFLICT rung has the
+    # base as its `parent` (each is built by applying a different number of calls to the
+    # base), so comparing against the parent passes a rung that duplicates the rung
+    # immediately below it -- which is exactly how f002's `coherent` rung slipped through
+    # an earlier version of this gate.
+    #
+    # Scope matters. `shuffle_order` reorders sentences and `ordering_only` swaps
+    # Precedence for Succession; both are factor-invariant BY DESIGN, and the ORDER and
+    # CONTROL ladders exist to check that a score does NOT move for them. So a pair is
+    # only checked when the higher rung's calls are not all edge-invariant, and
+    # `EDGE_INVARIANT_CALLS` names those exemptions explicitly.
+    for lower, upper in zip(lad.rungs, lad.rungs[1:]):
+        if all(call in EDGE_INVARIANT_CALLS for call in upper.calls) or all(
+            call in EDGE_INVARIANT_CALLS for call in lower.calls
+        ):
+            continue
+        if _edge_set_signature(rung_relations[upper.index]) != _edge_set_signature(
+            rung_relations[lower.index]
+        ):
+            continue
+        effect_detail = (
+            "; ".join(
+                f"{e['call']}({e['target'] or '-'}): {e['effect']}"
+                for e in rung_edit_logs[upper.index]
+            )
+            or "no calls"
+        )
+        res.verdict.add(
+            validate.GateResult(
+                f"P5.rung{upper.index}.edge_effect",
+                False,
+                detail=(
+                    f"rungs {lower.index} ({lower.name}) and {upper.index} "
+                    f"({upper.name}) build the same gold edge set [{effect_detail}], so "
+                    "no readout can order that adjacent pair and the ladder's ranking "
+                    "claim across it has no label behind it. The family is rejected. The "
+                    "usual cause is a plan with too few eligible edges for the ladder's "
+                    "calls -- a CONFLICT ladder needs three unresolved conflict edges for "
+                    "its deepest rung."
+                ),
+            )
+        )
+        res.stage = "perturb"
+        res.artifacts = {
+            "question": question,
+            "claims": claims,
+            "plan": plan,
+            "response": base,
+        }
+        res.calls = caller.counts
+        return res
     res.timing["perturb"] = round(time.perf_counter() - t2, 3)
 
     # ---- stage: admit -------------------------------------------------------
     t3 = time.perf_counter()
-    # `claims` carries P2's [correct]/[incorrect] tags, which is the only place the corpus's
-    # factuality exists -- P3's atom schema does not preserve it.
-    atoms = _atoms_from_plan(plan, claims)
-    relations = _relations_from_plan(plan, atoms, generator)
-    by_pos = {a["pos"]: a["id"] for a in atoms}
-    non_relations = [
-        {
-            "source_id": by_pos[nr["source_pos"]],
-            "target_id": by_pos[nr["target_pos"]],
-            "position_distance": abs(nr["source_pos"] - nr["target_pos"]),
-        }
-        for nr in plan.get("non_relations", [])
-        if nr["source_pos"] in by_pos and nr["target_pos"] in by_pos
-    ]
-
+    # `atoms`, the base relations and the per-rung relations/non-relations were all built in
+    # the perturb stage above, because the perturbations need edge ids to target.
     items: list[dict[str, Any]] = []
     for rung in lad.rungs:
         item = {
@@ -865,8 +1011,12 @@ def generate_family(
             "num_atoms": len(atoms),
             "atoms": [dict(a) for a in atoms],
             "notes": lad.notes,
-            "relations": [dict(r) for r in relations],
-            "non_relations": [dict(n) for n in non_relations],
+            # This rung's OWN relations: the base edge set with this rung's perturbations
+            # applied. Every rung carrying the base list is Defect 2.
+            "relations": [dict(r) for r in rung_relations[rung.index]],
+            # Per-rung too: a pair that gained a spurious edge is no longer a declared
+            # non-relation for that rung.
+            "non_relations": [dict(n) for n in rung_non_relations[rung.index]],
             "expected": {
                 "family_id": family_id,
                 "family": family,
@@ -875,6 +1025,12 @@ def generate_family(
                 "perturbation": {
                     "calls": list(rung.calls),
                     "parent_rung": rung.parent,
+                    # Which edge each call targeted, and what it did to the edge set, so a
+                    # reader can audit the label transform against the text edit.
+                    "targets": list(rung_targets.get(rung.index, [])),
+                    "edge_effects": [
+                        dict(e) for e in rung_edit_logs.get(rung.index, [])
+                    ],
                 },
                 "readout_directions": readout_directions(family, rung.index),
             },

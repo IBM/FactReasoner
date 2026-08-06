@@ -104,7 +104,8 @@ def mock_plan(question: str, claims: str, seed: int = 0) -> str:
     ]
     # 11 relations: 7 valid, 4 invalid -> 0.64, inside 0.55 +/- 0.15. Every required
     # sense appears, all six no-prior-gold senses are present, and every pair is within
-    # 4 positions.
+    # 4 positions. Three of the conflicts are unresolved, which is what the CONFLICT
+    # ladder's deepest rung needs (one resolution plus two drops).
     relations = [
         {
             "source_pos": 1,
@@ -189,7 +190,15 @@ def mock_plan(question: str, claims: str, seed: int = 0) -> str:
         {
             "source_pos": 7,
             "target_pos": 8,
-            "sense": "Condition",
+            # A CONFLICT sense rather than Condition. The CONFLICT ladder's `coherent` rung
+            # composes add_resolution + drop_relation + drop_relation, so it needs THREE
+            # unresolved conflict edges; with only two its edge set collapsed onto rung 3's
+            # and the per-rung edge-effect gate rejected the family. Retyping an existing
+            # edge (rather than adding one) keeps the plan at 11 relations, which both the
+            # 8-12 count gate and the duplicate-pair tests depend on. Condition is the one
+            # retyped because it is not among the six no-prior-gold senses this fixture is
+            # required to exhibit.
+            "sense": "Contrast",
             "strength_band": "moderate",
             "validity": "invalid",
             "error_kind": "false_endpoint",

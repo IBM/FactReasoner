@@ -3742,3 +3742,309 @@ class TestPromptTexParity:
         assert prompts.PROMPTS[pid].strip() in tex, (
             f"{pid} has drifted from locobench_phase1.tex; update the verbatim block"
         )
+
+
+class TestDefectTwoPerRungRelations:
+    """A rung's gold relations describe that rung, not the base plan (Defect 2).
+
+    Before the fix, `pipeline` copied the base plan's relation list into all five items of
+    a family: every rung's TEXT was perturbed but its LABELS were not. The whole family
+    then scored identically on every readout, and the C1/C3 strict-increase constraints
+    could not hold by construction.
+    """
+
+    @staticmethod
+    def _base_relations():
+        """A small edge set with the shapes the CONFLICT ladder needs."""
+        return [
+            {
+                "id": "r000", "source_id": "a0", "target_id": "a1",
+                "level2_sense": "Cause-Effect", "level1_coupling": "entailment",
+                "directed": True, "ordering_only": False,
+                "intended_strength_band": "strong", "strength_range": [0.85, 1.0],
+                "validity": "valid", "error_kind": None, "is_concession": False,
+                "is_resolved_concession": False, "resolver_atom_id": None,
+            },
+            {
+                "id": "r001", "source_id": "a2", "target_id": "a3",
+                "level2_sense": "Alternative", "level1_coupling": "exclusive",
+                "directed": False, "ordering_only": False,
+                "intended_strength_band": "strong", "strength_range": [0.85, 1.0],
+                "validity": "valid", "error_kind": None, "is_concession": False,
+                "is_resolved_concession": False, "resolver_atom_id": None,
+                "exhaustive": True,
+            },
+            {
+                "id": "r002", "source_id": "a4", "target_id": "a5",
+                "level2_sense": "Contrast", "level1_coupling": "contradiction",
+                "directed": False, "ordering_only": False,
+                "intended_strength_band": "weak", "strength_range": [0.35, 0.59],
+                "validity": "invalid", "error_kind": "false_endpoint",
+                "is_concession": False, "is_resolved_concession": False,
+                "resolver_atom_id": None, "exhaustive": False,
+            },
+            {
+                "id": "r003", "source_id": "a6", "target_id": "a7",
+                "level2_sense": "Precedence", "level1_coupling": "none",
+                "directed": True, "ordering_only": True,
+                "intended_strength_band": "strong", "strength_range": [0.85, 1.0],
+                "validity": "valid", "error_kind": None, "is_concession": False,
+                "is_resolved_concession": False, "resolver_atom_id": None,
+            },
+        ]
+
+    # -- the target chooser ---------------------------------------------------
+
+    def test_successive_drops_target_different_edges(self):
+        """The old code passed the literal `r000` to every call, so a two-drop rung
+        asked twice for the same edge and the second call had nothing to do."""
+        targets = perturb.plan_targets("CONFLICT", self._base_relations())
+        coherent = targets[4]  # add_resolution, drop_relation, drop_relation
+        assert len(coherent) == 3
+        named = [t for t in coherent if t]
+        assert len(named) == len(set(named)), (
+            f"a rung must not target the same edge twice: {coherent}"
+        )
+
+    def test_no_call_targets_the_hardcoded_r000_by_default(self):
+        """r000 is an entailment here; a conflict-oriented call must not pick it."""
+        targets = perturb.plan_targets("CONFLICT", self._base_relations())
+        assert "r000" not in targets[4]
+
+    def test_drop_prefers_the_invalid_conflict(self):
+        """The planted-invalid conflict is the one a "fix" should remove first."""
+        targets = perturb.plan_targets("CONFLICT", self._base_relations())
+        # rung 3 = add_resolution + drop_relation.
+        assert targets[3][1] == "r002"
+
+    def test_resolution_targets_a_valid_conflict(self):
+        """Resolving a planted error would dress up a mistake, not settle a tension."""
+        rels = self._base_relations()
+        targets = perturb.plan_targets("CONFLICT", rels)
+        resolved_id = targets[2][0]
+        edge = next(e for e in rels if e["id"] == resolved_id)
+        assert edge["validity"] == "valid"
+        assert edge["level1_coupling"] in ("contradiction", "exclusive")
+
+    # -- the edge-set transforms ---------------------------------------------
+
+    def test_drop_relation_removes_exactly_one_edge(self):
+        rels = self._base_relations()
+        out, _nons, log = perturb.apply_calls(rels, ("drop_relation",), targets=["r002"])
+        assert len(out) == len(rels) - 1
+        assert "r002" not in {e["id"] for e in out}
+        assert log[0]["effect"] == "removed"
+
+    def test_add_resolution_only_sets_the_flag(self):
+        """It must NOT retype the edge: turning an exclusive into a contradiction would
+        change which factor table the MRF builds, making the rung differ from its parent
+        by a coupling change rather than by a resolution."""
+        rels = self._base_relations()
+        out, _nons, log = perturb.apply_calls(
+            rels, ("add_resolution",), targets=["r001"]
+        )
+        edge = next(e for e in out if e["id"] == "r001")
+        assert edge["is_resolved_concession"] is True
+        assert edge["level2_sense"] == "Alternative"      # unchanged
+        assert edge["level1_coupling"] == "exclusive"     # unchanged
+        assert log[0]["effect"] == "resolved"
+
+    def test_apply_calls_does_not_mutate_its_input(self):
+        rels = self._base_relations()
+        before = json.dumps(rels, sort_keys=True)
+        perturb.apply_calls(rels, ("drop_relation",), targets=["r002"])
+        assert json.dumps(rels, sort_keys=True) == before
+
+    def test_spurious_relation_adds_an_invalid_edge_and_frees_the_non_relation(self):
+        """An added edge on a declared non-relation pair would leave the item asserting
+        the pair both is and is not related, which `validate_item` rejects."""
+        rels = self._base_relations()
+        nons = [{"source_id": "a0", "target_id": "a5", "position_distance": 5}]
+        out, out_nons, log = perturb.apply_calls(
+            rels, ("spurious_relation",), non_relations=nons
+        )
+        assert len(out) == len(rels) + 1
+        added = out[-1]
+        assert (added["source_id"], added["target_id"]) == ("a0", "a5")
+        assert added["validity"] == "invalid"
+        assert out_nons == []          # the pair is no longer a declared non-relation
+        assert log[0]["effect"] == "added"
+
+    def test_wrong_sense_relabels_and_marks_the_edge_invalid(self):
+        out, _nons, log = perturb.apply_calls(
+            self._base_relations(), ("wrong_sense",), targets=["r000"]
+        )
+        edge = next(e for e in out if e["id"] == "r000")
+        assert edge["level2_sense"] != "Cause-Effect"
+        assert edge["validity"] == "invalid"
+        assert edge["error_kind"] == "wrong_sense"
+        assert log[0]["effect"] == "relabeled"
+
+    def test_every_transform_keeps_gold_consistent_with_the_taxonomy(self):
+        """The builder assertion in `schema.py` must have nothing to catch: a retyped
+        edge's coupling and derived flags are re-derived from its new sense."""
+        from fact_reasoner.locobench.taxonomy_bridge import (
+            coupling_for_sense,
+            is_directed,
+        )
+
+        for call in perturb.ALL_CALLS:
+            rels = self._base_relations()
+            targets = ["r001"] if call != "spurious_relation" else [""]
+            out, _nons, _log = perturb.apply_calls(
+                rels,
+                (call,),
+                targets=targets,
+                non_relations=[
+                    {"source_id": "a0", "target_id": "a5", "position_distance": 5}
+                ],
+            )
+            for edge in out:
+                sense = edge["level2_sense"]
+                assert edge["level1_coupling"] == coupling_for_sense(sense), (
+                    f"{call} left {edge['id']} with a coupling COMPILE disagrees with"
+                )
+                assert bool(edge["directed"]) == is_directed(sense)
+
+    def test_ordering_only_flip_keeps_the_factor_set_unchanged(self):
+        """Precedence and Succession both compile to Level-1 `none`, so an ORDER or
+        CONTROL rung built on this edit is factor-invariant by design."""
+        out, _nons, log = perturb.apply_calls(
+            self._base_relations(), ("ordering_only",), targets=["r003"]
+        )
+        edge = next(e for e in out if e["id"] == "r003")
+        assert edge["level2_sense"] == "Succession"
+        assert edge["level1_coupling"] == "none"
+        assert log[0]["effect"] == "reordered"
+
+    def test_unknown_call_raises(self):
+        with pytest.raises(ValueError, match="Unknown perturbation call"):
+            perturb.apply_calls(self._base_relations(), ("teleport",))
+
+    def test_edge_invariant_calls_are_named_not_implicit(self):
+        assert set(perturb.EDGE_INVARIANT_CALLS) == {"shuffle_order", "ordering_only"}
+
+    # -- end to end through the pipeline -------------------------------------
+
+    @pytest.mark.parametrize("family", ["CONFLICT", "CHAIN"])
+    def test_a_conflict_or_chain_ladder_gets_five_distinct_edge_sets(
+        self, family, tmp_path
+    ):
+        """The regression itself: five rungs, five different gold relation sets."""
+        cfg = GenConfig(
+            dataset_name="t", out_dir=str(tmp_path), dry_run=True
+        )
+        res = pipeline.generate_family("f001", "Anthropology", family, cfg)
+        assert res.admitted, res.verdict.reason()
+        sigs = {
+            pipeline._edge_set_signature(it["relations"]) for it in res.items
+        }
+        assert len(sigs) == 5, (
+            f"{family}: {len(sigs)} distinct edge sets across 5 rungs; before the fix "
+            "this was 1"
+        )
+
+    @pytest.mark.parametrize("family", ["ORDER", "CONTROL"])
+    def test_a_factor_invariant_ladder_still_admits(self, family, tmp_path):
+        """ORDER's shuffle rungs and CONTROL's edits are meaning-preserving and add no
+        factor, which is exactly what those ladders test. The per-rung edge-effect gate
+        must exempt them rather than reject the families that check the invariance."""
+        cfg = GenConfig(dataset_name="t", out_dir=str(tmp_path), dry_run=True)
+        res = pipeline.generate_family("f001", "Anthropology", family, cfg)
+        assert res.admitted, res.verdict.reason()
+
+    def test_each_rung_records_the_edges_it_targeted(self, tmp_path):
+        cfg = GenConfig(dataset_name="t", out_dir=str(tmp_path), dry_run=True)
+        res = pipeline.generate_family("f001", "Anthropology", "CONFLICT", cfg)
+        assert res.admitted, res.verdict.reason()
+        for item in res.items:
+            pert = item["expected"]["perturbation"]
+            assert "targets" in pert and "edge_effects" in pert
+            assert len(pert["edge_effects"]) == len(pert["calls"])
+
+    def test_the_dry_run_plan_carries_enough_conflicts_for_the_deepest_rung(self):
+        """CONFLICT's `coherent` rung composes add_resolution + 2x drop_relation, so the
+        plan needs three unresolved conflict edges. With two, rung 4's edge set collapsed
+        onto rung 3's -- Defect 2 one rung at a time -- and the fixture silently stopped
+        exercising the deepest rung."""
+        plan = json.loads(
+            mock.mock_plan("q", "claims").split("```json")[1].split("```")[0]
+        )
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        unresolved = [
+            r
+            for r in plan["relations"]
+            if coupling_for_sense(r["sense"]) in ("contradiction", "exclusive")
+            and not r.get("resolved")
+        ]
+        assert len(unresolved) >= 3, (
+            f"only {len(unresolved)} unresolved conflict edges in the dry-run plan; "
+            "the CONFLICT ladder's deepest rung needs 3"
+        )
+
+    def test_the_edge_effect_gate_fires_when_a_rung_matches_its_parent(self):
+        """The gate's own logic, exercised directly: a rung claiming an edge-set change
+        whose relations equal its parent's must be caught."""
+        rels = self._base_relations()
+        # `drop_relation` with no eligible target is a no-op, so the edge set is unchanged
+        # while the call still claims a change.
+        out, _nons, log = perturb.apply_calls(
+            rels, ("drop_relation",), targets=[""]
+        )
+        assert log[0]["effect"] == "noop"
+        assert pipeline._edge_set_signature(out) == pipeline._edge_set_signature(rels)
+        assert any(
+            call not in perturb.EDGE_INVARIANT_CALLS for call in ("drop_relation",)
+        ), "drop_relation must not be exempt from the edge-effect gate"
+
+    def test_the_gate_compares_adjacent_rungs_not_parentage(self):
+        """Every CONFLICT rung's `parent` is the base, so a parent-only comparison passes
+        a rung that duplicates the rung immediately BELOW it -- and the C1 constraints are
+        stated over adjacent pairs. A plan with only two unresolved conflicts cannot feed
+        the `coherent` rung's third call, so rungs 3 and 4 collide and must be rejected."""
+        # Two unresolved conflicts only: one for add_resolution, one for the first drop.
+        rels = [
+            e
+            for e in self._base_relations()
+            if e["level1_coupling"] != "contradiction"
+        ] + [
+            {
+                "id": "r010", "source_id": "a8", "target_id": "a9",
+                "level2_sense": "Contrast", "level1_coupling": "contradiction",
+                "directed": False, "ordering_only": False,
+                "intended_strength_band": "weak", "strength_range": [0.35, 0.59],
+                "validity": "invalid", "error_kind": "spurious",
+                "is_concession": False, "is_resolved_concession": False,
+                "resolver_atom_id": None, "exhaustive": False,
+            },
+        ]
+        unresolved = [
+            e
+            for e in rels
+            if e["level1_coupling"] in ("contradiction", "exclusive")
+            and not e["is_resolved_concession"]
+        ]
+        assert len(unresolved) == 2, "fixture must have exactly two to force the collision"
+
+        lad = perturb.ladder_for("CONFLICT")
+        targets = perturb.plan_targets("CONFLICT", rels)
+        sigs = {}
+        for rung in lad.rungs:
+            new = (
+                rels
+                if rung.is_base
+                else perturb.apply_calls(
+                    rels, rung.calls, targets=targets[rung.index]
+                )[0]
+            )
+            sigs[rung.index] = pipeline._edge_set_signature(new)
+
+        # Rungs 3 and 4 collide...
+        assert sigs[3] == sigs[4]
+        # ...even though rung 4 differs from its declared parent, the base.
+        parent = next(r.parent for r in lad.rungs if r.index == 4)
+        assert parent == 1
+        assert sigs[4] != sigs[parent], (
+            "this is precisely why a parent-only comparison misses the collision"
+        )

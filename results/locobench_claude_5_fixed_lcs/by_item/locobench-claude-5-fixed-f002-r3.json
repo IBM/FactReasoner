@@ -1,0 +1,836 @@
+{
+  "item_id": "locobench-claude-5-fixed-f002-r3",
+  "item_name": "Archaeology -- fix_one_conflict",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f002",
+    "family": "CONFLICT",
+    "rung_index": 3,
+    "rung_name": "fix_one_conflict",
+    "perturbation": {
+      "calls": [
+        "add_resolution",
+        "drop_relation"
+      ],
+      "parent_rung": 1,
+      "targets": [
+        "r003",
+        "r005"
+      ],
+      "edge_effects": [
+        {
+          "call": "add_resolution",
+          "target": "r003",
+          "effect": "resolved",
+          "detail": "r003 (exclusive, sense unchanged)"
+        },
+        {
+          "call": "drop_relation",
+          "target": "r005",
+          "effect": "removed",
+          "detail": "a8->a7 (Contrast)"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "increase",
+      "consistency": "unconstrained",
+      "log_partition": "increase"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Archaeology",
+    "domain": "Humanities",
+    "framing": "How do archaeologists adjudicate between competing interpretations when a stratified deposit yields artifacts that appear older than the layer containing them?",
+    "split": "test",
+    "word_count": 665,
+    "generator": "claude-opus-5"
+  },
+  "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The law of superposition holds that in an undisturbed sequence lower deposits were laid down before those above them.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The artifacts were older than the sediment that enclosed them.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The sediment enclosing the artifacts was younger than the artifacts.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Older material was incorporated into the layer while the layer was forming.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Older artifacts moved into the layer after the layer had formed.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The deposit containing the artifacts was stratigraphically intact.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a6",
+      "text": "The deposit containing the artifacts was disturbed after its formation.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a7",
+      "text": "Burrowing animals can transport artifacts vertically between stratigraphic layers.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Bioturbation displaces artifacts downward only.",
+      "label": "p9",
+      "factual": false,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The final excavation report concluded that the deposit had been disturbed by rodent burrowing after its formation.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Refitting fragments of a single broken artifact across two layers demonstrates vertical displacement of material.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Radiocarbon dating of short-lived plant remains from a context provides an age estimate for that context's formation.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Radiocarbon dating directly measures the age at which a flint tool was knapped.",
+      "label": "p13",
+      "factual": false,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "A lithics specialist interpreted the older flint blades as residual material eroded from an earlier deposit.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "A review panel determined that the older flint blades were residual finds rather than curated heirlooms.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": true,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5",
+        "perturbed_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a6",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a6",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 3,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a9",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a9",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a12",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a13",
+      "position_distance": 1
+    }
+  ],
+  "response": "When a stratified deposit yields material that appears to predate the layer holding it, the first task is not to discard either observation but to specify what each rests on. The law of superposition holds that in an undisturbed sequence lower deposits were laid down before those above them, and it was on the strength of that principle that the artifacts proved older than the sediment enclosing them. Chronological information at a site is carried in two partly independent registers \u2014 the order of the deposits and the age of the objects within them \u2014 and when those registers disagree the disagreement is informative rather than fatal. The same discrepancy can be stated from the other end without any change in content: equivalently, the sediment enclosing the artifacts was younger than the artifacts. What remains to be settled is which of the several histories capable of producing such an arrangement actually did so.\n\nTwo families of process can place old objects in young sediment, and they are not mutually exclusive, so at least one of the following obtained, perhaps both: older material was incorporated into the layer while the layer was forming, or older artifacts moved into the layer after the layer had formed. Discriminating between them requires a prior judgment about the integrity of the deposit, and there the options are exhaustive and mutually exclusive: either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold. Burrowing animals can transport artifacts vertically between stratigraphic layers. The second of those alternatives is post-depositional disturbance, traces of which are sometimes recognizable in section. By contrast with that burrowing transport, bioturbation displaces artifacts downward only.\n\nGeneral mechanisms, however, license possibilities rather than conclusions; adjudication is achieved by site-specific argument, marshalled from the excavated record itself. Here the final excavation report concluded that the deposit had been disturbed by rodent burrowing after its formation, and that determination constitutes the strongest evidence that the deposit's stratigraphic integrity had in fact been compromised. That determination also settled the earlier disjunction, since it fixed the operative process as the second one: the older artifacts moved into the layer after the layer had formed, rather than being incorporated while it was still accumulating. Refitting fragments of a single broken artifact across two layers demonstrates vertical displacement of material, and that demonstration was accomplished earlier than the conclusion eventually recorded in the report, so the argument for movement between strata was already in hand when the disturbance was formally diagnosed.\n\nIndependent chronometry supplies a second line of control on the same question. Radiocarbon dating of short-lived plant remains from a context provides an age estimate for that context's formation, because seeds, twigs and other ephemeral tissues enter a deposit close to the moment it accumulates and cannot have been curated for generations beforehand. Radiocarbon dating directly measures the age at which a flint tool was knapped; the plant-based estimate, by contrast, speaks to the accumulation of the enclosing matrix rather than to the objects recovered from within it, and the two therefore answer different questions about the same anomaly.\n\nWhere rival readings survive these stratigraphic and chronometric controls, resolution becomes a matter of specialist review. Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material eroded from an earlier deposit, reading their condition and technological character as products of reworking rather than of deliberate retention. The impasse was closed when a review panel determined that the older flint blades were residual finds rather than curated heirlooms, a finding that removed the curation hypothesis from consideration and aligned the artifact assemblage with the depositional history reconstructed from the section. Adjudication, in short, proceeds by converting an apparent contradiction into a testable choice among formation processes, and then by letting stratigraphic observation, refitting, dating and peer scrutiny narrow that choice to one.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r3",
+      "item_name": "Archaeology -- fix_one_conflict",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 8,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 8,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8240339375,
+        "consistency": 0.01644599999999996,
+        "reified": 0.248352,
+        "log_partition": 0.39331595846595135
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.894541,
+          "a1": 0.976963,
+          "a10": 0.9,
+          "a11": 0.901075,
+          "a12": 0.104299,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.977959,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.37923286833826053,
+        "log_z": -4.149096,
+        "log_z_max": -2.200476,
+        "log_z_min": -5.412395
+      },
+      "elapsed_s": 0.135
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r3",
+      "item_name": "Archaeology -- fix_one_conflict",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 2,
+        "relations_kept": 6,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8242659999999999,
+        "consistency": 0.018171000000000048,
+        "reified": 0.258309,
+        "log_partition": 0.4979127872556917
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3762909958819217,
+        "log_z": -2.714441,
+        "log_z_max": -1.454179,
+        "log_z_min": -3.964225
+      },
+      "elapsed_s": 0.122
+    }
+  ]
+}

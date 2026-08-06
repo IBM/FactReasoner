@@ -1,0 +1,5070 @@
+{
+  "config": {
+    "data_dir": "data/locobench-claude-5-fixed",
+    "output_dir": "results/locobench_claude_5_fixed_lcs",
+    "merlin_path": "/Users/radu/git/merlin/build_native/merlin",
+    "arms": [
+      "gold",
+      "gold_valid"
+    ],
+    "methods": [
+      "mean_marginal",
+      "consistency",
+      "reified",
+      "log_partition"
+    ],
+    "graded_readouts": [
+      "mean_marginal",
+      "consistency",
+      "log_partition"
+    ],
+    "concession_discount": 0.45,
+    "reified_prior": 0.5,
+    "ibound": 6,
+    "item_ids": null
+  },
+  "dataset": {
+    "name": "locobench-claude-5-fixed",
+    "num_items": 10,
+    "num_atoms": 160,
+    "num_atoms_factual": 140,
+    "num_atoms_not_factual": 20,
+    "senses": {
+      "Precedence": 10,
+      "Effect-Cause": 5,
+      "Contrast": 17,
+      "Concession": 10,
+      "Evidence": 15,
+      "Restatement": 10,
+      "Alternative": 9,
+      "Disjunction": 10,
+      "Cause-Effect": 10
+    },
+    "couplings": {
+      "none": 10,
+      "entailment": 30,
+      "contradiction": 27,
+      "equivalence": 10,
+      "exclusive": 9,
+      "co_necessity": 10
+    },
+    "validity": {
+      "valid": 59,
+      "invalid": 37
+    },
+    "error_kinds": {
+      "wrong_direction": 10,
+      "false_endpoint": 10,
+      "spurious": 12,
+      "wrong_sense": 5
+    }
+  },
+  "records": [
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r0",
+      "item_name": "Anthropology -- worse",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a0->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 10,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 10,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.750400125,
+        "consistency": 0.13146500000000005,
+        "reified": 0.150678,
+        "log_partition": 0.3425956380459952
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.852864,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.929387,
+          "a14": 0.921848,
+          "a15": 0.895138,
+          "a2": 0.803822,
+          "a3": 0.103249,
+          "a4": 0.680037,
+          "a5": 0.713809,
+          "a6": 0.116815,
+          "a7": 0.959332,
+          "a8": 0.984624,
+          "a9": 0.982319
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.5410890000405,
+        "log_z": -8.006219,
+        "log_z_max": -2.205868,
+        "log_z_min": -11.028978
+      },
+      "elapsed_s": 0.204
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r0",
+      "item_name": "Anthropology -- worse",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a0->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 5,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7491295625,
+        "consistency": 0.449963,
+        "reified": 0.333677,
+        "log_partition": 0.43235413781033954
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.92929,
+          "a14": 0.92929,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.742268,
+          "a5": 0.545103,
+          "a6": 0.114731,
+          "a7": 0.903683,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.5331036227268443,
+        "log_z": -4.445284,
+        "log_z_max": -0.650333,
+        "log_z_min": -7.335753
+      },
+      "elapsed_s": 0.133
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r1",
+      "item_name": "Anthropology -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.76053925,
+        "consistency": 0.340635,
+        "reified": 0.221853,
+        "log_partition": 0.37471166112858245
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.929387,
+          "a14": 0.921848,
+          "a15": 0.895138,
+          "a2": 0.904491,
+          "a3": 0.104336,
+          "a4": 0.672243,
+          "a5": 0.734937,
+          "a6": 0.116815,
+          "a7": 0.959332,
+          "a8": 0.984624,
+          "a9": 0.982319
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.5153980888460579,
+        "log_z": -6.926885,
+        "log_z_max": -2.205868,
+        "log_z_min": -9.756012
+      },
+      "elapsed_s": 0.129
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r1",
+      "item_name": "Anthropology -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7491295625,
+        "consistency": 0.449963,
+        "reified": 0.333677,
+        "log_partition": 0.43235413781033954
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.92929,
+          "a14": 0.92929,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.742268,
+          "a5": 0.545103,
+          "a6": 0.114731,
+          "a7": 0.903683,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.5331036227268443,
+        "log_z": -4.445284,
+        "log_z_max": -0.650333,
+        "log_z_min": -7.335753
+      },
+      "elapsed_s": 0.13
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r2",
+      "item_name": "Anthropology -- concession_resolved",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 2,
+      "rung_name": "concession_resolved",
+      "perturbation": {
+        "calls": [
+          "add_resolution"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.789579625,
+        "consistency": 0.084785,
+        "reified": 0.252912,
+        "log_partition": 0.37426805502480404
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.929387,
+          "a14": 0.921848,
+          "a15": 0.895138,
+          "a2": 0.924766,
+          "a3": 0.104555,
+          "a4": 0.898549,
+          "a5": 0.952783,
+          "a6": 0.116815,
+          "a7": 0.959332,
+          "a8": 0.984624,
+          "a9": 0.982319
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.44867102073426035,
+        "log_z": -5.754193,
+        "log_z_max": -2.205868,
+        "log_z_min": -7.876547
+      },
+      "elapsed_s": 0.142
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r2",
+      "item_name": "Anthropology -- concession_resolved",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 2,
+      "rung_name": "concession_resolved",
+      "perturbation": {
+        "calls": [
+          "add_resolution"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7809096875,
+        "consistency": 0.12710299999999997,
+        "reified": 0.293739,
+        "log_partition": 0.4413472195860369
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.92929,
+          "a14": 0.92929,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.898724,
+          "a5": 0.897129,
+          "a6": 0.114731,
+          "a7": 0.903683,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.47895558688975665,
+        "log_z": -3.511214,
+        "log_z_max": -0.650333,
+        "log_z_min": -5.771369
+      },
+      "elapsed_s": 0.157
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r3",
+      "item_name": "Anthropology -- fix_one_conflict",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a3->a2 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 8,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 8,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.789239375,
+        "consistency": 0.09368200000000004,
+        "reified": 0.261813,
+        "log_partition": 0.4253674310883386
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.929387,
+          "a14": 0.921848,
+          "a15": 0.895138,
+          "a2": 0.923927,
+          "a3": 0.1,
+          "a4": 0.898549,
+          "a5": 0.952733,
+          "a6": 0.116815,
+          "a7": 0.959332,
+          "a8": 0.984624,
+          "a9": 0.982319
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.44798173250811235,
+        "log_z": -5.06612,
+        "log_z_max": -2.205868,
+        "log_z_min": -7.1834
+      },
+      "elapsed_s": 0.168
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r3",
+      "item_name": "Anthropology -- fix_one_conflict",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a3->a2 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 5,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7809096875,
+        "consistency": 0.12710299999999997,
+        "reified": 0.293739,
+        "log_partition": 0.4413472195860369
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.9,
+          "a13": 0.92929,
+          "a14": 0.92929,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.898724,
+          "a5": 0.897129,
+          "a6": 0.114731,
+          "a7": 0.903683,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.47895558688975665,
+        "log_z": -3.511214,
+        "log_z_max": -0.650333,
+        "log_z_min": -5.771369
+      },
+      "elapsed_s": 0.151
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r4",
+      "item_name": "Anthropology -- coherent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r002",
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a3->a2 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r007",
+            "effect": "removed",
+            "detail": "a10->a11 (Alternative)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 7,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 7,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.822792,
+        "consistency": 0.12771,
+        "reified": 0.320921,
+        "log_partition": 0.4886509721553051
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.929387,
+          "a14": 0.921848,
+          "a15": 0.895138,
+          "a2": 0.923927,
+          "a3": 0.1,
+          "a4": 0.898549,
+          "a5": 0.952733,
+          "a6": 0.116815,
+          "a7": 0.959332,
+          "a8": 0.984624,
+          "a9": 0.982319
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.38792468489911935,
+        "log_z": -3.58771,
+        "log_z_max": -2.205868,
+        "log_z_min": -4.908214
+      },
+      "elapsed_s": 0.156
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f001-r4",
+      "item_name": "Anthropology -- coherent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r002",
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (contradiction, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a3->a2 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r007",
+            "effect": "removed",
+            "detail": "a10->a11 (Alternative)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 4,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 4,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a12"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8144623125,
+        "consistency": 0.17327099999999995,
+        "reified": 0.356573,
+        "log_partition": 0.5142150851239524
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.92929,
+          "a14": 0.92929,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.898724,
+          "a5": 0.897129,
+          "a6": 0.114731,
+          "a7": 0.903683,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.41889853928076365,
+        "log_z": -2.032804,
+        "log_z_max": -0.650333,
+        "log_z_min": -3.496183
+      },
+      "elapsed_s": 0.161
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r0",
+      "item_name": "Archaeology -- worse",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a0->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 10,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 10,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.785739875,
+        "consistency": 0.01622100000000004,
+        "reified": 0.119975,
+        "log_partition": 0.2814793688197228
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.830962,
+          "a1": 0.960777,
+          "a10": 0.9,
+          "a11": 0.901075,
+          "a12": 0.104299,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.950667,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.477855,
+          "a6": 0.901651,
+          "a7": 0.920007,
+          "a8": 0.104504,
+          "a9": 0.919129
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4592865419035564,
+        "log_z": -7.045041,
+        "log_z_max": -2.200476,
+        "log_z_min": -8.942892
+      },
+      "elapsed_s": 0.156
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r0",
+      "item_name": "Archaeology -- worse",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a0->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7923228125,
+        "consistency": 0.09231100000000003,
+        "reified": 0.268805,
+        "log_partition": 0.4347371288744684
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.477912,
+          "a6": 0.901551,
+          "a7": 0.91912,
+          "a8": 0.1,
+          "a9": 0.91912
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.4318803184335819,
+        "log_z": -3.757303,
+        "log_z_max": -1.454179,
+        "log_z_min": -5.528609
+      },
+      "elapsed_s": 0.144
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r1",
+      "item_name": "Archaeology -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7924309375,
+        "consistency": 0.075492,
+        "reified": 0.249746,
+        "log_partition": 0.32724277578184285
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.894541,
+          "a1": 0.976963,
+          "a10": 0.9,
+          "a11": 0.901075,
+          "a12": 0.104299,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.977959,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.477855,
+          "a6": 0.901651,
+          "a7": 0.920007,
+          "a8": 0.104504,
+          "a9": 0.919129
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4354872297139292,
+        "log_z": -5.880088,
+        "log_z_max": -2.200476,
+        "log_z_min": -7.669926
+      },
+      "elapsed_s": 0.148
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r1",
+      "item_name": "Archaeology -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7923228125,
+        "consistency": 0.09231100000000003,
+        "reified": 0.268805,
+        "log_partition": 0.4347371288744684
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.477912,
+          "a6": 0.901551,
+          "a7": 0.91912,
+          "a8": 0.1,
+          "a9": 0.91912
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.4318803184335819,
+        "log_z": -3.757303,
+        "log_z_max": -1.454179,
+        "log_z_min": -5.528609
+      },
+      "elapsed_s": 0.139
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r2",
+      "item_name": "Archaeology -- concession_resolved",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 2,
+      "rung_name": "concession_resolved",
+      "perturbation": {
+        "calls": [
+          "add_resolution"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.82437275,
+        "consistency": 0.014861000000000013,
+        "reified": 0.239682,
+        "log_partition": 0.324809363017168
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.894541,
+          "a1": 0.976963,
+          "a10": 0.9,
+          "a11": 0.901075,
+          "a12": 0.104299,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.977959,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.97908,
+          "a7": 0.927214,
+          "a8": 0.104582,
+          "a9": 0.926402
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.3799355170329533,
+        "log_z": -4.83714,
+        "log_z_max": -2.200476,
+        "log_z_min": -6.105542
+      },
+      "elapsed_s": 0.135
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r2",
+      "item_name": "Archaeology -- concession_resolved",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 2,
+      "rung_name": "concession_resolved",
+      "perturbation": {
+        "calls": [
+          "add_resolution"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8242659999999999,
+        "consistency": 0.018171000000000048,
+        "reified": 0.258309,
+        "log_partition": 0.4979127872556917
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3762909958819217,
+        "log_z": -2.714441,
+        "log_z_max": -1.454179,
+        "log_z_min": -3.964225
+      },
+      "elapsed_s": 0.137
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r3",
+      "item_name": "Archaeology -- fix_one_conflict",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 8,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 8,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8240339375,
+        "consistency": 0.01644599999999996,
+        "reified": 0.248352,
+        "log_partition": 0.39331595846595135
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.894541,
+          "a1": 0.976963,
+          "a10": 0.9,
+          "a11": 0.901075,
+          "a12": 0.104299,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.977959,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.37923286833826053,
+        "log_z": -4.149096,
+        "log_z_max": -2.200476,
+        "log_z_min": -5.412395
+      },
+      "elapsed_s": 0.135
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r3",
+      "item_name": "Archaeology -- fix_one_conflict",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 3,
+      "rung_name": "fix_one_conflict",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 9,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 9,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 2,
+        "relations_kept": 6,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 9,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8242659999999999,
+        "consistency": 0.018171000000000048,
+        "reified": 0.258309,
+        "log_partition": 0.4979127872556917
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3762909958819217,
+        "log_z": -2.714441,
+        "log_z_max": -1.454179,
+        "log_z_min": -3.964225
+      },
+      "elapsed_s": 0.122
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r4",
+      "item_name": "Archaeology -- coherent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005",
+          "r008"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r008",
+            "effect": "removed",
+            "detail": "a12->a11 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 7,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 7,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8236980625,
+        "consistency": 0.018171000000000048,
+        "reified": 0.256971,
+        "log_partition": 0.49965260849334525
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.894541,
+          "a1": 0.976963,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.977959,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.37860385177276545,
+        "log_z": -3.460737,
+        "log_z_max": -2.200476,
+        "log_z_min": -4.719248
+      },
+      "elapsed_s": 0.152
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f002-r4",
+      "item_name": "Archaeology -- coherent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r003",
+          "r005",
+          "r008"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r003",
+            "effect": "resolved",
+            "detail": "r003 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r005",
+            "effect": "removed",
+            "detail": "a8->a7 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r008",
+            "effect": "removed",
+            "detail": "a12->a11 (Contrast)"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 1,
+        "relations_kept": 6,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8242659999999999,
+        "consistency": 0.018171000000000048,
+        "reified": 0.258309,
+        "log_partition": 0.4979127872556917
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.979275,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.1,
+          "a13": 0.913025,
+          "a14": 0.929307,
+          "a15": 0.9,
+          "a2": 0.979275,
+          "a3": 0.92929,
+          "a4": 0.92929,
+          "a5": 0.896937,
+          "a6": 0.979057,
+          "a7": 0.9264,
+          "a8": 0.1,
+          "a9": 0.9264
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3762909958819217,
+        "log_z": -2.714441,
+        "log_z_max": -1.454179,
+        "log_z_min": -3.964225
+      },
+      "elapsed_s": 0.15
+    }
+  ],
+  "families": [
+    {
+      "family_id": "f001",
+      "family": "CONFLICT",
+      "canonical_topic": "Anthropology",
+      "rungs": [
+        {
+          "rung_index": 0,
+          "rung_name": "worse",
+          "item_id": "locobench-claude-5-fixed-f001-r0"
+        },
+        {
+          "rung_index": 1,
+          "rung_name": "base",
+          "item_id": "locobench-claude-5-fixed-f001-r1"
+        },
+        {
+          "rung_index": 2,
+          "rung_name": "concession_resolved",
+          "item_id": "locobench-claude-5-fixed-f001-r2"
+        },
+        {
+          "rung_index": 3,
+          "rung_name": "fix_one_conflict",
+          "item_id": "locobench-claude-5-fixed-f001-r3"
+        },
+        {
+          "rung_index": 4,
+          "rung_name": "coherent",
+          "item_id": "locobench-claude-5-fixed-f001-r4"
+        }
+      ],
+      "gold_relations_identical_across_rungs": false,
+      "distinct_responses": 5,
+      "arms": {
+        "gold": {
+          "checks": [
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.750400125,
+              "hi": 0.76053925,
+              "delta": 0.010139125000000027,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.13146500000000005,
+              "hi": 0.340635,
+              "delta": 0.20916999999999997,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.3425956380459952,
+              "hi": 0.37471166112858245,
+              "delta": 0.032116023082587264,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.76053925,
+              "hi": 0.789579625,
+              "delta": 0.029040375000000007,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.789579625,
+              "hi": 0.789239375,
+              "delta": -0.0003402500000000419,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.37426805502480404,
+              "hi": 0.4253674310883386,
+              "delta": 0.05109937606353454,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.789239375,
+              "hi": 0.822792,
+              "delta": 0.033552625,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.09368200000000004,
+              "hi": 0.12771,
+              "delta": 0.03402799999999995,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.4253674310883386,
+              "hi": 0.4886509721553051,
+              "delta": 0.06328354106696654,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "consistency",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "decrease",
+              "observed": "decrease",
+              "lo": 0.340635,
+              "hi": 0.084785,
+              "delta": -0.25585,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "log_partition",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "invariant",
+              "observed": "decrease",
+              "lo": 0.37471166112858245,
+              "hi": 0.37426805502480404,
+              "delta": -0.0004436061037784156,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.750400125,
+              "hi": 0.822792,
+              "delta": 0.072391875,
+              "passed": true
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.13146500000000005,
+              "hi": 0.12771,
+              "delta": -0.003755000000000064,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.3425956380459952,
+              "hi": 0.4886509721553051,
+              "delta": 0.14605533410930993,
+              "passed": true
+            }
+          ],
+          "summary": {
+            "total": 14,
+            "passed": 11,
+            "failed": 3,
+            "pass_rate": 0.7857142857142857,
+            "by_class": {
+              "C1": {
+                "total": 9,
+                "passed": 8
+              },
+              "C2": {
+                "total": 2,
+                "passed": 1
+              },
+              "C3": {
+                "total": 3,
+                "passed": 2
+              }
+            }
+          },
+          "scores_by_rung": {
+            "0": {
+              "mean_marginal": 0.750400125,
+              "consistency": 0.13146500000000005,
+              "reified": 0.150678,
+              "log_partition": 0.3425956380459952
+            },
+            "1": {
+              "mean_marginal": 0.76053925,
+              "consistency": 0.340635,
+              "reified": 0.221853,
+              "log_partition": 0.37471166112858245
+            },
+            "2": {
+              "mean_marginal": 0.789579625,
+              "consistency": 0.084785,
+              "reified": 0.252912,
+              "log_partition": 0.37426805502480404
+            },
+            "3": {
+              "mean_marginal": 0.789239375,
+              "consistency": 0.09368200000000004,
+              "reified": 0.261813,
+              "log_partition": 0.4253674310883386
+            },
+            "4": {
+              "mean_marginal": 0.822792,
+              "consistency": 0.12771,
+              "reified": 0.320921,
+              "log_partition": 0.4886509721553051
+            }
+          }
+        },
+        "gold_valid": {
+          "checks": [
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.7491295625,
+              "hi": 0.7491295625,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.449963,
+              "hi": 0.449963,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.43235413781033954,
+              "hi": 0.43235413781033954,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7491295625,
+              "hi": 0.7809096875,
+              "delta": 0.03178012500000005,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.7809096875,
+              "hi": 0.7809096875,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.4413472195860369,
+              "hi": 0.4413472195860369,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7809096875,
+              "hi": 0.8144623125,
+              "delta": 0.033552625,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.12710299999999997,
+              "hi": 0.17327099999999995,
+              "delta": 0.04616799999999999,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.4413472195860369,
+              "hi": 0.5142150851239524,
+              "delta": 0.07286786553791552,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "consistency",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "decrease",
+              "observed": "decrease",
+              "lo": 0.449963,
+              "hi": 0.12710299999999997,
+              "delta": -0.32286000000000004,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "log_partition",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "invariant",
+              "observed": "increase",
+              "lo": 0.43235413781033954,
+              "hi": 0.4413472195860369,
+              "delta": 0.008993081775697354,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7491295625,
+              "hi": 0.8144623125,
+              "delta": 0.06533275000000005,
+              "passed": true
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.449963,
+              "hi": 0.17327099999999995,
+              "delta": -0.27669200000000005,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.43235413781033954,
+              "hi": 0.5142150851239524,
+              "delta": 0.08186094731361288,
+              "passed": true
+            }
+          ],
+          "summary": {
+            "total": 14,
+            "passed": 7,
+            "failed": 7,
+            "pass_rate": 0.5,
+            "by_class": {
+              "C1": {
+                "total": 9,
+                "passed": 4
+              },
+              "C2": {
+                "total": 2,
+                "passed": 1
+              },
+              "C3": {
+                "total": 3,
+                "passed": 2
+              }
+            }
+          },
+          "scores_by_rung": {
+            "0": {
+              "mean_marginal": 0.7491295625,
+              "consistency": 0.449963,
+              "reified": 0.333677,
+              "log_partition": 0.43235413781033954
+            },
+            "1": {
+              "mean_marginal": 0.7491295625,
+              "consistency": 0.449963,
+              "reified": 0.333677,
+              "log_partition": 0.43235413781033954
+            },
+            "2": {
+              "mean_marginal": 0.7809096875,
+              "consistency": 0.12710299999999997,
+              "reified": 0.293739,
+              "log_partition": 0.4413472195860369
+            },
+            "3": {
+              "mean_marginal": 0.7809096875,
+              "consistency": 0.12710299999999997,
+              "reified": 0.293739,
+              "log_partition": 0.4413472195860369
+            },
+            "4": {
+              "mean_marginal": 0.8144623125,
+              "consistency": 0.17327099999999995,
+              "reified": 0.356573,
+              "log_partition": 0.5142150851239524
+            }
+          }
+        }
+      }
+    },
+    {
+      "family_id": "f002",
+      "family": "CONFLICT",
+      "canonical_topic": "Archaeology",
+      "rungs": [
+        {
+          "rung_index": 0,
+          "rung_name": "worse",
+          "item_id": "locobench-claude-5-fixed-f002-r0"
+        },
+        {
+          "rung_index": 1,
+          "rung_name": "base",
+          "item_id": "locobench-claude-5-fixed-f002-r1"
+        },
+        {
+          "rung_index": 2,
+          "rung_name": "concession_resolved",
+          "item_id": "locobench-claude-5-fixed-f002-r2"
+        },
+        {
+          "rung_index": 3,
+          "rung_name": "fix_one_conflict",
+          "item_id": "locobench-claude-5-fixed-f002-r3"
+        },
+        {
+          "rung_index": 4,
+          "rung_name": "coherent",
+          "item_id": "locobench-claude-5-fixed-f002-r4"
+        }
+      ],
+      "gold_relations_identical_across_rungs": false,
+      "distinct_responses": 5,
+      "arms": {
+        "gold": {
+          "checks": [
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.785739875,
+              "hi": 0.7924309375,
+              "delta": 0.006691062500000067,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.01622100000000004,
+              "hi": 0.075492,
+              "delta": 0.05927099999999996,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.2814793688197228,
+              "hi": 0.32724277578184285,
+              "delta": 0.04576340696212006,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7924309375,
+              "hi": 0.82437275,
+              "delta": 0.031941812499999944,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.82437275,
+              "hi": 0.8240339375,
+              "delta": -0.0003388125000000075,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.324809363017168,
+              "hi": 0.39331595846595135,
+              "delta": 0.06850659544878335,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.8240339375,
+              "hi": 0.8236980625,
+              "delta": -0.0003358749999999855,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.01644599999999996,
+              "hi": 0.018171000000000048,
+              "delta": 0.0017250000000000876,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.39331595846595135,
+              "hi": 0.49965260849334525,
+              "delta": 0.1063366500273939,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "consistency",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "decrease",
+              "observed": "decrease",
+              "lo": 0.075492,
+              "hi": 0.014861000000000013,
+              "delta": -0.06063099999999999,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "log_partition",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "invariant",
+              "observed": "decrease",
+              "lo": 0.32724277578184285,
+              "hi": 0.324809363017168,
+              "delta": -0.002433412764674847,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.785739875,
+              "hi": 0.8236980625,
+              "delta": 0.03795818750000002,
+              "passed": true
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.01622100000000004,
+              "hi": 0.018171000000000048,
+              "delta": 0.0019500000000000073,
+              "passed": true
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.2814793688197228,
+              "hi": 0.49965260849334525,
+              "delta": 0.21817323967362245,
+              "passed": true
+            }
+          ],
+          "summary": {
+            "total": 14,
+            "passed": 11,
+            "failed": 3,
+            "pass_rate": 0.7857142857142857,
+            "by_class": {
+              "C1": {
+                "total": 9,
+                "passed": 7
+              },
+              "C2": {
+                "total": 2,
+                "passed": 1
+              },
+              "C3": {
+                "total": 3,
+                "passed": 3
+              }
+            }
+          },
+          "scores_by_rung": {
+            "0": {
+              "mean_marginal": 0.785739875,
+              "consistency": 0.01622100000000004,
+              "reified": 0.119975,
+              "log_partition": 0.2814793688197228
+            },
+            "1": {
+              "mean_marginal": 0.7924309375,
+              "consistency": 0.075492,
+              "reified": 0.249746,
+              "log_partition": 0.32724277578184285
+            },
+            "2": {
+              "mean_marginal": 0.82437275,
+              "consistency": 0.014861000000000013,
+              "reified": 0.239682,
+              "log_partition": 0.324809363017168
+            },
+            "3": {
+              "mean_marginal": 0.8240339375,
+              "consistency": 0.01644599999999996,
+              "reified": 0.248352,
+              "log_partition": 0.39331595846595135
+            },
+            "4": {
+              "mean_marginal": 0.8236980625,
+              "consistency": 0.018171000000000048,
+              "reified": 0.256971,
+              "log_partition": 0.49965260849334525
+            }
+          }
+        },
+        "gold_valid": {
+          "checks": [
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.7923228125,
+              "hi": 0.7923228125,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.09231100000000003,
+              "hi": 0.09231100000000003,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                1
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.4347371288744684,
+              "hi": 0.4347371288744684,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7923228125,
+              "hi": 0.8242659999999999,
+              "delta": 0.031943187499999914,
+              "passed": true
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.8242659999999999,
+              "hi": 0.8242659999999999,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                2,
+                3
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.4979127872556917,
+              "hi": 0.4979127872556917,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.8242659999999999,
+              "hi": 0.8242659999999999,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.018171000000000048,
+              "hi": 0.018171000000000048,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c1",
+              "constraint_class": "C1",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                3,
+                4
+              ],
+              "expected": "increase",
+              "observed": "invariant",
+              "lo": 0.4979127872556917,
+              "hi": 0.4979127872556917,
+              "delta": 0.0,
+              "passed": false
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "consistency",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "decrease",
+              "observed": "decrease",
+              "lo": 0.09231100000000003,
+              "hi": 0.018171000000000048,
+              "delta": -0.07413999999999998,
+              "passed": true
+            },
+            {
+              "constraint": "c2",
+              "constraint_class": "C2",
+              "strict": false,
+              "readout": "log_partition",
+              "pair": [
+                1,
+                2
+              ],
+              "expected": "invariant",
+              "observed": "increase",
+              "lo": 0.4347371288744684,
+              "hi": 0.4979127872556917,
+              "delta": 0.0631756583812233,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "mean_marginal",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.7923228125,
+              "hi": 0.8242659999999999,
+              "delta": 0.031943187499999914,
+              "passed": true
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "consistency",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "decrease",
+              "lo": 0.09231100000000003,
+              "hi": 0.018171000000000048,
+              "delta": -0.07413999999999998,
+              "passed": false
+            },
+            {
+              "constraint": "c3",
+              "constraint_class": "C3",
+              "strict": true,
+              "readout": "log_partition",
+              "pair": [
+                0,
+                4
+              ],
+              "expected": "increase",
+              "observed": "increase",
+              "lo": 0.4347371288744684,
+              "hi": 0.4979127872556917,
+              "delta": 0.0631756583812233,
+              "passed": true
+            }
+          ],
+          "summary": {
+            "total": 14,
+            "passed": 4,
+            "failed": 10,
+            "pass_rate": 0.2857142857142857,
+            "by_class": {
+              "C1": {
+                "total": 9,
+                "passed": 1
+              },
+              "C2": {
+                "total": 2,
+                "passed": 1
+              },
+              "C3": {
+                "total": 3,
+                "passed": 2
+              }
+            }
+          },
+          "scores_by_rung": {
+            "0": {
+              "mean_marginal": 0.7923228125,
+              "consistency": 0.09231100000000003,
+              "reified": 0.268805,
+              "log_partition": 0.4347371288744684
+            },
+            "1": {
+              "mean_marginal": 0.7923228125,
+              "consistency": 0.09231100000000003,
+              "reified": 0.268805,
+              "log_partition": 0.4347371288744684
+            },
+            "2": {
+              "mean_marginal": 0.8242659999999999,
+              "consistency": 0.018171000000000048,
+              "reified": 0.258309,
+              "log_partition": 0.4979127872556917
+            },
+            "3": {
+              "mean_marginal": 0.8242659999999999,
+              "consistency": 0.018171000000000048,
+              "reified": 0.258309,
+              "log_partition": 0.4979127872556917
+            },
+            "4": {
+              "mean_marginal": 0.8242659999999999,
+              "consistency": 0.018171000000000048,
+              "reified": 0.258309,
+              "log_partition": 0.4979127872556917
+            }
+          }
+        }
+      }
+    }
+  ]
+}
