@@ -393,7 +393,6 @@ def call_budget(
     families: "list[str] | dict[str, int]",
     *,
     n_voters: int = 4,
-    conflict_edges_per_family: int = 3,
     inline_responses: int = 1,
 ) -> dict[str, int]:
     """Project the LLM call budget for a set of families, per prompt identifier.
@@ -401,11 +400,14 @@ def call_budget(
     Derived from :data:`LADDERS` rather than hard-coded, so the projection cannot drift
     from the ladders actually executed.
 
+    Phase 1's V2 exhaustiveness adjudicator carried its own per-conflict-edge term here. It
+    is gone with the prompt: ``exclusive`` and ``co_necessity`` are derived from the sense by
+    ``taxonomy_bridge.COMPILE``, so no model call is needed to assign them.
+
     Args:
         families: Either a list of family-type labels (one entry per family) or a
             ``{family_type: count}`` mapping.
         n_voters: Committee models per item, excluding the generator (R3).
-        conflict_edges_per_family: V2 runs per conflict edge per *family*, not per item.
         inline_responses: Responses the inline V1/V3/V4 gate gets run on. The harness
             currently audits the base response only (1); Phase 1's V3 scope is all five.
 
@@ -428,14 +430,13 @@ def call_budget(
         "P4": n_fam,
         "P5": sum(p5_calls_for(f) * n for f, n in counts.items()),
         "V1": n_fam * inline_responses + n_items * n_voters,
-        "V2": n_fam * conflict_edges_per_family * n_voters,
         "V3": n_fam * inline_responses,
         "V4": n_fam * inline_responses + n_items * n_voters,
     }
-    committee = n_items * n_voters * 2 + budget["V2"]
+    committee = n_items * n_voters * 2
     budget["committee"] = committee
     budget["total"] = sum(budget[k] for k in ("P1", "P2", "P3", "P4", "P5")) + sum(
-        budget[k] for k in ("V1", "V2", "V3", "V4")
+        budget[k] for k in ("V1", "V3", "V4")
     )
     budget["generation"] = budget["total"] - committee
     return budget

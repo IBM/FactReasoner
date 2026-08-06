@@ -264,7 +264,6 @@ _PROBES: dict[str, str] = {
     "P4": "realizes the plan exactly",
     "P5": "one PERTURBATION to apply",
     "V1": "recover_relations(",
-    "V2": "adjudicate_exhaustiveness(",
     "V3": "check_response(",
     "V4": "check_atom_coverage(",
 }
@@ -470,8 +469,6 @@ def make_mock_llm(cfg: GenConfig, *, plan_holder: dict[str, Any] | None = None) 
             return _mock.mock_recovery(
                 rendered, _atoms_payload(rendered), holder.get("plan"), seed=seed
             )
-        if pid == "V2":
-            return _mock.mock_verdict(rendered, rendered, rendered, seed)
         if pid == "V3":
             return _mock.mock_audit(rendered, seed, leak=bool(holder.get("force_leak")))
         if pid == "V4":
@@ -484,25 +481,81 @@ def make_mock_llm(cfg: GenConfig, *, plan_holder: dict[str, Any] | None = None) 
     return llm
 
 
-def _atoms_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
-    """Convert a plan's positioned atoms into schema atoms (``a0``-indexed)."""
+def _atoms_from_plan(
+    plan: dict[str, Any], claims: list[dict[str, str]] | None = None
+) -> list[dict[str, Any]]:
+    """Convert a plan's positioned atoms into schema atoms (``a0``-indexed).
+
+    ``factual`` is DERIVED from P2's tags by exact text match, not taken from P3. P2 produces
+    4 ``[incorrect]`` claims per question, but P3's atom schema is ``{pos, text}`` and carried
+    no factuality field, so the tag was dropped at the P2->P3 boundary and every atom
+    defaulted to ``factual: True``. Measured on the shipped corpus: all 170 atoms across both
+    admitted families were ``factual: true``, i.e. the benchmark's false claims never reached
+    it -- and no test caught this because ``mock.py`` emits ``factual`` itself, making the dry
+    run more faithful than the live path.
+
+    Matching on text is reliable rather than a heuristic: P3 instruction 2 requires every
+    selected claim to keep its text "EXACTLY as given", and all 34 plan atoms in the shipped
+    corpus matched a P2 claim verbatim. A model-reported ``factual`` field is accepted as a
+    cross-check when present but never overrides the tag, because the tag is the ground truth
+    and asking a model to restate it only invites drift.
+
+    Args:
+        plan: A parsed P3 plan.
+        claims: P2's parsed claims (``text``/``tag``). When omitted, ``factual`` falls back to
+            the plan's own field -- the pre-existing behaviour, kept so callers without the
+            claims (and the resume path) still work.
+
+    Returns:
+        The schema atoms. Each carries ``factual`` and, for the exhaustive pair, a
+        ``factual_note`` recording that the label is known-imprecise.
+    """
+    # Tag lookup, normalized on whitespace only: P3 must reproduce the text exactly, so
+    # anything looser would risk matching a different claim.
+    def _norm(s: str) -> str:
+        return " ".join((s or "").split()).rstrip(".").lower()
+
+    by_text: dict[str, str] = {}
+    for c in claims or []:
+        by_text[_norm(c.get("text", ""))] = c.get("tag", "")
+
     out = []
+    n_unmatched = 0
     for i, a in enumerate(sorted(plan["atoms"], key=lambda x: x["pos"])):
         role = "claim"
         text = a.get("text", "")
         low = text.lower()
         if any(w in low for w in ("held", "found that", "tribunal", "review board")):
             role = "holding"
-        out.append(
-            {
-                "id": f"a{i}",
-                "text": text,
-                "label": f"p{a['pos']}",
-                "factual": bool(a.get("factual", True)),
-                "role": role,
-                "pos": a["pos"],
-            }
-        )
+        tag = by_text.get(_norm(text))
+        note = None
+        if tag is None:
+            n_unmatched += 1
+            factual = bool(a.get("factual", True))
+        else:
+            factual = tag != "incorrect"
+            if tag.startswith("alt-pair"):
+                # An exhaustive pair is exactly-one-of, so one of the two IS false and P2
+                # does not say which. Labelling both `factual: True` is the honest default
+                # (neither text is individually asserted false) but it is imprecise, and
+                # Phase 3 must be able to exclude these rather than trust the flag.
+                note = "exhaustive_pair: exactly one of this pair is false"
+        atom = {
+            "id": f"a{i}",
+            "text": text,
+            "label": f"p{a['pos']}",
+            "factual": factual,
+            "role": role,
+            "pos": a["pos"],
+        }
+        if note:
+            atom["factual_note"] = note
+        out.append(atom)
+    if claims and n_unmatched:
+        # Recorded on the first atom rather than silently swallowed: a nonzero count means
+        # P3 paraphrased a claim, which is both a P3 instruction-2 violation and the failure
+        # mode that would quietly restore all-true atoms.
+        out[0]["factual_unmatched"] = n_unmatched
     return out
 
 
@@ -623,7 +676,7 @@ def generate_family(
 
         def _plan_ok(candidate: dict[str, Any]) -> str | None:
             """The plan gates, as a retryable check rather than a terminal verdict."""
-            verdict = validate.gate_plan(candidate)
+            verdict = validate.gate_plan(candidate, claims)
             return None if verdict.passed else verdict.reason()
 
         plan, err = caller.ask(
@@ -648,7 +701,7 @@ def generate_family(
 
     # Re-run the gates on the accepted plan so their results are recorded on the verdict
     # (the check above only decided whether to retry).
-    plan_verdict = validate.gate_plan(plan)
+    plan_verdict = validate.gate_plan(plan, claims)
     res.verdict.results.extend(plan_verdict.results)
     if not plan_verdict.passed:
         res.stage = "plan"
@@ -787,7 +840,9 @@ def generate_family(
 
     # ---- stage: admit -------------------------------------------------------
     t3 = time.perf_counter()
-    atoms = _atoms_from_plan(plan)
+    # `claims` carries P2's [correct]/[incorrect] tags, which is the only place the corpus's
+    # factuality exists -- P3's atom schema does not preserve it.
+    atoms = _atoms_from_plan(plan, claims)
     relations = _relations_from_plan(plan, atoms, generator)
     by_pos = {a["pos"]: a["id"] for a in atoms}
     non_relations = [
@@ -884,20 +939,35 @@ def _validate_response(
     *,
     auditors: list[tuple[str, _Caller]] | None = None,
 ) -> Verdict:
-    """Run V1, V3 and V4 on a base response.
+    """Run V1, V3 and V4 on a base response, on the committee rather than the author.
 
-    V2 runs per conflict edge and is a committee concern, so it belongs to the committee
-    pass rather than here.
+    ALL THREE validators run on the panel. V1 and V4 used to run on ``caller`` -- the
+    generator's own callable -- which is the R3 self-generation violation this module's
+    threshold table names in its first paragraph: "a model asked to recover relations from
+    its own prose recovers its own lexical fingerprints, which inflates every Target-A
+    number." V3 was moved to a panel earlier and V1/V4 were simply left behind, so the
+    corpus's recall figures were self-reported. The panel is small and the extra calls are a
+    handful per family, so there is no reason to keep grading the author's own homework.
+
+    The three gates combine differently, because they measure different things:
+
+    * **V1 -- any-of.** Recoverability is a claim about whether a careful reader *can*
+      recover the plan, so one competent reader succeeding is sufficient evidence. Requiring
+      every rater to independently clear 5-of-6 would be a far harsher gate than the one
+      being applied, and ``THRESHOLDS["v1_rule"]`` says "majority", not "unanimity". The best
+      rater's verdict is the one reported; every rater's rates are recorded.
+    * **V3 -- majority per facet**, unchanged.
+    * **V4 -- majority per atom**, so no single rater can declare an atom absent.
 
     Args:
-        caller: The prompt caller.
+        caller: The generator's caller. Used only as the fallback rater when no panel is
+            configured, and for nothing else.
         response: The prose.
         plan: The plan it realizes.
         atom_texts: The planned atom texts, in position order.
-        auditors: ``(name, caller)`` pairs for V3, per R3 generator exclusion. V3 rejects
-            only on a majority of them, because its judgments diverge sharply across models.
-            Defaults to ``[("self", caller)]`` -- the model audits its own prose, a weaker
-            result, so the CLI warns when it cannot supply separate ones.
+        auditors: ``(name, caller)`` pairs, per R3 generator exclusion. Defaults to
+            ``[("self", caller)]`` -- the model validates its own prose, a weaker result, so
+            the CLI warns when it cannot supply separate ones.
 
     Returns:
         The combined verdict.
@@ -910,27 +980,48 @@ def _validate_response(
     # re-indexed scored 0.50/0.50). Labelling the payload makes the index intrinsic to the
     # data, so nothing has to be transmitted in prose, and V1 still never sees the plan.
     atoms_arg = json.dumps({str(i + 1): t for i, t in enumerate(atom_texts)})
-
-    rec, err = caller.ask(
-        "V1", parse.parse_recovery, response=response, atoms=atoms_arg
-    )
-    if rec is None:
-        return v.add(
-            validate.GateResult("V1", False, detail=err or "no recovery output")
-        )
-    v.results.extend(
-        validate.gate_recovery(
-            plan.get("relations", []), rec, n_atoms=len(atom_texts)
-        ).results
-    )
-
-    # V3 on a DIFFERENT model where one is configured. A model auditing its own prose is
-    # both a spec violation (R3, self-generation bias) and, measured, the weaker judgment:
-    # on identical prose with the identical narrowed prompt, deepseek's own auditor flagged
-    # 5 leakage spans that the prompt names verbatim as exempt, while a Claude auditor
-    # flagged 1 -- a true positive naming a sense. The lenient self-auditor also passed
-    # prose that V1 and V4 independently scored worse.
     panel = auditors or [("self", caller)]
+    planned = plan.get("relations", [])
+
+    # ---- V1, on every rater; best verdict wins (any-of) ----------------------
+    recoveries: list[tuple[str, Verdict]] = []
+    for name, ac in panel:
+        rec, err = ac.ask("V1", parse.parse_recovery, response=response, atoms=atoms_arg)
+        if rec is None:
+            continue
+        recoveries.append(
+            (name, validate.gate_recovery(planned, rec, n_atoms=len(atom_texts)))
+        )
+    if not recoveries:
+        # No rater produced parseable output: a harness/backend problem, not a verdict.
+        return v.add(validate.GateResult("V1", False, detail="no recovery output"))
+
+    def _v1_rates(item: tuple[str, Verdict]) -> tuple[bool, float, float]:
+        g = next(r for r in item[1].results if r.gate == "V1")
+        obs = g.observed if isinstance(g.observed, dict) else {}
+        return (g.passed, obs.get("coupling") or 0.0, obs.get("sense") or 0.0)
+
+    best_name, best = max(recoveries, key=_v1_rates)
+    v.results.extend(best.results)
+    if len(recoveries) > 1:
+        # Who else read the prose, and how they scored it. Without this the any-of rule is
+        # invisible in the record and a systematically weak rater cannot be spotted.
+        v.add(
+            validate.GateResult(
+                "V1.raters",
+                True,  # observation only
+                threshold="recorded, not enforced",
+                observed={
+                    "reported": best_name,
+                    "rates": {
+                        name: _v1_rates((name, ver))[1:] for name, ver in recoveries
+                    },
+                },
+                detail=f"V1 reported from {best_name} of {len(recoveries)} rater(s)",
+            )
+        )
+
+    # ---- V3, majority per facet ---------------------------------------------
     audits: list[tuple[str, dict[str, Any]]] = []
     for name, ac in panel:
         aud, err = ac.ask("V3", parse.parse_audit, response=response)
@@ -940,16 +1031,19 @@ def _validate_response(
         # Every auditor failed to produce parseable output, which is a harness/backend
         # problem rather than a verdict about the prose.
         return v.add(validate.GateResult("V3", False, detail="no audit output"))
-    v.results.extend(validate.gate_audit_panel(audits).results)
+    v.results.extend(validate.gate_audit_panel(audits, response=response).results)
 
-    cov, err = caller.ask(
-        "V4", parse.parse_coverage, response=response, atoms=atoms_arg
+    # ---- V4, majority per atom ----------------------------------------------
+    coverages: list[tuple[str, list[dict[str, Any]]]] = []
+    for name, ac in panel:
+        cov, err = ac.ask("V4", parse.parse_coverage, response=response, atoms=atoms_arg)
+        if cov is not None:
+            coverages.append((name, cov))
+    if not coverages:
+        return v.add(validate.GateResult("V4", False, detail="no coverage output"))
+    v.results.extend(
+        validate.gate_coverage_panel(coverages, len(atom_texts)).results
     )
-    if cov is None:
-        return v.add(
-            validate.GateResult("V4", False, detail=err or "no coverage output")
-        )
-    v.results.extend(validate.gate_coverage(cov, len(atom_texts)).results)
     return v
 
 
@@ -991,7 +1085,7 @@ def build_llm(model: ModelRef, cfg: GenConfig) -> LLM:
        ``(ModelOutputThunk, Context)`` TUPLE, and ``str()`` of that is a repr like
        ``"(ModelOutputThunk(...), <SimpleContext object at 0x...>)"``. Because the repr
        embeds the text, fenced-output prompts (P2--P5) survive by luck while V1/V4 (a bare
-       JSON list) and V2 (a single letter) parse the wrong object -- so the validators
+       JSON list) parse the wrong object -- so the validators
        silently died on every live run while generation looked healthy.
 
     2. THE PARSER IS THE REJECTION-SAMPLING PREDICATE. The prompt's real parser from

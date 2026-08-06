@@ -90,8 +90,7 @@ STRENGTH_BANDS = {
 
 ERROR_KINDS = ("wrong_sense", "wrong_direction", "false_endpoint", "spurious")
 
-# V2's four verdicts and V4's four statuses.
-V2_VERDICTS = ("A", "B", "C", "D")
+# V4's four statuses.
 V4_STATUSES = ("asserted", "altered", "missing", "merged")
 
 _TAG_RE = re.compile(r"\[([a-z0-9-]+)\]\s*$")
@@ -248,6 +247,14 @@ def parse_plan(text: str) -> tuple[dict[str, Any] | None, str | None]:
             return None, f"atom 'pos' must be a positive int, got {pos!r}"
         if pos in positions:
             return None, f"duplicate atom position {pos}"
+        # `factual` is OPTIONAL here and authoritative nowhere: the pipeline derives it from
+        # P2's [correct]/[incorrect] tag by text match, because the tag is the ground truth
+        # and a model restating it can only drift. Type-checked when present so a string
+        # "false" -- which is truthy -- cannot silently mark a false claim as true.
+        if "factual" in a and not isinstance(a["factual"], bool):
+            return None, (
+                f"atom 'factual' must be true or false, got {a['factual']!r} at pos {pos}"
+            )
         positions.add(pos)
     if positions != set(range(1, len(atoms) + 1)):
         return None, f"atom positions must be 1..{len(atoms)} with no gaps"
@@ -477,24 +484,6 @@ def parse_recovery(text: str) -> tuple[list[dict[str, Any]] | None, str | None]:
     return parsed, None
 
 
-def parse_verdict(text: str) -> tuple[str | None, str | None]:
-    """Extract V2's single-letter exhaustiveness verdict.
-
-    Args:
-        text: V2's output.
-
-    Returns:
-        ``(letter, None)`` or ``(None, reason)``.
-    """
-    s = (text or "").strip().strip('"').strip("'").strip()
-    if not s:
-        return None, "empty verdict"
-    letter = s[0].upper()
-    if letter not in V2_VERDICTS:
-        return None, f"verdict must be one of {list(V2_VERDICTS)}, got {s[:20]!r}"
-    return letter, None
-
-
 def parse_audit(text: str) -> tuple[dict[str, Any] | None, str | None]:
     """Extract V3's naturalness/leakage audit.
 
@@ -556,7 +545,6 @@ PARSERS = {
     "P4": parse_response,
     "P5": parse_perturbation,
     "V1": parse_recovery,
-    "V2": parse_verdict,
     "V3": parse_audit,
     "V4": parse_coverage,
 }
@@ -570,7 +558,6 @@ __all__ = [
     "N_RELATIONS_RANGE",
     "PARSERS",
     "STRENGTH_BANDS",
-    "V2_VERDICTS",
     "V4_STATUSES",
     "parse_audit",
     "parse_claims",
@@ -580,5 +567,4 @@ __all__ = [
     "parse_question",
     "parse_recovery",
     "parse_response",
-    "parse_verdict",
 ]

@@ -46,7 +46,14 @@ _CLAIM_BANK = [
     ("The regulator ordered the affected units withdrawn.", "correct"),
     ("Every affected unit was taken out of service.", "equiv-pair-1"),
     ("The order removed all affected units from operation.", "equiv-pair-2"),
+    # FOUR incorrect claims, as P2 instruction 3(b) mandates -- not one. The bank had a single
+    # one, which made the mock unable to satisfy `plan.factuality`'s quota of 2 and so unable
+    # to exercise the path where a corpus actually carries false content. A mock that cannot
+    # meet the real contract tests the rejection path only.
     ("The component was certified under a 1998 standard.", "incorrect"),
+    ("The supplier held sole approval for the part until 2021.", "incorrect"),
+    ("The investigation closed without a published finding.", "incorrect"),
+    ("The fleet returned to service within a week of the order.", "incorrect"),
     ("No one was harmed in any of the incidents.", "alt-pair-1"),
     ("Three people were injured in one of the incidents.", "alt-pair-2"),
     ("The vibration analysis identified the defect.", "disj-pair-1"),
@@ -403,29 +410,34 @@ def mock_recovery(
     return json.dumps(out)
 
 
-def mock_verdict(claim_a: str, claim_b: str, response: str, seed: int = 0) -> str:
-    """V2's output: one letter.
-
-    Returns ``A`` (exhaustive) for a numeric/polarity complement -- which is what the
-    mock's alt-pair is -- and ``B`` otherwise.
-    """
-    negation = any(w in claim_a.lower() for w in ("no one", "none", "not", "never"))
-    return "A" if negation else "B"
-
-
 def mock_audit(response: str, seed: int = 0, *, leak: bool = False) -> str:
     """V3's output: scores and span lists.
 
+    The leak span is QUOTED FROM ``response`` rather than being a fixed string.
+    ``validate._filter_spans`` drops any span it cannot find in the prose, because V3's
+    prompt requires verbatim quotation and live auditors were inventing spans -- so a fixed
+    span that happens not to occur in the mock's own text would be filtered out and the
+    gate-failure path this flag exists to drive would silently stop being exercised. The
+    first words of the prose are a span no filter rule can excuse: present verbatim, and
+    not a connective on the exemption list.
+
     Args:
-        response: The prose.
+        response: The prose, or the rendered prompt that embeds it.
         seed: Determinism.
         leak: Emit a leakage span, to drive the gate-failure path in tests.
     """
+    spans: list[str] = []
+    if leak:
+        # `response` is the rendered V3 prompt, so take the words after the call marker
+        # when it is present and fall back to the head of the string otherwise.
+        body = response.split('check_response(response="', 1)[-1]
+        words = [w for w in body.replace('"', " ").split() if w.isalpha()]
+        spans = [" ".join(words[:4])] if len(words) >= 4 else ["the relation plan"]
     audit = {
         "fluency": 5,
         "formality": 5,
         "organization": 4,
-        "leakage": ["the relation plan"] if leak else [],
+        "leakage": spans,
         "hedging": [],
         "artifacts": [],
     }
@@ -466,5 +478,4 @@ __all__ = [
     "mock_question",
     "mock_recovery",
     "mock_response",
-    "mock_verdict",
 ]

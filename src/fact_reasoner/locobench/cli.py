@@ -37,7 +37,12 @@ import argparse
 from typing import Any
 
 from fact_reasoner.locobench import perturb
-from fact_reasoner.locobench.config import GenConfig, ModelRef, load_config
+from fact_reasoner.locobench.config import (
+    DEFAULT_COMMITTEE_MIN,
+    GenConfig,
+    ModelRef,
+    load_config,
+)
 from fact_reasoner.locobench.pipeline import build_llm, generate_family, make_mock_llm
 from fact_reasoner.locobench.store import FamilyState, Store
 from fact_reasoner.locobench.taxonomy_bridge import NEW_SENSES
@@ -274,7 +279,7 @@ def _report(store: Store, cfg: GenConfig) -> int:
     if budget["total"]:
         per_prompt = " ".join(
             f"{k}={budget[k]}"
-            for k in ("P1", "P2", "P3", "P4", "P5", "V1", "V2", "V3", "V4")
+            for k in ("P1", "P2", "P3", "P4", "P5", "V1", "V3", "V4")
         )
         print(f"    per prompt         : {per_prompt}")
     rejected = store.rejected_ids()
@@ -351,7 +356,11 @@ def _build_generators(cfg: GenConfig) -> dict[str, Any]:
 
 
 def _build_auditors(cfg: GenConfig) -> dict[str, list[tuple[str, Any]]]:
-    """Build the V3 auditor PANEL for each generator, excluding self-audits.
+    """Build the validation PANEL for each generator, excluding self-validation.
+
+    The panel runs V1, V3 and V4 -- not V3 alone. V1 and V4 used to run on the generator's
+    own callable, which inflated every recall figure with the author's own lexical
+    fingerprints (R3).
 
     Keyed per generator because eligibility depends on who generated: R3 excludes the model
     that ran P3/P4 from validating its own item, so the same committee can yield different
@@ -400,9 +409,20 @@ def _build_auditors(cfg: GenConfig) -> dict[str, list[tuple[str, Any]]]:
             built[gen.name] = panel
             names = ", ".join(n for n, _ in panel)
             print(
-                f"[locobench] V3 panel for {gen.name!r} ({len(panel)} auditor(s), reject "
-                f"on majority): {names}"
+                f"[locobench] validation panel for {gen.name!r} ({len(panel)} rater(s), "
+                f"V1 any-of, V3/V4 majority): {names}"
             )
+            if len(panel) < DEFAULT_COMMITTEE_MIN:
+                # A panel that shrinks to one restores single-rater admission -- the very
+                # thing the majority rules exist to prevent -- and it does so silently,
+                # because a failed build only warns. Say it loudly here: `config.validate()`
+                # checked the CONFIGURED panel, and this is the one that will actually vote.
+                print(
+                    f"            WARNING: only {len(panel)} of "
+                    f"{len(cfg.eligible_auditors(gen))} eligible rater(s) could be built. "
+                    f"A majority needs {DEFAULT_COMMITTEE_MIN}; with fewer, V3/V4 reject on "
+                    f"{len(panel) // 2 + 1} vote(s), so one rater can decide admission."
+                )
         else:
             print(
                 f"[locobench] WARNING: no auditor for {gen.name!r} could be built; V3 "

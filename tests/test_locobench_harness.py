@@ -305,10 +305,13 @@ class TestCallBudget:
         assert per_family == {"CONFLICT": 7, "CHAIN": 7, "ORDER": 4, "CONTROL": 4}
 
     def test_documented_corpus_budget(self):
+        # Phase 1 quoted 7800/1560/6240 with V2 in the committee. V2 is gone -- its
+        # `exclusive`/`co_necessity` labels are derived from the sense by COMPILE rather than
+        # adjudicated by a model -- so the committee drops by exactly its 1440 calls.
         b = perturb.call_budget(perturb.family_type_slots(120))
-        assert b["total"] == 7800
+        assert b["total"] == 6360
         assert b["generation"] == 1560
-        assert b["committee"] == 6240
+        assert b["committee"] == 4800
 
     def test_documented_per_prompt_budget(self):
         b = perturb.call_budget(perturb.family_type_slots(120))
@@ -319,29 +322,31 @@ class TestCallBudget:
             "P4": 120,
             "P5": 720,
         }
-        assert {k: b[k] for k in ("V1", "V2", "V3", "V4")} == {
+        assert {k: b[k] for k in ("V1", "V3", "V4")} == {
             "V1": 2520,
-            "V2": 1440,
             "V3": 120,
             "V4": 2520,
         }
 
-    def test_v2_is_per_family_not_per_item(self):
-        # 3 conflict edges x 4 voters x 120 families -- NOT multiplied by the 5 rungs.
-        b = perturb.call_budget(perturb.family_type_slots(120), n_voters=4)
-        assert b["V2"] == 3 * 4 * 120
+    def test_the_budget_no_longer_carries_a_v2_term(self):
+        # The prompt, its parser, its mock and this budget line were all removed together;
+        # a stray V2 term here would mean the deletion was partial.
+        b = perturb.call_budget(perturb.family_type_slots(120))
+        assert "V2" not in b
 
     def test_committee_dominates_generation(self):
         b = perturb.call_budget(perturb.family_type_slots(120))
         assert b["committee"] > 3 * b["generation"]
 
-    def test_closing_the_v3_scope_gap_costs_eighteen_percent(self):
+    def test_closing_the_v3_scope_gap_costs_twenty_three_percent(self):
+        # The relative cost of auditing all five rungs rather than the base response rose
+        # from 18% to 23% when V2's 1440 fixed calls left the denominator.
         shipped = perturb.call_budget(perturb.family_type_slots(120))
         complete = perturb.call_budget(
             perturb.family_type_slots(120), inline_responses=5
         )
-        assert complete["total"] == 9240
-        assert round(complete["total"] / shipped["total"] - 1, 2) == 0.18
+        assert complete["total"] == 7800
+        assert round(complete["total"] / shipped["total"] - 1, 2) == 0.23
 
     def test_budget_accepts_a_mapping_and_agrees_with_a_list(self):
         from_list = perturb.call_budget(perturb.family_type_slots(120))
@@ -368,11 +373,14 @@ class TestPromptDrift:
         assert prompts.instruction_count(pid) == want_n
         assert prompts.placeholders(pid) == tuple(sorted(want_ph))
 
-    def test_all_nine_prompts_present(self):
+    def test_all_eight_prompts_present(self):
         assert set(prompts.PROMPTS) == set(prompts.GENERATION_PROMPTS) | set(
             prompts.VALIDATION_PROMPTS
         )
-        assert len(prompts.PROMPTS) == 9
+        # Eight, not Phase 1's nine: V2 was removed with the rest of the exhaustiveness
+        # adjudicator, since COMPILE derives `exclusive`/`co_necessity` from the sense.
+        assert len(prompts.PROMPTS) == 8
+        assert "V2" not in prompts.PROMPTS
 
     def test_fill_requires_every_placeholder(self):
         with pytest.raises(ValueError, match="missing value"):
@@ -428,7 +436,6 @@ class TestParsers:
             ("parse_plan", "definitely not json"),
             ("parse_response", ""),
             ("parse_perturbation", "no code block"),
-            ("parse_verdict", ""),
             ("parse_audit", "{}"),
             ("parse_coverage", "nope"),
         ],
@@ -557,8 +564,27 @@ class TestGates:
     """The thresholds, and the reasons a gate gives when it rejects."""
 
     def test_all_thresholds_live_in_one_table(self):
-        for key in ("v1_coupling", "v1_sense", "v3_min_score", "v4_coverage", "window"):
+        for key in (
+            "v1_coupling",
+            "v1_sense",
+            "v3_min_score",
+            "v4_coverage",
+            "v4_gating_statuses",
+            "min_incorrect_atoms",
+            "window",
+        ):
             assert key in validate.THRESHOLDS
+
+    def test_thresholds_for_deleted_machinery_are_gone(self):
+        # V2 and the V5 kappa statistics were removed; a stale threshold would advertise a
+        # gate that nothing enforces, which is exactly how `v1_rule` sat unused for so long.
+        for key in ("v2_exclusive", "kappa_coupling", "kappa_sense", "kappa_exhaustive"):
+            assert key not in validate.THRESHOLDS
+
+    def test_v1_coupling_stays_below_the_unanimity_cliff(self):
+        # With planted errors excluded the denominator is 6, so anything above 0.834 demands
+        # 6-of-6 -- a fresh unsatisfiable gate of the species this change removed.
+        assert validate.THRESHOLDS["v1_coupling"] <= 0.834
 
     def test_v1_full_recovery_passes_and_partial_fails(self):
         planned = [
@@ -594,7 +620,7 @@ class TestGates:
         v = validate.gate_coverage(
             [{"index": 0, "status": "asserted"}, {"index": 1, "status": "missing"}], 2
         )
-        assert not v.passed and "not asserted" in v.reason()
+        assert not v.passed and "not present" in v.reason()
 
     def test_length_drift_gate(self):
         assert validate.gate_length_drift("w " * 100, "w " * 110).passed
@@ -610,21 +636,6 @@ class TestGates:
         assert validate.majority(["A", "B"])[2] is False
         assert validate.unanimous(["A", "A"])
         assert not validate.unanimous(["A", "B"])
-
-    def test_agreement_flags_facets_below_their_floor(self):
-        rep = validate.agreement_report(
-            coupling=[["entailment", "exclusive"], ["exclusive", "entailment"]],
-            sense=[["Cause-Effect", "Alternative"], ["Alternative", "Cause-Effect"]],
-        )
-        assert "coupling" in rep["low_agreement"]
-
-    def test_perfect_agreement_flags_nothing(self):
-        rep = validate.agreement_report(
-            coupling=[["entailment"] * 3, ["exclusive"] * 3],
-            sense=[["Cause-Effect"] * 3, ["Alternative"] * 3],
-        )
-        assert rep["low_agreement"] == []
-        assert rep["kappa_coupling"] == pytest.approx(1.0)
 
     def test_stratified_sample_prioritizes_the_scarce_facets(self):
         rare = {
@@ -647,26 +658,64 @@ class TestConfig:
         with pytest.raises(ValueError, match="at least one generator"):
             cfg.validate()
 
-    def test_committee_too_small_is_refused_up_front(self):
-        # With one generator excluded per item, three models leave two voters and no
-        # majority. Better to fail now than at item 400.
+    def test_aliases_of_one_model_are_not_a_committee(self):
+        # Three entries, one underlying model: they dedupe to a single voter, which cannot
+        # form a majority. A raw `len(committee)` check called this a committee of 3.
         cfg = GenConfig(
             dry_run=False,
             generators=[ModelRef(name="g-1", model_id="g")],
             committee=[ModelRef(name=f"m-{i}", model_id="m") for i in range(3)],
         )
-        with pytest.raises(ValueError, match="at least 4 are needed"):
+        with pytest.raises(ValueError, match="eligible voter"):
             cfg.validate()
 
+    def test_a_committee_that_is_mostly_the_generator_is_refused(self):
+        # Four entries but three are the generator under other labels, so R3 leaves one
+        # voter. This is the case a size-only check admitted, and it is the self-validation
+        # bias the exclusion exists to prevent.
+        cfg = GenConfig(
+            dry_run=False,
+            generators=[ModelRef(name="g-1", model_id="vendor/g")],
+            committee=[
+                ModelRef(name="alias-1", model_id="vendor/g", family="p"),
+                ModelRef(name="alias-2", model_id="vendor/g", family="q"),
+                ModelRef(name="alias-3", model_id="vendor/g", family="r"),
+                ModelRef(name="other", model_id="vendor/h", family="s"),
+            ],
+        )
+        with pytest.raises(ValueError, match="eligible voter"):
+            cfg.validate()
+
+    def test_three_distinct_models_are_enough(self):
+        # The frontier committee shape: 3 models, none sharing the generator's id, so all
+        # three vote and a 2-1 majority is available. The old `>= MIN + 1` size check
+        # refused this outright even though it satisfies the property the rule is about.
+        cfg = GenConfig(
+            dry_run=False,
+            generators=[ModelRef(name="claude", model_id="aws/claude-opus-5",
+                                 family="claude")],
+            committee=[
+                ModelRef(name="gpt", model_id="azure/gpt-5.6-terra", family="openai"),
+                ModelRef(name="gemini", model_id="gcp/gemini-3.1-pro", family="gemini"),
+                ModelRef(name="sonnet", model_id="aws/claude-sonnet-5",
+                         family="anthropic"),
+            ],
+        )
+        cfg.validate()
+        assert len(cfg.eligible_auditors(cfg.generators[0])) == 3
+
     def test_committee_needs_three_families(self):
+        # Four DISTINCT models, so the eligible-voter floor is satisfied and this isolates
+        # the family rule: they span only two families, which makes agreement an artefact of
+        # shared training rather than independent judgment.
         cfg = GenConfig(
             dry_run=False,
             generators=[ModelRef(name="g-1", model_id="g")],
             committee=[
-                ModelRef(name="a-1", model_id="a", family="x"),
-                ModelRef(name="a-2", model_id="a", family="x"),
-                ModelRef(name="b-1", model_id="b", family="y"),
-                ModelRef(name="b-2", model_id="b", family="y"),
+                ModelRef(name="a-1", model_id="a1", family="x"),
+                ModelRef(name="a-2", model_id="a2", family="x"),
+                ModelRef(name="b-1", model_id="b1", family="y"),
+                ModelRef(name="b-2", model_id="b2", family="y"),
             ],
         )
         with pytest.raises(ValueError, match="at least 3 distinct families"):
@@ -842,7 +891,7 @@ class TestPipelineAndResume:
         llm = make_mock_llm(cfg, plan_holder=holder)
         res = generate_family("f001", "Law", "CONFLICT", cfg, llm=llm)
         assert not res.admitted
-        assert "not asserted" in res.verdict.reason()
+        assert "not present" in res.verdict.reason()
 
     def test_a_dead_llm_rejects_at_the_first_stage_without_raising(self):
         def dead(_rendered):
@@ -908,9 +957,8 @@ def _fake_live(monkeypatch, canned, *, success=True, record=None):
 
 
 # What each prompt is contractually required to return. P1 is bracketed, P2--P5 are
-# fenced, V1/V4 are BARE JSON lists and V2 is a BARE single letter -- and it is exactly
-# those last three that the old tuple-repr bug corrupted, because they have no fence for
-# the extractor to anchor on.
+# fenced, and V1/V4 are BARE JSON lists -- and it is exactly those two that the old
+# tuple-repr bug corrupted, because they have no fence for the extractor to anchor on.
 _CANNED = {
     "P1": "[What caused the actuator to fail during the test flight?]",
     # 1-based integer atom numbers -- the keys of the mapping V1 is handed. This fixture
@@ -918,7 +966,6 @@ _CANNED = {
     # total recovery failure; the parser now rejects it outright.
     "V1": '[{"source": 1, "target": 2, "sense": "Restatement", '
     '"coupling": "equivalence"}]',
-    "V2": "A",
     "V3": '{"fluency": 5, "formality": 4, "organization": 5}',
     "V4": '[{"index": 0, "status": "asserted"}]',
 }
@@ -940,8 +987,8 @@ class TestLivePathReturnsText:
         assert parse.PARSERS[pid](out)[1] is None
 
     def test_the_old_tuple_repr_would_have_failed_the_bare_prompts(self):
-        # Pins WHY this matters: a repr-wrapped payload breaks exactly V1/V2/V4.
-        for pid in ("V1", "V2", "V4"):
+        # Pins WHY this matters: a repr-wrapped payload breaks exactly V1/V4.
+        for pid in ("V1", "V4"):
             wrapped = (
                 f"(ModelOutputThunk({_CANNED[pid]}), <SimpleContext object at 0x1>)"
             )
@@ -1012,22 +1059,19 @@ class TestLivePathCallShape:
     def test_the_requirement_names_the_prompt_it_guards(self, monkeypatch):
         rec = {}
         _fake_live(monkeypatch, _CANNED, record=rec)
-        build_llm(ModelRef("m", "m", "rits"), _dry_cfg())(prompts.PROMPTS["V2"])
+        build_llm(ModelRef("m", "m", "rits"), _dry_cfg())(prompts.PROMPTS["V3"])
         req = rec["requirements"][0]
         assert req.validation_fn is not None
         # The requirement is built from the prompt the harness recovered, which is what
         # makes the predicate the *right* parser rather than an arbitrary one. Exercising
         # `validation_fn` itself would mean constructing a Mellea Context, so the
         # predicate's behaviour is covered directly below instead.
-        assert "V2" in str(req.description)
+        assert "V3" in str(req.description)
 
     @pytest.mark.parametrize(
         "pid,good,bad",
         [
-            # "banana" would NOT do here: parse_verdict reads the first character, so it
-            # resolves to a valid "B". A rejected verdict has to start with a non-letter
-            # or a letter outside A-D.
-            ("V2", "A", "zebra"),
+            ("V3", '{"fluency": 5, "formality": 4, "organization": 5}', "{}"),
             ("P1", "[What caused the actuator to fail in flight?]", "no brackets"),
             ("V4", '[{"index": 0, "status": "asserted"}]', "{}"),
         ],
@@ -1360,7 +1404,11 @@ class TestV3AuditorExclusion:
         # self-audit is a weaker result and not an invalid one.
         assert cfg.resolved_auditor(cfg.generators[0]) is None
 
-    def test_v3_runs_on_the_auditor_when_one_is_given(self, monkeypatch):
+    def test_all_three_validators_run_on_the_auditor_not_the_author(self, monkeypatch):
+        # V1 and V4 used to run on the generator's own caller while only V3 was moved to the
+        # panel, so the corpus's recall figures were self-reported -- the exact R3
+        # self-generation bias `validate.py`'s header names first. All three now run on the
+        # committee, and the generator's caller is only a fallback when no panel exists.
         seen = []
 
         def _mk(tag):
@@ -1379,9 +1427,58 @@ class TestV3AuditorExclusion:
         )
         assert v is not None
         by_prompt = {pid: tag for tag, pid in seen}
-        assert by_prompt.get("V3") == "aud", "V3 must run on the auditor"
-        assert by_prompt.get("V1") == "gen", "V1 stays on the generator's caller"
-        assert by_prompt.get("V4") == "gen"
+        assert by_prompt.get("V1") == "aud", "V1 must not grade its own author's prose"
+        assert by_prompt.get("V3") == "aud"
+        assert by_prompt.get("V4") == "aud"
+        assert "gen" not in {tag for tag, _ in seen}, (
+            "the generator must not appear as a rater when a panel is configured"
+        )
+
+    def test_the_generator_is_the_fallback_when_no_panel_exists(self):
+        # Degrading to a self-audit is a weaker result, not an invalid one, so the dry run
+        # and single-model configs must keep working.
+        seen = []
+
+        def _llm(rendered, *, attempt=0):
+            seen.append(which_prompt(rendered))
+            return _CANNED[which_prompt(rendered)]
+
+        pipeline._validate_response(
+            _Caller(_llm, attempts=1), "prose", {"atoms": [], "relations": []}, []
+        )
+        assert {"V1", "V3", "V4"} <= set(seen)
+
+    def test_v1_takes_the_best_rater_not_the_first(self):
+        # Recoverability is a claim about whether a careful reader CAN recover the plan, so
+        # one competent reader succeeding settles it. Ordering must not decide admission --
+        # that accident is what `gate_audit_panel` was built to remove from V3, and V1 is
+        # graded across raters for the same reason.
+        planned = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Restatement", "validity": "valid"}
+        ]
+        good = '[{"source": 1, "target": 2, "sense": "Restatement", "coupling": "equivalence"}]'
+
+        def _mk(payload):
+            def _llm(rendered, *, attempt=0):
+                pid = which_prompt(rendered)
+                return payload if pid == "V1" else _CANNED[pid]
+
+            return _Caller(_llm, attempts=1)
+
+        v = pipeline._validate_response(
+            _Caller(lambda r, **kw: _CANNED[which_prompt(r)], attempts=1),
+            "prose",
+            {"atoms": [], "relations": planned},
+            ["a", "b"],
+            # The weak rater is FIRST, so a first-wins rule would reject.
+            auditors=[("weak", _mk("[]")), ("strong", _mk(good))],
+        )
+        v1 = next(g for g in v.results if g.gate == "V1")
+        assert v1.passed
+        raters = next(g for g in v.results if g.gate == "V1.raters")
+        assert raters.observed["reported"] == "strong"
+        # Both rates are recorded, so a persistently weak panel member is diagnosable.
+        assert set(raters.observed["rates"]) == {"weak", "strong"}
 
     def test_every_panel_member_audits(self):
         seen = []
@@ -1444,6 +1541,202 @@ class TestV3AuditorExclusion:
         assert "V3" in seen
 
 
+class TestFactualityReachesTheCorpus:
+    """The response must contain false claims, not only true ones.
+
+    P2 generates 4 `[incorrect]` claims, but P3's atom schema was `{pos, text}` and
+    `parse_plan` required only those two keys, so the tag was dropped at the P2->P3 boundary
+    and `_atoms_from_plan` defaulted every atom to `factual: True`. Measured on the shipped
+    corpus: **all 170 atoms across both admitted families were `factual: true`** -- the
+    benchmark's false content never reached it. No test caught this because `mock.py` emits
+    `factual` itself, which made the dry run more faithful than the live path.
+    """
+
+    _CLAIMS = [
+        {"text": "The regulator opened an investigation.", "tag": "correct"},
+        {"text": "The component was certified in 1998.", "tag": "incorrect"},
+        {"text": "The fleet returned to service in a week.", "tag": "incorrect"},
+        {"text": "No one was harmed.", "tag": "alt-pair-1"},
+        {"text": "Three people were injured.", "tag": "alt-pair-2"},
+        {"text": "The tribunal held the supplier liable.", "tag": "holding"},
+    ]
+
+    def _plan(self, texts):
+        return {"atoms": [{"pos": i + 1, "text": t} for i, t in enumerate(texts)]}
+
+    def test_an_incorrect_claim_becomes_a_false_atom(self):
+        plan = self._plan([c["text"] for c in self._CLAIMS])
+        atoms = pipeline._atoms_from_plan(plan, self._CLAIMS)
+        by_text = {a["text"]: a for a in atoms}
+        assert by_text["The component was certified in 1998."]["factual"] is False
+        assert by_text["The fleet returned to service in a week."]["factual"] is False
+        assert by_text["The regulator opened an investigation."]["factual"] is True
+
+    def test_the_exhaustive_pair_is_flagged_as_imprecise(self):
+        # Exactly one of an alt-pair IS false and P2 does not say which, so labelling both
+        # True is the honest default but must be marked so Phase 3 can exclude them.
+        atoms = pipeline._atoms_from_plan(
+            self._plan([c["text"] for c in self._CLAIMS]), self._CLAIMS
+        )
+        alt = [a for a in atoms if a["text"] in ("No one was harmed.", "Three people were injured.")]
+        assert len(alt) == 2
+        assert all("exhaustive_pair" in a.get("factual_note", "") for a in alt)
+
+    def test_a_paraphrased_atom_falls_back_and_is_counted(self):
+        # P3 instruction 2 requires verbatim reuse. If it paraphrases anyway, the tag cannot
+        # be matched -- so the miss is COUNTED rather than silently defaulting to all-true.
+        plan = self._plan(["Something P2 never said."])
+        atoms = pipeline._atoms_from_plan(plan, self._CLAIMS)
+        assert atoms[0]["factual"] is True  # the old default
+        assert atoms[0]["factual_unmatched"] == 1
+
+    def test_without_claims_the_old_behaviour_is_preserved(self):
+        plan = {"atoms": [{"pos": 1, "text": "x", "factual": False}]}
+        assert pipeline._atoms_from_plan(plan)[0]["factual"] is False
+
+    def test_trailing_punctuation_does_not_defeat_the_match(self):
+        plan = self._plan(["The component was certified in 1998"])  # no full stop
+        assert pipeline._atoms_from_plan(plan, self._CLAIMS)[0]["factual"] is False
+
+    def test_the_gate_rejects_a_plan_with_too_few_false_claims(self):
+        plan = self._plan(["The regulator opened an investigation."])
+        v = validate.gate_plan(plan, self._CLAIMS)
+        gate = next(g for g in v.results if g.gate == "plan.factuality")
+        assert not gate.passed
+        assert gate.observed["n_incorrect_selected"] == 0
+        # The reason must tell P3 what to DO, since it is fed back as a retry note.
+        assert "choose more of the [incorrect] claims" in gate.detail
+
+    def test_the_gate_accepts_the_quota(self):
+        plan = self._plan([c["text"] for c in self._CLAIMS])
+        gate = next(
+            g for g in validate.gate_plan(plan, self._CLAIMS).results
+            if g.gate == "plan.factuality"
+        )
+        assert gate.passed
+        assert gate.observed["n_incorrect_selected"] == 2
+
+    def test_the_gate_is_skipped_when_no_claims_are_supplied(self):
+        plan = self._plan(["The regulator opened an investigation."])
+        gates = [g.gate for g in validate.gate_plan(plan).results]
+        assert "plan.factuality" not in gates
+
+    def test_the_quota_is_two(self):
+        assert validate.THRESHOLDS["min_incorrect_atoms"] == 2
+
+    def test_a_non_boolean_factual_field_is_rejected(self):
+        # "false" is a truthy string, so accepting it would mark a false claim as true.
+        atoms = [{"pos": i + 1, "text": f"claim {i}"} for i in range(14)]
+        atoms[3]["factual"] = "false"
+        plan, err = parse.parse_plan(
+            json.dumps({"atoms": atoms, "relations": [], "non_relations": []})
+        )
+        assert plan is None
+        assert "must be true or false" in err
+
+    def test_an_admitted_dry_run_family_carries_false_atoms(self):
+        # The end-to-end acceptance test for the requirement: a generated corpus must contain
+        # incorrect claims, which is exactly what the shipped one did not.
+        res = generate_family("f001", "Law", "CONFLICT", _dry_cfg())
+        assert res.admitted, res.verdict.reason()
+        for item in res.items:
+            n_false = sum(1 for a in item["atoms"] if a["factual"] is False)
+            assert n_false >= validate.THRESHOLDS["min_incorrect_atoms"], (
+                f"{item['id']} carries only {n_false} false atom(s)"
+            )
+
+
+class TestV3ClosedListsAreClosedInCode:
+    """V3's prompt promises closed lists; the code, not the auditor, is the guarantor.
+
+    Measured live on one response, auditors reported spans the prompt names VERBATIM as not
+    reportable: "at least one of these was true:" and "as indicated by the fact that" as
+    leakage, and "perhaps both" as hedging -- the last being a phrase P4 instruction 3
+    *mandates* for Disjunction. One auditor also flagged "One or both of these factors may
+    hold" as hedging, which contains no word on the closed list at all. Two of three agreed
+    on some of these, so the majority rule did not save the family.
+
+    Filtering happens before the vote for that reason: two auditors making the same
+    prompt-exempt mistake would otherwise constitute a "majority".
+    """
+
+    def _a(self, **kw):
+        base = {"fluency": 5, "formality": 5, "organization": 5,
+                "leakage": [], "hedging": [], "artifacts": []}
+        base.update(kw)
+        return base
+
+    def test_hedging_must_contain_a_word_from_the_closed_list(self):
+        # "perhaps both" and "may hold" are not on HEDGE_WORDS, and `parse_response` has
+        # already rejected any prose containing one that is.
+        out = validate._filter_spans(
+            self._a(hedging=["perhaps both", "One or both of these factors may hold"])
+        )
+        assert out["hedging"] == []
+        assert out["_raw_counts"]["hedging"] == 2
+
+    def test_a_real_hedge_word_survives(self):
+        out = validate._filter_spans(self._a(hedging=["we assume the alloy held"]))
+        assert out["hedging"] == ["we assume the alloy held"]
+
+    @pytest.mark.parametrize(
+        "span",
+        [
+            "at least one of these was true",
+            "as indicated by",
+            "perhaps both",
+            "either this or that",
+            "one or both",
+            "one of these accounts must be wrong",
+            "subsequently",
+            "earlier than",
+            "which postdates",
+            "although",
+        ],
+    )
+    def test_p4_mandated_phrasings_are_never_leakage(self, span):
+        # Each of these is required by P4 instruction 3 to realize a coupling. A writer
+        # cannot express joint truth without them, so flagging them punishes obedience.
+        assert validate._filter_spans(self._a(leakage=[span]))["leakage"] == []
+
+    @pytest.mark.parametrize(
+        "span",
+        [
+            "the relation plan",
+            "naming the sense Concession",
+            "the earlier statement that they were manufactured after 6500 BCE",
+            "the plan's strength band",
+        ],
+    )
+    def test_real_leakage_still_reports(self, span):
+        # The last one CONTAINS the exempt word "after"; a naive substring test in the wrong
+        # direction would suppress it, which would be a true positive lost.
+        assert validate._filter_spans(self._a(leakage=[span]))["leakage"] == [span]
+
+    def test_a_span_absent_from_the_response_is_dropped(self):
+        # V3's prompt: "if you cannot copy it out of the text, it is not there and must not
+        # be reported." An invented quote cannot evidence anything.
+        out = validate._filter_spans(
+            self._a(leakage=["the annotation plan"]), "Prose that says nothing of the sort."
+        )
+        assert out["leakage"] == []
+
+    def test_a_verbatim_span_is_kept_when_the_response_is_given(self):
+        prose = "The tribunal reviewed the annotation plan before ruling."
+        out = validate._filter_spans(self._a(leakage=["the annotation plan"]), prose)
+        assert out["leakage"] == ["the annotation plan"]
+
+    def test_two_auditors_making_the_same_exempt_mistake_do_not_reject(self):
+        # The live failure mode: a "majority" built entirely out of false positives.
+        bad = self._a(leakage=["at least one of these was true"], hedging=["perhaps both"])
+        v = validate.gate_audit_panel([("a", bad), ("b", bad), ("c", self._a())])
+        spans = next(g for g in v.results if g.gate == "V3.spans")
+        assert spans.passed
+        # The raw reports are preserved: a systematically-wrong auditor is a finding.
+        assert spans.observed["raw_counts"]["a"]["leakage"] == 1
+        assert spans.observed["n_flagging_per_kind"] == {"leakage": 0, "hedging": 0}
+
+
 class TestV3MajorityVote:
     """A single V3 rater must not decide admission; its judgments diverge too much.
 
@@ -1486,8 +1779,11 @@ class TestV3MajorityVote:
     def test_span_kinds_are_voted_separately(self):
         # The measured shape: leakage split 1-of-3, hedging unanimous. Pooling them would
         # let the agreed hedge carry the disputed leakage into the rejection reason.
+        # The leakage span must be REAL leakage -- a bare "at least one of" is a connective
+        # P4 mandates, so `_filter_spans` drops it before the vote and the split would be
+        # 0-of-3 rather than 1-of-3.
         hedged = self._a(hedging=["might seem"])
-        both = self._a(leakage=["at least one of"], hedging=["might seem"])
+        both = self._a(leakage=["the plan's strength band"], hedging=["might seem"])
         v = validate.gate_audit_panel([("a", hedged), ("b", both), ("c", hedged)])
         spans = next(g for g in v.results if g.gate == "V3.spans")
         assert not spans.passed, (
@@ -2307,6 +2603,129 @@ class TestV1IndexContract:
         assert validate.gate_recovery(plan["relations"], out, n_atoms=len(atoms)).passed
 
 
+class TestPlantedErrorsAreNotGraded:
+    """V1 scores RECOVERABILITY, so the deliberately-broken relations are not in it.
+
+    This is the regression test for an unsatisfiable gate. P3 mandates that exactly 4 of
+    10 relations be `validity: "invalid"` -- planted errors with an `error_kind` -- and
+    `gate_recovery` used to divide by `len(planned)`, putting all 10 in the denominator
+    against `v1_coupling = 0.80`. The ceiling was therefore 6/10 = 0.60 and no writer and
+    no reader could ever pass: an invalid relation is broken ON PURPOSE, so its absence
+    from the recovery is the intended outcome rather than a defect.
+
+    Measured live before the fix: five frontier models independently scored one admitted
+    family at ALL-10 0.80/0.80 but VALID-6 1.00/1.00 -- seven raters converging on the
+    same shortfall while recovering every sound relation perfectly, which is the
+    arithmetic fingerprint of the bug rather than of weak prose. The three historical
+    "passes" only passed because the invalid quota was under-filled or because the error
+    injection had silently failed and the broken edges were credited as correct.
+    """
+
+    def _spec_plan(self):
+        """A plan shaped exactly as P3 instruction 8 mandates: 6 valid, 4 invalid."""
+        valid = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect"},
+            {"source_pos": 2, "target_pos": 3, "sense": "Evidence"},
+            {"source_pos": 3, "target_pos": 4, "sense": "Restatement"},
+            {"source_pos": 5, "target_pos": 6, "sense": "Alternative"},
+            {"source_pos": 7, "target_pos": 8, "sense": "Disjunction"},
+            {"source_pos": 9, "target_pos": 10, "sense": "Concession"},
+        ]
+        for r in valid:
+            r["validity"] = "valid"
+        invalid = [
+            {"source_pos": 11, "target_pos": 12, "sense": "Precedence",
+             "validity": "invalid", "error_kind": "wrong_sense"},
+            {"source_pos": 12, "target_pos": 13, "sense": "Cause-Effect",
+             "validity": "invalid", "error_kind": "wrong_direction"},
+            {"source_pos": 13, "target_pos": 14, "sense": "Contrast",
+             "validity": "invalid", "error_kind": "spurious"},
+            {"source_pos": 4, "target_pos": 6, "sense": "Instantiation",
+             "validity": "invalid", "error_kind": "false_endpoint"},
+        ]
+        return valid + invalid
+
+    def _recover(self, planned):
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        return [
+            {
+                "source": p["source_pos"],
+                "target": p["target_pos"],
+                "sense": p["sense"],
+                "coupling": coupling_for_sense(p["sense"]),
+            }
+            for p in planned
+        ]
+
+    def test_a_spec_conforming_plan_can_reach_a_perfect_score(self):
+        # The satisfiability test. If this ever fails, the gate has become unpassable
+        # again for a plan that obeys P3 exactly -- which is the whole bug class.
+        planned = self._spec_plan()
+        valid_only = [p for p in planned if p["validity"] == "valid"]
+        v = validate.gate_recovery(planned, self._recover(valid_only), n_atoms=14)
+        obs = v.results[0].observed
+        assert (obs["coupling"], obs["sense"]) == (1.0, 1.0)
+        assert v.passed
+
+    def test_invalid_relations_are_excluded_from_the_denominator(self):
+        planned = self._spec_plan()
+        valid_only = [p for p in planned if p["validity"] == "valid"]
+        obs = validate.gate_recovery(
+            planned, self._recover(valid_only), n_atoms=14
+        ).results[0].observed
+        # 6 valid recovered out of 6 graded, NOT 6 out of 10.
+        assert obs["n_graded"] == 6
+        assert obs["n_planted"] == 4
+
+    def test_recovering_nothing_still_fails(self):
+        # The fix must not turn the gate off: an empty recovery is still a rejection.
+        v = validate.gate_recovery(self._spec_plan(), [], n_atoms=14)
+        assert not v.passed
+        assert "recovery too low" in v.reason()
+
+    def test_relations_with_no_validity_key_are_all_graded(self):
+        # Back-compatibility: `validity` defaults to graded, so the many call sites and
+        # tests that omit it -- and any plan predating the field -- behave as before.
+        planned = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect"},
+            {"source_pos": 3, "target_pos": 4, "sense": "Alternative"},
+        ]
+        obs = validate.gate_recovery(
+            planned, self._recover(planned[:1]), n_atoms=5
+        ).results[0].observed
+        assert obs["n_graded"] == 2
+        assert obs["coupling"] == 0.5
+
+    def test_an_all_invalid_plan_passes_instead_of_dividing_by_zero(self):
+        planned = [
+            {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect",
+             "validity": "invalid", "error_kind": "spurious"},
+        ]
+        v = validate.gate_recovery(planned, [], n_atoms=5)
+        assert v.passed
+        assert "no valid planned relations" in v.reason() or v.results[0].detail
+
+    def test_planted_realization_is_recorded_but_never_gates(self):
+        planned = self._spec_plan()
+        # Every relation recovered as planned, including all four planted errors: the
+        # writer realized the broken edges faithfully, which is a MEASUREMENT and must
+        # not be an admission criterion in either direction.
+        v = validate.gate_recovery(planned, self._recover(planned), n_atoms=14)
+        planted = [r for r in v.results if r.gate == "V1.planted"]
+        assert len(planted) == 1
+        assert planted[0].passed  # observation only
+        obs = planted[0].observed
+        assert obs["n_invalid"] == 4
+        # wrong_direction is recovered with the endpoints as planned here, so it counts as
+        # realized; the per-kind breakdown is what makes error injection auditable.
+        assert obs["by_error_kind"]["spurious"]["recovered_as_planned"] == 1
+        assert set(obs["by_error_kind"]) == {
+            "wrong_sense", "wrong_direction", "spurious", "false_endpoint"
+        }
+        assert v.passed
+
+
 class TestRecoveryDirection:
     """`wrong_direction` is a first-class error kind, so the match must see direction."""
 
@@ -2597,7 +3016,7 @@ class TestV4MergedSemantics:
             [{"index": 1, "status": "asserted"}, {"index": 2, "status": "merged"}], 2
         )
         assert not v.passed
-        assert "not asserted" in v.reason()
+        assert "not present" in v.reason()
 
     def test_full_coverage_passes(self):
         v = validate.gate_coverage(
@@ -2608,6 +3027,124 @@ class TestV4MergedSemantics:
     def test_the_coverage_threshold_is_unchanged(self):
         # The fix is definitional; the committed Phase-1 bar stays at 100%.
         assert validate.THRESHOLDS["v4_coverage"] == 1.00
+
+
+class TestV4AlteredIsRecordedNotGated:
+    """`altered` is a wording judgment, so it must not cost a family on its own.
+
+    P4 instruction 2 explicitly licenses surface rewording ("You may adjust surface wording
+    for fluency"), and `altered` means "asserts something related but changes the content" --
+    the judgment most sensitive to exactly that licence. Measured across 11 live rejections, 5
+    were V4 and 3 of those were a SINGLE `altered` atom at coverage 0.938-0.944. `missing` and
+    `merged` are structural losses and still reject.
+    """
+
+    def test_an_altered_atom_does_not_reject(self):
+        v = validate.gate_coverage(
+            [{"index": 1, "status": "asserted"}, {"index": 2, "status": "altered"}], 2
+        )
+        assert v.passed
+        # Recorded, though: a rising altered rate is a P4 fidelity signal worth having.
+        assert v.results[0].observed["n_altered"] == 1
+
+    def test_a_missing_atom_still_rejects(self):
+        v = validate.gate_coverage(
+            [{"index": 1, "status": "asserted"}, {"index": 2, "status": "missing"}], 2
+        )
+        assert not v.passed
+
+    def test_only_missing_and_merged_gate(self):
+        assert validate.THRESHOLDS["v4_gating_statuses"] == ("missing", "merged")
+
+
+class TestV4PanelVote:
+    """V4 was the last single-rater gate, over a 14-16 way conjunction.
+
+    Measured on identical prose, seven raters: six returned all 17 atoms asserted, one
+    returned three defects (altered/missing/merged) and one returned a single altered. Under
+    a single-rater gate, drawing either of the last two rejects a family the other six judged
+    perfect. Voting per ATOM keeps "every atom present" absolute while denying any one rater
+    the power to declare an atom absent.
+    """
+
+    def _cov(self, statuses):
+        return [{"index": i + 1, "status": s} for i, s in enumerate(statuses)]
+
+    def test_a_lone_missing_vote_does_not_reject(self):
+        clean = self._cov(["asserted"] * 3)
+        outlier = self._cov(["asserted", "missing", "asserted"])
+        v = validate.gate_coverage_panel(
+            [("a", clean), ("b", outlier), ("c", clean)], 3
+        )
+        assert v.passed
+        # The dissent is still visible -- outvoting is not the same as discarding.
+        assert v.results[0].observed["lost_votes"] == {"2": ["b"]}
+
+    def test_a_majority_missing_vote_rejects(self):
+        bad = self._cov(["asserted", "missing", "asserted"])
+        v = validate.gate_coverage_panel(
+            [("a", bad), ("b", bad), ("c", self._cov(["asserted"] * 3))], 3
+        )
+        assert not v.passed
+        assert "majority" in v.results[0].detail
+
+    def test_altered_never_counts_however_many_raters_agree(self):
+        alt = self._cov(["asserted", "altered", "asserted"])
+        v = validate.gate_coverage_panel([("a", alt), ("b", alt), ("c", alt)], 3)
+        assert v.passed
+        assert v.results[0].observed["altered_votes"] == {"2": ["a", "b", "c"]}
+
+    def test_a_single_rater_panel_matches_the_solo_gate(self):
+        # The degenerate case must not change behaviour: `gate_coverage` is still used on
+        # the no-panel path, so the two must agree.
+        cov = self._cov(["asserted", "missing"])
+        panel = validate.gate_coverage_panel([("only", cov)], 2)
+        solo = validate.gate_coverage(cov, 2)
+        assert panel.passed == solo.passed is False
+
+    def test_no_raters_is_a_harness_failure_not_a_verdict(self):
+        v = validate.gate_coverage_panel([], 3)
+        assert not v.passed
+        assert "no coverage output" in v.reason()
+
+    def test_mixed_index_types_do_not_raise(self):
+        # Found on the first live run: `parse_coverage` accepts both `3` and `"3"`, and real
+        # raters disagree about which they emit -- one returned ints, another numeric strings.
+        # Sorting the mixed keys raised TypeError and killed the whole run mid-family.
+        v = validate.gate_coverage_panel(
+            [
+                ("ints", [{"index": 1, "status": "asserted"},
+                          {"index": 2, "status": "missing"}]),
+                ("strs", [{"index": "1", "status": "asserted"},
+                          {"index": "2", "status": "asserted"}]),
+            ],
+            2,
+        )
+        assert v.results[0].observed["lost_votes"] == {"2": ["ints"]}
+
+    def test_a_string_and_an_int_index_are_the_same_atom(self):
+        # The subtler half of the same bug: keying `2` apart from `"2"` splits one atom's
+        # votes across two buckets, so two raters agreeing it is missing each count once
+        # against a quorum of two and the majority silently never forms.
+        v = validate.gate_coverage_panel(
+            [
+                ("a", [{"index": 1, "status": "asserted"}, {"index": 2, "status": "missing"}]),
+                ("b", [{"index": "1", "status": "asserted"}, {"index": "2", "status": "missing"}]),
+            ],
+            2,
+        )
+        assert not v.passed, "two raters agreed atom 2 is missing; that is a majority"
+        assert v.results[0].observed["lost_votes"] == {"2": ["a", "b"]}
+
+    def test_a_repeated_vote_from_one_rater_is_not_two_votes(self):
+        v = validate.gate_coverage_panel(
+            [
+                ("a", [{"index": 2, "status": "missing"}, {"index": 2, "status": "merged"}]),
+                ("b", [{"index": 1, "status": "asserted"}]),
+            ],
+            2,
+        )
+        assert v.passed, "one rater listing an atom twice must not constitute a majority"
 
 
 class TestV3LeakageSemantics:
@@ -2810,12 +3347,18 @@ class TestResponseGateIsRetryable:
             if pid == "P4":
                 state["p4"] += 1
             if pid == "V3" and state["p4"] <= leak_until:
+                # Quoted from the prose under audit, because `validate._filter_spans` drops
+                # a span it cannot find in the response -- V3's prompt requires verbatim
+                # quotation. A fixed string absent from the mock's text would be filtered
+                # and this fixture would stop simulating leakage at all.
+                body = rendered.split('check_response(response="', 1)[-1]
+                words = [w for w in body.replace('"', " ").split() if w.isalpha()]
                 return json.dumps(
                     {
                         "fluency": 5,
                         "formality": 5,
                         "organization": 5,
-                        "leakage": ["the relation plan"],
+                        "leakage": [" ".join(words[:4])],
                         "hedging": [],
                         "artifacts": [],
                     }
@@ -3179,16 +3722,19 @@ class TestV1PrefersTheSpecificSense:
 
 
 class TestPromptTexParity:
-    """The tex holds all nine prompts verbatim; nothing guarded that until now.
+    """The tex holds the prompts verbatim; nothing guarded that until now.
 
-    Widened from five to nine after a P2 edit: all nine were already byte-identical, but
-    only P3/P4/V1/V3/V4 were checked, so editing P2 would have silently desynced the
-    document from the code.
+    Widened from five to all of them after a P2 edit: every prompt was already
+    byte-identical, but only P3/P4/V1/V3/V4 were checked, so editing P2 would have silently
+    desynced the document from the code.
+
+    Parametrized over `prompts.PROMPTS` rather than a hard-coded list, so removing a prompt
+    (V2) or adding one cannot leave a stale entry behind. The tex is the Phase 1 design
+    record and still documents V2; that is deliberate -- it records what was specified,
+    while this test only asserts that prompts the harness SHIPS match it.
     """
 
-    @pytest.mark.parametrize(
-        "pid", ["P1", "P2", "P3", "P4", "P5", "V1", "V2", "V3", "V4"]
-    )
+    @pytest.mark.parametrize("pid", sorted(prompts.PROMPTS))
     def test_the_prompt_matches_the_phase_one_document(self, pid):
         tex = open(
             "docs/ideation/coherence/benchmark/locobench_phase1.tex", encoding="utf-8"

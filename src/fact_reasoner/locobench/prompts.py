@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The nine prompts of the generation pipeline, verbatim from Phase 1 Appendix A.
+# The eight prompts of the generation pipeline, verbatim from Phase 1 Appendix A.
 #
-# P1-P5 generate; V1-V4 validate. V5 is not a prompt -- it is the committee protocol
-# that runs V1/V2/V4 (see `validate.py`).
+# P1-P5 generate; V1, V3 and V4 validate, each on the committee (see `validate.py`).
+#
+# Phase 1 also specified a V2 exhaustiveness adjudicator. It is deliberately absent: the
+# `exclusive` and `co_necessity` couplings it was to adjudicate are derived deterministically
+# from the relation sense by `taxonomy_bridge.COMPILE`, which every other part of the harness
+# already treats as the authority, so V2 would have re-derived from prose what the taxonomy
+# fixes by construction. It was never wired to a call site in any run.
 #
 # These strings are the SPEC, not a paraphrase of it: the Phase-1 document and this
 # module are each other's reference, and `tests/test_locobench_harness.py` asserts the
@@ -80,7 +85,8 @@ Instructions:
    well-informed answer to it might contain.
 2. An atomic claim is a sentence containing a singular piece of information,
    which should be basic, indivisible, and independently verifiable.
-3. Generate exactly 24 atomic claims, in the following required composition:
+3. Generate exactly 26 atomic claims: the 24 below, plus the 2 holding claims
+   required by instruction 4. The 24 break down as:
    (a) 14 factually correct claims;
    (b) 4 factually incorrect claims (plausible but false);
    (c) 2 EXHAUSTIVE ALTERNATIVE claims: a pair X, Y such that exactly one of X
@@ -154,7 +160,11 @@ Instructions:
    3rd, 7th and 12th claims they become pos 1, 2 and 3. The position is the
    order the response will assert the claim in. Every selected claim keeps its
    text EXACTLY as given. Do NOT introduce information not in the claims, and
-   do NOT alter the claims.
+   do NOT alter the claims. Your selection MUST INCLUDE AT LEAST 2 of the
+   [incorrect] claims: the response has to assert false content alongside the
+   true, so a selection drawn only from the [correct] claims is rejected. Carry
+   each selected claim's tag through as a "factual" field - false for an
+   [incorrect] claim, true for every other tag.
 3. Plan EXACTLY 10 RELATIONS. Each relation connects exactly two selected claims
    and has a SENSE. Every relation must join a DIFFERENT pair of claims: once two
    claims are related, that pair is used up and must not appear again in the
@@ -202,20 +212,27 @@ Instructions:
    either direction - the two lists are disjoint.
 10. Output a single JSON object in a code block and nothing else. Below is a
     COMPLETE, correctly-shaped example - copy its structure exactly, not its
-    text. It has 14 atoms numbered 1..14 with no gaps, 10 relations (6 valid, 4
-    invalid), all five required senses, and 5 non-relations disjoint from the
-    relations:
+    text. It has 14 atoms numbered 1..14 with no gaps, 2 of them factually
+    incorrect, 10 relations (6 valid, 4 invalid), all five required senses, and 5
+    non-relations disjoint from the relations:
 
 ```json
 {
   "atoms": [
-    {"pos": 1, "text": "<claim text>"}, {"pos": 2, "text": "<claim text>"},
-    {"pos": 3, "text": "<claim text>"}, {"pos": 4, "text": "<claim text>"},
-    {"pos": 5, "text": "<claim text>"}, {"pos": 6, "text": "<claim text>"},
-    {"pos": 7, "text": "<claim text>"}, {"pos": 8, "text": "<claim text>"},
-    {"pos": 9, "text": "<claim text>"}, {"pos": 10, "text": "<claim text>"},
-    {"pos": 11, "text": "<claim text>"}, {"pos": 12, "text": "<claim text>"},
-    {"pos": 13, "text": "<claim text>"}, {"pos": 14, "text": "<claim text>"}
+    {"pos": 1, "text": "<claim text>", "factual": true},
+    {"pos": 2, "text": "<claim text>", "factual": true},
+    {"pos": 3, "text": "<claim text>", "factual": true},
+    {"pos": 4, "text": "<claim text>", "factual": false},
+    {"pos": 5, "text": "<claim text>", "factual": true},
+    {"pos": 6, "text": "<claim text>", "factual": true},
+    {"pos": 7, "text": "<claim text>", "factual": true},
+    {"pos": 8, "text": "<claim text>", "factual": true},
+    {"pos": 9, "text": "<claim text>", "factual": false},
+    {"pos": 10, "text": "<claim text>", "factual": true},
+    {"pos": 11, "text": "<claim text>", "factual": true},
+    {"pos": 12, "text": "<claim text>", "factual": true},
+    {"pos": 13, "text": "<claim text>", "factual": true},
+    {"pos": 14, "text": "<claim text>", "factual": true}
   ],
   "relations": [
     {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect",
@@ -467,34 +484,6 @@ python interpreter, SO NO OTHER WORDS!
 recover_relations(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])
 """
 
-# --- V2: exhaustiveness adjudication -------------------------------
-PROMPT_V2 = r"""
-Let's define a function named adjudicate_exhaustiveness(claim_a: str,
-claim_b: str, response: str).
-
-Given two claims and the response that asserts both, the function decides the
-logical relationship between their truth values, returning exactly one of:
-  "A" - EXHAUSTIVE EXCLUSION: exactly one of A and B holds. They cannot both be
-        true, and they cannot both be false.
-  "B" - NON-EXHAUSTIVE OPPOSITION: they cannot both be true, but both could be
-        false (some third possibility exists).
-  "C" - DISJUNCTION: at least one holds, and both may hold together.
-  "D" - NEITHER: the truth values are not coupled in any of these ways.
-
-To decide between A and B, ask: is there a coherent third state of the world in
-which A and B are BOTH false? If yes, answer B. If no such third state exists,
-answer A.
-To decide between A and C, ask: could A and B both be true at once? If yes,
-answer C.
-
-Answer with the single letter only. Note that your response will be passed to
-the python interpreter, SO NO OTHER WORDS!
-
-adjudicate_exhaustiveness(claim_a="[CLAIM_A_PLACEHOLDER]",
-                          claim_b="[CLAIM_B_PLACEHOLDER]",
-                          response="[RESPONSE_PLACEHOLDER]")
-"""
-
 # --- V3: naturalness and leakage audit -----------------------------
 PROMPT_V3 = r"""
 Let's define a function named check_response(response: str).
@@ -511,9 +500,11 @@ The function audits a generated response and returns a JSON object:
   "statements" as the objects the text was assembled from; or any label, tag,
   numeric index, or bracketed marker. Do NOT flag a connective or coordination
   that merely realizes a relation - "either X or Y", "at least one of X or Y",
-  "at least one of these was true", "perhaps both",
-  "the two cannot both be true, and one of them must hold", "although X, Y",
-  "before", "after", "as indicated by", "as shown by", "which indicates", or an
+  "at least one of these was true", "perhaps both", "one or both",
+  "the two cannot both be true, and one of them must hold",
+  "one of these accounts must be wrong", "although X, Y",
+  "before", "after", "subsequently", "earlier than", "which postdates",
+  "as indicated by", "as shown by", "which indicates", or an
   explicit statement that an ordering carries no causal or inferential force. A
   writer is REQUIRED to use those, and a coupling over two claims' joint truth
   cannot be expressed without one. Every span you report must be QUOTED VERBATIM
@@ -576,13 +567,12 @@ PROMPTS: dict[str, str] = {
     "P4": PROMPT_P4,
     "P5": PROMPT_P5,
     "V1": PROMPT_V1,
-    "V2": PROMPT_V2,
     "V3": PROMPT_V3,
     "V4": PROMPT_V4,
 }
 
 GENERATION_PROMPTS = ("P1", "P2", "P3", "P4", "P5")
-VALIDATION_PROMPTS = ("V1", "V2", "V3", "V4")
+VALIDATION_PROMPTS = ("V1", "V3", "V4")
 
 # Per prompt: (numbered-instruction count, required placeholders). Transcribed from
 # Phase 1 Appendix A; the test asserts the constants above still match. V1-V4 use
@@ -595,7 +585,6 @@ PROMPT_SPEC: dict[str, tuple[int, tuple[str, ...]]] = {
     "P4": (8, ("PLAN_PLACEHOLDER", "QUESTION_PLACEHOLDER")),
     "P5": (5, ("OPERATOR_PLACEHOLDER", "PLAN_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
     "V1": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
-    "V2": (0, ("CLAIM_A_PLACEHOLDER", "CLAIM_B_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
     "V3": (0, ("RESPONSE_PLACEHOLDER",)),
     "V4": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
 }
@@ -681,7 +670,6 @@ __all__ = [
     "PROMPT_P5",
     "PROMPT_SPEC",
     "PROMPT_V1",
-    "PROMPT_V2",
     "PROMPT_V3",
     "PROMPT_V4",
     "VALIDATION_PROMPTS",

@@ -1765,7 +1765,8 @@ Instructions:
    well-informed answer to it might contain.
 2. An atomic claim is a sentence containing a singular piece of information,
    which should be basic, indivisible, and independently verifiable.
-3. Generate exactly 24 atomic claims, in the following required composition:
+3. Generate exactly 26 atomic claims: the 24 below, plus the 2 holding claims
+   required by instruction 4. The 24 break down as:
    (a) 14 factually correct claims;
    (b) 4 factually incorrect claims (plausible but false);
    (c) 2 EXHAUSTIVE ALTERNATIVE claims: a pair X, Y such that exactly one of X
@@ -1860,7 +1861,11 @@ Instructions:
    3rd, 7th and 12th claims they become pos 1, 2 and 3. The position is the
    order the response will assert the claim in. Every selected claim keeps its
    text EXACTLY as given. Do NOT introduce information not in the claims, and
-   do NOT alter the claims.
+   do NOT alter the claims. Your selection MUST INCLUDE AT LEAST 2 of the
+   [incorrect] claims: the response has to assert false content alongside the
+   true, so a selection drawn only from the [correct] claims is rejected. Carry
+   each selected claim's tag through as a "factual" field - false for an
+   [incorrect] claim, true for every other tag.
 3. Plan EXACTLY 10 RELATIONS. Each relation connects exactly two selected claims
    and has a SENSE. Every relation must join a DIFFERENT pair of claims: once two
    claims are related, that pair is used up and must not appear again in the
@@ -1908,20 +1913,27 @@ Instructions:
    either direction - the two lists are disjoint.
 10. Output a single JSON object in a code block and nothing else. Below is a
     COMPLETE, correctly-shaped example - copy its structure exactly, not its
-    text. It has 14 atoms numbered 1..14 with no gaps, 10 relations (6 valid, 4
-    invalid), all five required senses, and 5 non-relations disjoint from the
-    relations:
+    text. It has 14 atoms numbered 1..14 with no gaps, 2 of them factually
+    incorrect, 10 relations (6 valid, 4 invalid), all five required senses, and 5
+    non-relations disjoint from the relations:
 
 ```json
 {
   "atoms": [
-    {"pos": 1, "text": "<claim text>"}, {"pos": 2, "text": "<claim text>"},
-    {"pos": 3, "text": "<claim text>"}, {"pos": 4, "text": "<claim text>"},
-    {"pos": 5, "text": "<claim text>"}, {"pos": 6, "text": "<claim text>"},
-    {"pos": 7, "text": "<claim text>"}, {"pos": 8, "text": "<claim text>"},
-    {"pos": 9, "text": "<claim text>"}, {"pos": 10, "text": "<claim text>"},
-    {"pos": 11, "text": "<claim text>"}, {"pos": 12, "text": "<claim text>"},
-    {"pos": 13, "text": "<claim text>"}, {"pos": 14, "text": "<claim text>"}
+    {"pos": 1, "text": "<claim text>", "factual": true},
+    {"pos": 2, "text": "<claim text>", "factual": true},
+    {"pos": 3, "text": "<claim text>", "factual": true},
+    {"pos": 4, "text": "<claim text>", "factual": false},
+    {"pos": 5, "text": "<claim text>", "factual": true},
+    {"pos": 6, "text": "<claim text>", "factual": true},
+    {"pos": 7, "text": "<claim text>", "factual": true},
+    {"pos": 8, "text": "<claim text>", "factual": true},
+    {"pos": 9, "text": "<claim text>", "factual": false},
+    {"pos": 10, "text": "<claim text>", "factual": true},
+    {"pos": 11, "text": "<claim text>", "factual": true},
+    {"pos": 12, "text": "<claim text>", "factual": true},
+    {"pos": 13, "text": "<claim text>", "factual": true},
+    {"pos": 14, "text": "<claim text>", "factual": true}
   ],
   "relations": [
     {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect",
@@ -2350,9 +2362,11 @@ The function audits a generated response and returns a JSON object:
   "statements" as the objects the text was assembled from; or any label, tag,
   numeric index, or bracketed marker. Do NOT flag a connective or coordination
   that merely realizes a relation - "either X or Y", "at least one of X or Y",
-  "at least one of these was true", "perhaps both",
-  "the two cannot both be true, and one of them must hold", "although X, Y",
-  "before", "after", "as indicated by", "as shown by", "which indicates", or an
+  "at least one of these was true", "perhaps both", "one or both",
+  "the two cannot both be true, and one of them must hold",
+  "one of these accounts must be wrong", "although X, Y",
+  "before", "after", "subsequently", "earlier than", "which postdates",
+  "as indicated by", "as shown by", "which indicates", or an
   explicit statement that an ordering carries no causal or inferential force. A
   writer is REQUIRED to use those, and a coupling over two claims' joint truth
   cannot be expressed without one. Every span you report must be QUOTED VERBATIM

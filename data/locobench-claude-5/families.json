@@ -3,63 +3,63 @@
   "families": [
     {
       "family_id": "f001",
-      "family": "CHAIN",
-      "dataset": "locobench-claude-opus-5",
+      "family": "CONFLICT",
+      "dataset": "locobench-claude-5",
       "canonical_topic": "Anthropology",
       "domain": "Social Sciences",
-      "framing": "How do anthropologists adjudicate between rival readings of a burial site when one team interprets the assemblage as evidence of ritual practice while another attributes it to natural taphonomic processes?",
+      "framing": "How did researchers adjudicate the dispute over whether the Liang Bua remains from Flores represent a distinct hominin lineage or modern humans affected by a developmental pathology?",
       "generator": "claude-opus-5",
       "rungs": [
         {
           "index": 0,
-          "name": "break_3",
+          "name": "worse",
           "calls": [
-            "break_chain",
-            "break_chain",
-            "break_chain"
+            "spurious_relation"
           ],
-          "parent": 3,
+          "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f001-r0"
+          "item_id": "locobench-claude-5-f001-r0"
         },
         {
           "index": 1,
-          "name": "break_2",
-          "calls": [
-            "break_chain",
-            "break_chain"
-          ],
-          "parent": 3,
-          "is_base": false,
-          "item_id": "locobench-claude-opus-5-f001-r1"
-        },
-        {
-          "index": 2,
-          "name": "break_1",
-          "calls": [
-            "break_chain"
-          ],
-          "parent": 3,
-          "is_base": false,
-          "item_id": "locobench-claude-opus-5-f001-r2"
-        },
-        {
-          "index": 3,
           "name": "base",
           "calls": [],
           "parent": null,
           "is_base": true,
-          "item_id": "locobench-claude-opus-5-f001-r3"
+          "item_id": "locobench-claude-5-f001-r1"
+        },
+        {
+          "index": 2,
+          "name": "concession_resolved",
+          "calls": [
+            "add_resolution"
+          ],
+          "parent": 1,
+          "is_base": false,
+          "item_id": "locobench-claude-5-f001-r2"
+        },
+        {
+          "index": 3,
+          "name": "fix_one_conflict",
+          "calls": [
+            "add_resolution",
+            "drop_relation"
+          ],
+          "parent": 1,
+          "is_base": false,
+          "item_id": "locobench-claude-5-f001-r3"
         },
         {
           "index": 4,
           "name": "coherent",
           "calls": [
+            "add_resolution",
+            "drop_relation",
             "drop_relation"
           ],
-          "parent": 3,
+          "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f001-r4"
+          "item_id": "locobench-claude-5-f001-r4"
         }
       ],
       "ordering_constraints": [
@@ -97,28 +97,7 @@
               ]
             },
             {
-              "readout": "consistency",
-              "pair": [
-                1,
-                2
-              ]
-            },
-            {
-              "readout": "log_partition",
-              "pair": [
-                1,
-                2
-              ]
-            },
-            {
               "readout": "mean_marginal",
-              "pair": [
-                2,
-                3
-              ]
-            },
-            {
-              "readout": "consistency",
               "pair": [
                 2,
                 3
@@ -155,6 +134,29 @@
           ]
         },
         {
+          "id": "c2",
+          "class": "C2",
+          "strict": false,
+          "pairs": [
+            {
+              "readout": "consistency",
+              "pair": [
+                1,
+                2
+              ],
+              "expect": "decrease"
+            },
+            {
+              "readout": "log_partition",
+              "pair": [
+                1,
+                2
+              ],
+              "expect": "invariant"
+            }
+          ]
+        },
+        {
           "id": "c3",
           "class": "C3",
           "strict": true,
@@ -171,15 +173,15 @@
           ]
         }
       ],
-      "notes": "Entailment-chain integrity at decreasing break depth."
+      "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence."
     },
     {
       "family_id": "f002",
       "family": "CONFLICT",
-      "dataset": "locobench-claude-opus-5",
+      "dataset": "locobench-claude-5",
       "canonical_topic": "Archaeology",
       "domain": "Humanities",
-      "framing": "How do archaeologists adjudicate between rival interpretations when a site's stratigraphy suggests one chronology while radiocarbon dates from the same deposits suggest another?",
+      "framing": "How do archaeologists adjudicate between rival interpretations when a site's stratigraphy and its radiocarbon dates appear to disagree about when a settlement was abandoned?",
       "generator": "claude-opus-5",
       "rungs": [
         {
@@ -190,7 +192,7 @@
           ],
           "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f002-r0"
+          "item_id": "locobench-claude-5-f002-r0"
         },
         {
           "index": 1,
@@ -198,7 +200,7 @@
           "calls": [],
           "parent": null,
           "is_base": true,
-          "item_id": "locobench-claude-opus-5-f002-r1"
+          "item_id": "locobench-claude-5-f002-r1"
         },
         {
           "index": 2,
@@ -208,7 +210,7 @@
           ],
           "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f002-r2"
+          "item_id": "locobench-claude-5-f002-r2"
         },
         {
           "index": 3,
@@ -219,7 +221,7 @@
           ],
           "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f002-r3"
+          "item_id": "locobench-claude-5-f002-r3"
         },
         {
           "index": 4,
@@ -231,7 +233,7 @@
           ],
           "parent": 1,
           "is_base": false,
-          "item_id": "locobench-claude-opus-5-f002-r4"
+          "item_id": "locobench-claude-5-f002-r4"
         }
       ],
       "ordering_constraints": [

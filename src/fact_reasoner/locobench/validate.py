@@ -12,25 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The gates, the committee, and the agreement statistics.
+# The gates and the committee.
 #
 # EVERY acceptance threshold in the harness lives in THRESHOLDS below and nowhere else.
 # A run's behaviour is entirely determined by that dict, so it should be auditable in one
 # screen -- and a reviewer should be able to diff it against Phase 1's table directly.
 #
-# Two rules here are not conveniences:
+# Three rules here are not conveniences:
 #
 #   * GENERATOR EXCLUSION (R3). The model that wrote an item may not vote on it. A model
 #     asked to recover relations from its own prose recovers its own lexical
 #     fingerprints, which inflates every Target-A number.
-#   * V2 UNANIMITY (R1). An `exclusive` gold label needs every voter to agree, because
-#     exhaustiveness requires quantifying over possible worlds and is the label with no
-#     prior art. A split vote still ships -- flagged `low_agreement` -- because an
-#     unreliable facet is itself a result about the taxonomy.
+#   * PLANTED ERRORS ARE MEASURED, NOT GRADED. P3 plants 4 deliberately-invalid relations
+#     per plan. Scoring them as recovery failures made V1 unsatisfiable (ceiling 0.60
+#     against a 0.80 threshold), so `gate_recovery` grades the valid relations and reports
+#     the planted ones as the non-gating `V1.planted`.
+#   * A CLOSED LIST IS CLOSED IN CODE. V3's hedge list and leakage exemptions are enforced
+#     by `_filter_spans`, not left to the auditor's goodwill: live auditors flagged spans
+#     the prompt exempts verbatim, and `parse_response` has already applied the same hedge
+#     check as a rejection-sampling predicate before V3 ever runs.
+#
+# Phase 1's V2 exhaustiveness adjudicator and V5 agreement statistics (Fleiss/Cohen/
+# Krippendorff) are deliberately absent. V2's `exclusive`/`co_necessity` labels are derived
+# from the sense by `taxonomy_bridge.COMPILE`, which the rest of the harness already treats
+# as authoritative, and neither V2 nor the kappa functions were ever wired to a call site.
 
 from __future__ import annotations
 
-import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -45,30 +54,46 @@ from fact_reasoner.locobench.taxonomy_bridge import (
 
 THRESHOLDS: dict[str, Any] = {
     # -- per-item admission --
+    #
+    # Both V1 rates are taken over the VALID planned relations only (see `gate_recovery`),
+    # so with P3's mandated 6-valid-of-10 the denominator is 6 and these are integer gates:
+    # 0.80 needs 5 of 6 and 0.70 needs 5 of 6 as well, since 4/6 = 0.667 misses both. One
+    # relation therefore decides admission. DO NOT RAISE `v1_coupling` ABOVE 0.834: it
+    # silently becomes unanimity-of-6, which is a fresh unsatisfiable gate of exactly the
+    # species that scoring the planted errors used to be. Measured across 7 raters and 2
+    # items, the valid-only rates ranged 0.833-1.00, so these clear with one relation spare.
     "v1_coupling": 0.80,  # fraction recovered with the correct coupling
     "v1_sense": 0.70,  # ... and with the correct sense
     "v1_rule": "majority",  # of the committee must meet both rates
-    "v2_exclusive": "unanimity",  # to assign an `exclusive` gold label
     "v3_min_score": 4,  # fluency / formality / organization, on 1..5
     "v3_empty_spans": ("leakage", "hedging"),  # must be empty; artifacts recorded only
     "v3_rule": "majority",  # of the auditors must fail a facet for it to reject
-    "v4_coverage": 1.00,  # every atom `asserted`
+    "v4_coverage": 1.00,  # every atom present, over the gating statuses below
+    # WHICH V4 statuses reject. `altered` is deliberately absent: it is the judgment most
+    # sensitive to the surface rewording P4 instruction 2 licenses, and 3 of 5 live V4
+    # rejections were one `altered` atom. `missing` and `merged` are structural losses.
+    "v4_gating_statuses": ("missing", "merged"),
+    "v4_rule": "majority",  # of the panel must call an atom lost for it to count
     # -- plan structure (P3) --
     "n_claims": (14, 16),  # a dead copy of parse.N_CLAIMS_RANGE; keep them in step
     "n_relations": (8, 12),
     "n_non_relations": (4, 6),
     "validity_split": 0.55,  # target fraction valid
     "validity_tolerance": 0.15,  # per-family slack on that fraction
+    # How many of P2's `[incorrect]` claims P3 must actually select. The response is required
+    # to contain false content as well as true; without this, P3 selected none and the shipped
+    # corpus was 100% `factual: true`. TWO, not four: P2 writes 4 incorrect of ~26 and P3
+    # selects ~15, so ~2.3 are expected under indifferent sampling -- the quota sits just
+    # below the natural rate. Demanding all 4 would force P3's hand on 4 of 15 slots and
+    # collide with the five required senses and the selected-holding resolver, which is how
+    # the next unsatisfiable gate gets built.
+    "min_incorrect_atoms": 2,
     "window": 4,  # positions, or a shared named entity
     # -- perturbation (P5) --
     "length_drift": 0.15,
     # -- corpus level --
     "topic_floor": 3,
     "none_pool": 1500,
-    # -- agreement (V5) --
-    "kappa_coupling": 0.70,
-    "kappa_sense": 0.60,
-    "kappa_exhaustive": 0.55,
     # -- scoring margin (used by the metrics, not by admission) --
     "margin_sigmas": 2.0,
     "sigma_remines": 5,
@@ -200,8 +225,10 @@ def unanimous(votes: list[Any]) -> bool:
 # ----------------------------------------------------------------------------
 
 
-def gate_plan(plan: dict[str, Any]) -> Verdict:
-    """Apply the P3 gates a parser cannot: rare facets, window, validity split.
+def gate_plan(
+    plan: dict[str, Any], claims: list[dict[str, str]] | None = None
+) -> Verdict:
+    """Apply the P3 gates a parser cannot: rare facets, window, validity split, factuality.
 
     Structural checks (counts, legal values, sense/coupling agreement) already happened
     in :func:`fact_reasoner.locobench.parse.parse_plan`; these are the semantic ones,
@@ -209,6 +236,8 @@ def gate_plan(plan: dict[str, Any]) -> Verdict:
 
     Args:
         plan: A parsed P3 plan.
+        claims: P2's parsed claims, enabling the factuality gate. When omitted that gate is
+            skipped, so callers that only have a plan keep working.
 
     Returns:
         The verdict.
@@ -290,6 +319,41 @@ def gate_plan(plan: dict[str, Any]) -> Verdict:
             detail="" if ok else f"valid fraction {frac:.2f} outside {target}+/-{tol}",
         )
     )
+
+    # FACTUALITY: the response must contain false claims, not merely true ones. P2 generates
+    # 4 `[incorrect]` claims of ~26, but P3 selects only 14-16 of them and nothing required it
+    # to keep any -- so the shipped corpus had 170/170 atoms `factual: true` and the benchmark
+    # had no false content at all. Checked here rather than at admission because `gate_plan`
+    # is wired as a retryable check (`pipeline._plan_ok`), so a plan short on false claims is
+    # re-planned with this reason attached instead of killing the family.
+    if claims is not None:
+        need = THRESHOLDS["min_incorrect_atoms"]
+        incorrect = {
+            " ".join((c.get("text") or "").split()).rstrip(".").lower()
+            for c in claims
+            if c.get("tag") == "incorrect"
+        }
+        selected = [
+            " ".join((a.get("text") or "").split()).rstrip(".").lower()
+            for a in plan.get("atoms", [])
+        ]
+        n_false = sum(1 for t in selected if t in incorrect)
+        ok_f = n_false >= need
+        v.add(
+            GateResult(
+                "plan.factuality",
+                ok_f,
+                threshold=f">= {need} incorrect claim(s) selected",
+                observed={"n_incorrect_selected": n_false, "n_incorrect_available": len(incorrect)},
+                detail=""
+                if ok_f
+                else (
+                    f"only {n_false} of the {len(incorrect)} [incorrect] claim(s) were "
+                    f"selected, need {need}. The response must assert false claims as well "
+                    "as true ones; choose more of the [incorrect] claims."
+                ),
+            )
+        )
     return v
 
 
@@ -424,14 +488,23 @@ def gate_recovery(
     once for real: a 0-based reply scored 0.08/0.00, indistinguishable in the verdict from
     recovering nothing, while the same output re-indexed scored 0.50/0.50.)
 
+    Relations planned ``validity: "invalid"`` are EXCLUDED from both rates. They are
+    deliberate errors, so not recovering them as planned is the intended outcome; counting
+    them made the gate unsatisfiable, because P3 mandates 4 invalid of 10 and the ceiling
+    was therefore 6/10 = 0.60 against a 0.80 threshold. Whether each planted error was
+    faithfully realized is reported separately as the non-gating ``V1.planted``. A relation
+    with no ``validity`` key is graded, so older plans and call sites are unaffected.
+
     Args:
-        planned: The plan's relations (``source_pos``/``target_pos``/``sense``).
+        planned: The plan's relations (``source_pos``/``target_pos``/``sense``, and
+            optionally ``validity``/``error_kind``).
         recovered: V1's output (``source``/``target``/``sense``/``coupling``).
         n_atoms: How many atoms the plan selected. Enables the index-base check.
 
     Returns:
-        The verdict. ``observed`` carries the two rates *and* the pairs behind them, so a
-        low rate is diagnosable without re-running the model.
+        The verdict. ``observed`` carries the two rates, the denominator they were taken
+        over, *and* the pairs behind them, so a low rate is diagnosable without re-running
+        the model.
     """
     v = Verdict()
     if not planned:
@@ -505,11 +578,27 @@ def gate_recovery(
         reverse=True,
     )
 
+    def _is_planted(p: dict[str, Any]) -> bool:
+        """Whether this relation was planned as a deliberate error.
+
+        Defaults to NOT planted, so a relation carrying no ``validity`` key is graded --
+        which keeps every pre-existing call site and any plan predating the field behaving
+        exactly as before.
+        """
+        return p.get("validity", "valid") == "invalid"
+
     n_coupling = n_sense = 0
+    n_planted_realized = 0
+    by_kind: dict[str, dict[str, int]] = {}
     matched: list[tuple[Any, Any]] = []
     reversed_pairs: list[tuple[Any, Any, str]] = []
     for i in order:
         p = planned[i]
+        planted = _is_planted(p)
+        if planted:
+            kind = str(p.get("error_kind") or "unspecified")
+            slot = by_kind.setdefault(kind, {"n": 0, "recovered_as_planned": 0})
+            slot["n"] += 1
         candidates = rec_by_pair.get(_pair_key(p["source_pos"], p["target_pos"]))
         if not candidates:
             continue
@@ -544,12 +633,40 @@ def gate_recovery(
             # Guarded rather than propagated: `_pair_key` falls back to directed on a bad
             # sense, so such a relation can reach here and must not take down the gate.
             rec_coupling = None
+        # PLANTED ERRORS ARE MEASURED, NOT GRADED. A relation planned `invalid` is broken
+        # on purpose, so failing to recover it as planned is the intended outcome and must
+        # not count against recall. Counting it was an unsatisfiable gate: P3 mandates 4
+        # invalid of 10, so the ceiling was 6/10 = 0.60 against a 0.80 threshold, and no
+        # writer and no reader could pass. Measured before the fix, five frontier models
+        # independently scored one family at 0.80/0.80 over all 10 while scoring the 6
+        # valid relations at 1.00/1.00 -- the shortfall was entirely this arithmetic.
+        # Whether the error was faithfully realized is reported as `V1.planted` below.
+        if planted:
+            if rec_sense == p["sense"]:
+                n_planted_realized += 1
+                by_kind[kind]["recovered_as_planned"] += 1
+            continue
         if rec_coupling is not None and rec_coupling == coupling_for_sense(p["sense"]):
             n_coupling += 1
         if rec_sense == p["sense"]:
             n_sense += 1
 
-    total = len(planned)
+    n_planted = sum(1 for p in planned if _is_planted(p))
+    total = len(planned) - n_planted
+    if total <= 0:
+        # Every planned relation was a deliberate error, so there is nothing to recover.
+        # Passing is correct here: the gate measures recoverability of the sound relations
+        # and this plan asserts none. Guarded explicitly rather than left to divide by zero.
+        return v.add(
+            GateResult(
+                "V1",
+                True,
+                threshold={"coupling": THRESHOLDS["v1_coupling"],
+                           "sense": THRESHOLDS["v1_sense"]},
+                observed={"n_graded": 0, "n_planted": n_planted},
+                detail="no valid planned relations to recover",
+            )
+        )
     r_coupling, r_sense = n_coupling / total, n_sense / total
     t_coupling, t_sense = THRESHOLDS["v1_coupling"], THRESHOLDS["v1_sense"]
     ok = r_coupling >= t_coupling and r_sense >= t_sense
@@ -561,6 +678,11 @@ def gate_recovery(
             observed={
                 "coupling": round(r_coupling, 3),
                 "sense": round(r_sense, 3),
+                # The denominator, recorded so a rate is never ambiguous about what it was
+                # taken over. This is the field that makes the old unsatisfiable-gate bug
+                # visible at a glance in a persisted record.
+                "n_graded": total,
+                "n_planted": n_planted,
                 # The pairs, so "recovered nothing" and "matched the wrong key space" are
                 # distinguishable from the persisted record alone.
                 "matched_pairs": matched,
@@ -585,7 +707,169 @@ def gate_recovery(
             ),
         )
     )
+
+    # Was the planted error faithfully realized? RECORDED, NEVER ENFORCED -- mirrors
+    # `plan.window` and `V3.artifacts`. This is the readout the old denominator destroyed:
+    # a planted error recovered as planned means P4 wrote the broken relation the plan
+    # asked for, and one that vanished means the injection failed. Both are findings about
+    # the corpus, and neither is grounds to reject a family. Without this the two cases are
+    # indistinguishable, which is how a family whose error injection silently failed once
+    # scored 0.90/0.90 and looked like the BEST result in the run.
+    if n_planted:
+        v.add(
+            GateResult(
+                "V1.planted",
+                True,  # observation only
+                threshold="recorded, not enforced",
+                observed={
+                    "n_invalid": n_planted,
+                    "recovered_as_planned": n_planted_realized,
+                    "by_error_kind": by_kind,
+                },
+                detail=(
+                    f"{n_planted_realized}/{n_planted} planted error(s) realized as "
+                    f"planned: { {k: v2['recovered_as_planned'] for k, v2 in by_kind.items()} }"
+                ),
+            )
+        )
     return v
+
+
+# Phrasings P4 REQUIRES and V3 must therefore never call leakage. A relation's coupling is
+# a claim about two propositions' joint truth, and there is no way to express it in prose
+# without one of these -- so flagging them punishes the writer for obeying instruction 3.
+#
+# V3's prompt already lists most of them as exempt, and live auditors flagged them anyway:
+# measured on one response, auditors reported "at least one of these was true:" and "as
+# indicated by the fact that" as leakage and "perhaps both" as hedging, all three named
+# verbatim in the prompt as NOT reportable. So the exemption is enforced here as well as
+# stated there. The five added beyond the prompt's own list are the P4-mandated phrasings it
+# omitted: "one of these accounts must be wrong" (P4 instruction 3's Alternative marker, and
+# the riskiest, since it talks about accounts being wrong), "one or both", and the three
+# ordering markers past "before"/"after".
+V3_EXEMPT_SPANS: tuple[str, ...] = (
+    "either",
+    "or",
+    "at least one of",
+    "at least one of these",
+    "one or both",
+    "perhaps both",
+    "the two cannot both be true, and one of them must hold",
+    "one of these accounts must be wrong",
+    "although",
+    "despite",
+    "even though",
+    "whereas",
+    "by contrast",
+    "on the other hand",
+    "that is",
+    "in other words",
+    "equivalently",
+    "for example",
+    "specifically",
+    "in one case",
+    "before",
+    "after",
+    "subsequently",
+    "earlier than",
+    "which postdates",
+    "which predates",
+    "came after",
+    "as indicated by",
+    "as shown by",
+    "which indicates",
+    "confirms",
+    "if",
+    "provided that",
+    "only when",
+)
+
+
+# Function words that carry no reference to the annotation machinery. Removed alongside the
+# exempt phrases when deciding whether a span is *nothing but* mandated connective language,
+# because an auditor quotes a clause rather than a bare connective: "at least one of these
+# was true" and "either this or that" are the exempt marker plus glue, and the glue must not
+# keep a false positive alive. Deliberately excludes every noun the leakage criterion names
+# ("claim", "atom", "statement", "plan", "sense", "relation", ...), so a span mentioning one
+# can never be filtered out this way.
+_V3_FILLER = frozenset(
+    """
+    a an the this that these those it its they them their there here is are was were be been
+    being of to in on at as by for from with and both one two each other others such same
+    true false hold holds held case cases thing things above below fact facts
+    """.split()
+)
+
+
+def _is_exempt_span(span: str) -> bool:
+    """Whether a reported leakage span is nothing but P4-mandated connective language.
+
+    A span is exempt when, after removing every exempt phrase and the function words that
+    glue one into a clause, no content word survives -- i.e. the auditor quoted a connective
+    rather than a reference to the plan. Deliberately NOT a substring test in the other
+    direction: a real leakage span such as "the earlier statement that they were manufactured
+    after 6500 BCE" *contains* "after", and dropping it for that reason would suppress a true
+    positive. It survives here because "statement" and "manufactured" are content words.
+    """
+    low = " " + " ".join(str(span).lower().split()) + " "
+    for phrase in sorted(V3_EXEMPT_SPANS, key=len, reverse=True):
+        low = low.replace(f" {phrase} ", "  ")
+    residue = [w.strip(".,;:!?\"'()") for w in low.split()]
+    return not any(w and w.isalpha() and w not in _V3_FILLER for w in residue)
+
+
+def _filter_spans(audit: dict[str, Any], response: str | None = None) -> dict[str, Any]:
+    """Drop reported spans that V3's own prompt says are not reportable.
+
+    Three rules, each enforcing a promise the prompt already makes:
+
+    1. **The hedge list is CLOSED.** A hedging span must contain one of
+       :data:`fact_reasoner.locobench.parse.HEDGE_WORDS`. This is not a second opinion about
+       the prose: ``parse_response`` installs that same word-bounded check as the P4
+       rejection-sampling predicate, so any hedge word still present has already been
+       cleared, and a span without one was never a hedge. Live auditors flagged "perhaps
+       both" (mandated by P4) and "One or both of these factors may hold" (no listed word at
+       all) as hedging.
+    2. **P4-mandated connectives are not leakage.** See :data:`V3_EXEMPT_SPANS`.
+    3. **Spans must be quoted verbatim.** The prompt says "if you cannot copy it out of the
+       text, it is not there and must not be reported"; a span absent from the response is a
+       hallucinated quote and cannot evidence anything. Skipped when ``response`` is None.
+
+    Args:
+        audit: One auditor's parsed V3 output. Not mutated.
+        response: The prose it judged, for the verbatim check. Optional.
+
+    Returns:
+        A shallow copy with the gated span lists filtered, plus ``_raw_counts`` recording
+        what each list held before filtering, so suppression stays auditable rather than
+        silently discarding a systematically-wrong auditor's evidence.
+    """
+    from fact_reasoner.locobench.parse import HEDGE_WORDS
+
+    out = dict(audit)
+    raw: dict[str, int] = {}
+    hay = " ".join((response or "").lower().split())
+    for kind in THRESHOLDS["v3_empty_spans"]:
+        spans = list(audit.get(kind) or [])
+        raw[kind] = len(spans)
+        kept = []
+        for s in spans:
+            text = str(s)
+            flat = " ".join(text.lower().split())
+            if response is not None and flat and flat not in hay:
+                continue  # rule 3: not quoted from the text
+            if kind == "hedging":
+                if not any(
+                    re.search(rf"\b{re.escape(w)}\b", text, re.IGNORECASE)
+                    for w in HEDGE_WORDS
+                ):
+                    continue  # rule 1: not on the closed list
+            elif kind == "leakage" and _is_exempt_span(text):
+                continue  # rule 2: mandated connective
+            kept.append(s)
+        out[kind] = kept
+    out["_raw_counts"] = raw
+    return out
 
 
 def gate_audit(audit: dict[str, Any]) -> Verdict:
@@ -663,7 +947,9 @@ def gate_audit(audit: dict[str, Any]) -> Verdict:
     return v
 
 
-def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
+def gate_audit_panel(
+    audits: list[tuple[str, dict[str, Any]]], *, response: str | None = None
+) -> Verdict:
     """Apply the V3 gate over several auditors, rejecting only on a majority.
 
     A single rater must not decide admission here, because V3's judgments diverge far more
@@ -677,9 +963,16 @@ def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
     Each facet is voted separately rather than voting on the whole verdict, so a real
     leakage span still rejects even when the scores are unanimous and vice versa.
 
+    Every auditor's spans pass through :func:`_filter_spans` FIRST, so the vote is taken over
+    reportable spans only. Filtering before the vote rather than after is deliberate: two
+    auditors independently flagging the same prompt-exempt connective would otherwise be a
+    "majority" and would reject the family, which is exactly what happened live.
+
     Args:
         audits: ``(auditor name, parsed V3 output)`` pairs. A single entry degrades to the
             same behaviour as :func:`gate_audit`, so a one-model config still works.
+        response: The prose judged, enabling the verbatim-quote filter. Optional so existing
+            call sites keep working.
 
     Returns:
         The verdict, with every auditor's vote recorded in ``observed`` -- a lone dissenter
@@ -689,6 +982,12 @@ def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
     v = Verdict()
     if not audits:
         return v.add(GateResult("V3", False, detail="no audit output"))
+
+    raw_counts = {
+        name: {k: len(a.get(k) or []) for k in THRESHOLDS["v3_empty_spans"]}
+        for name, a in audits
+    }
+    audits = [(name, _filter_spans(a, response)) for name, a in audits]
 
     floor = THRESHOLDS["v3_min_score"]
     keys = ("fluency", "formality", "organization")
@@ -739,6 +1038,11 @@ def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
                 "votes": dirty_votes,
                 "n_flagging_per_kind": per_kind,
                 "needed_to_reject": needed,
+                # What each auditor reported BEFORE `_filter_spans`. Kept so the filtering is
+                # auditable: a large gap between raw and voted counts means an auditor is
+                # systematically reporting prompt-exempt spans, which is a finding about the
+                # auditor, and silently discarding it would hide a broken panel member.
+                "raw_counts": raw_counts,
                 "spans": {
                     name: {
                         k: [
@@ -782,7 +1086,14 @@ def gate_audit_panel(audits: list[tuple[str, dict[str, Any]]]) -> Verdict:
 
 
 def gate_coverage(entries: list[dict[str, Any]], n_atoms: int) -> Verdict:
-    """Apply the V4 gate: every planned atom asserted, and the window re-verified.
+    """Apply the V4 gate: every planned atom present, and the window re-verified.
+
+    Only the statuses in ``THRESHOLDS["v4_gating_statuses"]`` reject. ``altered`` is
+    recorded but does not gate: it means "asserts something related but changes the
+    content", which is the judgment most sensitive to the surface rewording P4 instruction 2
+    explicitly licenses, whereas ``missing`` and ``merged`` are structural. Measured across
+    11 live rejections, 5 were V4 and 3 of those were a SINGLE ``altered`` atom at coverage
+    0.938-0.944 -- a family lost to one rater's wording judgment.
 
     Args:
         entries: V4's parsed output.
@@ -792,21 +1103,137 @@ def gate_coverage(entries: list[dict[str, Any]], n_atoms: int) -> Verdict:
         The verdict.
     """
     v = Verdict()
-    asserted = sum(1 for e in entries if e.get("status") == "asserted")
-    frac = asserted / n_atoms if n_atoms else 0.0
+    gating = THRESHOLDS["v4_gating_statuses"]
+    bad = [e for e in entries if e.get("status") in gating]
+    altered = [e for e in entries if e.get("status") == "altered"]
+    present = n_atoms - len(bad)
+    frac = present / n_atoms if n_atoms else 0.0
     need = THRESHOLDS["v4_coverage"]
-    bad = [e for e in entries if e.get("status") != "asserted"]
     ok = frac >= need
     v.add(
         GateResult(
             "V4",
             ok,
             threshold=need,
-            observed=round(frac, 3),
+            observed={
+                "coverage": round(frac, 3),
+                "gating_statuses": list(gating),
+                # Non-gating, but recorded: a rising `altered` rate is a P4 fidelity signal
+                # worth having even though it must not cost a family.
+                "altered": [(e.get("index"), e.get("span")) for e in altered[:6]],
+                "n_altered": len(altered),
+            },
             detail=""
             if ok
-            else f"{len(bad)} atom(s) not asserted: "
+            else f"{len(bad)} atom(s) not present: "
             f"{[(e.get('index'), e.get('status')) for e in bad][:6]}",
+        )
+    )
+    return v
+
+
+def gate_coverage_panel(
+    coverages: list[tuple[str, list[dict[str, Any]]]], n_atoms: int
+) -> Verdict:
+    """Apply the V4 gate over several raters, counting an atom lost only on a majority.
+
+    V4 was the last gate decided by a single rater, and it is a conjunction over 14-16
+    stochastic per-atom judgments, so its family-level false-negative rate compounds: at a
+    2% per-atom error rate roughly a quarter of well-formed families fail, and the measured
+    rate was nearer 5%. Voting per ATOM rather than on the whole verdict is what fixes that
+    without weakening the requirement -- "every atom present" stays absolute, but one rater
+    can no longer decide that an atom is absent.
+
+    Measured on identical prose: six raters returned all 17 atoms asserted while one returned
+    three defects and another one. Under the single-rater gate, drawing either of the latter
+    two would have rejected a family the other six judged perfect.
+
+    Args:
+        coverages: ``(rater name, parsed V4 output)`` pairs. A single entry reduces to
+            :func:`gate_coverage`'s behaviour.
+        n_atoms: How many atoms the plan selected.
+
+    Returns:
+        The verdict, with every rater's per-atom dissent recorded.
+    """
+    v = Verdict()
+    if not coverages:
+        return v.add(GateResult("V4", False, detail="no coverage output"))
+
+    gating = THRESHOLDS["v4_gating_statuses"]
+    n = len(coverages)
+    needed = n // 2 + 1  # strict majority, mirroring `gate_audit_panel`
+
+    # Per atom index: who called it lost, and who called it merely altered.
+    #
+    # The index is CANONICALIZED to an int where it looks like one. Live raters disagree about
+    # the type -- `parse_coverage` accepts both `3` and `"3"`, and on the first live run one
+    # model returned ints while another returned numeric strings. Two consequences, both bad
+    # and both silent: sorting the mixed keys raises TypeError, and, worse, `3` and `"3"` key
+    # as DIFFERENT atoms, so two raters agreeing that one atom is missing would each be
+    # counted once against a quorum of two and the majority would never form.
+    def _idx(raw: Any) -> Any:
+        if isinstance(raw, bool) or raw is None:
+            return raw
+        if isinstance(raw, int):
+            return raw
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            return str(raw)
+
+    def _order(key: Any) -> tuple[int, float, str]:
+        """Sort ints numerically, then everything else by text, with None last."""
+        if key is None:
+            return (2, 0.0, "")
+        if isinstance(key, int) and not isinstance(key, bool):
+            return (0, float(key), "")
+        return (1, 0.0, str(key))
+
+    lost_by: dict[Any, list[str]] = {}
+    altered_by: dict[Any, list[str]] = {}
+    for name, entries in coverages:
+        for e in entries:
+            idx = _idx(e.get("index"))
+            status = e.get("status")
+            if status in gating:
+                lost_by.setdefault(idx, []).append(name)
+            elif status == "altered":
+                altered_by.setdefault(idx, []).append(name)
+
+    lost = sorted(
+        (idx for idx, voters in lost_by.items() if len(set(voters)) >= needed),
+        key=_order,
+    )
+    present = n_atoms - len(lost)
+    frac = present / n_atoms if n_atoms else 0.0
+    need = THRESHOLDS["v4_coverage"]
+    ok = frac >= need
+    v.add(
+        GateResult(
+            "V4",
+            ok,
+            threshold=need,
+            observed={
+                "coverage": round(frac, 3),
+                "gating_statuses": list(gating),
+                "needed_to_reject": needed,
+                # The full dissent map, so a lone rater's objection is visible rather than
+                # silently outvoted -- the same reason `gate_audit_panel` records its votes.
+                "lost_votes": {
+                    str(k): v2
+                    for k, v2 in sorted(lost_by.items(), key=lambda kv: _order(kv[0]))
+                },
+                "altered_votes": {
+                    str(k): v2
+                    for k, v2 in sorted(altered_by.items(), key=lambda kv: _order(kv[0]))
+                },
+                "n_raters": n,
+            },
+            detail=""
+            if ok
+            else f"{len(lost)} atom(s) a majority of {n} rater(s) found not present: "
+            f"{[(i, lost_by[i]) for i in lost[:6]]}",
         )
     )
     return v
@@ -840,169 +1267,8 @@ def gate_length_drift(base: str, perturbed: str, *, operator: str = "") -> GateR
 
 
 # ----------------------------------------------------------------------------
-# Agreement statistics.
+# Human-annotation sampling.
 # ----------------------------------------------------------------------------
-
-
-def fleiss_kappa(ratings: list[list[Any]]) -> float | None:
-    """Fleiss' kappa over categorical ratings.
-
-    Args:
-        ratings: One list of rater labels per item. Items whose rater count differs are
-            allowed; each is normalized independently.
-
-    Returns:
-        The kappa, or None when it is undefined (fewer than two items, or fewer than two
-        raters on some item).
-    """
-    rows = [r for r in ratings if r and len(r) >= 2]
-    if len(rows) < 2:
-        return None
-    cats = sorted({c for r in rows for c in r}, key=str)
-    if len(cats) < 2:
-        return 1.0  # everyone agreed on everything; kappa is degenerate but perfect
-
-    p_i = []
-    col_sums = dict.fromkeys(cats, 0.0)
-    total = 0
-    for r in rows:
-        n = len(r)
-        counts = {c: r.count(c) for c in cats}
-        p_i.append((sum(v * v for v in counts.values()) - n) / (n * (n - 1)))
-        for c in cats:
-            col_sums[c] += counts[c]
-        total += n
-    p_bar = sum(p_i) / len(p_i)
-    p_e = sum((col_sums[c] / total) ** 2 for c in cats)
-    if math.isclose(p_e, 1.0):
-        return 1.0
-    return (p_bar - p_e) / (1.0 - p_e)
-
-
-def cohen_kappa(a: list[Any], b: list[Any]) -> float | None:
-    """Cohen's kappa between two raters.
-
-    Args:
-        a: Rater A's labels.
-        b: Rater B's labels, same length and order.
-
-    Returns:
-        The kappa, or None if the inputs are unusable.
-    """
-    if len(a) != len(b) or not a:
-        return None
-    n = len(a)
-    agree = sum(1 for x, y in zip(a, b) if x == y) / n
-    cats = set(a) | set(b)
-    expected = sum((a.count(c) / n) * (b.count(c) / n) for c in cats)
-    if math.isclose(expected, 1.0):
-        return 1.0
-    return (agree - expected) / (1.0 - expected)
-
-
-def krippendorff_alpha_ordinal(
-    ratings: list[list[Any]], levels: list[Any]
-) -> float | None:
-    """Krippendorff's alpha for ordinal data, over an explicit level order.
-
-    Used for strength bands (weak < moderate < strong), where treating a
-    weak-vs-strong disagreement as no worse than weak-vs-moderate would flatter the
-    annotators.
-
-    Args:
-        ratings: One list of rater labels per item.
-        levels: The ordered level values.
-
-    Returns:
-        The alpha, or None when undefined.
-    """
-    rank = {lv: i for i, lv in enumerate(levels)}
-    rows = [[rank[x] for x in r if x in rank] for r in ratings]
-    rows = [r for r in rows if len(r) >= 2]
-    if len(rows) < 2:
-        return None
-
-    def sq(x: float) -> float:
-        return x * x
-
-    d_o_num = d_o_den = 0.0
-    for r in rows:
-        n = len(r)
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    d_o_num += sq(r[i] - r[j])
-                    d_o_den += 1
-    if not d_o_den:
-        return None
-    d_o = d_o_num / d_o_den
-
-    flat = [x for r in rows for x in r]
-    d_e_num = d_e_den = 0.0
-    for i, x in enumerate(flat):
-        for j, y in enumerate(flat):
-            if i != j:
-                d_e_num += sq(x - y)
-                d_e_den += 1
-    if not d_e_den:
-        return None
-    d_e = d_e_num / d_e_den
-    if math.isclose(d_e, 0.0):
-        return 1.0
-    return 1.0 - d_o / d_e
-
-
-def agreement_report(
-    coupling: list[list[str]],
-    sense: list[list[str]],
-    exhaustive: tuple[list[bool], list[bool]] | None = None,
-    strength: list[list[str]] | None = None,
-) -> dict[str, Any]:
-    """Compute the V5 agreement statistics and flag facets below their floors.
-
-    A facet below its floor is not dropped: it ships flagged ``low_agreement`` and is
-    excluded from headline metrics but reported, because an unreliable facet is itself a
-    result about the taxonomy.
-
-    Args:
-        coupling: Per-edge rater coupling labels.
-        sense: Per-edge rater sense labels.
-        exhaustive: Two raters' binary exhaustiveness calls, for Cohen's kappa.
-        strength: Per-edge rater strength bands, for ordinal alpha.
-
-    Returns:
-        The statistics, the floors, and a ``low_agreement`` list of facet names.
-    """
-    k_coupling = fleiss_kappa(coupling)
-    k_sense = fleiss_kappa(sense)
-    k_exh = cohen_kappa(*exhaustive) if exhaustive else None
-    a_strength = (
-        krippendorff_alpha_ordinal(strength, ["weak", "moderate", "strong"])
-        if strength
-        else None
-    )
-
-    low: list[str] = []
-    for name, value, floor in (
-        ("coupling", k_coupling, THRESHOLDS["kappa_coupling"]),
-        ("sense", k_sense, THRESHOLDS["kappa_sense"]),
-        ("exhaustiveness", k_exh, THRESHOLDS["kappa_exhaustive"]),
-    ):
-        if value is not None and value < floor:
-            low.append(name)
-
-    return {
-        "kappa_coupling": k_coupling,
-        "kappa_sense": k_sense,
-        "kappa_exhaustive": k_exh,
-        "alpha_strength": a_strength,
-        "floors": {
-            "coupling": THRESHOLDS["kappa_coupling"],
-            "sense": THRESHOLDS["kappa_sense"],
-            "exhaustiveness": THRESHOLDS["kappa_exhaustive"],
-        },
-        "low_agreement": low,
-    }
 
 
 def stratified_sample(items: list[dict[str, Any]], n: int = 120) -> list[str]:
@@ -1049,18 +1315,17 @@ def stratified_sample(items: list[dict[str, Any]], n: int = 120) -> list[str]:
 
 __all__ = [
     "THRESHOLDS",
+    "V3_EXEMPT_SPANS",
     "GateResult",
     "Verdict",
-    "agreement_report",
-    "cohen_kappa",
     "committee_for",
-    "fleiss_kappa",
     "gate_audit",
+    "gate_audit_panel",
     "gate_coverage",
+    "gate_coverage_panel",
     "gate_length_drift",
     "gate_plan",
     "gate_recovery",
-    "krippendorff_alpha_ordinal",
     "majority",
     "stratified_sample",
     "unanimous",

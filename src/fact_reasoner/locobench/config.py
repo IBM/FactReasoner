@@ -35,6 +35,11 @@ from fact_reasoner.locobench.topics import TOPICS, canonicalize
 # A committee needs a majority, and the item's own generator is excluded from it
 # (Phase 1 R3), so the configured panel must leave at least this many voters after that
 # exclusion. Three is the smallest panel that can produce a 2-1 majority.
+#
+# This is a floor on the RESOLVED panel -- what `eligible_auditors` returns for a given
+# generator -- not on `len(committee)`. The two differ whenever a committee entry shares the
+# generator's model_id or two entries alias the same model, and `validate()` checks the
+# resolved count for exactly that reason.
 DEFAULT_COMMITTEE_MIN = 3
 
 # Phase 2 grades three readouts. `reified` is recorded as a diagnostic but enters no
@@ -239,10 +244,12 @@ class GenConfig:
         out_dir: Output directory. Re-running against the same directory resumes.
         generators: Models that may run P1--P5. Stratified round-robin over family
             slots, so no single model authors the corpus.
-        committee: Models that may run V1/V2/V4. The generator of an item is excluded
-            from that item's committee, so this must be large enough to keep a majority
-            (see :data:`DEFAULT_COMMITTEE_MIN`).
-        auditor: The single model that runs V3. Defaults to the first committee entry.
+        committee: Models that run V1, V3 and V4. The generator of an item is excluded
+            from that item's committee, so this must leave at least
+            :data:`DEFAULT_COMMITTEE_MIN` eligible voters after that exclusion and after
+            deduplication by ``model_id`` -- which is what ``validate()`` checks.
+        auditor: A single model to run V3, overriding the panel. Normally left unset so the
+            whole eligible committee votes; naming one collapses the panel to it alone.
         merlin_path: Merlin executable, needed only to score admitted items. Optional:
             generation itself does not score.
         formulation: Coherence formulation; only ``"mrf"`` is in scope.
@@ -402,14 +409,26 @@ class GenConfig:
 
         if not self.generators:
             raise ValueError("A live run needs at least one generator model.")
-        if len(self.committee) < DEFAULT_COMMITTEE_MIN + 1:
-            raise ValueError(
-                f"committee has {len(self.committee)} model(s). Each item excludes its "
-                f"own generator from its committee (R3), so at least "
-                f"{DEFAULT_COMMITTEE_MIN + 1} are needed to keep "
-                f"{DEFAULT_COMMITTEE_MIN} voters and a majority. This is checked now "
-                "rather than at item 400."
-            )
+        # The requirement is VOTERS THAT ACTUALLY REMAIN, not a raw committee size. R3
+        # excludes the model that generated an item from validating it, and
+        # `eligible_auditors` applies that by `model_id` while also deduplicating aliases --
+        # so a flat `len(committee) >= MIN + 1` both over- and under-counted. It refused a
+        # committee of 3 distinct frontier models that leaves all 3 eligible (no member
+        # shares the generator's id), and it admitted 4 entries that are the same model
+        # under four labels, which dedupe to a single voter and cannot form a majority.
+        # Checking the resolved panel per generator measures the property the threshold is
+        # actually about, and still fails at load time rather than at item 400.
+        for gen in self.generators:
+            n_voters = len(self.eligible_auditors(gen))
+            if n_voters < DEFAULT_COMMITTEE_MIN:
+                raise ValueError(
+                    f"committee leaves only {n_voters} eligible voter(s) for generator "
+                    f"{gen.name!r} ({gen.model_id}), but {DEFAULT_COMMITTEE_MIN} are "
+                    f"needed for a majority. Each item excludes its own generator (R3), "
+                    f"and models are deduplicated by model_id, so {len(self.committee)} "
+                    "committee entry/entries were not enough. Add committee models with "
+                    "distinct model_ids that differ from the generator's."
+                )
         families = {m.family for m in self.committee}
         if len(families) < 3:
             raise ValueError(
