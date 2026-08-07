@@ -1452,3 +1452,89 @@ def test_findings_omit_the_saturation_bullet_when_confidence_varies(
         for i, rel in enumerate(rec.get("relations") or []):
             rel["type_confidence"] = 0.4 + 0.01 * i
     assert "type confidence is saturated" not in rp._findings_section(results)
+
+
+def test_gate_admitted_gold_edges_are_inside_the_window():
+    """Pins the fact the report's stratification caption now asserts.
+
+    `window_admission == "gate"` does NOT mean out-of-window in this corpus: every
+    such edge sits within the radius-4 window, so a miss is the response-anchored
+    refinement declining the link, not a candidate-selection shortfall. If a future
+    corpus changes that, this fails and the caption must be revisited.
+    """
+    path = "data/locobench-claude-5-test/items.jsonl"
+    if not os.path.exists(path):
+        pytest.skip("dataset not present")
+    items = [json.loads(line) for line in open(path)]
+    gate_edges = [
+        rel
+        for item in items
+        for rel in item.get("relations", [])
+        if rel.get("window_admission") == "gate"
+    ]
+    assert gate_edges, "expected some gate-admitted edges in this corpus"
+    for rel in gate_edges:
+        dist = mg._atom_index(rel["target_id"]) - mg._atom_index(rel["source_id"])
+        assert 0 < dist <= 4, f"{rel['id']}: distance {dist} is outside the window"
+        # And they are all planted errors, so declining them is correct.
+        assert rel["validity"] == "invalid"
+
+
+def test_fingerprint_is_scoped_to_what_each_arm_reads(mined_specs):
+    """Changing --gate must not invalidate arms that never read it.
+
+    A coarse run-level fingerprint would discard cached windowed / all_pairs / gold
+    cells when a `gated` arm is added, silently re-spending thousands of LLM calls
+    on a knob those arms never saw.
+    """
+    specs = {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+    arms = ("gold", "mined:m1:windowed", "mined:m1:gated", "mined:m1:all_pairs")
+
+    def fps(**kw):
+        r = rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=arms, model_specs=specs, **kw,
+        )
+        return {a: r._run_fingerprint(a) for a in arms}
+
+    base, changed = fps(gate="none"), fps(gate="embedding")
+    assert changed["mined:m1:gated"] != base["mined:m1:gated"]
+    for arm in ("gold", "mined:m1:windowed", "mined:m1:all_pairs"):
+        assert changed[arm] == base[arm], f"{arm} invalidated by an unrelated knob"
+
+
+def test_window_only_invalidates_the_policies_that_use_it(mined_specs):
+    specs = {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+    arms = ("gold", "mined:m1:windowed", "mined:m1:gated", "mined:m1:all_pairs")
+
+    def fps(**kw):
+        r = rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=arms, model_specs=specs, **kw,
+        )
+        return {a: r._run_fingerprint(a) for a in arms}
+
+    base, changed = fps(window=4), fps(window=6)
+    assert changed["mined:m1:windowed"] != base["mined:m1:windowed"]
+    assert changed["mined:m1:gated"] != base["mined:m1:gated"]
+    # all_pairs ignores the window entirely, and gold reads no mining knob.
+    assert changed["mined:m1:all_pairs"] == base["mined:m1:all_pairs"]
+    assert changed["gold"] == base["gold"]
+
+
+def test_gold_fingerprint_ignores_every_mining_knob(mined_specs):
+    specs = {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+
+    def fp(**kw):
+        return rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=("gold",), model_specs=specs, **kw,
+        )._run_fingerprint("gold")
+
+    base = fp()
+    for kw in ({"window": 9}, {"gate": "entity"}, {"strength_method": "verbalized"},
+               {"nli_method": "simbauq"}, {"strength_samples": 32}):
+        assert fp(**kw) == base, f"gold invalidated by {kw}"
+    # But a SCORING knob must still invalidate it.
+    assert fp(ibound=10) != base
+    assert fp(reified_prior=0.7) != base

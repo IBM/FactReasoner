@@ -377,13 +377,16 @@ class GoldEvalRunner:
         records_dir = os.path.join(self.output_dir, "records")
         os.makedirs(records_dir, exist_ok=True)
 
-        fingerprint = self._run_fingerprint()
+        # Per-arm, so a knob only invalidates the arms that actually read it.
+        fingerprints = {arm: self._run_fingerprint(arm) for arm in self.arms}
         records: list[dict[str, Any]] = []
         reused = 0
         for item in items:
             for arm in self.arms:
                 cached = (
-                    self._load_record(records_dir, item["id"], arm, fingerprint)
+                    self._load_record(
+                        records_dir, item["id"], arm, fingerprints[arm]
+                    )
                     if self.resume
                     else None
                 )
@@ -392,7 +395,7 @@ class GoldEvalRunner:
                     records.append(cached)
                     continue
                 record = self._run_cell(item, arm)
-                record["run_config_fingerprint"] = fingerprint
+                record["run_config_fingerprint"] = fingerprints[arm]
                 records.append(record)
                 self._save_record(records_dir, record)
         if reused:
@@ -705,28 +708,44 @@ class GoldEvalRunner:
             "run_config_fingerprint": self._run_fingerprint(),
         }
 
-    def _run_fingerprint(self) -> str:
+    def _run_fingerprint(self, arm: str | None = None) -> str:
         """Short hash of the knobs a cached record must have been produced under.
 
         The record filename keys only (item, arm), so it cannot tell that `--window`
         or `--strength-method` changed between runs. Without this, `--resume` would
         silently mix cells scored under different settings.
+
+        The hash is scoped to what the given arm actually consumes. A gold arm reads
+        no mining knob, and only `gated` reads `gate`, so changing `--gate` to add a
+        `gated` arm must not invalidate cached `windowed` / `all_pairs` / gold cells
+        -- that would silently re-spend thousands of LLM calls for a knob those arms
+        never saw. Passing `arm=None` hashes every knob, for the run-level record in
+        `config`.
         """
-        payload = json.dumps(
-            {
-                "methods": list(self.methods),
-                "concession_discount": self.concession_discount,
-                "reified_prior": self.reified_prior,
-                "ibound": self.ibound,
-                "window": self.window,
-                "gate": self.gate,
-                "nli_method": self.nli_method,
-                "strength_method": self.strength_method,
-                "strength_samples": self.strength_samples,
-            },
-            sort_keys=True,
-        )
-        return hashlib.sha256(payload.encode()).hexdigest()[:12]
+        payload: dict[str, Any] = {
+            "methods": list(self.methods),
+            "concession_discount": self.concession_discount,
+            "reified_prior": self.reified_prior,
+            "ibound": self.ibound,
+        }
+        spec = self.mined_arms.get(arm) if arm is not None else None
+        if arm is None or spec is not None:
+            # Mining knobs: only a mined arm (or the run-level hash) depends on them.
+            payload.update(
+                {
+                    "nli_method": self.nli_method,
+                    "strength_method": self.strength_method,
+                    "strength_samples": self.strength_samples,
+                }
+            )
+            policy = spec.pair_policy if spec is not None else None
+            if arm is None or policy in ("windowed", "gated"):
+                payload["window"] = self.window
+            if arm is None or policy == "gated":
+                payload["gate"] = self.gate
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True).encode()
+        ).hexdigest()[:12]
 
     def _mining_summary(
         self, records: Sequence[Mapping[str, Any]]

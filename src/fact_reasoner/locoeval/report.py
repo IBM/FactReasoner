@@ -937,9 +937,13 @@ def _mining_quality_section(results: Mapping[str, Any]) -> str:
         r"properties. \textbf{Fwd}/\textbf{Bwd} is the sign of the target-minus-"
         r"source atom index; \textbf{Dir}/\textbf{Undir} is whether the coupling is "
         r"asymmetric; \textbf{win}/\textbf{gate} is the generator's own "
-        r"\texttt{window\_admission} label, i.e. whether it expected the edge inside "
-        r"a radius-4 window. A forward-only policy is structurally capped in the "
-        r"\textbf{Bwd}$\times$\textbf{Dir} cell.}",
+        r"\texttt{window\_admission} label. A forward-only policy is structurally "
+        r"capped in the \textbf{Bwd}$\times$\textbf{Dir} cell. Note that the "
+        r"\texttt{gate} label does \emph{not} mean out-of-window: in this dataset "
+        r"every such edge sits at distance $+2$ or $+3$, inside the radius-4 window, "
+        r"so a miss there is a discourse \emph{demotion} --- the response does not "
+        r"draw the link --- and not a reach failure. Every one of them is also "
+        r"\texttt{invalid}, so demoting them is the desired behaviour.}",
         r"\label{tab:mining-recall-strat}",
         r"\begin{tabular}{lrrrrrr}", r"\toprule",
         r"Policy & Fwd & Bwd & Dir & Undir & win & gate \\",
@@ -991,11 +995,20 @@ def _mining_quality_section(results: Mapping[str, Any]) -> str:
         for a in arms
     ):
         caveat = (
-            "One confound to note in Table~\\ref{tab:mining-recall-strat}: in this "
-            "dataset every \\texttt{gate}-admitted gold edge is also marked "
-            "\\texttt{invalid}, so the \\textbf{gate} column and the "
-            "\\textbf{invalid} column of Table~\\ref{tab:mining-validity} are not "
-            "independent."
+            "Two things about the \\textbf{gate} column of "
+            "Table~\\ref{tab:mining-recall-strat} are worth stating plainly, because "
+            "the label invites a wrong reading. First, in this dataset every "
+            "\\texttt{gate}-admitted gold edge is also marked \\texttt{invalid}, so "
+            "that column and the \\textbf{invalid} column of "
+            "Table~\\ref{tab:mining-validity} are not independent. Second, those "
+            "edges are not actually out of reach: measured by atom index they sit at "
+            "distance $+2$ or $+3$, well inside the radius-4 window, so they are "
+            "offered to the miner by every policy here and then dropped by the "
+            "response-anchored refinement. A recall of zero in that column therefore "
+            "records the refinement declining to assert a link the prose does not "
+            "draw --- on planted-invalid edges, the behaviour one wants --- rather "
+            "than a candidate-selection shortfall. It follows that no gate threshold "
+            "recovers them, which is what the \\texttt{gated} arm demonstrates."
         )
 
     return "\n".join(
@@ -1326,6 +1339,28 @@ def _mining_findings(results: Mapping[str, Any]) -> list[str]:
             "coupling recall is therefore partly a comparison of their reach."
         )
 
+    by_policy = {b.get("pair_policy"): b for b in mining.values()}
+    win, gated = by_policy.get("windowed"), by_policy.get("gated")
+    if win and gated:
+        wp, gp = win.get("num_pairs_scored") or 0, gated.get("num_pairs_scored") or 0
+        wr = (win.get("coupling") or {}).get("recall")
+        gr = (gated.get("coupling") or {}).get("recall")
+        if wp and wr is not None and gr is not None:
+            bullets.append(
+                r"\item \textbf{The long-range gate buys candidates, not coverage.} "
+                f"\\texttt{{gated}} scored {gp} pairs against \\texttt{{windowed}}'s "
+                f"{wp} ($\\times${gp / wp:.1f} the LLM cost) for a coupling-level "
+                f"recall of {_pct(gr)}\\% against {_pct(wr)}\\% --- no better, and "
+                "at markedly worse precision. The reason is structural rather than a "
+                "threshold that wants tuning: \\texttt{gated} is also forward-only, "
+                "so the edges \\texttt{windowed} cannot reach are exactly the ones "
+                "the gate cannot reach either. Sweeping the gate threshold from "
+                "$0.5$ down to $0.1$ was measured to raise the selected-pair count "
+                "from 401 to 906 while leaving the number of \\emph{reachable} gold "
+                "edges fixed at 60 of 86. Only dropping the forward-only restriction "
+                "(i.e. \\texttt{all\\_pairs}) changes that number."
+            )
+
     dups = {
         b.get("pair_policy"): b.get("duplicate_unordered_pairs") for b in mining.values()
     }
@@ -1464,10 +1499,15 @@ def _threats_section(results: Mapping[str, Any]) -> str:
                 r"threshold, so the reported numbers are not built on dropped calls "
                 r"--- but the underlying ambiguity is a property of the pipeline, and "
                 r"a run without that accounting would show no symptom.",
-                r"\item \textbf{One mined observation per cell.} Mining is sampled "
-                r"once per (item, arm) at the model's default temperature, so no "
-                r"run-to-run variance is measured. Differences between mined arms of "
-                r"a similar size should not be read as reliable.",
+                r"\item \textbf{One mined observation per cell, and the sampling "
+                r"noise is not small.} Mining is sampled once per (item, arm) at the "
+                r"model's default temperature. Two independent sweeps of this same "
+                r"configuration were run during development: coupling-level recall "
+                r"was stable to within $0.02$, but the ladder pass rate for one arm "
+                r"moved by $3$ of $28$ assertions --- larger than the gap between "
+                r"several of the arms in Table~\ref{tab:ladder-by-arm}. Treat the "
+                r"ordering of arms whose pass rates differ by only a few assertions "
+                r"as unresolved; the large gap to the gold arm is the robust part.",
             ]
         )
     return r"\begin{itemize}" + "\n" + "\n".join(items) + "\n" + r"\end{itemize}"

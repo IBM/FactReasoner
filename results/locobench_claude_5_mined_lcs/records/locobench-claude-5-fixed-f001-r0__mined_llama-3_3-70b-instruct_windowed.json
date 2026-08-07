@@ -32,7 +32,7 @@
   "backend": "rits",
   "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
   "window": 4,
-  "gate": "none",
+  "gate": "embedding",
   "nli_method": "logprobs",
   "strength_method": "surrogate_logprobs",
   "strength_samples": 8,
@@ -77,7 +77,7 @@
     "strength_samples": 8,
     "pair_policy": "windowed",
     "window": 4,
-    "gate": "none",
+    "gate": "embedding",
     "gate_threshold": 0.3,
     "prior": 0.5,
     "prior_source": "per_atom",
@@ -103,12 +103,24 @@
   },
   "relations": [
     {
+      "source": "a2",
+      "target": "a3",
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.003172580431294779,
+      "strength": 0.0031726830465299816,
+      "type_confidence": 0.9999676566383412,
+      "directed": false,
+      "concession_resolved": false,
+      "resolving_atom_id": null
+    },
+    {
       "source": "a3",
       "target": "a4",
       "type": "entailment",
-      "sense": "Instantiation",
-      "probability": 0.9999999976644071,
-      "strength": 0.9999999976644071,
+      "sense": "Evidence",
+      "probability": 0.9999999981810384,
+      "strength": 0.9999999981810384,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
@@ -119,9 +131,9 @@
       "target": "a5",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.22270011686531105,
-      "strength": 0.2227001434132311,
-      "type_confidence": 0.9999998807907365,
+      "probability": 0.18242546101545534,
+      "strength": 0.1824255190069292,
+      "type_confidence": 0.9999996821087633,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -131,9 +143,9 @@
       "target": "a6",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.00033534988380737996,
-      "strength": 0.0003353500303889888,
-      "type_confidence": 0.9999995628996703,
+      "probability": 0.0005527781546559421,
+      "strength": 0.0005527785500334112,
+      "type_confidence": 0.9999992847452764,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -142,10 +154,10 @@
       "source": "a4",
       "target": "a7",
       "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.999999998394772,
+      "sense": "Instantiation",
+      "probability": 0.9999872431631043,
       "strength": 0.999999998394772,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999872447683118,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -155,9 +167,9 @@
       "target": "a8",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9999999973534265,
+      "probability": 0.9999999178805796,
       "strength": 0.9999999973534265,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999999205271529,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -167,21 +179,9 @@
       "target": "a6",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.43782315189564147,
-      "strength": 0.43782349984596075,
-      "type_confidence": 0.9999992052726283,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null
-    },
-    {
-      "source": "a5",
-      "target": "a7",
-      "type": "contradiction",
-      "sense": "Contrast",
-      "probability": 0.0001225685536665185,
-      "strength": 0.000123394618696034,
-      "type_confidence": 0.9933055019882967,
+      "probability": 0.49999988044233323,
+      "strength": 0.4999999996515706,
+      "type_confidence": 0.9999997615815251,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -191,9 +191,9 @@
       "target": "a7",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.00020327780156796687,
+      "probability": 0.0002034264231513841,
       "strength": 0.00020342704557436349,
-      "type_confidence": 0.9992663512072584,
+      "type_confidence": 0.9999969403135279,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -201,6 +201,18 @@
     {
       "source": "a7",
       "target": "a8",
+      "type": "entailment",
+      "sense": "Evidence",
+      "probability": 0.9999999205271529,
+      "strength": 1.0,
+      "type_confidence": 0.9999999205271529,
+      "directed": true,
+      "concession_resolved": false,
+      "resolving_atom_id": null
+    },
+    {
+      "source": "a7",
+      "target": "a9",
       "type": "entailment",
       "sense": "Evidence",
       "probability": 1.0,
@@ -211,26 +223,14 @@
       "resolving_atom_id": null
     },
     {
-      "source": "a7",
-      "target": "a9",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999999602635733,
-      "strength": 1.0,
-      "type_confidence": 0.9999999602635733,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null
-    },
-    {
       "source": "a8",
       "target": "a9",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999999602635733,
+      "type": "equivalence",
+      "sense": "Restatement",
+      "probability": 0.9999990463270478,
       "strength": 1.0,
-      "type_confidence": 0.9999999602635733,
-      "directed": true,
+      "type_confidence": 0.9999990463270478,
+      "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
     },
@@ -238,13 +238,13 @@
       "source": "a8",
       "target": "a10",
       "type": "contradiction",
-      "sense": "Concession",
-      "probability": 0.46857393178012263,
-      "strength": 0.8519528063578753,
-      "type_confidence": 0.9999997615815251,
-      "directed": true,
-      "concession_resolved": true,
-      "resolving_atom_id": "a12"
+      "sense": "Contrast",
+      "probability": 0.9046503605829556,
+      "strength": 0.9046505403208,
+      "type_confidence": 0.9999998013179273,
+      "directed": false,
+      "concession_resolved": false,
+      "resolving_atom_id": null
     },
     {
       "source": "a8",
@@ -262,10 +262,10 @@
       "source": "a8",
       "target": "a12",
       "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999999677581344,
+      "sense": "Instantiation",
+      "probability": 0.9999998088124706,
       "strength": 0.9999999677581344,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999998410543312,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -275,8 +275,8 @@
       "target": "a10",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 4.222834949541085e-06,
-      "strength": 4.222834949541085e-06,
+      "probability": 4.222834948838172e-06,
+      "strength": 4.222834948838172e-06,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
@@ -287,9 +287,9 @@
       "target": "a11",
       "type": "entailment",
       "sense": "Instantiation",
-      "probability": 0.9999999205271529,
+      "probability": 0.9999999602635733,
       "strength": 1.0,
-      "type_confidence": 0.9999999205271529,
+      "type_confidence": 0.9999999602635733,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -298,9 +298,9 @@
       "source": "a9",
       "target": "a12",
       "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999997617630397,
-      "strength": 0.9999997617630397,
+      "sense": "Instantiation",
+      "probability": 0.9999997617630402,
+      "strength": 0.9999997617630402,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
@@ -323,9 +323,9 @@
       "target": "a12",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 3.5356246447927466e-05,
-      "strength": 3.535625487751351e-05,
-      "type_confidence": 0.9999997615814777,
+      "probability": 2.753568778732314e-05,
+      "strength": 2.753568778732314e-05,
+      "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -335,8 +335,8 @@
       "target": "a12",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9999998735966048,
-      "strength": 0.9999999928058674,
+      "probability": 0.9999998744419375,
+      "strength": 0.9999999936512002,
       "type_confidence": 0.9999998807907365,
       "directed": true,
       "concession_resolved": false,
@@ -347,9 +347,9 @@
       "target": "a14",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999999071947836,
-      "strength": 0.9999999966017322,
-      "type_confidence": 0.999999910593051,
+      "probability": 0.9999999377487906,
+      "strength": 0.9999999973534264,
+      "type_confidence": 0.9999999403953641,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -359,9 +359,9 @@
       "target": "a15",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999982396570308,
-      "strength": 0.9999982396570308,
-      "type_confidence": 1.0,
+      "probability": 0.9999989024947351,
+      "strength": 0.9999989322970234,
+      "type_confidence": 0.9999999701976798,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -371,9 +371,9 @@
       "target": "a9",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9999938558225776,
-      "strength": 0.9999938558225776,
-      "type_confidence": 1.0,
+      "probability": 0.9999951354331136,
+      "strength": 0.9999952149055804,
+      "type_confidence": 0.9999999205271529,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
@@ -382,20 +382,20 @@
       "source": "a4",
       "target": "a12",
       "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999999677581344,
-      "strength": 0.9999999677581344,
-      "type_confidence": 1.0,
+      "sense": "Instantiation",
+      "probability": 0.9999999237287549,
+      "strength": 0.9999999634651802,
+      "type_confidence": 0.9999999602635733,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null
     }
   ],
   "lcs": {
-    "mean_marginal": 0.922064875,
+    "mean_marginal": 0.9615231875,
     "consistency": 0.0,
-    "reified": 0.193941,
-    "log_partition": 0.13755288565790263
+    "reified": 0.038867,
+    "log_partition": 0.06710077082373157
   },
   "diagnostics": {
     "marginals": {
@@ -407,66 +407,66 @@
       "a13": 0.948649,
       "a14": 0.975676,
       "a15": 0.948649,
-      "a2": 0.947368,
-      "a3": 0.17874,
-      "a4": 0.983068,
-      "a5": 0.985287,
-      "a6": 0.985623,
-      "a7": 0.999978,
+      "a2": 0.86637,
+      "a3": 0.877619,
+      "a4": 0.996915,
+      "a5": 0.975574,
+      "a6": 0.994988,
+      "a7": 0.999931,
       "a8": 1.0,
       "a9": 1.0
     },
-    "num_below_prior": 0,
-    "avg_norm_entropy": 0.18784344785373572,
-    "log_z": -5.406419,
-    "log_z_max": -1.453008,
-    "log_z_min": -6.036954
+    "num_below_prior": 1,
+    "avg_norm_entropy": 0.1895693876540733,
+    "log_z": -8.800529,
+    "log_z_max": -1.453024,
+    "log_z_min": -9.329014
   },
   "comparison": {
     "gold_edges_total": 11,
     "gold_edges_scorable": 10,
     "mined_edges_total": 24,
     "pair": {
-      "tp": 7,
-      "fp": 17,
-      "fn": 3,
-      "precision": 0.2916666666666667,
-      "recall": 0.7,
-      "f1": 0.4117647058823529
+      "tp": 8,
+      "fp": 16,
+      "fn": 2,
+      "precision": 0.3333333333333333,
+      "recall": 0.8,
+      "f1": 0.47058823529411764
     },
     "coupling": {
-      "tp": 4,
-      "fp": 20,
-      "fn": 6,
-      "precision": 0.16666666666666666,
-      "recall": 0.4,
-      "f1": 0.23529411764705882
+      "tp": 6,
+      "fp": 18,
+      "fn": 4,
+      "precision": 0.25,
+      "recall": 0.6,
+      "f1": 0.35294117647058826
     },
     "sense": {
-      "tp": 3,
-      "fp": 21,
-      "fn": 7,
-      "precision": 0.125,
-      "recall": 0.3,
-      "f1": 0.17647058823529413
+      "tp": 5,
+      "fp": 19,
+      "fn": 5,
+      "precision": 0.20833333333333334,
+      "recall": 0.5,
+      "f1": 0.29411764705882354
     },
     "recall_by_direction": {
       "forward": {
         "total": 7,
-        "found": 4,
-        "recall": 0.5714285714285714
+        "found": 5,
+        "recall": 0.7142857142857143
       },
       "backward": {
         "total": 3,
-        "found": 0,
-        "recall": 0.0
+        "found": 1,
+        "recall": 0.3333333333333333
       }
     },
     "recall_by_directed_flag": {
       "False": {
         "total": 6,
-        "found": 3,
-        "recall": 0.5
+        "found": 5,
+        "recall": 0.8333333333333334
       },
       "True": {
         "total": 4,
@@ -482,8 +482,8 @@
       },
       "window": {
         "total": 8,
-        "found": 4,
-        "recall": 0.5
+        "found": 6,
+        "recall": 0.75
       }
     },
     "recall_by_coupling": {
@@ -494,8 +494,8 @@
       },
       "contradiction": {
         "total": 4,
-        "found": 2,
-        "recall": 0.5
+        "found": 3,
+        "recall": 0.75
       },
       "entailment": {
         "total": 3,
@@ -504,8 +504,8 @@
       },
       "equivalence": {
         "total": 1,
-        "found": 0,
-        "recall": 0.0
+        "found": 1,
+        "recall": 1.0
       },
       "exclusive": {
         "total": 1,
@@ -516,13 +516,13 @@
     "recall_by_validity": {
       "invalid": {
         "total": 5,
-        "found": 0,
-        "recall": 0.0
+        "found": 1,
+        "recall": 0.2
       },
       "valid": {
         "total": 5,
-        "found": 4,
-        "recall": 0.8
+        "found": 5,
+        "recall": 1.0
       }
     },
     "non_relation_pairs": 4,
@@ -530,6 +530,6 @@
     "non_relation_violation_rate": 0.0
   },
   "duplicate_unordered_pairs": 0,
-  "elapsed_s": 17.342,
-  "run_config_fingerprint": "6701135de3aa"
+  "elapsed_s": 25.527,
+  "run_config_fingerprint": "bf40f01ad8ed"
 }

@@ -31,7 +31,7 @@ This report evaluates the Logical Coherence Score (LCS) pipeline on the \textbf{
 
 \paragraph{Ordering-only relations.} \texttt{Precedence} and \texttt{Succession} compile to Level-1 \texttt{none}: they record source/target order but couple no truth values, so they contribute \textbf{no factor}. They are counted in the dataset table and excluded from the MRF, exactly as \texttt{lcs.taxonomy.compile\_sense} dictates.
 
-\paragraph{Arms.} Each item is scored under \textbf{\texttt{gold}} (all gold edges) and \textbf{\texttt{gold\_valid}} (valid edges only) and \textbf{\texttt{mined:llama-3.3-70b-instruct:windowed}} (mined by llama-3.3-70b-instruct, windowed) and \textbf{\texttt{mined:llama-3.3-70b-instruct:all\_pairs}} (mined by llama-3.3-70b-instruct, all pairs). The second arm drops the deliberately-planted invalid relations, which isolates what those planted errors cost. All four readouts are computed for both: \texttt{mean\_marginal}, \texttt{consistency}, \texttt{reified}, \texttt{log\_partition}.
+\paragraph{Arms.} Each item is scored under \textbf{\texttt{gold}} (all gold edges) and \textbf{\texttt{gold\_valid}} (valid edges only) and \textbf{\texttt{mined:llama-3.3-70b-instruct:windowed}} (mined by llama-3.3-70b-instruct, windowed) and \textbf{\texttt{mined:llama-3.3-70b-instruct:gated}} (mined by llama-3.3-70b-instruct, gated) and \textbf{\texttt{mined:llama-3.3-70b-instruct:all\_pairs}} (mined by llama-3.3-70b-instruct, all pairs). The second arm drops the deliberately-planted invalid relations, which isolates what those planted errors cost. All four readouts are computed for both: \texttt{mean\_marginal}, \texttt{consistency}, \texttt{reified}, \texttt{log\_partition}.
 
 \section{Dataset}
 
@@ -191,11 +191,11 @@ Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} &
 \toprule
 Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} & $\log Z$ \\
 \midrule
-\texttt{f001} & 0 (worse) & 24 & 0.922 & 0.000 & 0.194 & 0.138 & -5.41 \\
-\texttt{f001} & 1 (base) & 23 & 0.919 & 0.000 & 0.393 & 0.190 & -4.33 \\
-\texttt{f001} & 2 (concession\_resolved) & 22 & 0.905 & 0.000 & 0.328 & 0.135 & -4.90 \\
-\texttt{f001} & 3 (fix\_one\_conflict) & 22 & 0.924 & 0.000 & 0.478 & 0.188 & -4.05 \\
-\texttt{f001} & 4 (coherent) & 19 & 0.854 & 0.000 & 0.495 & 0.132 & -6.77 \\
+\texttt{f001} & 0 (worse) & 24 & 0.962 & 0.000 & 0.039 & 0.067 & -8.80 \\
+\texttt{f001} & 1 (base) & 25 & 0.931 & 0.000 & 0.376 & 0.206 & -5.00 \\
+\texttt{f001} & 2 (concession\_resolved) & 22 & 0.920 & 0.000 & 0.344 & 0.171 & -4.62 \\
+\texttt{f001} & 3 (fix\_one\_conflict) & 22 & 0.900 & 0.000 & 0.475 & 0.203 & -4.07 \\
+\texttt{f001} & 4 (coherent) & 18 & 0.915 & 0.000 & 0.495 & 0.185 & -3.31 \\
 \midrule
 \texttt{f002} & 0 (worse) & 17 & 0.855 & 0.000 & 0.492 & 0.067 & -5.88 \\
 \texttt{f002} & 1 (base) & 19 & 0.678 & 0.054 & 0.314 & 0.166 & -16.42 \\
@@ -209,16 +209,40 @@ Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} &
 \begin{table}[htbp]
 \centering
 \small
+\caption{LCS readouts, arm \texttt{mined:llama-3.3-70b-instruct:gated} (mined by llama-3.3-70b-instruct, gated). Higher is more coherent for every readout. \textbf{Rel} is the number of edge-producing relations in the MRF.}
+\label{tab:scores-mined-llama-3-3-70b-instruct-gated}
+\begin{tabular}{llrrrrrr}
+\toprule
+Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} & $\log Z$ \\
+\midrule
+\texttt{f001} & 0 (worse) & 42 & 0.670 & 0.001 & 0.500 & 0.035 & -31.64 \\
+\texttt{f001} & 1 (base) & 44 & 0.689 & 0.000 & 0.366 & 0.080 & -35.11 \\
+\texttt{f001} & 2 (concession\_resolved) & 37 & 0.639 & 0.002 & 0.352 & 0.129 & -28.23 \\
+\texttt{f001} & 3 (fix\_one\_conflict) & 40 & 0.654 & 0.019 & 0.466 & 0.045 & -30.42 \\
+\texttt{f001} & 4 (coherent) & 35 & 0.762 & 0.000 & 0.497 & 0.058 & -28.52 \\
+\midrule
+\texttt{f002} & 0 (worse) & 27 & 0.689 & 0.000 & 0.003 & 0.036 & -25.16 \\
+\texttt{f002} & 1 (base) & 25 & 0.779 & 0.000 & 0.004 & 0.052 & -21.88 \\
+\texttt{f002} & 2 (concession\_resolved) & 23 & 0.654 & 0.000 & 0.131 & 0.210 & -18.80 \\
+\texttt{f002} & 3 (fix\_one\_conflict) & 24 & 0.605 & 0.000 & 0.277 & 0.236 & -20.80 \\
+\texttt{f002} & 4 (coherent) & 24 & 0.648 & 0.000 & 0.020 & 0.138 & -21.51 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
 \caption{LCS readouts, arm \texttt{mined:llama-3.3-70b-instruct:all\_pairs} (mined by llama-3.3-70b-instruct, all pairs). Higher is more coherent for every readout. \textbf{Rel} is the number of edge-producing relations in the MRF.}
 \label{tab:scores-mined-llama-3-3-70b-instruct-all-pairs}
 \begin{tabular}{llrrrrrr}
 \toprule
 Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} & $\log Z$ \\
 \midrule
-\texttt{f001} & 0 (worse) & 97 & 0.789 & 0.012 & 0.000 & 0.007 & -66.10 \\
-\texttt{f001} & 1 (base) & 87 & 0.262 & 0.341 & 0.018 & 0.007 & -75.94 \\
-\texttt{f001} & 2 (concession\_resolved) & 97 & 0.361 & 0.350 & 0.015 & 0.011 & -83.03 \\
-\texttt{f001} & 3 (fix\_one\_conflict) & 95 & 0.570 & 0.023 & 0.197 & 0.041 & -73.99 \\
+\texttt{f001} & 0 (worse) & 89 & 0.833 & 0.000 & 0.000 & 0.014 & -50.64 \\
+\texttt{f001} & 1 (base) & 91 & 0.248 & 0.315 & 0.050 & 0.002 & -76.85 \\
+\texttt{f001} & 2 (concession\_resolved) & 91 & 0.822 & 0.000 & 0.002 & 0.014 & -59.82 \\
+\texttt{f001} & 3 (fix\_one\_conflict) & 93 & 0.811 & 0.000 & 0.002 & 0.002 & -59.53 \\
 \texttt{f001} & 4 (coherent) & 96 & 0.735 & 0.068 & 0.097 & 0.076 & -77.37 \\
 \midrule
 \texttt{f002} & 0 (worse) & 79 & 0.807 & 0.000 & 0.000 & 0.004 & -71.97 \\
@@ -270,16 +294,41 @@ This is the mined-versus-labelled comparison: identical atoms, identical priors 
 \toprule
 Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} \\
 \midrule
-\texttt{f001} & 0 & 10 $\to$ 24 & +0.172 & -0.131 & +0.043 & -0.205 \\
-\texttt{f001} & 1 & 9 $\to$ 23 & +0.159 & -0.341 & +0.171 & -0.185 \\
-\texttt{f001} & 2 & 9 $\to$ 22 & +0.115 & -0.085 & +0.075 & -0.239 \\
-\texttt{f001} & 3 & 8 $\to$ 22 & +0.135 & -0.094 & +0.217 & -0.238 \\
-\texttt{f001} & 4 & 7 $\to$ 19 & +0.031 & -0.128 & +0.174 & -0.356 \\
+\texttt{f001} & 0 & 10 $\to$ 24 & +0.211 & -0.131 & -0.112 & -0.275 \\
+\texttt{f001} & 1 & 9 $\to$ 25 & +0.171 & -0.341 & +0.154 & -0.168 \\
+\texttt{f001} & 2 & 9 $\to$ 22 & +0.130 & -0.085 & +0.091 & -0.204 \\
+\texttt{f001} & 3 & 8 $\to$ 22 & +0.111 & -0.094 & +0.213 & -0.223 \\
+\texttt{f001} & 4 & 7 $\to$ 18 & +0.092 & -0.128 & +0.174 & -0.304 \\
 \texttt{f002} & 0 & 10 $\to$ 17 & +0.069 & -0.016 & +0.372 & -0.214 \\
 \texttt{f002} & 1 & 9 $\to$ 19 & -0.115 & -0.021 & +0.064 & -0.161 \\
 \texttt{f002} & 2 & 9 $\to$ 14 & -0.081 & -0.014 & +0.187 & -0.151 \\
 \texttt{f002} & 3 & 8 $\to$ 14 & -0.080 & -0.000 & +0.158 & -0.221 \\
 \texttt{f002} & 4 & 7 $\to$ 15 & -0.038 & -0.018 & -0.027 & -0.268 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is the mined-versus-labelled comparison: identical atoms, identical priors and identical readouts, with the relation graph the only thing that changed. A positive delta means the graph the miner recovered from the prose scores as \emph{more} coherent than the one the corpus asserts --- which, given the corpus deliberately plants conflict edges, is the expected direction whenever the miner misses them. Read it alongside the recall tables in Section~\ref{sec:mining}: a large positive delta with low conflict recall means the readout moved because edges are missing, not because the text is more coherent.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Change in each readout from arm \texttt{gold} to arm \texttt{mined:llama-3.3-70b-instruct:gated} (mined by llama-3.3-70b-instruct, gated). Positive means the latter scores as more coherent.}
+\label{tab:arm-delta-gold-mined-llama-3-3-70b-instruct-gated}
+\begin{tabular}{llrrrrr}
+\toprule
+Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} \\
+\midrule
+\texttt{f001} & 0 & 10 $\to$ 42 & -0.080 & -0.130 & +0.349 & -0.308 \\
+\texttt{f001} & 1 & 9 $\to$ 44 & -0.071 & -0.341 & +0.144 & -0.294 \\
+\texttt{f001} & 2 & 9 $\to$ 37 & -0.150 & -0.083 & +0.099 & -0.245 \\
+\texttt{f001} & 3 & 8 $\to$ 40 & -0.135 & -0.075 & +0.205 & -0.381 \\
+\texttt{f001} & 4 & 7 $\to$ 35 & -0.060 & -0.128 & +0.176 & -0.430 \\
+\texttt{f002} & 0 & 10 $\to$ 27 & -0.097 & -0.016 & -0.117 & -0.246 \\
+\texttt{f002} & 1 & 9 $\to$ 25 & -0.013 & -0.075 & -0.246 & -0.275 \\
+\texttt{f002} & 2 & 9 $\to$ 23 & -0.170 & -0.015 & -0.109 & -0.115 \\
+\texttt{f002} & 3 & 8 $\to$ 24 & -0.219 & -0.016 & +0.028 & -0.157 \\
+\texttt{f002} & 4 & 7 $\to$ 24 & -0.176 & -0.018 & -0.237 & -0.362 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -295,10 +344,10 @@ This is the mined-versus-labelled comparison: identical atoms, identical priors 
 \toprule
 Family & Rung & Rel & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf{log-Z} \\
 \midrule
-\texttt{f001} & 0 & 10 $\to$ 97 & +0.039 & -0.119 & -0.150 & -0.336 \\
-\texttt{f001} & 1 & 9 $\to$ 87 & -0.498 & +0.000 & -0.204 & -0.367 \\
-\texttt{f001} & 2 & 9 $\to$ 97 & -0.428 & +0.265 & -0.238 & -0.363 \\
-\texttt{f001} & 3 & 8 $\to$ 95 & -0.219 & -0.071 & -0.065 & -0.384 \\
+\texttt{f001} & 0 & 10 $\to$ 89 & +0.083 & -0.131 & -0.151 & -0.328 \\
+\texttt{f001} & 1 & 9 $\to$ 91 & -0.512 & -0.025 & -0.172 & -0.372 \\
+\texttt{f001} & 2 & 9 $\to$ 91 & +0.032 & -0.085 & -0.251 & -0.360 \\
+\texttt{f001} & 3 & 8 $\to$ 93 & +0.022 & -0.094 & -0.260 & -0.423 \\
 \texttt{f001} & 4 & 7 $\to$ 96 & -0.088 & -0.059 & -0.224 & -0.413 \\
 \texttt{f002} & 0 & 10 $\to$ 79 & +0.022 & -0.016 & -0.120 & -0.278 \\
 \texttt{f002} & 1 & 9 $\to$ 75 & -0.019 & -0.075 & -0.250 & -0.303 \\
@@ -326,8 +375,9 @@ A mined arm is scored on exactly the atoms and priors the gold arms use, so the 
 \toprule
 Policy & Mined & Gold & Pair P & Pair R & Coup P & Coup R & Sense R & dup \\
 \midrule
-\texttt{windowed} & 189 & 86 & 36.5 & 80.2 & 24.9 & 54.7 & 43.0 & 0 \\
-\texttt{all\_pairs} & 879 & 86 & 14.8 & 98.8 & 9.1 & 81.4 & 58.1 & 306 \\
+\texttt{windowed} & 190 & 86 & 37.9 & 83.7 & 25.8 & 57.0 & 43.0 & 0 \\
+\texttt{gated} & 321 & 86 & 22.4 & 83.7 & 14.6 & 54.7 & 45.3 & 0 \\
+\texttt{all\_pairs} & 867 & 86 & 14.4 & 95.3 & 9.3 & 82.6 & 59.3 & 298 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -335,14 +385,15 @@ Policy & Mined & Gold & Pair P & Pair R & Coup P & Coup R & Sense R & dup \\
 \begin{table}[htbp]
 \centering
 \small
-\caption{Coupling-level recall (\%) stratified by the gold edge's own properties. \textbf{Fwd}/\textbf{Bwd} is the sign of the target-minus-source atom index; \textbf{Dir}/\textbf{Undir} is whether the coupling is asymmetric; \textbf{win}/\textbf{gate} is the generator's own \texttt{window\_admission} label, i.e. whether it expected the edge inside a radius-4 window. A forward-only policy is structurally capped in the \textbf{Bwd}$\times$\textbf{Dir} cell.}
+\caption{Coupling-level recall (\%) stratified by the gold edge's own properties. \textbf{Fwd}/\textbf{Bwd} is the sign of the target-minus-source atom index; \textbf{Dir}/\textbf{Undir} is whether the coupling is asymmetric; \textbf{win}/\textbf{gate} is the generator's own \texttt{window\_admission} label. A forward-only policy is structurally capped in the \textbf{Bwd}$\times$\textbf{Dir} cell. Note that the \texttt{gate} label does \emph{not} mean out-of-window: in this dataset every such edge sits at distance $+2$ or $+3$, inside the radius-4 window, so a miss there is a discourse \emph{demotion} --- the response does not draw the link --- and not a reach failure. Every one of them is also \texttt{invalid}, so demoting them is the desired behaviour.}
 \label{tab:mining-recall-strat}
 \begin{tabular}{lrrrrrr}
 \toprule
 Policy & Fwd & Bwd & Dir & Undir & win & gate \\
 \midrule
-\texttt{windowed} & 73.2 & 20.0 & 25.0 & 80.4 & 58.8 & 0.0 \\
-\texttt{all\_pairs} & 83.9 & 76.7 & 80.0 & 82.6 & 81.2 & 83.3 \\
+\texttt{windowed} & 75.0 & 23.3 & 30.0 & 80.4 & 61.3 & 0.0 \\
+\texttt{gated} & 69.6 & 26.7 & 22.5 & 82.6 & 58.8 & 0.0 \\
+\texttt{all\_pairs} & 87.5 & 73.3 & 80.0 & 84.8 & 82.5 & 83.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -356,13 +407,14 @@ Policy & Fwd & Bwd & Dir & Undir & win & gate \\
 \toprule
 Policy & valid R & invalid R & Non-rel & rate \\
 \midrule
-\texttt{windowed} & 66.7 & 34.4 & 7/48 & 14.6 \\
-\texttt{all\_pairs} & 87.0 & 71.9 & 13/48 & 27.1 \\
+\texttt{windowed} & 68.5 & 37.5 & 7/48 & 14.6 \\
+\texttt{gated} & 63.0 & 40.6 & 8/48 & 16.7 \\
+\texttt{all\_pairs} & 90.7 & 68.8 & 10/48 & 20.8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-One confound to note in Table~\ref{tab:mining-recall-strat}: in this dataset every \texttt{gate}-admitted gold edge is also marked \texttt{invalid}, so the \textbf{gate} column and the \textbf{invalid} column of Table~\ref{tab:mining-validity} are not independent.
+Two things about the \textbf{gate} column of Table~\ref{tab:mining-recall-strat} are worth stating plainly, because the label invites a wrong reading. First, in this dataset every \texttt{gate}-admitted gold edge is also marked \texttt{invalid}, so that column and the \textbf{invalid} column of Table~\ref{tab:mining-validity} are not independent. Second, those edges are not actually out of reach: measured by atom index they sit at distance $+2$ or $+3$, well inside the radius-4 window, so they are offered to the miner by every policy here and then dropped by the response-anchored refinement. A recall of zero in that column therefore records the refinement declining to assert a link the prose does not draw --- on planted-invalid edges, the behaviour one wants --- rather than a candidate-selection shortfall. It follows that no gate threshold recovers them, which is what the \texttt{gated} arm demonstrates.
 
 \section{Arm comparison}\label{sec:arms}
 
@@ -377,8 +429,9 @@ Arm & Cells & \textbf{mean-marg} & \textbf{consist} & \textbf{reified} & \textbf
 \midrule
 \texttt{gold} & 10 & 0.796 & 0.092 & 0.232 & 0.383 \\
 \texttt{gold\_valid} & 10 & 0.793 & 0.157 & 0.292 & 0.462 \\
-\texttt{mined:llama-3.3-70b-instruct:windowed} & 10 & 0.833 & 0.007 & 0.376 & 0.159 \\
-\texttt{mined:llama-3.3-70b-instruct:all\_pairs} & 10 & 0.517 & 0.204 & 0.055 & 0.021 \\
+\texttt{mined:llama-3.3-70b-instruct:windowed} & 10 & 0.843 & 0.007 & 0.360 & 0.164 \\
+\texttt{mined:llama-3.3-70b-instruct:gated} & 10 & 0.679 & 0.002 & 0.262 & 0.102 \\
+\texttt{mined:llama-3.3-70b-instruct:all\_pairs} & 10 & 0.590 & 0.163 & 0.037 & 0.018 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -394,8 +447,9 @@ Arm & \texttt{f001} & \texttt{f002} & total & \% \\
 \midrule
 \texttt{gold} & 11/14 & 11/14 & 22/28 & 78.6 \\
 \texttt{gold\_valid} & 7/14 & 4/14 & 11/28 & 39.3 \\
-\texttt{mined:llama-3.3-70b-instruct:windowed} & 3/14 & 9/14 & 12/28 & 42.9 \\
-\texttt{mined:llama-3.3-70b-instruct:all\_pairs} & 10/14 & 5/14 & 15/28 & 53.6 \\
+\texttt{mined:llama-3.3-70b-instruct:windowed} & 4/14 & 9/14 & 13/28 & 46.4 \\
+\texttt{mined:llama-3.3-70b-instruct:gated} & 7/14 & 8/14 & 15/28 & 53.6 \\
+\texttt{mined:llama-3.3-70b-instruct:all\_pairs} & 7/14 & 5/14 & 12/28 & 42.9 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -469,26 +523,26 @@ Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
 \begin{table}[htbp]
 \centering
 \small
-\caption{Ordering constraints for \texttt{f001}, arm \texttt{mined:llama-3.3-70b-instruct:windowed}: 3 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
+\caption{Ordering constraints for \texttt{f001}, arm \texttt{mined:llama-3.3-70b-instruct:windowed}: 4 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
 \label{tab:ladder-f001-mined-llama-3-3-70b-instruct-windowed}
 \begin{tabular}{lllllrc}
 \toprule
 Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
 \midrule
-\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & decrease & -0.003 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & decrease & -0.030 & $\times$ \\
 \texttt{C1} & \texttt{consist} & 0$\to$1 & increase & invariant & 0.000 & $\times$ \\
-\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & increase & 0.052 & \checkmark \\
-\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & decrease & -0.014 & $\times$ \\
-\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & increase & 0.019 & \checkmark \\
-\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & increase & 0.053 & \checkmark \\
-\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & decrease & -0.070 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & increase & 0.139 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & decrease & -0.012 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & decrease & -0.020 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & increase & 0.032 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & increase & 0.014 & \checkmark \\
 \texttt{C1} & \texttt{consist} & 3$\to$4 & increase & invariant & 0.000 & $\times$ \\
-\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & decrease & -0.055 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & decrease & -0.018 & $\times$ \\
 \texttt{C2} & \texttt{consist} & 1$\to$2 & decrease & invariant & 0.000 & $\times$ \\
-\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & decrease & -0.055 & $\times$ \\
-\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.068 & $\times$ \\
+\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & decrease & -0.036 & $\times$ \\
+\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.047 & $\times$ \\
 \texttt{C3} & \texttt{consist} & 0$\to$4 & increase & invariant & 0.000 & $\times$ \\
-\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & decrease & -0.005 & $\times$ \\
+\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.118 & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -496,26 +550,53 @@ Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
 \begin{table}[htbp]
 \centering
 \small
-\caption{Ordering constraints for \texttt{f001}, arm \texttt{mined:llama-3.3-70b-instruct:all\_pairs}: 10 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
+\caption{Ordering constraints for \texttt{f001}, arm \texttt{mined:llama-3.3-70b-instruct:gated}: 7 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
+\label{tab:ladder-f001-mined-llama-3-3-70b-instruct-gated}
+\begin{tabular}{lllllrc}
+\toprule
+Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
+\midrule
+\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & increase & 0.019 & \checkmark \\
+\texttt{C1} & \texttt{consist} & 0$\to$1 & increase & decrease & -0.001 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & increase & 0.045 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & decrease & -0.050 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & increase & 0.015 & \checkmark \\
+\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & decrease & -0.084 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & increase & 0.108 & \checkmark \\
+\texttt{C1} & \texttt{consist} & 3$\to$4 & increase & decrease & -0.018 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & increase & 0.013 & \checkmark \\
+\texttt{C2} & \texttt{consist} & 1$\to$2 & decrease & increase & 0.002 & $\times$ \\
+\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & increase & 0.049 & $\times$ \\
+\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & increase & 0.092 & \checkmark \\
+\texttt{C3} & \texttt{consist} & 0$\to$4 & increase & decrease & -0.001 & $\times$ \\
+\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.023 & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Ordering constraints for \texttt{f001}, arm \texttt{mined:llama-3.3-70b-instruct:all\_pairs}: 7 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
 \label{tab:ladder-f001-mined-llama-3-3-70b-instruct-all-pairs}
 \begin{tabular}{lllllrc}
 \toprule
 Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
 \midrule
-\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & decrease & -0.527 & $\times$ \\
-\texttt{C1} & \texttt{consist} & 0$\to$1 & increase & increase & 0.329 & \checkmark \\
-\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & increase & 0.001 & \checkmark \\
-\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & increase & 0.099 & \checkmark \\
-\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & increase & 0.209 & \checkmark \\
-\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & increase & 0.030 & \checkmark \\
-\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & increase & 0.165 & \checkmark \\
-\texttt{C1} & \texttt{consist} & 3$\to$4 & increase & increase & 0.045 & \checkmark \\
-\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & increase & 0.035 & \checkmark \\
-\texttt{C2} & \texttt{consist} & 1$\to$2 & decrease & increase & 0.009 & $\times$ \\
-\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & increase & 0.004 & $\times$ \\
-\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.054 & $\times$ \\
-\texttt{C3} & \texttt{consist} & 0$\to$4 & increase & increase & 0.056 & \checkmark \\
-\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.069 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & decrease & -0.585 & $\times$ \\
+\texttt{C1} & \texttt{consist} & 0$\to$1 & increase & increase & 0.315 & \checkmark \\
+\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & decrease & -0.012 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & increase & 0.574 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & decrease & -0.010 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & decrease & -0.012 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & decrease & -0.076 & $\times$ \\
+\texttt{C1} & \texttt{consist} & 3$\to$4 & increase & increase & 0.068 & \checkmark \\
+\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & increase & 0.074 & \checkmark \\
+\texttt{C2} & \texttt{consist} & 1$\to$2 & decrease & decrease & -0.315 & \checkmark \\
+\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & increase & 0.012 & $\times$ \\
+\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.098 & $\times$ \\
+\texttt{C3} & \texttt{consist} & 0$\to$4 & increase & increase & 0.068 & \checkmark \\
+\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.062 & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -601,6 +682,33 @@ Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
 \texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.069 & $\times$ \\
 \texttt{C3} & \texttt{consist} & 0$\to$4 & increase & increase & 0.000 & \checkmark \\
 \texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.165 & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Ordering constraints for \texttt{f002}, arm \texttt{mined:llama-3.3-70b-instruct:gated}: 8 of 14 hold. C1 asserts a strict increase; C2 asserts a predicted decrease or invariance; C3 asserts endpoint separation.}
+\label{tab:ladder-f002-mined-llama-3-3-70b-instruct-gated}
+\begin{tabular}{lllllrc}
+\toprule
+Class & Readout & Rungs & Expected & Observed & $\Delta$ & OK \\
+\midrule
+\texttt{C1} & \texttt{mean-marg} & 0$\to$1 & increase & increase & 0.090 & \checkmark \\
+\texttt{C1} & \texttt{consist} & 0$\to$1 & increase & increase & 0.000 & \checkmark \\
+\texttt{C1} & \texttt{log-Z} & 0$\to$1 & increase & increase & 0.016 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 1$\to$2 & increase & decrease & -0.125 & $\times$ \\
+\texttt{C1} & \texttt{mean-marg} & 2$\to$3 & increase & decrease & -0.049 & $\times$ \\
+\texttt{C1} & \texttt{log-Z} & 2$\to$3 & increase & increase & 0.026 & \checkmark \\
+\texttt{C1} & \texttt{mean-marg} & 3$\to$4 & increase & increase & 0.043 & \checkmark \\
+\texttt{C1} & \texttt{consist} & 3$\to$4 & increase & increase & 0.000 & \checkmark \\
+\texttt{C1} & \texttt{log-Z} & 3$\to$4 & increase & decrease & -0.098 & $\times$ \\
+\texttt{C2} & \texttt{consist} & 1$\to$2 & decrease & increase & 0.000 & $\times$ \\
+\texttt{C2} & \texttt{log-Z} & 1$\to$2 & invariant & increase & 0.158 & $\times$ \\
+\texttt{C3} & \texttt{mean-marg} & 0$\to$4 & increase & decrease & -0.041 & $\times$ \\
+\texttt{C3} & \texttt{consist} & 0$\to$4 & increase & increase & 0.000 & \checkmark \\
+\texttt{C3} & \texttt{log-Z} & 0$\to$4 & increase & increase & 0.102 & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -924,12 +1032,13 @@ All \textbf{80} readout values shared with \texttt{results/locobench\_claude\_5\
 \item \textbf{The readouts differ sharply in sensitivity.} Across the 10 scored items \texttt{mean\_marginal} spans only $[0.750, 0.824]$, while \texttt{consistency} spans $[0.015, 0.341]$. With atom priors pinned at $0.9/0.1$ the mean marginal is dominated by those priors and moves little; the conflict-sensitive readouts are what register the contradiction structure. For a benchmark whose families vary conflict structure, \texttt{consistency} and \texttt{log\_partition} are the discriminating readouts.
 \item \textbf{The planted invalid relations carry most of the incoherence.} Dropping them changes \texttt{consistency} by 0.000 to 0.318 across items. The planted errors are largely conflict edges anchored to a false endpoint, so they add active contradictions, and the intended-correct subgraph is markedly more coherent. That the effect runs in this direction is a sanity check that the gold labels and the MRF encoding agree about which edges are the damaging ones.
 \item \textbf{Relation counts and factor counts are not the same number.} Of 96 gold relations, 10 are Precedence edges that couple no truth values and never reach the MRF, and 37 are deliberately invalid. Any comparison of graph density needs both figures; Table~\ref{tab:dataset} reports them separately for that reason.
-\item \textbf{Recovering the graph is harder than scoring it.} The best mined arm (\texttt{all\_pairs}) reaches 98.8\% recall at the pair level but only 81.4\% once the Level-1 coupling has to match, at 9.1\% precision. The gold arms show the readouts behave correctly on a correct graph; these numbers are what the pipeline actually delivers from prose, and the gap between the two is the finding.
-\item \textbf{The direction split is a policy property, not a model property.} \texttt{windowed} 73.2\% forward vs 20.0\% backward; \texttt{all\_pairs} 83.9\% forward vs 76.7\% backward. A forward-only policy cannot emit a backward ordered pair at all, so its backward recall is bounded by the undirected couplings it can still match on the unordered pair. Any comparison of the two policies' coupling recall is therefore partly a comparison of their reach.
-\item \textbf{One policy scores a denser network than the others.} Duplicate unordered pairs: \texttt{windowed} 0, \texttt{all\_pairs} 306. Because edges are not deduplicated, each duplicate puts a second factor on the same variable pair, so that pair's influence is applied twice. Readout differences between the policies cannot be attributed to coverage alone.
-\item \textbf{The declared negatives are a cleaner precision signal than the unlabelled pairs.} Violations of the item's own \texttt{non\_relations}: \texttt{windowed} 7/48, \texttt{all\_pairs} 13/48. Precision against every unlabelled pair is dominated by pairs of unknown status, whereas these are pairs the corpus asserts are unrelated.
-\item \textbf{The type confidence is saturated, so the factor probability is carrying only the strength.} 1017 of 1068 mined relations (95.2\%) have $P(\tau \mid a_i,a_j) = 1.0$, with a minimum of 0.679 across the whole sweep. Because $p = P(\tau \mid a_i,a_j) \times P(a_j \mid a_i,\tau)$, the edge weight is effectively the conditional strength alone. This is a genuine reading and not a missing-logprobs fallback --- that path returns 0.5, not 1.0 --- but it means Prompt~A contributes a label and no usable uncertainty on this model, and the two-factor decomposition is not being exercised. A model whose \texttt{[coupling=...]} span is less peaked, or a calibrator fitted on that span, would be needed to test it.
-\item \textbf{The mined numbers are not built on dropped calls.} 0 of 3732 LLM calls failed across the mined arms. This matters because a failed call is parsed as \emph{no relation} --- indistinguishable from a genuine negative --- so an unmeasured failure rate would silently depress recall and inflate every readout. The run refuses a cell whose failure rate exceeds the configured ceiling.
+\item \textbf{Recovering the graph is harder than scoring it.} The best mined arm (\texttt{all\_pairs}) reaches 95.3\% recall at the pair level but only 82.6\% once the Level-1 coupling has to match, at 9.3\% precision. The gold arms show the readouts behave correctly on a correct graph; these numbers are what the pipeline actually delivers from prose, and the gap between the two is the finding.
+\item \textbf{The direction split is a policy property, not a model property.} \texttt{windowed} 75.0\% forward vs 23.3\% backward; \texttt{gated} 69.6\% forward vs 26.7\% backward; \texttt{all\_pairs} 87.5\% forward vs 73.3\% backward. A forward-only policy cannot emit a backward ordered pair at all, so its backward recall is bounded by the undirected couplings it can still match on the unordered pair. Any comparison of the two policies' coupling recall is therefore partly a comparison of their reach.
+\item \textbf{The long-range gate buys candidates, not coverage.} \texttt{gated} scored 741 pairs against \texttt{windowed}'s 264 ($\times$2.8 the LLM cost) for a coupling-level recall of 54.7\% against 57.0\% --- no better, and at markedly worse precision. The reason is structural rather than a threshold that wants tuning: \texttt{gated} is also forward-only, so the edges \texttt{windowed} cannot reach are exactly the ones the gate cannot reach either. Sweeping the gate threshold from $0.5$ down to $0.1$ was measured to raise the selected-pair count from 401 to 906 while leaving the number of \emph{reachable} gold edges fixed at 60 of 86. Only dropping the forward-only restriction (i.e. \texttt{all\_pairs}) changes that number.
+\item \textbf{One policy scores a denser network than the others.} Duplicate unordered pairs: \texttt{windowed} 0, \texttt{gated} 0, \texttt{all\_pairs} 298. Because edges are not deduplicated, each duplicate puts a second factor on the same variable pair, so that pair's influence is applied twice. Readout differences between the policies cannot be attributed to coverage alone.
+\item \textbf{The declared negatives are a cleaner precision signal than the unlabelled pairs.} Violations of the item's own \texttt{non\_relations}: \texttt{windowed} 7/48, \texttt{gated} 8/48, \texttt{all\_pairs} 10/48. Precision against every unlabelled pair is dominated by pairs of unknown status, whereas these are pairs the corpus asserts are unrelated.
+\item \textbf{The type confidence is saturated, so the factor probability is carrying only the strength.} 1303 of 1378 mined relations (94.6\%) have $P(\tau \mid a_i,a_j) = 1.0$, with a minimum of 0.622 across the whole sweep. Because $p = P(\tau \mid a_i,a_j) \times P(a_j \mid a_i,\tau)$, the edge weight is effectively the conditional strength alone. This is a genuine reading and not a missing-logprobs fallback --- that path returns 0.5, not 1.0 --- but it means Prompt~A contributes a label and no usable uncertainty on this model, and the two-factor decomposition is not being exercised. A model whose \texttt{[coupling=...]} span is less peaked, or a calibrator fitted on that span, would be needed to test it.
+\item \textbf{The mined numbers are not built on dropped calls.} 0 of 4783 LLM calls failed across the mined arms. This matters because a failed call is parsed as \emph{no relation} --- indistinguishable from a genuine negative --- so an unmeasured failure rate would silently depress recall and inflate every readout. The run refuses a cell whose failure rate exceeds the configured ceiling.
 \end{itemize}
 
 \section{Threats to validity}
@@ -942,7 +1051,7 @@ All \textbf{80} readout values shared with \texttt{results/locobench\_claude\_5\
 \item \textbf{Inference is approximate in general.} Merlin runs weighted mini-bucket at a finite $i$-bound. On these 16-atom networks the induced width is small enough that it reports exact inference, but the normalized log-partition also depends on a MAP floor and a contradiction-free ceiling, so it is the readout most sensitive to any approximation.
 \item \textbf{The policy comparison is not a coverage ablation.} \texttt{windowed} and \texttt{all\_pairs} differ in three ways at once: which pairs they reach, whether they consider both directions, and --- because duplicate edges are not merged --- how dense a network they build. A readout difference between them cannot be attributed to coverage alone. Isolating coverage would need one policy at two window radii.
 \item \textbf{A failed call and a genuine negative look the same.} The miner parses a captured exception as \emph{no relation}. This run counts those failures and refuses a cell that exceeds a threshold, so the reported numbers are not built on dropped calls --- but the underlying ambiguity is a property of the pipeline, and a run without that accounting would show no symptom.
-\item \textbf{One mined observation per cell.} Mining is sampled once per (item, arm) at the model's default temperature, so no run-to-run variance is measured. Differences between mined arms of a similar size should not be read as reliable.
+\item \textbf{One mined observation per cell, and the sampling noise is not small.} Mining is sampled once per (item, arm) at the model's default temperature. Two independent sweeps of this same configuration were run during development: coupling-level recall was stable to within $0.02$, but the ladder pass rate for one arm moved by $3$ of $28$ assertions --- larger than the gap between several of the arms in Table~\ref{tab:ladder-by-arm}. Treat the ordering of arms whose pass rates differ by only a few assertions as unresolved; the large gap to the gold arm is the robust part.
 \end{itemize}
 
 \end{document}
