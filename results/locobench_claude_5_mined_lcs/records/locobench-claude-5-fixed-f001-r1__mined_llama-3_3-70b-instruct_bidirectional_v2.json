@@ -21,28 +21,29 @@
   "backend": "rits",
   "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
   "window": 4,
-  "gate": "embedding",
+  "gate": "none",
   "nli_method": "logprobs",
   "strength_method": "surrogate_logprobs",
   "strength_samples": 8,
   "max_concurrency": 16,
   "max_distance": 1,
   "discourse": false,
-  "sense_menu": "full",
-  "reconcile": "ratchet",
-  "prompt_variant": "v1",
-  "require_evidence": false,
+  "strategy": "v2",
+  "sense_menu": "gold9",
+  "reconcile": "strict",
+  "prompt_variant": "v2",
+  "require_evidence": true,
   "num_pairs_scored": 30,
-  "num_dropped_none": 9,
+  "num_dropped_none": 12,
   "num_inadmissible_sense": 0,
   "num_unparseable_coupling": 0,
   "num_evidence_rejected": 0,
-  "num_llm_calls": 51,
+  "num_llm_calls": 48,
   "num_call_exceptions": 0,
   "call_exceptions_by_stage": {},
   "call_exceptions_by_type": {},
   "call_error_rate": 0.0,
-  "num_relations": 21,
+  "num_relations": 18,
   "coverage": {
     "policy": "bidirectional",
     "num_atoms": 16,
@@ -54,9 +55,9 @@
     "gate": null,
     "discourse_anchored": false,
     "pairs_scored": 30,
-    "dropped_none": 9,
-    "relations_kept": 21,
-    "llm_calls": 51,
+    "dropped_none": 12,
+    "relations_kept": 18,
+    "llm_calls": 48,
     "llm_call_errors": 0,
     "llm_call_errors_by_stage": {},
     "llm_call_errors_by_type": {},
@@ -72,15 +73,15 @@
     "pair_policy": "bidirectional",
     "window": 4,
     "max_distance": 1,
-    "gate": "embedding",
+    "gate": "none",
     "gate_threshold": 0.3,
     "discourse": false,
     "discourse_gate_threshold": 0.2,
     "discourse_sentence_span": 2,
-    "sense_menu": "full",
-    "reconcile": "ratchet",
-    "prompt_variant": "v1",
-    "require_evidence": false,
+    "sense_menu": "gold9",
+    "reconcile": "strict",
+    "prompt_variant": "v2",
+    "require_evidence": true,
     "prior": 0.5,
     "prior_source": "per_atom",
     "concession_discount": 0.45
@@ -105,95 +106,82 @@
   },
   "relations": [
     {
-      "source": "a2",
-      "target": "a3",
-      "type": "entailment",
-      "sense": "Instantiation",
-      "probability": 0.22269986990014334,
-      "strength": 0.22270014422803644,
-      "type_confidence": 0.999998768173707,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a3",
-      "target": "a4",
-      "type": "entailment",
-      "sense": "Instantiation",
-      "probability": 0.9999999988967441,
-      "strength": 0.9999999988967441,
-      "type_confidence": 1.0,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
       "source": "a4",
       "target": "a5",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.14804714223104198,
+      "probability": 0.14800715452084762,
       "strength": 0.14804720105966881,
-      "type_confidence": 0.9999996026360078,
+      "type_confidence": 0.9997295015472459,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "whereas"
     },
     {
       "source": "a5",
       "target": "a4",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.0031725843461201243,
-      "strength": 0.0031726830536448663,
-      "type_confidence": 0.999968888312172,
+      "probability": 0.0024720976956399015,
+      "strength": 0.0024726229308074847,
+      "type_confidence": 0.9997875797554737,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "whereas"
     },
     {
       "source": "a5",
       "target": "a6",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.3775403840473632,
+      "probability": 0.37753796874416473,
       "strength": 0.37754066908718875,
-      "type_confidence": 0.9999992450089515,
+      "type_confidence": 0.9999928475439995,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Even so"
+    },
+    {
+      "source": "a6",
+      "target": "a5",
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9999797621123526,
+      "strength": 0.9999832985704947,
+      "type_confidence": 0.999996463482793,
+      "directed": false,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": "Even so"
     },
     {
       "source": "a6",
       "target": "a7",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.00015843611577157153,
-      "strength": 0.00015843623538953352,
-      "type_confidence": 0.9999992450088094,
+      "probability": 0.00015843529716945515,
+      "strength": 0.0001584362352162779,
+      "type_confidence": 0.9999940793416262,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Even so"
     },
     {
       "source": "a7",
       "target": "a6",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.001501175421364835,
+      "probability": 0.0015011646247661136,
       "strength": 0.001501181982984641,
-      "type_confidence": 0.9999956290310699,
+      "type_confidence": 0.9999884369658548,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Even so"
     },
     {
       "source": "a7",
@@ -206,72 +194,72 @@
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "which confirms that"
     },
     {
       "source": "a8",
       "target": "a7",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 1.0,
+      "type": "equivalence",
+      "sense": "Restatement",
+      "probability": 0.9999889733233831,
       "strength": 1.0,
-      "type_confidence": 1.0,
-      "directed": true,
+      "type_confidence": 0.9999889733233831,
+      "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "in other words"
     },
     {
       "source": "a8",
       "target": "a9",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 1.0,
+      "type": "equivalence",
+      "sense": "Restatement",
+      "probability": 0.9999812846677395,
       "strength": 1.0,
-      "type_confidence": 1.0,
-      "directed": true,
+      "type_confidence": 0.9999812846677395,
+      "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "in other words"
     },
     {
       "source": "a9",
       "target": "a8",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999998807907365,
+      "type": "equivalence",
+      "sense": "Restatement",
+      "probability": 0.9999830131097371,
       "strength": 1.0,
-      "type_confidence": 0.9999998807907365,
-      "directed": true,
+      "type_confidence": 0.9999830131097371,
+      "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "in other words"
     },
     {
       "source": "a9",
       "target": "a10",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 2.9023119823734752e-06,
-      "strength": 2.9023119823734752e-06,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.3775033114383445,
+      "strength": 0.3775406743251153,
+      "type_confidence": 0.9999010361285242,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either every fracture margin on the skeleton was produced after death, or at least one fracture margin on the skeleton was produced at or around the time of death"
     },
     {
       "source": "a10",
       "target": "a9",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 2.753568779136794e-05,
-      "strength": 2.753568779136794e-05,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9999252355769638,
+      "strength": 0.9999785550419076,
+      "type_confidence": 0.999946679391598,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either every fracture margin on the skeleton was produced after death, or at least one fracture margin on the skeleton was produced at or around the time of death"
     },
     {
       "source": "a10",
@@ -284,7 +272,7 @@
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "exactly one of which must be right: either every fracture margin on the skeleton was produced after death, or at least one fracture margin on the skeleton was produced at or around the time of death"
     },
     {
       "source": "a11",
@@ -297,20 +285,20 @@
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "exactly one of which must be right: either every fracture margin on the skeleton was produced after death, or at least one fracture margin on the skeleton was produced at or around the time of death"
     },
     {
       "source": "a11",
       "target": "a12",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9999998354515359,
+      "probability": 0.9999999943972039,
       "strength": 0.9999999943972039,
-      "type_confidence": 0.9999998410543312,
+      "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "a determination that dissolved the apparent conflict between the two accounts of beveling by fixing which of them governs the cranial evidence"
     },
     {
       "source": "a12",
@@ -323,142 +311,116 @@
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "which confirms that"
     },
     {
       "source": "a13",
       "target": "a14",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999999652532297,
+      "probability": 0.9999999950555497,
       "strength": 0.9999999950555497,
-      "type_confidence": 0.9999999701976798,
+      "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "at least one of two processes was at work, and perhaps both"
     },
     {
       "source": "a14",
       "target": "a13",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999999299279632,
-      "strength": 0.9999999895325984,
-      "type_confidence": 0.9999999403953641,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a14",
-      "target": "a15",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.9999991684720866,
-      "strength": 0.9999991684720866,
+      "probability": 0.9999999881388802,
+      "strength": 0.9999999881388802,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a15",
-      "target": "a14",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.9999993524053664,
-      "strength": 0.9999993524053664,
-      "type_confidence": 1.0,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "at least one of two processes was at work, and perhaps both"
     }
   ],
   "lcs": {
-    "mean_marginal": 0.919712375,
-    "consistency": 0.0,
-    "reified": 0.300967,
-    "log_partition": 0.11657741352326247
+    "mean_marginal": 0.6644293125,
+    "consistency": 1.3000000000040757e-05,
+    "reified": 0.459666,
+    "log_partition": 0.04955738822455388
   },
   "diagnostics": {
     "marginals": {
       "a0": 0.9,
       "a1": 0.9,
-      "a10": 1.0,
-      "a11": 1.0,
-      "a12": 1.0,
-      "a13": 0.973149,
-      "a14": 0.993469,
-      "a15": 0.973149,
-      "a2": 0.924133,
-      "a3": 0.068913,
-      "a4": 0.997113,
-      "a5": 0.989587,
-      "a6": 0.995885,
-      "a7": 1.0,
-      "a8": 1.0,
-      "a9": 1.0
+      "a10": 0.996378,
+      "a11": 0.996378,
+      "a12": 0.996378,
+      "a13": 0.973684,
+      "a14": 0.973684,
+      "a15": 0.9,
+      "a2": 0.9,
+      "a3": 0.1,
+      "a4": 0.993787,
+      "a5": 0.977815,
+      "a6": 0.004966,
+      "a7": 0.005933,
+      "a8": 0.005933,
+      "a9": 0.005933
     },
-    "num_below_prior": 1,
-    "avg_norm_entropy": 0.14070917848010153,
-    "log_z": -5.039881,
-    "log_z_max": -1.800449,
-    "log_z_min": -5.46736
+    "num_below_prior": 4,
+    "avg_norm_entropy": 0.20064412575676097,
+    "log_z": -12.275535,
+    "log_z_max": -0.679735,
+    "log_z_min": -12.880156
   },
   "comparison": {
     "gold_edges_total": 10,
     "gold_edges_scorable": 9,
-    "mined_edges_total": 21,
+    "mined_edges_total": 18,
     "pair": {
-      "tp": 8,
-      "fp": 4,
-      "fn": 1,
+      "tp": 6,
+      "fp": 3,
+      "fn": 3,
       "precision": 0.6666666666666666,
-      "recall": 0.8888888888888888,
-      "f1": 0.761904761904762
+      "recall": 0.6666666666666666,
+      "f1": 0.6666666666666666
     },
     "coupling": {
       "tp": 5,
-      "fp": 10,
+      "fp": 6,
       "fn": 4,
-      "precision": 0.3333333333333333,
+      "precision": 0.45454545454545453,
       "recall": 0.5555555555555556,
-      "f1": 0.4166666666666667
+      "f1": 0.5
     },
     "sense": {
       "tp": 4,
-      "fp": 11,
+      "fp": 7,
       "fn": 5,
-      "precision": 0.26666666666666666,
+      "precision": 0.36363636363636365,
       "recall": 0.4444444444444444,
-      "f1": 0.33333333333333337
+      "f1": 0.39999999999999997
     },
     "recall_by_direction": {
       "forward": {
         "total": 6,
-        "found": 4,
-        "recall": 0.6666666666666666
+        "found": 5,
+        "recall": 0.8333333333333334
       },
       "backward": {
         "total": 3,
-        "found": 1,
-        "recall": 0.3333333333333333
+        "found": 0,
+        "recall": 0.0
       }
     },
     "recall_by_directed_flag": {
       "False": {
         "total": 5,
-        "found": 3,
-        "recall": 0.6
+        "found": 4,
+        "recall": 0.8
       },
       "True": {
         "total": 4,
-        "found": 2,
-        "recall": 0.5
+        "found": 1,
+        "recall": 0.25
       }
     },
     "recall_by_window_admission": {
@@ -486,13 +448,13 @@
       },
       "entailment": {
         "total": 3,
-        "found": 1,
-        "recall": 0.3333333333333333
+        "found": 0,
+        "recall": 0.0
       },
       "equivalence": {
         "total": 1,
-        "found": 0,
-        "recall": 0.0
+        "found": 1,
+        "recall": 1.0
       },
       "exclusive": {
         "total": 1,
@@ -503,13 +465,13 @@
     "recall_by_validity": {
       "invalid": {
         "total": 4,
-        "found": 1,
-        "recall": 0.25
+        "found": 0,
+        "recall": 0.0
       },
       "valid": {
         "total": 5,
-        "found": 4,
-        "recall": 0.8
+        "found": 5,
+        "recall": 1.0
       }
     },
     "non_relation_pairs": 5,
@@ -517,6 +479,6 @@
     "non_relation_violation_rate": 0.0
   },
   "duplicate_unordered_pairs": 9,
-  "elapsed_s": 16.847,
-  "run_config_fingerprint": "10e10a446aa8"
+  "elapsed_s": 3.075,
+  "run_config_fingerprint": "96513eb95ee7"
 }

@@ -84,6 +84,53 @@ class MinedArmError(ValueError):
     """Raised when a mined arm cannot be run as specified."""
 
 
+# Named mining strategies, keyed by the arm's variant label.
+#
+# The strategy has to travel WITH the arm, not alongside it as a global CLI flag.
+# Two arms in one sweep can differ in strategy -- comparing an old and a new one is
+# the whole point -- so a single global `--prompt-variant` cannot express the run,
+# and worse, `--resume` will then re-mine the other arm under the wrong settings
+# and silently overwrite correct records with mislabelled ones. Naming the strategy
+# makes the arm self-describing: `mined:m:bidirectional:v2` fully determines how it
+# was mined.
+#
+# An arm with no variant label uses the historical defaults, so every stored result
+# keeps its meaning.
+MINING_STRATEGIES: dict[str, dict[str, Any]] = {
+    "v1": {
+        "sense_menu": "full",
+        "prompt_variant": "v1",
+        "require_evidence": False,
+        "reconcile": "ratchet",
+    },
+    # The revised strategy: restricted output vocabulary, rebalanced prompt with
+    # silence negatives, and an evidence span verified against the response.
+    "v2": {
+        "sense_menu": "gold9",
+        "prompt_variant": "v2",
+        "require_evidence": True,
+        "reconcile": "strict",
+    },
+}
+
+
+def strategy_for(variant: str | None) -> dict[str, Any] | None:
+    """The mining knobs a variant label stands for, or None when unlabelled.
+
+    Raises:
+        MinedArmError: If `variant` is not a known strategy.
+    """
+    if variant is None:
+        return None
+    if variant not in MINING_STRATEGIES:
+        raise MinedArmError(
+            f"Unknown mining strategy {variant!r} (expected one of "
+            f"{sorted(MINING_STRATEGIES)}). The strategy is part of the arm name so "
+            "that an arm fully determines how it was mined."
+        )
+    return dict(MINING_STRATEGIES[variant])
+
+
 @dataclass(frozen=True)
 class MinedArm:
     """One mined cell: a served model crossed with a candidate-pair policy.

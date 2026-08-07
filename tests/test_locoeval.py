@@ -1778,3 +1778,75 @@ def test_cli_rejects_unknown_menu_or_reconcile():
     for flag, value in (("--sense-menu", "gold10"), ("--reconcile", "lenient")):
         with pytest.raises(SystemExit):
             cli.build_parser().parse_args([flag, value])
+
+
+# ---------------------------------------------------------------------------
+# Named mining strategies travel WITH the arm.
+# ---------------------------------------------------------------------------
+
+
+def test_strategy_for_resolves_a_named_variant():
+    v2 = mg.strategy_for("v2")
+    assert v2["sense_menu"] == "gold9"
+    assert v2["prompt_variant"] == "v2"
+    assert v2["require_evidence"] is True
+    assert mg.strategy_for(None) is None
+
+
+def test_strategy_for_rejects_an_unknown_variant():
+    with pytest.raises(mg.MinedArmError, match="Unknown mining strategy"):
+        mg.strategy_for("v99")
+
+
+def test_two_strategies_do_not_collide_on_one_arm_name():
+    """Regression: a global --prompt-variant cannot express a two-strategy sweep.
+
+    Both strategies previously produced the arm `mined:m:bidirectional`, so the
+    second overwrote the first's records and the report compared a strategy against
+    itself. The variant label is what keeps them distinct.
+    """
+    plain = mg.format_arm("m", "bidirectional")
+    tagged = mg.format_arm("m", "bidirectional", "v2")
+    assert plain != tagged
+    assert mg.parse_arm(plain).variant is None
+    assert mg.parse_arm(tagged).variant == "v2"
+
+
+def test_fingerprint_follows_the_arms_own_strategy(mined_specs):
+    """Two arms in one run must hash differently when their strategies differ.
+
+    Otherwise `--resume` serves a record mined under the other arm's settings --
+    which is exactly how a v2 arm came to hold v1 numbers.
+    """
+    specs = {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+    arms = ("mined:m1:bidirectional", "mined:m1:bidirectional:v2")
+    r = rn.GoldEvalRunner(
+        data_dir=".", output_dir=".", merlin_path="m",
+        arms=arms, model_specs=specs, max_distance=1,
+    )
+    assert r._run_fingerprint(arms[0]) != r._run_fingerprint(arms[1])
+
+
+def test_arm_strategy_overrides_the_run_level_flags(dataset, mined_specs, mock_llm):
+    """The arm's own strategy wins, so one sweep can hold both."""
+    arm_v2 = "mined:m1:bidirectional:v2"
+    runner = _mined_runner(
+        dataset, "strat1", mined_specs, arms=(arm_v2,),
+        max_distance=1,
+        # Deliberately the v1 defaults at run level; the arm must still be v2.
+        sense_menu="full", prompt_variant="v1", require_evidence=False,
+    )
+    results = runner.run()
+    for rec in results["records"]:
+        assert rec["strategy"] == "v2"
+        assert rec["sense_menu"] == "gold9"
+        assert rec["prompt_variant"] == "v2"
+        assert rec["require_evidence"] is True
+
+
+def test_short_arm_keeps_the_variant_visible():
+    assert rp._short_arm("mined:llama-3.3-70b-instruct:bidirectional:v2") == (
+        "bidirectional:v2"
+    )
+    assert rp._short_arm("mined:m:windowed") == "windowed"
+    assert rp._short_arm("gold") == "gold"

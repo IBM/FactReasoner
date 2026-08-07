@@ -32,28 +32,29 @@
   "backend": "rits",
   "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
   "window": 4,
-  "gate": "embedding",
+  "gate": "none",
   "nli_method": "logprobs",
   "strength_method": "surrogate_logprobs",
   "strength_samples": 8,
   "max_concurrency": 16,
   "max_distance": 1,
   "discourse": false,
-  "sense_menu": "full",
-  "reconcile": "ratchet",
-  "prompt_variant": "v1",
-  "require_evidence": false,
+  "strategy": "v2",
+  "sense_menu": "gold9",
+  "reconcile": "strict",
+  "prompt_variant": "v2",
+  "require_evidence": true,
   "num_pairs_scored": 30,
-  "num_dropped_none": 10,
+  "num_dropped_none": 12,
   "num_inadmissible_sense": 0,
   "num_unparseable_coupling": 0,
   "num_evidence_rejected": 0,
-  "num_llm_calls": 50,
+  "num_llm_calls": 48,
   "num_call_exceptions": 0,
   "call_exceptions_by_stage": {},
   "call_exceptions_by_type": {},
   "call_error_rate": 0.0,
-  "num_relations": 20,
+  "num_relations": 18,
   "coverage": {
     "policy": "bidirectional",
     "num_atoms": 16,
@@ -65,9 +66,9 @@
     "gate": null,
     "discourse_anchored": false,
     "pairs_scored": 30,
-    "dropped_none": 10,
-    "relations_kept": 20,
-    "llm_calls": 50,
+    "dropped_none": 12,
+    "relations_kept": 18,
+    "llm_calls": 48,
     "llm_call_errors": 0,
     "llm_call_errors_by_stage": {},
     "llm_call_errors_by_type": {},
@@ -83,15 +84,15 @@
     "pair_policy": "bidirectional",
     "window": 4,
     "max_distance": 1,
-    "gate": "embedding",
+    "gate": "none",
     "gate_threshold": 0.3,
     "discourse": false,
     "discourse_gate_threshold": 0.2,
     "discourse_sentence_span": 2,
-    "sense_menu": "full",
-    "reconcile": "ratchet",
-    "prompt_variant": "v1",
-    "require_evidence": false,
+    "sense_menu": "gold9",
+    "reconcile": "strict",
+    "prompt_variant": "v2",
+    "require_evidence": true,
     "prior": 0.5,
     "prior_source": "per_atom",
     "concession_discount": 0.45
@@ -126,124 +127,124 @@
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a1",
-      "target": "a0",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9980732260945719,
-      "strength": 0.9980732657544371,
-      "type_confidence": 0.9999999602635733,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "and it was on the strength of that principle"
     },
     {
       "source": "a1",
       "target": "a2",
       "type": "equivalence",
       "sense": "Restatement",
-      "probability": 0.9999989867225754,
+      "probability": 0.9999952912664315,
       "strength": 1.0,
-      "type_confidence": 0.9999989867225754,
+      "type_confidence": 0.9999952912664315,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "equivalently"
     },
     {
       "source": "a2",
       "target": "a1",
       "type": "equivalence",
       "sense": "Restatement",
-      "probability": 0.9999990463270478,
+      "probability": 0.9999955296816426,
       "strength": 1.0,
-      "type_confidence": 0.9999990463270478,
+      "type_confidence": 0.9999955296816426,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "equivalently"
     },
     {
       "source": "a3",
       "target": "a4",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.9999986290421577,
-      "strength": 0.9999986290421577,
-      "type_confidence": 1.0,
+      "type": "exclusive",
+      "sense": "Alternative",
+      "probability": 9.610235773792073e-05,
+      "strength": 9.610239210680278e-05,
+      "type_confidence": 0.9999996423722521,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "since it fixed the operative process as the second one"
     },
     {
       "source": "a4",
       "target": "a3",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.02297737235952881,
-      "strength": 0.02297737235952881,
-      "type_confidence": 1.0,
+      "probability": 0.017986210225756326,
+      "strength": 0.01798621183384865,
+      "type_confidence": 0.999999910593051,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "at least one of the following obtained, perhaps both"
     },
     {
       "source": "a4",
       "target": "a5",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 9.610239200967714e-05,
-      "strength": 9.610239200967714e-05,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.8802305392633856,
+      "strength": 0.8807970853129393,
+      "type_confidence": 0.9993567802857198,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a5",
       "target": "a4",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 4.539785238630741e-05,
-      "strength": 4.539785238630741e-05,
-      "type_confidence": 1.0,
+      "probability": 4.539782532251139e-05,
+      "strength": 4.539785238172423e-05,
+      "type_confidence": 0.9999994039539004,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a5",
       "target": "a6",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 4.539785238630741e-05,
-      "strength": 4.539785238630741e-05,
+      "probability": 4.539785239392145e-05,
+      "strength": 4.539785239392145e-05,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a6",
       "target": "a5",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 0.00026119030992709263,
-      "strength": 0.00026119030992709263,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9754887453696424,
+      "strength": 0.9914225149510577,
+      "type_confidence": 0.9839283763066426,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
+    },
+    {
+      "source": "a6",
+      "target": "a7",
+      "type": "entailment",
+      "sense": "Evidence",
+      "probability": 0.9399132761844413,
+      "strength": 0.9399133508820313,
+      "type_confidence": 0.9999999205271529,
+      "directed": true,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": "indicates the second of those alternatives, post-depositional disturbance"
     },
     {
       "source": "a7",
@@ -256,184 +257,158 @@
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "indicates the second of those alternatives, post-depositional disturbance, wherever traces of such activity can be recognized in section"
     },
     {
       "source": "a7",
       "target": "a8",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.03732494573722436,
-      "strength": 0.037326890160096056,
-      "type_confidence": 0.9999479082542545,
+      "probability": 0.029303234531576617,
+      "strength": 0.029312232626948723,
+      "type_confidence": 0.9996930259292555,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "By contrast with that burrowing transport, bioturbation displaces artifacts downward only."
     },
     {
       "source": "a8",
       "target": "a7",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.0002611710385072256,
-      "strength": 0.00026119030904192997,
-      "type_confidence": 0.9999262203303979,
+      "probability": 0.00026097373170568173,
+      "strength": 0.00026119030917581257,
+      "type_confidence": 0.9991708058740224,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "By contrast with that burrowing transport"
     },
     {
       "source": "a9",
       "target": "a10",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9999999865595904,
-      "strength": 0.9999999865595904,
-      "type_confidence": 1.0,
+      "probability": 0.9999997894568098,
+      "strength": 0.9999999881388801,
+      "type_confidence": 0.9999998013179273,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "that demonstration was accomplished earlier than the conclusion eventually recorded in the report"
     },
     {
       "source": "a10",
       "target": "a9",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.09534946324370287,
+      "probability": 0.09534945945485591,
       "strength": 0.09534946324370287,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999999602635733,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a11",
-      "target": "a12",
-      "type": "contradiction",
-      "sense": "Contrast",
-      "probability": 0.9933069515653984,
-      "strength": 0.9933071489177215,
-      "type_confidence": 0.9999998013179273,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a12",
-      "target": "a11",
-      "type": "contradiction",
-      "sense": "Contrast",
-      "probability": 1.0114764456725215e-05,
-      "strength": 1.0129987351646244e-05,
-      "type_confidence": 0.9984972444295743,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "that demonstration was accomplished earlier than the conclusion eventually recorded in the report"
     },
     {
       "source": "a13",
       "target": "a14",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.8166562960522201,
-      "strength": 0.8519528047966445,
-      "type_confidence": 0.9585698778785646,
+      "probability": 0.8519396019798164,
+      "strength": 0.8519528044643064,
+      "type_confidence": 0.9999845032677622,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material eroded from an earlier deposit"
     },
     {
       "source": "a14",
       "target": "a13",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 0.0024726226451599136,
-      "strength": 0.0024726229399195023,
-      "type_confidence": 0.9999998807907247,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9999808259302881,
+      "strength": 0.9999921107356894,
+      "type_confidence": 0.9999887151055692,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material"
     },
     {
       "source": "a14",
       "target": "a15",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.001169510299631162,
-      "strength": 0.001169510299631162,
+      "probability": 0.0009110513581412637,
+      "strength": 0.0009110513581412637,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "a finding that removed the curation hypothesis from consideration and aligned the artifact assemblage with the depositional history reconstructed from the section"
     }
   ],
   "lcs": {
-    "mean_marginal": 0.6769191875,
-    "consistency": 0.0021529999999999605,
-    "reified": 0.225414,
-    "log_partition": 0.18465389049256128
+    "mean_marginal": 0.555664875,
+    "consistency": 0.20491499999999996,
+    "reified": 0.473774,
+    "log_partition": 0.12476268293294521
   },
   "diagnostics": {
     "marginals": {
-      "a0": 0.998819,
-      "a1": 0.989018,
+      "a0": 0.872603,
+      "a1": 0.981039,
       "a10": 0.979243,
-      "a11": 0.947107,
-      "a12": 0.001416,
-      "a13": 0.857251,
-      "a14": 0.852713,
-      "a15": 0.14145,
-      "a2": 0.989018,
-      "a3": 0.486872,
-      "a4": 0.937579,
-      "a5": 0.937579,
-      "a6": 0.937579,
-      "a7": 0.07225,
-      "a8": 0.061568,
+      "a11": 0.9,
+      "a12": 0.1,
+      "a13": 0.768243,
+      "a14": 0.18167,
+      "a15": 0.737976,
+      "a2": 0.981039,
+      "a3": 0.022105,
+      "a4": 0.02168,
+      "a5": 0.021567,
+      "a6": 0.021437,
+      "a7": 0.88322,
+      "a8": 0.777571,
       "a9": 0.641245
     },
-    "num_below_prior": 8,
-    "avg_norm_entropy": 0.3806095780000999,
-    "log_z": -16.103106,
-    "log_z_max": -10.068674,
-    "log_z_min": -17.469742
+    "num_below_prior": 10,
+    "avg_norm_entropy": 0.43933309464788206,
+    "log_z": -20.431738,
+    "log_z_max": -10.344459,
+    "log_z_min": -21.869652
   },
   "comparison": {
     "gold_edges_total": 10,
     "gold_edges_scorable": 9,
-    "mined_edges_total": 20,
+    "mined_edges_total": 18,
     "pair": {
-      "tp": 8,
+      "tp": 7,
       "fp": 3,
-      "fn": 1,
-      "precision": 0.7272727272727273,
-      "recall": 0.8888888888888888,
-      "f1": 0.7999999999999999
+      "fn": 2,
+      "precision": 0.7,
+      "recall": 0.7777777777777778,
+      "f1": 0.7368421052631577
     },
     "coupling": {
-      "tp": 8,
-      "fp": 6,
-      "fn": 1,
-      "precision": 0.5714285714285714,
-      "recall": 0.8888888888888888,
-      "f1": 0.6956521739130435
+      "tp": 7,
+      "fp": 8,
+      "fn": 2,
+      "precision": 0.4666666666666667,
+      "recall": 0.7777777777777778,
+      "f1": 0.5833333333333334
     },
     "sense": {
-      "tp": 6,
-      "fp": 8,
-      "fn": 3,
-      "precision": 0.42857142857142855,
-      "recall": 0.6666666666666666,
-      "f1": 0.5217391304347826
+      "tp": 5,
+      "fp": 10,
+      "fn": 4,
+      "precision": 0.3333333333333333,
+      "recall": 0.5555555555555556,
+      "f1": 0.4166666666666667
     },
     "recall_by_direction": {
       "forward": {
@@ -443,15 +418,15 @@
       },
       "backward": {
         "total": 4,
-        "found": 3,
-        "recall": 0.75
+        "found": 2,
+        "recall": 0.5
       }
     },
     "recall_by_directed_flag": {
       "False": {
         "total": 5,
-        "found": 5,
-        "recall": 1.0
+        "found": 4,
+        "recall": 0.8
       },
       "True": {
         "total": 4,
@@ -462,8 +437,8 @@
     "recall_by_window_admission": {
       "window": {
         "total": 9,
-        "found": 8,
-        "recall": 0.8888888888888888
+        "found": 7,
+        "recall": 0.7777777777777778
       }
     },
     "recall_by_coupling": {
@@ -474,8 +449,8 @@
       },
       "contradiction": {
         "total": 3,
-        "found": 3,
-        "recall": 1.0
+        "found": 2,
+        "recall": 0.6666666666666666
       },
       "entailment": {
         "total": 3,
@@ -496,8 +471,8 @@
     "recall_by_validity": {
       "invalid": {
         "total": 3,
-        "found": 3,
-        "recall": 1.0
+        "found": 2,
+        "recall": 0.6666666666666666
       },
       "valid": {
         "total": 6,
@@ -509,7 +484,7 @@
     "non_relation_violations": 0,
     "non_relation_violation_rate": 0.0
   },
-  "duplicate_unordered_pairs": 9,
-  "elapsed_s": 21.808,
-  "run_config_fingerprint": "10e10a446aa8"
+  "duplicate_unordered_pairs": 8,
+  "elapsed_s": 6.312,
+  "run_config_fingerprint": "96513eb95ee7"
 }

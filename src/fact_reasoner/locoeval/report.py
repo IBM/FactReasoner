@@ -71,6 +71,18 @@ _ARM_LABEL = {
 }
 
 
+def _short_arm(arm: str) -> str:
+    """An arm name with the model prefix stripped, for narrow table columns."""
+    spec = None
+    try:
+        spec = parse_arm(arm)
+    except ValueError:
+        pass
+    if spec is None:
+        return str(arm)
+    return spec.arm.split(f"{spec.model}:", 1)[-1]
+
+
 def _arm_label(arm: str) -> str:
     """A human-readable caption for one arm, gold or mined."""
     if arm in _ARM_LABEL:
@@ -1033,6 +1045,43 @@ def _strategy_comparison_section(results: Mapping[str, Any]) -> str:
     if len(arms) < 2:
         return ""
 
+    # Output-vocabulary legality and evidence provenance, per arm. Both are
+    # properties of the strategy rather than of the model, so they belong beside the
+    # accuracy figures: an edge built on a sense the corpus never labels is a
+    # guaranteed false positive, and an unverifiable claim of grounding is what let
+    # the original strategy over-assert.
+    vocab_rows = []
+    for arm in arms:
+        m = mining[arm]
+        vocab_rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(_short_arm(arm))}}}",
+                    str(m.get("mined_edges_total")),
+                    str(m.get("num_illegal_senses", "--")),
+                    str(m.get("num_evidence_spans", "--")),
+                    f"{m.get('non_relation_violations')}/{m.get('non_relation_pairs')}",
+                ]
+            )
+            + r" \\"
+        )
+    vocab_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Output-vocabulary legality and evidence provenance. The corpus "
+        r"uses exactly nine (sense, coupling) combinations and the mapping is a "
+        r"bijection, so an edge outside that set cannot be scored against gold at "
+        r"all. \textbf{Illegal} counts those edges; \textbf{Evidence} counts edges "
+        r"carrying a response span the parser verified. \textbf{Non-rel} counts "
+        r"edges asserted on pairs the corpus declares unrelated --- a small but "
+        r"explicitly-labelled negative set, unlike the unlabelled remainder.}",
+        r"\label{tab:vocabulary-legality}",
+        r"\begin{tabular}{lrrrr}", r"\toprule",
+        r"Strategy & Edges & Illegal & Evidence & Non-rel \\",
+        r"\midrule",
+        *vocab_rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+
     rows = []
     for arm in arms:
         m = mining[arm]
@@ -1041,7 +1090,7 @@ def _strategy_comparison_section(results: Mapping[str, Any]) -> str:
         rows.append(
             " & ".join(
                 [
-                    f"\\texttt{{{_tex(arm.replace('mined:llama-3.3-70b-instruct:', ''))}}}",
+                    f"\\texttt{{{_tex(_short_arm(arm))}}}",
                     str(m.get("mined_edges_total")),
                     _pct(c.get("precision")),
                     _pct(c.get("recall")),
@@ -1084,6 +1133,21 @@ def _strategy_comparison_section(results: Mapping[str, Any]) -> str:
             r"\midrule",
             *rows,
             r"\bottomrule", r"\end{tabular}", r"\end{table}",
+            "",
+            *vocab_table,
+            "",
+            r"\paragraph{Why the candidate-pair refinement was switched off.} "
+            "The response-anchored promote/demote refinement is a \\emph{correlated} "
+            "filter, not an independent one: it keeps pairs in the same or adjacent "
+            "sentences, or sharing vocabulary, which is precisely the surface "
+            "adjacency the sense prompt reads as evidence of a relation. So it hands "
+            "the prompt the pairs the prompt is most likely to over-relate. That "
+            "shows up in the assert rates --- the forward-only windowed policy, "
+            "which applies the refinement, asserts a relation on about 72\\% of the "
+            "pairs it keeps, while all-pairs, which skips it, asserts on about "
+            "36\\%. Two filters that fail on the same inputs do not compose, so the "
+            "revised strategy drops it and constrains the candidate pool by order "
+            "distance instead.",
         ]
     )
 

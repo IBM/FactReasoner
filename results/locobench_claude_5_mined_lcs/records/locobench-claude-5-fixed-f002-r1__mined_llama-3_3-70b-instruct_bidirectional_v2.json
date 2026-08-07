@@ -21,28 +21,29 @@
   "backend": "rits",
   "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
   "window": 4,
-  "gate": "embedding",
+  "gate": "none",
   "nli_method": "logprobs",
   "strength_method": "surrogate_logprobs",
   "strength_samples": 8,
   "max_concurrency": 16,
   "max_distance": 1,
   "discourse": false,
-  "sense_menu": "full",
-  "reconcile": "ratchet",
-  "prompt_variant": "v1",
-  "require_evidence": false,
+  "strategy": "v2",
+  "sense_menu": "gold9",
+  "reconcile": "strict",
+  "prompt_variant": "v2",
+  "require_evidence": true,
   "num_pairs_scored": 30,
-  "num_dropped_none": 7,
+  "num_dropped_none": 12,
   "num_inadmissible_sense": 0,
   "num_unparseable_coupling": 0,
   "num_evidence_rejected": 0,
-  "num_llm_calls": 53,
+  "num_llm_calls": 48,
   "num_call_exceptions": 0,
   "call_exceptions_by_stage": {},
   "call_exceptions_by_type": {},
   "call_error_rate": 0.0,
-  "num_relations": 23,
+  "num_relations": 18,
   "coverage": {
     "policy": "bidirectional",
     "num_atoms": 16,
@@ -54,9 +55,9 @@
     "gate": null,
     "discourse_anchored": false,
     "pairs_scored": 30,
-    "dropped_none": 7,
-    "relations_kept": 23,
-    "llm_calls": 53,
+    "dropped_none": 12,
+    "relations_kept": 18,
+    "llm_calls": 48,
     "llm_call_errors": 0,
     "llm_call_errors_by_stage": {},
     "llm_call_errors_by_type": {},
@@ -72,15 +73,15 @@
     "pair_policy": "bidirectional",
     "window": 4,
     "max_distance": 1,
-    "gate": "embedding",
+    "gate": "none",
     "gate_threshold": 0.3,
     "discourse": false,
     "discourse_gate_threshold": 0.2,
     "discourse_sentence_span": 2,
-    "sense_menu": "full",
-    "reconcile": "ratchet",
-    "prompt_variant": "v1",
-    "require_evidence": false,
+    "sense_menu": "gold9",
+    "reconcile": "strict",
+    "prompt_variant": "v2",
+    "require_evidence": true,
     "prior": 0.5,
     "prior_source": "per_atom",
     "concession_discount": 0.45
@@ -115,331 +116,274 @@
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a1",
-      "target": "a0",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999543240064626,
-      "strength": 0.9999546021486915,
-      "type_confidence": 0.9999997218451434,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "and it was on the strength of that principle"
     },
     {
       "source": "a1",
       "target": "a2",
       "type": "equivalence",
       "sense": "Restatement",
-      "probability": 0.9999989271181065,
+      "probability": 0.9999961257206013,
       "strength": 1.0,
-      "type_confidence": 0.9999989271181065,
+      "type_confidence": 0.9999961257206013,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "equivalently"
     },
     {
       "source": "a2",
       "target": "a1",
       "type": "equivalence",
       "sense": "Restatement",
-      "probability": 0.9999988079091793,
+      "probability": 0.9999968409688211,
       "strength": 1.0,
-      "type_confidence": 0.9999988079091793,
+      "type_confidence": 0.9999968409688211,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a2",
-      "target": "a3",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.999999971546653,
-      "strength": 0.999999971546653,
-      "type_confidence": 1.0,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "equivalently, the sediment enclosing the artifacts was younger than the artifacts"
     },
     {
       "source": "a3",
       "target": "a4",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999999567572707,
-      "strength": 0.9999999865595904,
-      "type_confidence": 0.9999999701976798,
+      "probability": 0.9999999847700207,
+      "strength": 0.9999999847700207,
+      "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "at least one of the following obtained, perhaps both"
     },
     {
       "source": "a4",
       "target": "a3",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9992903296337216,
-      "strength": 0.9992903296337216,
+      "probability": 0.9990889489974248,
+      "strength": 0.9990889489974248,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "at least one of the following obtained, perhaps both"
     },
     {
       "source": "a4",
       "target": "a5",
       "type": "contradiction",
-      "sense": "Concession",
-      "probability": 0.42751484098381515,
-      "strength": 0.7772998653152122,
-      "type_confidence": 0.9999998013179273,
-      "directed": true,
-      "concession_resolved": true,
-      "resolving_atom_id": "a9",
-      "evidence_span": null
+      "sense": "Contrast",
+      "probability": 0.8175442775177234,
+      "strength": 0.8175744886509172,
+      "type_confidence": 0.9999630478523814,
+      "directed": false,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a5",
       "target": "a4",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 2.753568124046782e-05,
-      "strength": 2.7535687805485818e-05,
-      "type_confidence": 0.9999997615814777,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.988942329121402,
+      "strength": 0.9890130587292085,
+      "type_confidence": 0.9999284846573235,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a5",
       "target": "a6",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 4.5397846978506976e-05,
-      "strength": 4.539785239035206e-05,
-      "type_confidence": 0.9999998807907247,
+      "probability": 4.539784157023257e-05,
+      "strength": 4.539785239392145e-05,
+      "type_confidence": 0.9999997615814777,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a6",
       "target": "a5",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 5.829127247156319e-05,
-      "strength": 5.829127247156319e-05,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9631919602701786,
+      "strength": 0.9706877678754499,
+      "type_confidence": 0.9922778386074882,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a6",
-      "target": "a7",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9980732657642628,
-      "strength": 0.9980732657642628,
-      "type_confidence": 1.0,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "either the deposit containing the artifacts was stratigraphically intact, or it was disturbed after its formation, and since both cannot be true, one of them must hold"
     },
     {
       "source": "a7",
       "target": "a6",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.1192029179065751,
-      "strength": 0.1192029179065751,
-      "type_confidence": 1.0,
+      "probability": 0.11920291313287872,
+      "strength": 0.11920291786957672,
+      "type_confidence": 0.9999999602635733,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "indicates the second of those alternatives, post-depositional disturbance"
     },
     {
       "source": "a7",
       "target": "a8",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.04742585904357642,
-      "strength": 0.047425874119846195,
-      "type_confidence": 0.9999996821087633,
+      "probability": 0.04742047986975847,
+      "strength": 0.047425874066715445,
+      "type_confidence": 0.9998862604630251,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "By contrast with that burrowing transport, bioturbation displaces artifacts downward only."
     },
     {
       "source": "a8",
       "target": "a7",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.00042972597867147556,
-      "strength": 0.00043055709084487836,
-      "type_confidence": 0.9980696818352894,
+      "probability": 0.0005526291998061428,
+      "strength": 0.0005527785500334112,
+      "type_confidence": 0.9997298190617936,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a9",
-      "target": "a10",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9999999407078939,
-      "strength": 0.9999999804443198,
-      "type_confidence": 0.9999999602635733,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "By contrast with that burrowing transport"
     },
     {
       "source": "a10",
       "target": "a9",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.437823504924599,
-      "strength": 0.437823504924599,
+      "probability": 0.3775406738692375,
+      "strength": 0.3775406738692375,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a10",
-      "target": "a11",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.999876575585493,
-      "strength": 0.9998766053841358,
-      "type_confidence": 0.9999999701976798,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
-    },
-    {
-      "source": "a11",
-      "target": "a10",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.9999831793632702,
-      "strength": 0.9999832985705457,
-      "type_confidence": 0.9999998807907335,
-      "directed": false,
-      "concession_resolved": false,
-      "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "that demonstration was accomplished earlier than the conclusion eventually recorded in the report"
     },
     {
       "source": "a12",
       "target": "a11",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 2.753537048534895e-05,
-      "strength": 2.753568778732314e-05,
-      "type_confidence": 0.9999884767006133,
+      "probability": 1.9318443544568035e-05,
+      "strength": 2.1444958614682513e-05,
+      "type_confidence": 0.9008384623946749,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "by contrast"
     },
     {
       "source": "a13",
       "target": "a14",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 0.06008663594222148,
-      "strength": 0.06008665026799184,
-      "type_confidence": 0.9999997615814777,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9046368080428298,
+      "strength": 0.9046505396058357,
+      "type_confidence": 0.9999848211409768,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material eroded from an earlier deposit"
     },
     {
       "source": "a14",
       "target": "a13",
-      "type": "exclusive",
-      "sense": "Alternative",
-      "probability": 0.0011695102982880292,
-      "strength": 0.0011695102982880292,
-      "type_confidence": 1.0,
+      "type": "contradiction",
+      "sense": "Contrast",
+      "probability": 0.9999540547549434,
+      "strength": 0.9999832985706976,
+      "type_confidence": 0.9999707556958242,
       "directed": false,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material"
     },
     {
-      "source": "a15",
-      "target": "a14",
+      "source": "a14",
+      "target": "a15",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.9399133509066838,
-      "strength": 0.9399133509066838,
+      "probability": 0.017986212347795995,
+      "strength": 0.017986212347795995,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
       "resolving_atom_id": null,
-      "evidence_span": null
+      "evidence_span": "The impasse was closed when"
+    },
+    {
+      "source": "a15",
+      "target": "a14",
+      "type": "exclusive",
+      "sense": "Alternative",
+      "probability": 0.001926715686580819,
+      "strength": 0.0019267342908563312,
+      "type_confidence": 0.9999903441405488,
+      "directed": false,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": "Although the excavator interpreted the older flint blades as heirlooms curated by the occupants of the layer, a lithics specialist interpreted those same blades as residual material"
     }
   ],
   "lcs": {
-    "mean_marginal": 0.9249771875,
-    "consistency": 0.0,
-    "reified": 0.333027,
-    "log_partition": 0.1276637733396737
+    "mean_marginal": 0.647907125,
+    "consistency": 0.16210100000000005,
+    "reified": 0.436087,
+    "log_partition": 0.1234965937000116
   },
   "diagnostics": {
     "marginals": {
-      "a0": 0.999238,
-      "a1": 0.988743,
-      "a10": 0.998394,
-      "a11": 0.97781,
-      "a12": 0.17778,
-      "a13": 0.99856,
-      "a14": 0.998567,
-      "a15": 0.943583,
-      "a2": 0.988743,
-      "a3": 0.986463,
-      "a4": 0.998775,
-      "a5": 0.998775,
-      "a6": 0.998775,
-      "a7": 0.998135,
-      "a8": 0.815378,
-      "a9": 0.931916
+      "a0": 0.805081,
+      "a1": 0.964365,
+      "a10": 0.87859,
+      "a11": 0.916666,
+      "a12": 0.166664,
+      "a13": 0.705581,
+      "a14": 0.251109,
+      "a15": 0.260991,
+      "a2": 0.964365,
+      "a3": 0.974501,
+      "a4": 0.94263,
+      "a5": 0.048196,
+      "a6": 0.048354,
+      "a7": 0.873783,
+      "a8": 0.713809,
+      "a9": 0.851829
     },
-    "num_below_prior": 0,
-    "avg_norm_entropy": 0.16187602159658335,
-    "log_z": -9.182929,
-    "log_z_max": -5.200223,
-    "log_z_min": -9.765786
+    "num_below_prior": 9,
+    "avg_norm_entropy": 0.5206593271425177,
+    "log_z": -17.473374,
+    "log_z_max": -5.969315,
+    "log_z_min": -19.09426
   },
   "comparison": {
     "gold_edges_total": 10,
     "gold_edges_scorable": 9,
-    "mined_edges_total": 23,
+    "mined_edges_total": 18,
     "pair": {
+      "tp": 8,
+      "fp": 3,
+      "fn": 1,
+      "precision": 0.7272727272727273,
+      "recall": 0.8888888888888888,
+      "f1": 0.7999999999999999
+    },
+    "coupling": {
       "tp": 8,
       "fp": 5,
       "fn": 1,
@@ -447,27 +391,19 @@
       "recall": 0.8888888888888888,
       "f1": 0.7272727272727274
     },
-    "coupling": {
-      "tp": 7,
-      "fp": 10,
-      "fn": 2,
-      "precision": 0.4117647058823529,
-      "recall": 0.7777777777777778,
-      "f1": 0.5384615384615384
-    },
     "sense": {
       "tp": 6,
-      "fp": 11,
+      "fp": 7,
       "fn": 3,
-      "precision": 0.35294117647058826,
+      "precision": 0.46153846153846156,
       "recall": 0.6666666666666666,
-      "f1": 0.46153846153846156
+      "f1": 0.5454545454545455
     },
     "recall_by_direction": {
       "forward": {
         "total": 5,
-        "found": 4,
-        "recall": 0.8
+        "found": 5,
+        "recall": 1.0
       },
       "backward": {
         "total": 4,
@@ -483,15 +419,15 @@
       },
       "True": {
         "total": 4,
-        "found": 2,
-        "recall": 0.5
+        "found": 3,
+        "recall": 0.75
       }
     },
     "recall_by_window_admission": {
       "window": {
         "total": 9,
-        "found": 7,
-        "recall": 0.7777777777777778
+        "found": 8,
+        "recall": 0.8888888888888888
       }
     },
     "recall_by_coupling": {
@@ -502,8 +438,8 @@
       },
       "contradiction": {
         "total": 3,
-        "found": 2,
-        "recall": 0.6666666666666666
+        "found": 3,
+        "recall": 1.0
       },
       "entailment": {
         "total": 3,
@@ -529,15 +465,15 @@
       },
       "valid": {
         "total": 6,
-        "found": 4,
-        "recall": 0.6666666666666666
+        "found": 5,
+        "recall": 0.8333333333333334
       }
     },
     "non_relation_pairs": 5,
-    "non_relation_violations": 1,
-    "non_relation_violation_rate": 0.2
+    "non_relation_violations": 0,
+    "non_relation_violation_rate": 0.0
   },
-  "duplicate_unordered_pairs": 10,
-  "elapsed_s": 21.086,
-  "run_config_fingerprint": "10e10a446aa8"
+  "duplicate_unordered_pairs": 7,
+  "elapsed_s": 4.965,
+  "run_config_fingerprint": "96513eb95ee7"
 }

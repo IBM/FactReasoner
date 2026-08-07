@@ -52,6 +52,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
+from fact_reasoner.lcs.taxonomy import LEGAL_SENSE_COUPLING
 from fact_reasoner.locoeval.gold_graph import (
     DEFAULT_CONCESSION_DISCOUNT,
     atom_priors,
@@ -66,6 +67,7 @@ from fact_reasoner.locoeval.mined_graph import (
     compare_to_gold,
     count_duplicate_unordered_pairs,
     parse_arm,
+    strategy_for,
 )
 from fact_reasoner.locoeval.models import ModelSpec
 
@@ -640,6 +642,15 @@ class GoldEvalRunner:
         if nli_method == "auto":
             nli_method = "logprobs" if model_spec.has_logprobs else "simbauq"
 
+        # A named strategy on the arm WINS over the run-level flags: two arms in one
+        # sweep can differ in strategy, so the arm has to carry its own.
+        knobs = strategy_for(spec.variant) or {
+            "sense_menu": self.sense_menu,
+            "prompt_variant": self.prompt_variant,
+            "require_evidence": self.require_evidence,
+            "reconcile": self.reconcile,
+        }
+
         result = self._run_async(
             abuild_mined_result(
                 item,
@@ -654,10 +665,10 @@ class GoldEvalRunner:
                 max_concurrency=self.max_concurrency,
                 max_distance=self.max_distance,
                 discourse=self.discourse,
-                sense_menu=self.sense_menu,
-                reconcile=self.reconcile,
-                prompt_variant=self.prompt_variant,
-                require_evidence=self.require_evidence,
+                sense_menu=knobs["sense_menu"],
+                reconcile=knobs["reconcile"],
+                prompt_variant=knobs["prompt_variant"],
+                require_evidence=knobs["require_evidence"],
                 show_progress=self.show_progress,
             )
         )
@@ -680,10 +691,11 @@ class GoldEvalRunner:
                 "max_concurrency": self.max_concurrency,
                 "max_distance": self.max_distance,
                 "discourse": (result.config or {}).get("discourse"),
-                "sense_menu": self.sense_menu,
-                "reconcile": self.reconcile,
-                "prompt_variant": self.prompt_variant,
-                "require_evidence": self.require_evidence,
+                "strategy": spec.variant,
+                "sense_menu": knobs["sense_menu"],
+                "reconcile": knobs["reconcile"],
+                "prompt_variant": knobs["prompt_variant"],
+                "require_evidence": knobs["require_evidence"],
                 "num_pairs_scored": cov.get("pairs_scored"),
                 "num_dropped_none": cov.get("dropped_none"),
                 "num_inadmissible_sense": cov.get("num_inadmissible_sense"),
@@ -847,15 +859,21 @@ class GoldEvalRunner:
             # cached record produced under different values is stale. They enter
             # the hash only when set away from the historical default, so adding
             # them does not invalidate records mined before they existed.
-            if self.sense_menu != "full":
-                payload["sense_menu"] = self.sense_menu
-            if self.reconcile != "ratchet":
-                payload["reconcile"] = self.reconcile
+            knobs = (strategy_for(spec.variant) if spec is not None else None) or {
+                "sense_menu": self.sense_menu,
+                "prompt_variant": self.prompt_variant,
+                "require_evidence": self.require_evidence,
+                "reconcile": self.reconcile,
+            }
+            if knobs["sense_menu"] != "full":
+                payload["sense_menu"] = knobs["sense_menu"]
+            if knobs["reconcile"] != "ratchet":
+                payload["reconcile"] = knobs["reconcile"]
             if self.discourse is not None:
                 payload["discourse"] = self.discourse
-            if self.prompt_variant != "v1":
-                payload["prompt_variant"] = self.prompt_variant
-            if self.require_evidence:
+            if knobs["prompt_variant"] != "v1":
+                payload["prompt_variant"] = knobs["prompt_variant"]
+            if knobs["require_evidence"]:
                 payload["require_evidence"] = True
             policy = spec.pair_policy if spec is not None else None
             if arm is None or policy in ("windowed", "gated"):
@@ -894,6 +912,28 @@ class GoldEvalRunner:
             agg["duplicate_unordered_pairs"] = sum(
                 int(r.get("duplicate_unordered_pairs") or 0) for r in cells
             )
+            # Vocabulary legality and evidence provenance: properties of the
+            # strategy, computed here so the report need not re-derive them.
+            agg["num_illegal_senses"] = sum(
+                1
+                for r in cells
+                for rel in (r.get("relations") or [])
+                if (str(rel.get("sense")), str(rel.get("type")))
+                not in LEGAL_SENSE_COUPLING
+            )
+            agg["num_evidence_spans"] = sum(
+                1
+                for r in cells
+                for rel in (r.get("relations") or [])
+                if rel.get("evidence_span")
+            )
+            agg["num_evidence_rejected"] = sum(
+                int(r.get("num_evidence_rejected") or 0) for r in cells
+            )
+            agg["num_inadmissible_dropped"] = sum(
+                int(r.get("num_inadmissible_sense") or 0) for r in cells
+            )
+            agg["strategy"] = self.mined_arms[arm].variant
             agg["elapsed_s"] = round(sum(float(r.get("elapsed_s") or 0) for r in cells), 1)
             out[arm] = agg
         return out
