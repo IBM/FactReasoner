@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import os
 import time
@@ -361,16 +362,28 @@ class GoldEvalRunner:
         # Backends are built once per model and shared across that model's arms and
         # items: constructing one per cell would re-open a client 20 times.
         self._backends: dict[str, Any] = {}
+        # One event loop for the whole sweep (see `_run_async` for why).
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     # -- orchestration -------------------------------------------------------
 
     def run(self) -> dict[str, Any]:
         """Score every item x arm, check the ladders, and persist everything.
 
+        The sweep's event loop and any async clients on it are released before
+        returning, so a caller need not manage them (see :meth:`close`).
+
         Returns:
             The combined results dict (also written to `results.json`), with keys
             `config`, `records`, `families` and `dataset`.
         """
+        try:
+            return self._run_inner()
+        finally:
+            self.close()
+
+    def _run_inner(self) -> dict[str, Any]:
+        """The sweep proper. See :meth:`run`, which owns loop teardown."""
         items = load_items(self.data_dir, self.item_ids)
         families = load_families(self.data_dir)
 
@@ -534,6 +547,68 @@ class GoldEvalRunner:
         self._backends[spec.name] = backend
         return backend
 
+    def _run_async(self, coro: Any) -> Any:
+        """Run one coroutine on the sweep's own event loop.
+
+        Deliberately NOT `asyncio.run` per cell. Mellea caches its `AsyncOpenAI`
+        client per event loop, keyed on `id(loop)`, in an LRU of capacity 2 -- so a
+        fresh loop per cell means a fresh client per cell, and the third cell evicts
+        the first client without awaiting its `aclose()`. The orphaned httpx
+        connection pool is then finalized against a loop that no longer exists,
+        which is the `RuntimeError: Event loop is closed` traceback such runs print
+        after every few cells.
+
+        Holding one loop open for the whole sweep keeps a single cached client, so
+        connections are reused across cells and nothing is finalized against a dead
+        loop. `close()` shuts it down once, at the end.
+        """
+        if self._loop is None:
+            self._loop = asyncio.new_event_loop()
+        return self._loop.run_until_complete(coro)
+
+    def close(self) -> None:
+        """Release the sweep's event loop, closing async clients on it first.
+
+        Async HTTP clients hold connections bound to the loop that created them, so
+        they have to be closed *while* that loop is still alive. Closing the loop
+        first is what strands them and produces a teardown traceback.
+        """
+        loop = self._loop
+        self._loop = None
+        if loop is None:
+            return
+        try:
+            for backend in self._backends.values():
+                cache = getattr(backend, "_client_cache", None)
+                clients = (
+                    list(getattr(cache, "cache", {}).values()) if cache else []
+                )
+                for client in clients:
+                    closer = getattr(client, "close", None)
+                    if closer is None:
+                        continue
+                    try:
+                        result = closer()
+                        if inspect.isawaitable(result):
+                            loop.run_until_complete(result)
+                    except Exception:  # noqa: BLE001, S110
+                        # Best effort: a client that cannot be closed cleanly must
+                        # not fail a sweep whose scores are already written.
+                        pass
+                if cache is not None and hasattr(cache, "cache"):
+                    cache.cache.clear()
+            # Let any callbacks the closes scheduled actually run.
+            loop.run_until_complete(asyncio.sleep(0))
+        finally:
+            loop.close()
+            self._backends.clear()
+
+    def __enter__(self) -> GoldEvalRunner:
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
     def _mine_cell(
         self, item: Mapping[str, Any], spec: MinedArm, record: dict[str, Any]
     ) -> Any:
@@ -550,7 +625,7 @@ class GoldEvalRunner:
         if nli_method == "auto":
             nli_method = "logprobs" if model_spec.has_logprobs else "simbauq"
 
-        result = asyncio.run(
+        result = self._run_async(
             abuild_mined_result(
                 item,
                 backend=self._backend_for(model_spec),

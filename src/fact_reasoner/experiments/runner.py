@@ -15,11 +15,13 @@
 
 # The LCS experiment sweep: {model} x {example} x {strength method} -> records.
 
+import asyncio
+import inspect
 import json
 import os
 import time
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fact_reasoner.lcs.lcs_scorer import LCSScorer
 from fact_reasoner.lcs.relation_miner import RelationMiner
@@ -42,6 +44,55 @@ class ExperimentRunner:
 
     def __init__(self, config: ExperimentConfig):
         self.config = config
+        # One event loop for the whole sweep (see `_run_async`).
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        # Backends built this run, so `close` can shut their clients down.
+        self._backend_cache: Dict[str, Any] = {}
+
+    # -- event loop ----------------------------------------------------------
+
+    def _run_async(self, coro: Any) -> Any:
+        """Run one coroutine on the sweep's own event loop.
+
+        Deliberately not ``asyncio.run`` per cell: Mellea keys its async-client
+        cache on ``id(loop)`` with capacity 2, so a loop per cell means a client
+        per cell and every third cell strands one against a closed loop.
+        """
+        if self._loop is None:
+            self._loop = asyncio.new_event_loop()
+        return self._loop.run_until_complete(coro)
+
+    def close(self) -> None:
+        """Close async clients on their own loop, then release it."""
+        loop = self._loop
+        self._loop = None
+        if loop is None:
+            return
+        try:
+            for backend in list(self._backend_cache.values()):
+                cache = getattr(backend, "_client_cache", None)
+                for client in list(getattr(cache, "cache", {}).values()):
+                    closer = getattr(client, "close", None)
+                    if closer is None:
+                        continue
+                    try:
+                        result = closer()
+                        if inspect.isawaitable(result):
+                            loop.run_until_complete(result)
+                    except Exception:  # noqa: BLE001, S110
+                        pass  # a sweep whose scores are written must not fail here
+                if cache is not None and hasattr(cache, "cache"):
+                    cache.cache.clear()
+            loop.run_until_complete(asyncio.sleep(0))
+        finally:
+            loop.close()
+            self._backend_cache.clear()
+
+    def __enter__(self) -> "ExperimentRunner":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
 
     # -- orchestration -------------------------------------------------------
 
@@ -50,15 +101,19 @@ class ExperimentRunner:
 
         In dry-run mode the LLM and Merlin are stubbed (offline). Records are
         written incrementally to ``output_dir/records/`` and the combined result
-        to ``output_dir/results.json``.
+        to ``output_dir/results.json``. The sweep's event loop and any async
+        clients on it are released before returning.
         """
         cfg = self.config
-        if cfg.dry_run:
-            with dry_run_patches(
-                surrogate_p_yes=cfg.surrogate_p_yes, verbalized_p=cfg.verbalized_p
-            ):
-                return self._run_inner()
-        return self._run_inner()
+        try:
+            if cfg.dry_run:
+                with dry_run_patches(
+                    surrogate_p_yes=cfg.surrogate_p_yes, verbalized_p=cfg.verbalized_p
+                ):
+                    return self._run_inner()
+            return self._run_inner()
+        finally:
+            self.close()
 
     def _run_inner(self) -> Dict[str, Any]:
         cfg = self.config
@@ -165,8 +220,18 @@ class ExperimentRunner:
                 gate=cfg.gate,
             )
             # Mining is always response-grounded: the miner needs the response.
-            result = miner.mine_from_atoms(
-                example["atom_texts"], example["response"]
+            #
+            # Driven on the sweep's own loop rather than the miner's sync entry
+            # point, which calls asyncio.run per call. Mellea caches its async
+            # client per event loop (LRU, capacity 2), so a fresh loop per cell
+            # means a fresh client per cell and the third cell evicts the first
+            # without closing it -- its connection pool is then finalized against a
+            # dead loop, printing "RuntimeError: Event loop is closed". One loop for
+            # the sweep also lets connections be reused between cells.
+            result = self._run_async(
+                miner.amine_from_atoms(
+                    example["atom_texts"], example["response"]
+                )
             )
 
             merlin_path = _DRY_RUN_MERLIN if cfg.dry_run else cfg.merlin_path
@@ -231,7 +296,7 @@ class ExperimentRunner:
         try:
             from fact_reasoner.backends import build_backend
 
-            return build_backend(
+            backend = build_backend(
                 model.backend,
                 model_id=model.model_id,
                 base_url=model.base_url,
@@ -243,6 +308,9 @@ class ExperimentRunner:
                 f"({model.backend}): {e}"
             )
             return None
+        # Remembered so `close` can shut its async clients down on the sweep's loop.
+        self._backend_cache[model.name] = backend
+        return backend
 
     def _save_record(self, records_dir: str, record: Dict[str, Any]) -> None:
         fname = f"{record['model']}__{record['example_id']}__{record['strength_method']}.json"

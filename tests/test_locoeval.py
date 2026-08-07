@@ -1538,3 +1538,96 @@ def test_gold_fingerprint_ignores_every_mining_knob(mined_specs):
     # But a SCORING knob must still invalidate it.
     assert fp(ibound=10) != base
     assert fp(reified_prior=0.7) != base
+
+
+# ---------------------------------------------------------------------------
+# Event loop lifecycle.
+# ---------------------------------------------------------------------------
+
+
+def test_all_cells_share_one_event_loop(dataset, mined_specs, mock_llm):
+    """One loop per sweep, not one per cell.
+
+    Mellea caches its async client per event loop in an LRU of capacity 2, so a
+    fresh loop per cell means a fresh client per cell and the third cell evicts the
+    first without awaiting its close -- whose connection pool is then finalized
+    against a dead loop. Sharing one loop is what prevents that.
+    """
+    seen = []
+    runner = _mined_runner(dataset, "loop1", mined_specs, arms=(MINED_ARM,))
+    real = runner._run_async
+
+    def spy(coro):
+        out = real(coro)
+        seen.append(id(runner._loop))
+        return out
+
+    runner._run_async = spy
+    runner.run()
+    assert len(seen) == 2  # two items in the fixture
+    assert len(set(seen)) == 1, "a new loop was created per cell"
+    # And the loop is released once the sweep returns.
+    assert runner._loop is None
+
+
+def test_run_closes_the_loop_even_when_a_cell_raises(
+    dataset, mined_specs, monkeypatch, mock_llm
+):
+    async def _boom(*a, **k):
+        raise RuntimeError("endpoint down")
+
+    monkeypatch.setattr(rn, "abuild_mined_result", _boom)
+    runner = _mined_runner(dataset, "loop2", mined_specs, arms=(MINED_ARM,))
+    results = runner.run()
+    assert all("error" in r for r in results["records"])
+    assert runner._loop is None  # released despite every cell failing
+
+
+def test_close_is_idempotent_and_safe_before_any_run(dataset, mined_specs):
+    runner = _mined_runner(dataset, "loop3", mined_specs, arms=("gold",))
+    runner.close()  # never ran; must not raise
+    runner.close()
+    assert runner._loop is None
+
+
+def test_close_shuts_async_clients_down_on_their_own_loop(
+    dataset, mined_specs, mock_llm
+):
+    """A client must be closed while its loop is alive, else it strands connections."""
+    import asyncio
+
+    closed_on = []
+
+    class _Client:
+        async def close(self):
+            # Recording the loop is the whole point: closing on a different (or
+            # already-closed) loop is what strands the connection pool.
+            closed_on.append(id(asyncio.get_running_loop()))
+
+    class _Cache:
+        def __init__(self):
+            self.cache = {1: _Client()}
+
+    runner = _mined_runner(dataset, "loop4", mined_specs, arms=(MINED_ARM,))
+    runner.run()  # populates and then releases the loop
+    # Re-arm with a fake client on a fresh loop and close again.
+    runner._loop = None
+    backend = MagicMock()
+    backend._client_cache = _Cache()
+    runner._backends = {"m1": backend}
+    runner._run_async(_noop())
+    loop_id = id(runner._loop)
+    runner.close()
+    assert closed_on == [loop_id], "client was not closed on its own live loop"
+    assert not backend._client_cache.cache  # cache cleared
+
+
+async def _noop():
+    return None
+
+
+def test_runner_is_a_context_manager(dataset, mined_specs, mock_llm):
+    with _mined_runner(dataset, "loop5", mined_specs, arms=("gold",)) as runner:
+        runner._run_async(_noop())
+        assert runner._loop is not None
+    assert runner._loop is None

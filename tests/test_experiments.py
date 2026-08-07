@@ -133,15 +133,17 @@ class TestRunner:
 
     def test_broken_cell_is_recorded_not_fatal(self, tmp_path, monkeypatch):
         # Force mining to raise for one example only; the sweep must continue.
+        # Patches the ASYNC entry point, which is the one the runner drives: the
+        # sweep holds a single event loop rather than calling asyncio.run per cell.
         from fact_reasoner.lcs import relation_miner as rm_mod
-        orig = rm_mod.RelationMiner.mine_from_atoms
+        orig = rm_mod.RelationMiner.amine_from_atoms
 
-        def flaky(self, atoms, response, *args, **kwargs):
+        async def flaky(self, atoms, response, *args, **kwargs):
             if any("defendant" in a for a in atoms):  # example-1-damages
                 raise RuntimeError("boom")
-            return orig(self, atoms, response, *args, **kwargs)
+            return await orig(self, atoms, response, *args, **kwargs)
 
-        monkeypatch.setattr(rm_mod.RelationMiner, "mine_from_atoms", flaky)
+        monkeypatch.setattr(rm_mod.RelationMiner, "amine_from_atoms", flaky)
         cfg = _dry_config(tmp_path)
         results = ExperimentRunner(cfg).run()
         errored = [r for r in results["records"] if "error" in r]
@@ -193,3 +195,42 @@ class TestBruteForceGuard:
             mn.add_factor([f"a{i}"], [2], [0.5, 0.5])
         with pytest.raises(ValueError):
             brute_force_marginals(mn)
+
+
+class TestEventLoop:
+    """One loop per sweep, not one per cell.
+
+    Mellea caches its async client per event loop in an LRU of capacity 2, so a
+    fresh loop per cell means a fresh client per cell; the third cell evicts the
+    first without closing it, and its connection pool is finalized against a dead
+    loop ("RuntimeError: Event loop is closed").
+    """
+
+    def test_all_cells_share_one_loop(self, tmp_path):
+        cfg = _dry_config(tmp_path)
+        runner = ExperimentRunner(cfg)
+        seen = []
+        real = runner._run_async
+
+        def spy(coro):
+            out = real(coro)
+            seen.append(id(runner._loop))
+            return out
+
+        runner._run_async = spy
+        runner.run()
+        assert len(seen) > 2  # enough cells to have evicted a per-cell client
+        assert len(set(seen)) == 1
+        assert runner._loop is None  # released when run() returns
+
+    def test_close_is_idempotent(self, tmp_path):
+        runner = ExperimentRunner(_dry_config(tmp_path))
+        runner.close()
+        runner.close()
+        assert runner._loop is None
+
+    def test_runner_is_a_context_manager(self, tmp_path):
+        with ExperimentRunner(_dry_config(tmp_path)) as runner:
+            results = runner.run()
+        assert results["records"]
+        assert runner._loop is None
