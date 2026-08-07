@@ -1355,6 +1355,37 @@ def _mining_findings(results: Mapping[str, Any]) -> list[str]:
             "are pairs the corpus asserts are unrelated."
         )
 
+    # Type confidence saturation: when P(tau|a_i,a_j) is pinned at 1.0, the factor
+    # probability p = type_confidence x strength reduces to the strength alone, so
+    # one of the two mined quantities is carrying no information.
+    records = results.get("records", []) or []
+    tc = [
+        rel.get("type_confidence")
+        for r in records
+        if r.get("relation_source") == "mined"
+        for rel in (r.get("relations") or [])
+        if rel.get("type_confidence") is not None
+    ]
+    if tc:
+        at_one = sum(1 for v in tc if float(v) >= 0.99999)
+        if at_one / len(tc) > 0.5:
+            bullets.append(
+                r"\item \textbf{The type confidence is saturated, so the factor "
+                r"probability is carrying only the strength.} "
+                f"{at_one} of {len(tc)} mined relations "
+                f"({100.0 * at_one / len(tc):.1f}\\%) have "
+                f"$P(\\tau \\mid a_i,a_j) = 1.0$, with a minimum of "
+                f"{_fmt(min(float(v) for v in tc))} across the whole sweep. Because "
+                "$p = P(\\tau \\mid a_i,a_j) \\times P(a_j \\mid a_i,\\tau)$, the "
+                "edge weight is effectively the conditional strength alone. This is "
+                "a genuine reading and not a missing-logprobs fallback --- that path "
+                "returns 0.5, not 1.0 --- but it means Prompt~A contributes a label "
+                "and no usable uncertainty on this model, and the two-factor "
+                "decomposition is not being exercised. A model whose "
+                "\\texttt{[coupling=...]} span is less peaked, or a calibrator "
+                "fitted on that span, would be needed to test it."
+            )
+
     errs = sum(int(b.get("num_call_exceptions") or 0) for b in mining.values())
     calls = sum(int(b.get("num_llm_calls") or 0) for b in mining.values())
     if calls:

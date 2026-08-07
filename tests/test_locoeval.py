@@ -1431,3 +1431,24 @@ def test_cli_estimate_only_is_silent_about_llm_for_gold_arms(capsys):
     rc = cli.main(["--estimate-only"])
     assert rc == 0
     assert "make no LLM calls" in capsys.readouterr().out
+
+
+def test_findings_flag_saturated_type_confidence(dataset, mined_specs, mock_llm):
+    """A pinned P(tau|a_i,a_j) means the factor weight is only the strength."""
+    results, out_dir = _mined_results(dataset, "sat1", mined_specs, ("gold", MINED_ARM))
+    for rec in results["records"]:
+        for rel in rec.get("relations") or []:
+            rel["type_confidence"] = 1.0
+        rec["relation_source"] = "mined" if rec["arm"] == MINED_ARM else "gold"
+    text = rp._findings_section(results)
+    assert "type confidence is saturated" in text
+
+
+def test_findings_omit_the_saturation_bullet_when_confidence_varies(
+    dataset, mined_specs, mock_llm
+):
+    results, out_dir = _mined_results(dataset, "sat2", mined_specs, ("gold", MINED_ARM))
+    for rec in results["records"]:
+        for i, rel in enumerate(rec.get("relations") or []):
+            rel["type_confidence"] = 0.4 + 0.01 * i
+    assert "type confidence is saturated" not in rp._findings_section(results)
