@@ -86,23 +86,34 @@ class MinedArmError(ValueError):
 
 @dataclass(frozen=True)
 class MinedArm:
-    """One mined cell: a served model crossed with a candidate-pair policy."""
+    """One mined cell: a served model crossed with a candidate-pair policy.
+
+    An optional `variant` label distinguishes two runs that share a model and a
+    policy but differ in mining strategy (prompt version, admissible vocabulary,
+    and so on). Without it, running an old and a new strategy would collide on the
+    same arm name -- the records would overwrite each other and the report could
+    not compare them, which is the whole point of running both.
+    """
 
     model: str
     pair_policy: str
+    variant: str | None = None
 
     @property
     def arm(self) -> str:
         """The arm name this cell is recorded and reported under."""
-        return f"{MINED_PREFIX}:{self.model}:{self.pair_policy}"
+        base = f"{MINED_PREFIX}:{self.model}:{self.pair_policy}"
+        return f"{base}:{self.variant}" if self.variant else base
 
     def __str__(self) -> str:
         return self.arm
 
 
-def format_arm(model: str, pair_policy: str) -> str:
-    """The arm name for one (model, policy) cell."""
-    return MinedArm(model=model, pair_policy=pair_policy).arm
+def format_arm(model: str, pair_policy: str, variant: str | None = None) -> str:
+    """The arm name for one (model, policy[, variant]) cell."""
+    return MinedArm(
+        model=model, pair_policy=pair_policy, variant=variant
+    ).arm
 
 
 def parse_arm(arm: str) -> MinedArm | None:
@@ -127,12 +138,13 @@ def parse_arm(arm: str) -> MinedArm | None:
     parts = str(arm).split(":")
     if parts[0] != MINED_PREFIX:
         return None
-    if len(parts) != 3:
+    if len(parts) not in (3, 4):
         raise MinedArmError(
             f"Malformed mined arm {arm!r}: expected "
-            f"'{MINED_PREFIX}:<model>:<pair_policy>'."
+            f"'{MINED_PREFIX}:<model>:<pair_policy>[:<variant>]'."
         )
-    _, model, policy = parts
+    model, policy = parts[1], parts[2]
+    variant = parts[3] if len(parts) == 4 else None
     if not model:
         raise MinedArmError(f"Mined arm {arm!r} names no model.")
     if policy not in PAIR_POLICIES:
@@ -140,7 +152,9 @@ def parse_arm(arm: str) -> MinedArm | None:
             f"Unknown pair policy {policy!r} in arm {arm!r} (expected one of "
             f"{list(PAIR_POLICIES)})."
         )
-    return MinedArm(model=model, pair_policy=policy)
+    if len(parts) == 4 and not variant:
+        raise MinedArmError(f"Mined arm {arm!r} has an empty variant label.")
+    return MinedArm(model=model, pair_policy=policy, variant=variant)
 
 
 def count_call_exceptions(outputs: Iterable[Any]) -> tuple[int, dict[str, int]]:
@@ -183,6 +197,8 @@ async def abuild_mined_result(
     discourse: bool | None = None,
     sense_menu: str = "full",
     reconcile: str = "ratchet",
+    prompt_variant: str = "v1",
+    require_evidence: bool = False,
     show_progress: bool = False,
 ) -> MiningResult:
     """Mine one item's relations with its atoms and priors held fixed.
@@ -211,6 +227,9 @@ async def abuild_mined_result(
         sense_menu: `"full"` or `"gold9"` (restrict to the combinations the corpus
             uses).
         reconcile: `"ratchet"` or `"strict"` (see `RelationMiner`).
+        prompt_variant: Prompt A variant, `"v1"` or `"v2"`.
+        require_evidence: Whether to reject an answer whose cited evidence
+            span is absent from the response (needs `prompt_variant="v2"`).
         show_progress: Whether the miner prints a per-item progress bar.
 
     Returns:
@@ -252,6 +271,8 @@ async def abuild_mined_result(
         discourse=discourse,
         sense_menu=sense_menu,
         reconcile=reconcile,
+        prompt_variant=prompt_variant,
+        require_evidence=require_evidence,
         show_progress=show_progress,
         **kwargs,
     )

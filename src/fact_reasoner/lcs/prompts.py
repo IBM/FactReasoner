@@ -59,6 +59,16 @@ _SENSE_MENU = (
     "Precedence, Succession, None"
 )
 
+# The restricted menu: only the senses the LoCoBench corpora actually label.
+# `Condition` and `Instantiation` are dropped -- both compile to entailment, both
+# are semantically broad enough that a model reaching for "related somehow" lands
+# on them, and both appear ZERO times in gold while accounting for 13% of one
+# measured arm's edges. Kept in sync with `taxonomy.GOLD9_SENSES`.
+_SENSE_MENU_GOLD9 = (
+    "Cause-Effect, Effect-Cause, Evidence, Restatement, "
+    "Contrast, Concession, Alternative, Disjunction, Precedence, None"
+)
+
 
 # ----------------------------------------------------------------------------
 # Prompt A -- joint discourse sense + Level-1 coupling classification, grounded
@@ -318,16 +328,205 @@ coupling: {{coupling}}
 """
 
 
-def build_sense_coupling_prompt() -> str:
+# ----------------------------------------------------------------------------
+# Prompt A v2 -- same task, rebalanced for precision.
+#
+# v1 over-asserts: measured against a corpus where 7.2% of atom pairs are
+# related, it answers "related" on 72% of the pairs a windowed policy hands it.
+# Five properties of v1 push that way, and v2 addresses each:
+#
+#   1. Few-shot label balance was 3 related : 1 unrelated. v2 is 2 : 3. Few-shot
+#      class balance is a strong prior on the answer distribution, and v1's was
+#      pointed the wrong way by an order of magnitude relative to the truth.
+#   2. v1's single negative had the response say the two claims "were not related
+#      this year" -- an EXPLICIT disavowal. That teaches that None requires denial,
+#      whereas real prose simply stays silent. v2's negatives are all silence:
+#      topically adjacent claims the text never links.
+#   3. v1 asked the model to be grounded but gave it nowhere to show the grounding,
+#      and nothing checked it. v2 requires a verbatim [evidence=...] span QUOTED
+#      FROM THE RESPONSE, which the parser can verify -- the only precision
+#      mechanism here that is checkable rather than merely requested. (It must
+#      quote the response, not the atoms: atoms are decontextualized rewrites and
+#      only ~27% of them appear in the response even after normalization, whereas
+#      the response is literal source text.)
+#   4. v1's step 1 was a leading question listing eight affirmative relations
+#      before mentioning None. v2 asks the discriminating question first: does the
+#      text draw the link, or are the claims merely near each other?
+#   5. v1 gave None one line against nine for relation-bearing senses. v2 gives it
+#      first position and equal prose.
+#
+# Also named explicitly: transitivity. ~85% of v1's false positives are the model
+# closing a chain the text laid out pairwise (96.6% of them touch a gold-edge
+# endpoint), so v2 forbids inferring A-C from stated A-B and B-C.
+# ----------------------------------------------------------------------------
+
+PROMPT_SENSE_COUPLING_V2 = """
+
+Instructions:
+You are given the full RESPONSE a model produced, and two atomic claims, A and B, \
+both taken FROM THAT RESPONSE. Decide the discourse/logical relation FROM A TO B.
+
+Most pairs of claims in a text are NOT related. They are simply near each other. \
+Your default answer is None, and you should depart from it only when the response \
+itself draws a dependence between A and B.
+
+Three things that are NOT relations, however plausible they look:
+  - Topical adjacency. A and B being about the same subject, or sitting in \
+neighbouring sentences, is not a relation.
+  - World knowledge. If the link is true in general but the response does not \
+draw it, the answer is None.
+  - Transitivity. If the response links A to some third claim C, and C to B, that \
+does NOT make A related to B. Report only the links the text draws directly.
+
+1. First ask the discriminating question: does the response ITSELF assert a \
+dependence from A to B -- as written, or as an explicit step in the author's \
+argument? Identify the words in the response that do it. If you cannot point to \
+such words, the answer is None.
+
+2. If and only if you can, name the DISCOURSE SENSE, one of: {{sense_menu}}.
+   - None: the response draws no dependence between A and B. This is the common \
+case: unrelated, merely adjacent, related only by world knowledge, or related \
+only through a third claim.
+   - Cause-Effect: the response says A causes/leads to B. Effect-Cause: A is the \
+effect, B its cause.
+   - Evidence: the response offers A as evidence/support for B.
+   - Restatement: A and B say the same thing -- a paraphrase, a converse, or a \
+restatement the text marks ("in other words", "equivalently", "that is").
+   - Contrast: A and B are opposed but NOT exhaustive (both could be false).
+   - Concession: A and B are in tension and the text concedes or resolves it \
+("although A, still B"; a holding settles it).
+   - Alternative: A and B are EXHAUSTIVE competing options -- exactly one holds \
+(not both, not neither).
+   - Disjunction: AT LEAST ONE of A and B holds; both may.
+   - Precedence: A and B are ordered in time with no truth dependence.
+
+3. Map the sense to a COUPLING, one of: entailment, contradiction, equivalence, \
+exclusive, co_necessity, none.
+   - Cause-Effect, Effect-Cause, Evidence -> entailment
+   - Restatement -> equivalence
+   - Contrast, Concession -> contradiction
+   - Alternative -> exclusive       (exactly one of A, B is true)
+   - Disjunction -> co_necessity    (at least one of A, B is true)
+   - Precedence, None -> none
+   Prefer "exclusive" when the two claims are incompatible AND exhaustive; \
+"contradiction" when they merely cannot both hold but could both be false.
+
+4. Answer on ONE line, with three bracketed tags. The evidence must be a SHORT \
+VERBATIM QUOTE COPIED FROM THE RESPONSE -- the words that draw the link. Do not \
+quote claim A or claim B; quote the response. Use [evidence=none] when the sense \
+is None.
+[sense=Evidence] [coupling=entailment] [evidence="which is why the panel held"]
+
+Use the following examples to better understand your task.
+
+Example 1 (adjacent and on-topic, but the response draws no link -> None):
+RESPONSE: The survey was administered in March to a sample of 400 households. \
+Response rates in rural districts have declined over the past decade. The \
+analysis weighted results by district population.
+A: The survey was administered in March to a sample of 400 households.
+B: Response rates in rural districts have declined over the past decade.
+1. The two sentences are adjacent and both concern the survey, but the response \
+never says the March administration bears on rural response rates. There are no \
+words that draw a dependence.
+2. Discourse sense: None.
+3. Coupling: none.
+4. [sense=None] [coupling=none] [evidence=none]
+
+Example 2 (the response makes the causal link explicitly):
+RESPONSE: The company launched a flawed product last quarter. Reviewers panned \
+it, returns spiked, and as a direct result the company's stock price fell 15 \
+percent over the same period.
+A: The company launched a flawed product last quarter.
+B: The company's stock price fell 15 percent last quarter.
+1. The response presents the launch as the head of a chain ending in the stock \
+decline, and marks it: "as a direct result".
+2. Discourse sense: Cause-Effect.
+3. Coupling: entailment.
+4. [sense=Cause-Effect] [coupling=entailment] [evidence="as a direct result"]
+
+Example 3 (true in general, but this response does not draw it -> None):
+RESPONSE: Higher interest rates raise the cost of corporate borrowing. The firm \
+opened three distribution centres last year. Its logistics costs fell by eight \
+percent.
+A: Higher interest rates raise the cost of corporate borrowing.
+B: The firm opened three distribution centres last year.
+1. One could argue borrowing costs affect expansion decisions, but that is world \
+knowledge. This response states the two facts side by side and links neither to \
+the other.
+2. Discourse sense: None.
+3. Coupling: none.
+4. [sense=None] [coupling=none] [evidence=none]
+
+Example 4 (the response states an exhaustive alternative -> exclusive):
+RESPONSE: The two readings are mutually exclusive and exactly one must be right: \
+either no one was harmed in the incident, or three people died in it.
+A: No one was harmed in the incident.
+B: Three people died in the incident.
+1. The response sets A and B against each other and says exactly one must be \
+right: "mutually exclusive and exactly one must be right: either ... or".
+2. Discourse sense: Alternative.
+3. Coupling: exclusive.
+4. [sense=Alternative] [coupling=exclusive] [evidence="mutually exclusive and \
+exactly one must be right"]
+
+Example 5 (linked only through a third claim -> None):
+RESPONSE: The alloy is chemically identical to the certified reference. It \
+therefore meets the reference specification. Meeting that specification is a \
+precondition for airframe use.
+A: The alloy is chemically identical to the certified reference.
+B: Meeting that specification is a precondition for airframe use.
+1. The response links A to the middle claim (it meets the specification), and the \
+middle claim to B. It does not link A to B directly; that would be transitivity, \
+which is not a relation to report.
+2. Discourse sense: None.
+3. Coupling: none.
+4. [sense=None] [coupling=none] [evidence=none]
+
+Your task:
+RESPONSE: {{response}}
+A: {{atom_a}}
+B: {{atom_b}}
+"""
+
+# Prompt A variants selectable by the miner. "v1" is byte-identical to the
+# original and is kept permanently so any prompt claim can be A/B'd rather than
+# asserted.
+PROMPT_VARIANTS = ("v1", "v2")
+
+
+def build_sense_coupling_prompt(
+    variant: str = "v1", menu: str = "full"
+) -> str:
     """Return Prompt A (response-grounded) with the sense menu interpolated.
 
-    The ``{{response}}`` / ``{{atom_a}}`` / ``{{atom_b}}`` placeholders remain for
-    Mellea's ``user_variables`` substitution at call time.
+    Args:
+        variant: ``"v1"`` (the original) or ``"v2"`` (rebalanced for precision;
+            requires a verifiable evidence span -- see the module comment above
+            :data:`PROMPT_SENSE_COUPLING_V2`).
+        menu: ``"full"`` for the whole sense taxonomy, or ``"gold9"`` for only the
+            senses the LoCoBench corpora label.
 
     Returns:
         The Prompt A template string.
+
+    Raises:
+        ValueError: If `variant` or `menu` is unknown.
     """
-    return PROMPT_SENSE_COUPLING.replace("{{sense_menu}}", _SENSE_MENU)
+    if variant not in PROMPT_VARIANTS:
+        raise ValueError(
+            f"Unknown prompt variant {variant!r} (expected one of "
+            f"{list(PROMPT_VARIANTS)})."
+        )
+    if menu == "full":
+        sense_menu = _SENSE_MENU
+    elif menu == "gold9":
+        sense_menu = _SENSE_MENU_GOLD9
+    else:
+        raise ValueError(f"Unknown sense menu {menu!r} (expected 'full' or 'gold9').")
+    template = (
+        PROMPT_SENSE_COUPLING if variant == "v1" else PROMPT_SENSE_COUPLING_V2
+    )
+    return template.replace("{{sense_menu}}", sense_menu)
 
 
 def build_surrogate_strength_prompt() -> str:

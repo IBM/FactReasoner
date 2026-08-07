@@ -1145,3 +1145,142 @@ class TestSenseMenuAndReconcile:
         assert (
             self._miner(pair_policy="bidirectional", discourse=True).discourse is True
         )
+
+
+class TestPromptVariantAndEvidence:
+    def _miner(self, **kw):
+        from unittest.mock import MagicMock
+
+        from fact_reasoner.lcs.relation_miner import RelationMiner
+
+        kw.setdefault("prompt_variant", "v2")
+        kw.setdefault("require_evidence", True)
+        return RelationMiner(MagicMock(), **kw)
+
+    RESPONSE = (
+        "The alloy is identical to the reference. As a direct result it meets "
+        "the spec."
+    )
+
+    def _parse(self, miner, text, response=None):
+        from unittest.mock import MagicMock
+
+        out = MagicMock()
+        out.success = True
+        out.result = text
+        miner._drop_reasons = {}
+        return miner._parse_sense_output(
+            ("a0", "a1"), out, response=self.RESPONSE if response is None else response
+        )
+
+    def test_v1_prompt_is_byte_identical_to_the_original(self):
+        """v1 must stay frozen so any prompt claim can be A/B'd, not asserted."""
+        from fact_reasoner.lcs.prompts import (
+            PROMPT_SENSE_COUPLING,
+            _SENSE_MENU,
+            build_sense_coupling_prompt,
+        )
+
+        assert build_sense_coupling_prompt("v1", "full") == (
+            PROMPT_SENSE_COUPLING.replace("{{sense_menu}}", _SENSE_MENU)
+        )
+
+    def test_v2_inverts_the_few_shot_label_balance(self):
+        """v1 showed 3 related : 1 none against a corpus that is ~7% related."""
+        import re
+
+        from fact_reasoner.lcs.prompts import build_sense_coupling_prompt
+
+        v1 = build_sense_coupling_prompt("v1", "full")
+        v2 = build_sense_coupling_prompt("v2", "gold9")
+        none_v1 = len(re.findall(r"\[sense=None\]", v1))
+        rel_v1 = len(re.findall(r"\[sense=(?!None)", v1))
+        none_v2 = len(re.findall(r"\[sense=None\]", v2))
+        rel_v2 = len(re.findall(r"\[sense=(?!None)", v2))
+        assert rel_v1 > none_v1  # the old, wrong-way prior
+        assert none_v2 >= rel_v2  # at least balanced now
+
+    def test_gold9_menu_omits_the_never_in_gold_senses(self):
+        from fact_reasoner.lcs.prompts import build_sense_coupling_prompt
+
+        v2 = build_sense_coupling_prompt("v2", "gold9")
+        assert "Instantiation" not in v2
+        assert "Condition" not in v2
+        assert "Evidence" in v2 and "Restatement" in v2
+
+    def test_unknown_variant_or_menu_is_rejected(self):
+        import pytest as _pytest
+
+        from fact_reasoner.lcs.prompts import build_sense_coupling_prompt
+
+        with _pytest.raises(ValueError):
+            build_sense_coupling_prompt("v3", "full")
+        with _pytest.raises(ValueError):
+            build_sense_coupling_prompt("v2", "gold10")
+
+    def test_require_evidence_needs_v2(self):
+        import pytest as _pytest
+
+        with _pytest.raises(ValueError, match="needs prompt_variant='v2'"):
+            self._miner(prompt_variant="v1", require_evidence=True)
+
+    def test_a_present_span_is_admitted(self):
+        got = self._parse(
+            self._miner(),
+            '[sense=Evidence] [coupling=entailment] [evidence="As a direct result"]',
+        )
+        assert got is not None
+        assert got["evidence_span"] == "As a direct result"
+
+    def test_a_fabricated_span_is_rejected(self):
+        m = self._miner()
+        assert self._parse(
+            m, '[sense=Evidence] [coupling=entailment] [evidence="because the moon"]'
+        ) is None
+        assert m._drop_reasons["evidence_not_in_response"] == 1
+
+    def test_a_missing_span_is_rejected(self):
+        m = self._miner()
+        assert self._parse(m, "[sense=Evidence] [coupling=entailment]") is None
+        assert m._drop_reasons["evidence_missing"] == 1
+
+    def test_a_span_matching_only_after_normalization_is_admitted(self):
+        """Regression: the normalizer had an escaped `\\s+` and never collapsed
+        whitespace, so a correctly-cited span with different spacing was rejected.
+        """
+        got = self._parse(
+            self._miner(),
+            '[sense=Evidence] [coupling=entailment] [evidence="as  a   DIRECT result"]',
+        )
+        assert got is not None
+
+    @pytest.mark.parametrize(
+        "tag",
+        [
+            '[evidence="As a direct result"]',
+            "[evidence='As a direct result']",
+            "[evidence=As a direct result]",
+            '{"evidence":"As a direct result"}',
+        ],
+    )
+    def test_every_evidence_format_parses(self, tag):
+        """Regression: bare spans land in a later regex group, which the shared
+        span helper (which assumes group 1) crashed on.
+        """
+        got = self._parse(
+            self._miner(), f"[sense=Evidence] [coupling=entailment] {tag}"
+        )
+        assert got is not None
+
+    def test_evidence_is_recorded_but_not_required_by_default(self):
+        m = self._miner(require_evidence=False)
+        got = self._parse(
+            m, '[sense=Evidence] [coupling=entailment] [evidence="not in the text"]'
+        )
+        assert got is not None  # not enforced...
+        assert got["evidence_span"] == "not in the text"  # ...but still recorded
+
+    def test_config_records_the_prompt_knobs(self):
+        m = self._miner()
+        assert m.prompt_variant == "v2"
+        assert m.require_evidence is True

@@ -81,7 +81,8 @@ def _arm_label(arm: str) -> str:
         return str(arm)
     if spec is None:
         return str(arm)
-    return f"mined by {spec.model}, {spec.pair_policy.replace('_', ' ')}"
+    label = f"mined by {spec.model}, {spec.pair_policy.replace('_', ' ')}"
+    return f"{label}, strategy {spec.variant}" if spec.variant else label
 
 
 # ---------------------------------------------------------------------------
@@ -1016,6 +1017,77 @@ def _mining_quality_section(results: Mapping[str, Any]) -> str:
     ).strip()
 
 
+def _strategy_comparison_section(results: Mapping[str, Any]) -> str:
+    """Old versus new mining strategy, at the level that builds the factor.
+
+    Every number here is COUPLING-level. That matters: an earlier revision of this
+    report quoted pair-level figures as though they were coupling-level, which
+    overstated the miner by ~17 F1 points. Pair level asks only whether two atoms
+    were seen as related at all; the coupling is what determines the MRF factor.
+    """
+    mining = results.get("mining") or {}
+    if len(mining) < 2:
+        return ""
+    cfg = results.get("config") or {}
+    arms = [a for a in (cfg.get("arms") or []) if a in mining]
+    if len(arms) < 2:
+        return ""
+
+    rows = []
+    for arm in arms:
+        m = mining[arm]
+        c = m.get("coupling") or {}
+        d = m.get("recall_by_direction") or {}
+        rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(arm.replace('mined:llama-3.3-70b-instruct:', ''))}}}",
+                    str(m.get("mined_edges_total")),
+                    _pct(c.get("precision")),
+                    _pct(c.get("recall")),
+                    _pct(c.get("f1")),
+                    _pct((d.get("forward") or {}).get("recall")),
+                    _pct((d.get("backward") or {}).get("recall")),
+                    f"{m.get('non_relation_violations')}/{m.get('non_relation_pairs')}",
+                    str(m.get("num_llm_calls")),
+                ]
+            )
+            + r" \\"
+        )
+    return "\n".join(
+        [
+            "Sampling caveat, stated before the numbers: mining is sampled once "
+            "per cell at the model's default temperature, and repeated runs of an "
+            "identical configuration were measured to move coupling F1 by up to "
+            "0.06. Across five independent samples the two revised strategies span "
+            "0.49--0.58, every one of them above the unrevised 0.36 --- so the "
+            "improvement over the original is larger than the noise, while the "
+            "ordering of the two revisions between themselves is NOT resolved at "
+            "this sample count. Read the gap to the original, not the gap between "
+            "the revisions.",
+            "",
+            "The mining strategy was revised in three steps, each measured "
+            "separately. All figures are \\textbf{coupling-level}: the pair must be "
+            "right AND the Level-1 coupling must match, with direction required for "
+            "the asymmetric couplings. That is the level the MRF factor is built "
+            "from, and it is materially stricter than pair level.",
+            "",
+            r"\begin{table}[htbp]", r"\centering", r"\small",
+            r"\caption{Mining strategies compared, coupling level (percentages). "
+            r"\textbf{Fwd}/\textbf{Bwd} split recall by whether the gold edge runs "
+            r"forward or backward in atom order --- a forward-only candidate policy "
+            r"cannot emit a backward directed arc at all. \textbf{Non-rel} counts "
+            r"edges asserted on pairs the corpus declares unrelated.}",
+            r"\label{tab:strategy-comparison}",
+            r"\begin{tabular}{lrrrrrrrr}", r"\toprule",
+            r"Strategy & Edges & P & R & F1 & Fwd & Bwd & Non-rel & Calls \\",
+            r"\midrule",
+            *rows,
+            r"\bottomrule", r"\end{tabular}", r"\end{table}",
+        ]
+    )
+
+
 def _policy_comparison_section(results: Mapping[str, Any]) -> str:
     """Per-arm mean readouts and constraint pass rates, gold and mined together."""
     records = results.get("records", []) or []
@@ -1499,6 +1571,30 @@ def _threats_section(results: Mapping[str, Any]) -> str:
                 r"threshold, so the reported numbers are not built on dropped calls "
                 r"--- but the underlying ambiguity is a property of the pipeline, and "
                 r"a run without that accounting would show no symptom.",
+                r"\item \textbf{The mined figures here are coupling-level, and "
+                r"an earlier revision of this report was not.} Pair level asks only "
+                r"whether two atoms were seen as related; the coupling is what "
+                r"builds the factor, and it is roughly 17 F1 points stricter on this "
+                r"corpus. Any mining number quoted without its match level is "
+                r"ambiguous enough to mislead --- this one did.",
+                r"\item \textbf{Neither the model's confidence nor a degree cap can "
+                r"filter these relations.} Measured on this corpus, "
+                r"AUC(strength, true-positive) is at or below chance and "
+                r"$P(\tau \mid a_i,a_j)$ is saturated near 1.0 for almost every "
+                r"relation, so every probability threshold tested LOWERED F1 "
+                r"monotonically --- the model is most confident on its most "
+                r"inferential false positives. A per-atom degree cap also lowered F1 "
+                r"at every setting, despite the gold graph being a near-matching: "
+                r"gold's sparsity is a property of which pairs are related, not a "
+                r"budget per atom. Both are recorded here so neither is re-proposed.",
+                r"\item \textbf{Atom text cannot be located in the response, so "
+                r"character-offset provenance is not available.} The atoms are "
+                r"decontextualized rewrites: across this corpus essentially none "
+                r"occur verbatim in the response and only about a quarter match "
+                r"after whitespace and case normalization. A cited evidence span is "
+                r"checkable only because it is quoted FROM the response, which is "
+                r"literal source text --- the asymmetry the evidence requirement "
+                r"rests on.",
                 r"\item \textbf{One mined observation per cell, and the sampling "
                 r"noise is not small.} Mining is sampled once per (item, arm) at the "
                 r"model's default temperature. Two independent sweeps of this same "
@@ -1636,6 +1732,11 @@ def write_report(
     if quality:
         body.append(r"\section{Mining quality}\label{sec:mining}")
         body.append(quality)
+
+    strategy = _strategy_comparison_section(results)
+    if strategy:
+        body.append(r"\section{Mining strategies}\label{sec:strategies}")
+        body.append(strategy)
 
     policy = _policy_comparison_section(results)
     if policy:

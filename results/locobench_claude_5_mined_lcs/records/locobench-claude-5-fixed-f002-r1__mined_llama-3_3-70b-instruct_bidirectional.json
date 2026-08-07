@@ -21,25 +21,28 @@
   "backend": "rits",
   "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
   "window": 4,
-  "gate": "none",
+  "gate": "embedding",
   "nli_method": "logprobs",
   "strength_method": "surrogate_logprobs",
   "strength_samples": 8,
   "max_concurrency": 16,
   "max_distance": 1,
   "discourse": false,
-  "sense_menu": "gold9",
+  "sense_menu": "full",
   "reconcile": "ratchet",
+  "prompt_variant": "v1",
+  "require_evidence": false,
   "num_pairs_scored": 30,
-  "num_dropped_none": 10,
-  "num_inadmissible_sense": 1,
+  "num_dropped_none": 9,
+  "num_inadmissible_sense": 0,
   "num_unparseable_coupling": 0,
-  "num_llm_calls": 50,
+  "num_evidence_rejected": 0,
+  "num_llm_calls": 51,
   "num_call_exceptions": 0,
   "call_exceptions_by_stage": {},
   "call_exceptions_by_type": {},
   "call_error_rate": 0.0,
-  "num_relations": 20,
+  "num_relations": 21,
   "coverage": {
     "policy": "bidirectional",
     "num_atoms": 16,
@@ -51,17 +54,16 @@
     "gate": null,
     "discourse_anchored": false,
     "pairs_scored": 30,
-    "dropped_none": 10,
-    "relations_kept": 20,
-    "llm_calls": 50,
+    "dropped_none": 9,
+    "relations_kept": 21,
+    "llm_calls": 51,
     "llm_call_errors": 0,
     "llm_call_errors_by_stage": {},
     "llm_call_errors_by_type": {},
-    "drops_by_reason": {
-      "inadmissible_sense": 1
-    },
-    "num_inadmissible_sense": 1,
-    "num_unparseable_coupling": 0
+    "drops_by_reason": {},
+    "num_inadmissible_sense": 0,
+    "num_unparseable_coupling": 0,
+    "num_evidence_rejected": 0
   },
   "miner_config": {
     "nli_method": "logprobs",
@@ -70,13 +72,15 @@
     "pair_policy": "bidirectional",
     "window": 4,
     "max_distance": 1,
-    "gate": "none",
+    "gate": "embedding",
     "gate_threshold": 0.3,
     "discourse": false,
     "discourse_gate_threshold": 0.2,
     "discourse_sentence_span": 2,
-    "sense_menu": "gold9",
+    "sense_menu": "full",
     "reconcile": "ratchet",
+    "prompt_variant": "v1",
+    "require_evidence": false,
     "prior": 0.5,
     "prior_source": "per_atom",
     "concession_discount": 0.45
@@ -105,12 +109,13 @@
       "target": "a1",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.22270014162937368,
-      "strength": 0.22270014162937368,
+      "probability": 0.2227001423118364,
+      "strength": 0.2227001423118364,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a1",
@@ -122,7 +127,8 @@
       "type_confidence": 0.9999990463270478,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a2",
@@ -134,79 +140,86 @@
       "type_confidence": 0.9999990463270478,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
-      "source": "a2",
-      "target": "a3",
-      "type": "co_necessity",
-      "sense": "Disjunction",
-      "probability": 0.9999999417443337,
-      "strength": 0.999999971546653,
-      "type_confidence": 0.9999999701976798,
-      "directed": false,
+      "source": "a3",
+      "target": "a2",
+      "type": "entailment",
+      "sense": "Instantiation",
+      "probability": 0.9859313954912481,
+      "strength": 0.9999999973534265,
+      "type_confidence": 0.985931398100588,
+      "directed": true,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a3",
       "target": "a4",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.999999954967701,
+      "probability": 0.9999999847700207,
       "strength": 0.9999999847700207,
-      "type_confidence": 0.9999999701976798,
+      "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a4",
       "target": "a3",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.999088948995681,
-      "strength": 0.999088948995681,
-      "type_confidence": 1.0,
+      "probability": 0.9992902700720646,
+      "strength": 0.9992903296344009,
+      "type_confidence": 0.9999999403953641,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a4",
       "target": "a5",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 2.75356878008675e-05,
-      "strength": 2.75356878008675e-05,
-      "type_confidence": 1.0,
+      "probability": 2.144495606879302e-05,
+      "strength": 2.1444958625230998e-05,
+      "type_confidence": 0.9999998807907247,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a5",
       "target": "a4",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 3.535625491060822e-05,
-      "strength": 3.535625491060822e-05,
+      "probability": 2.7535687805485818e-05,
+      "strength": 2.7535687805485818e-05,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a5",
       "target": "a6",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 4.539785239035206e-05,
-      "strength": 4.539785239035206e-05,
+      "probability": 4.539785239392145e-05,
+      "strength": 4.539785239392145e-05,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a6",
@@ -218,187 +231,211 @@
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
-    },
-    {
-      "source": "a6",
-      "target": "a7",
-      "type": "entailment",
-      "sense": "Evidence",
-      "probability": 0.9980732261043976,
-      "strength": 0.9980732657642628,
-      "type_confidence": 0.9999999602635733,
-      "directed": true,
-      "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a7",
       "target": "a6",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.1192029179065751,
+      "probability": 0.11920291316987709,
       "strength": 0.1192029179065751,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999999602635733,
       "directed": true,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a7",
       "target": "a8",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.06008664147654156,
-      "strength": 0.060086651027054495,
-      "type_confidence": 0.9999998410543312,
+      "probability": 0.06008293636122719,
+      "strength": 0.060086651052608527,
+      "type_confidence": 0.9999381777596811,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a8",
       "target": "a7",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.0004305551404504126,
+      "probability": 0.0004305569539745523,
       "strength": 0.00043055709084487836,
-      "type_confidence": 0.9999954700677164,
+      "type_confidence": 0.9999996821087633,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a10",
       "target": "a9",
       "type": "entailment",
       "sense": "Evidence",
-      "probability": 0.4378235044254763,
-      "strength": 0.4378235044254763,
+      "probability": 0.37754067434578925,
+      "strength": 0.37754067434578925,
       "type_confidence": 1.0,
       "directed": true,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a11",
       "target": "a10",
       "type": "co_necessity",
       "sense": "Disjunction",
-      "probability": 0.9999785550418145,
-      "strength": 0.9999785550418145,
+      "probability": 0.999978555041808,
+      "strength": 0.999978555041808,
       "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a11",
       "target": "a12",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 0.9995666228644486,
-      "strength": 0.9995694429204467,
-      "type_confidence": 0.9999971787292838,
+      "probability": 0.9997340426168725,
+      "strength": 0.999738809697691,
+      "type_confidence": 0.9999952316737409,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a12",
       "target": "a11",
       "type": "contradiction",
       "sense": "Contrast",
-      "probability": 2.7535540080009472e-05,
-      "strength": 2.753568779136794e-05,
-      "type_confidence": 0.9999946356394078,
+      "probability": 2.7391806323557184e-05,
+      "strength": 2.753568778732314e-05,
+      "type_confidence": 0.9947747278049762,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a13",
       "target": "a14",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 0.060086643118783895,
-      "strength": 0.06008665028166993,
-      "type_confidence": 0.9999998807907247,
+      "probability": 0.06008665026799184,
+      "strength": 0.06008665026799184,
+      "type_confidence": 1.0,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
     },
     {
       "source": "a14",
       "target": "a13",
       "type": "exclusive",
       "sense": "Alternative",
-      "probability": 0.0011695102982880292,
+      "probability": 0.001169510158871554,
       "strength": 0.0011695102982880292,
-      "type_confidence": 1.0,
+      "type_confidence": 0.9999998807907247,
       "directed": false,
       "concession_resolved": false,
-      "resolving_atom_id": null
+      "resolving_atom_id": null,
+      "evidence_span": null
+    },
+    {
+      "source": "a14",
+      "target": "a15",
+      "type": "entailment",
+      "sense": "Evidence",
+      "probability": 0.017986212347795995,
+      "strength": 0.017986212347795995,
+      "type_confidence": 1.0,
+      "directed": true,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": null
+    },
+    {
+      "source": "a15",
+      "target": "a14",
+      "type": "entailment",
+      "sense": "Evidence",
+      "probability": 0.9525741273972539,
+      "strength": 0.9525741273972539,
+      "type_confidence": 1.0,
+      "directed": true,
+      "concession_resolved": false,
+      "resolving_atom_id": null,
+      "evidence_span": null
     }
   ],
   "lcs": {
-    "mean_marginal": 0.887043375,
-    "consistency": 5.000000000032756e-06,
-    "reified": 0.457604,
-    "log_partition": 0.18673764229061218
+    "mean_marginal": 0.79474425,
+    "consistency": 4.000000000004e-06,
+    "reified": 0.459206,
+    "log_partition": 0.3050878532810231
   },
   "diagnostics": {
     "marginals": {
-      "a0": 0.802723,
-      "a1": 0.982103,
-      "a10": 0.943373,
-      "a11": 0.974494,
-      "a12": 9.4e-05,
-      "a13": 0.987797,
-      "a14": 0.987797,
-      "a15": 0.9,
-      "a2": 0.982103,
-      "a3": 0.986553,
-      "a4": 0.998604,
-      "a5": 0.998604,
-      "a6": 0.998604,
-      "a7": 0.998185,
-      "a8": 0.775109,
-      "a9": 0.876551
+      "a0": 0.800481,
+      "a1": 0.998968,
+      "a10": 0.937008,
+      "a11": 0.97467,
+      "a12": 5.8e-05,
+      "a13": 0.991203,
+      "a14": 0.991205,
+      "a15": 0.24094,
+      "a2": 0.998968,
+      "a3": 0.985622,
+      "a4": 0.998506,
+      "a5": 0.998506,
+      "a6": 0.998506,
+      "a7": 0.536212,
+      "a8": 0.416429,
+      "a9": 0.848626
     },
-    "num_below_prior": 3,
-    "avg_norm_entropy": 0.22481828829269,
-    "log_z": -8.31254,
-    "log_z_max": -4.62204,
-    "log_z_min": -9.159936
+    "num_below_prior": 5,
+    "avg_norm_entropy": 0.3089552157291936,
+    "log_z": -10.569363,
+    "log_z_max": -7.04067,
+    "log_z_min": -12.118568
   },
   "comparison": {
     "gold_edges_total": 10,
     "gold_edges_scorable": 9,
-    "mined_edges_total": 20,
+    "mined_edges_total": 21,
     "pair": {
       "tp": 8,
-      "fp": 4,
+      "fp": 5,
       "fn": 1,
-      "precision": 0.6666666666666666,
+      "precision": 0.6153846153846154,
       "recall": 0.8888888888888888,
-      "f1": 0.761904761904762
+      "f1": 0.7272727272727274
     },
     "coupling": {
       "tp": 7,
-      "fp": 6,
+      "fp": 7,
       "fn": 2,
-      "precision": 0.5384615384615384,
+      "precision": 0.5,
       "recall": 0.7777777777777778,
-      "f1": 0.6363636363636364
+      "f1": 0.6086956521739131
     },
     "sense": {
       "tp": 6,
-      "fp": 7,
+      "fp": 8,
       "fn": 3,
-      "precision": 0.46153846153846156,
+      "precision": 0.42857142857142855,
       "recall": 0.6666666666666666,
-      "f1": 0.5454545454545455
+      "f1": 0.5217391304347826
     },
     "recall_by_direction": {
       "forward": {
@@ -475,6 +512,6 @@
     "non_relation_violation_rate": 0.2
   },
   "duplicate_unordered_pairs": 8,
-  "elapsed_s": 14.825,
-  "run_config_fingerprint": "3aab14247bdf"
+  "elapsed_s": 18.664,
+  "run_config_fingerprint": "10e10a446aa8"
 }

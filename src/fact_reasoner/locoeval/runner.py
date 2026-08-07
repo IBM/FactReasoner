@@ -282,6 +282,8 @@ class GoldEvalRunner:
         discourse: bool | None = None,
         sense_menu: str = "full",
         reconcile: str = "ratchet",
+        prompt_variant: str = "v1",
+        require_evidence: bool = False,
         resume: bool = False,
         show_progress: bool = False,
     ):
@@ -365,6 +367,8 @@ class GoldEvalRunner:
         self.discourse = discourse
         self.sense_menu = sense_menu
         self.reconcile = reconcile
+        self.prompt_variant = prompt_variant
+        self.require_evidence = require_evidence
         self.resume = resume
         self.show_progress = show_progress
         # Backends are built once per model and shared across that model's arms and
@@ -510,6 +514,9 @@ class GoldEvalRunner:
                     "directed": r.directed,
                     "concession_resolved": r.concession_resolved,
                     "resolving_atom_id": r.resolving_atom_id,
+                    # The response span the model cited as drawing this link
+                    # (Prompt A v2 only; None under v1, which has no slot).
+                    "evidence_span": r.evidence_span,
                 }
                 for r in result.relations
             ]
@@ -649,6 +656,8 @@ class GoldEvalRunner:
                 discourse=self.discourse,
                 sense_menu=self.sense_menu,
                 reconcile=self.reconcile,
+                prompt_variant=self.prompt_variant,
+                require_evidence=self.require_evidence,
                 show_progress=self.show_progress,
             )
         )
@@ -673,10 +682,13 @@ class GoldEvalRunner:
                 "discourse": (result.config or {}).get("discourse"),
                 "sense_menu": self.sense_menu,
                 "reconcile": self.reconcile,
+                "prompt_variant": self.prompt_variant,
+                "require_evidence": self.require_evidence,
                 "num_pairs_scored": cov.get("pairs_scored"),
                 "num_dropped_none": cov.get("dropped_none"),
                 "num_inadmissible_sense": cov.get("num_inadmissible_sense"),
                 "num_unparseable_coupling": cov.get("num_unparseable_coupling"),
+                "num_evidence_rejected": cov.get("num_evidence_rejected"),
                 "num_llm_calls": calls,
                 "num_call_exceptions": errors,
                 "call_exceptions_by_stage": cov.get("llm_call_errors_by_stage"),
@@ -841,6 +853,10 @@ class GoldEvalRunner:
                 payload["reconcile"] = self.reconcile
             if self.discourse is not None:
                 payload["discourse"] = self.discourse
+            if self.prompt_variant != "v1":
+                payload["prompt_variant"] = self.prompt_variant
+            if self.require_evidence:
+                payload["require_evidence"] = True
             policy = spec.pair_policy if spec is not None else None
             if arm is None or policy in ("windowed", "gated"):
                 payload["window"] = self.window

@@ -56,6 +56,7 @@ from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.factors import build_markov_network
 from fact_reasoner.lcs import candidate_pairs as _cp
 from fact_reasoner.lcs.prompts import (
+    PROMPT_VARIANTS,
     build_sense_coupling_prompt,
     build_strength_prompt,
     build_surrogate_strength_prompt,
@@ -143,6 +144,9 @@ class MinedRelation:
     directed: bool = True
     concession_resolved: bool = False
     resolving_atom_id: str | None = None
+    # The verbatim response span the model cited as drawing this link (Prompt A
+    # v2). None under v1, which has no evidence slot.
+    evidence_span: str | None = None
 
     def to_edge_dict(self) -> dict[str, Any]:
         """Return the FactGraph edge dict for this relation (link=atom_atom)."""
@@ -296,6 +300,12 @@ _PROB_RE = re.compile(r"\[\s*p\s*=\s*([0-9]*\.?[0-9]+)\s*\]", re.IGNORECASE)
 # JSON fallbacks for Prompt A.
 _JSON_COUPLING_RE = re.compile(r'"coupling"\s*:\s*"([^"]+)"', re.IGNORECASE)
 _JSON_SENSE_RE = re.compile(r'"sense"\s*:\s*"([^"]+)"', re.IGNORECASE)
+# Prompt A v2's evidence slot: a verbatim span the model must copy FROM THE
+# RESPONSE. Quoted or bare, since models vary on the quoting.
+_EVIDENCE_RE = re.compile(
+    r"\[\s*evidence\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\]]*?))\s*\]", re.IGNORECASE
+)
+_JSON_EVIDENCE_RE = re.compile(r'"evidence"\s*:\s*"([^"]*)"', re.IGNORECASE)
 
 
 def _last_match_span(
@@ -351,6 +361,8 @@ class RelationMiner:
         discourse_sentence_span: int = 2,
         sense_menu: str = "full",
         reconcile: str = "ratchet",
+        prompt_variant: str = "v1",
+        require_evidence: bool = False,
         show_progress: bool = False,
     ):
         """Initialize the relation miner.
@@ -467,6 +479,16 @@ class RelationMiner:
                 f"Unknown reconcile: {reconcile!r} "
                 f"(expected one of {list(RECONCILE_MODES)})."
             )
+        if prompt_variant not in PROMPT_VARIANTS:
+            raise ValueError(
+                f"Unknown prompt_variant: {prompt_variant!r} "
+                f"(expected one of {list(PROMPT_VARIANTS)})."
+            )
+        if require_evidence and prompt_variant == "v1":
+            raise ValueError(
+                "require_evidence=True needs prompt_variant='v2': v1 has no "
+                "evidence slot, so every answer would be rejected."
+            )
 
         self.backend = backend
         self.nli_method = nli_method
@@ -505,6 +527,9 @@ class RelationMiner:
         self.discourse_sentence_span = discourse_sentence_span
         self.sense_menu = sense_menu
         self.reconcile = reconcile
+        self.prompt_variant = prompt_variant
+        # v2 asks for an evidence span; requiring it only makes sense there.
+        self.require_evidence = bool(require_evidence)
         self.show_progress = show_progress
         # Why parsed answers were refused, reset per mining run.
         self._drop_reasons: dict[str, int] = {}
@@ -513,7 +538,9 @@ class RelationMiner:
         # model asserts only relations the response actually draws (pruning
         # spurious, abstractly-plausible edges that cause over-connection).
         # Grounding is mandatory -- there is no ungrounded path.
-        self._sense_prompt = build_sense_coupling_prompt()
+        self._sense_prompt = build_sense_coupling_prompt(
+            variant=prompt_variant, menu=sense_menu
+        )
         self._strength_prompt = build_strength_prompt()
         self._surrogate_strength_prompt = build_surrogate_strength_prompt()
 
@@ -787,6 +814,9 @@ class RelationMiner:
         coverage["drops_by_reason"] = drops
         coverage["num_inadmissible_sense"] = drops.get("inadmissible_sense", 0)
         coverage["num_unparseable_coupling"] = drops.get("unparseable_coupling", 0)
+        coverage["num_evidence_rejected"] = drops.get(
+            "evidence_missing", 0
+        ) + drops.get("evidence_not_in_response", 0)
 
         # `prior` stays a FLOAT: it is JSON-serialized and read as
         # `float(config["prior"])` by LCSScorer, so it holds the uniform fallback.
@@ -807,6 +837,8 @@ class RelationMiner:
             "discourse_sentence_span": self.discourse_sentence_span,
             "sense_menu": self.sense_menu,
             "reconcile": self.reconcile,
+            "prompt_variant": self.prompt_variant,
+            "require_evidence": self.require_evidence,
             "prior": default_prior,
             "prior_source": "per_atom" if per_atom else "uniform",
             "concession_discount": self.concession_discount,
@@ -894,7 +926,9 @@ class RelationMiner:
         # Parse Prompt A → (sense, coupling, type_conf); compile to Level 1.
         interim: list[dict[str, Any] | None] = []
         for pair, out in zip(pairs, sense_outputs):
-            interim.append(self._parse_sense_output(pair, out))
+            interim.append(
+                self._parse_sense_output(pair, out, response=response)
+            )
 
         # Conditional strength P(a_j|a_i,tau) only for pairs producing an edge.
         edge_indices = [i for i, r in enumerate(interim) if r is not None]
@@ -926,6 +960,7 @@ class RelationMiner:
                     strength_raw=strength_raw,
                     directed=r["directed"],
                     concession_resolved=r["is_concession"],
+                    evidence_span=r.get("evidence_span"),
                 )
             )
         return results
@@ -1086,8 +1121,32 @@ class RelationMiner:
 
     # -- prompt parsing ------------------------------------------------------
 
+    @staticmethod
+    def _normalize_for_match(text: str) -> str:
+        """Collapse whitespace and case, for verbatim-span checking."""
+        return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+    @staticmethod
+    def _evidence_span(text: str) -> str | None:
+        """The [evidence=...] span from a Prompt A v2 answer, if present.
+
+        Accepts double-quoted, single-quoted and bare forms, since models vary --
+        hence the three alternatives, and hence the group scan rather than
+        `_last_match_span`, which assumes the value is group 1.
+        """
+        last = None
+        for m in _EVIDENCE_RE.finditer(text):
+            value = next((g for g in m.groups() if g is not None), "")
+            last = value.strip().strip("\"'")
+        if last is not None:
+            return last
+        m2 = None
+        for m2 in _JSON_EVIDENCE_RE.finditer(text):
+            pass
+        return m2.group(1).strip() if m2 is not None else None
+
     def _parse_sense_output(
-        self, pair: tuple[str, str], output: Any
+        self, pair: tuple[str, str], output: Any, *, response: str | None = None
     ) -> dict[str, Any] | None:
         """Parse a Prompt A result to a compiled interim relation dict.
 
@@ -1149,6 +1208,27 @@ class RelationMiner:
             self._note_drop("inadmissible_sense")
             return None
 
+        # Evidence: the model must be able to point at the words in the RESPONSE
+        # that draw the link, and those words must actually be there. This is the
+        # only precision mechanism here that is checkable rather than merely
+        # requested -- "be grounded" is an instruction with no verification
+        # surface, which is why it did not bite.
+        #
+        # Checked against the response, never the atoms: atoms are decontextualized
+        # rewrites (only ~27% of them occur in the response even after
+        # normalization) whereas the response is literal source text, so only a
+        # response-quoted span can be verified at all.
+        evidence = self._evidence_span(text)
+        if self.require_evidence:
+            if not evidence or is_explicit_none(evidence):
+                self._note_drop("evidence_missing")
+                return None
+            if response:
+                span = self._normalize_for_match(evidence)
+                if span and span not in self._normalize_for_match(response):
+                    self._note_drop("evidence_not_in_response")
+                    return None
+
         type_conf = self._type_confidence(output.result, text, coupling_span)
 
         return {
@@ -1159,6 +1239,7 @@ class RelationMiner:
             "type_confidence": type_conf,
             "directed": spec.directed,
             "is_concession": spec.is_concession,
+            "evidence_span": evidence,
         }
 
     def _note_drop(self, reason: str) -> None:

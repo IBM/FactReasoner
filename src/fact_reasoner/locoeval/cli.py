@@ -59,6 +59,7 @@ import os
 
 from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
+from fact_reasoner.lcs.prompts import PROMPT_VARIANTS
 from fact_reasoner.lcs.relation_miner import RECONCILE_MODES
 from fact_reasoner.lcs.taxonomy import SENSE_MENUS
 from fact_reasoner.locoeval.gold_graph import DEFAULT_CONCESSION_DISCOUNT, item_atoms
@@ -236,6 +237,26 @@ def build_parser() -> argparse.ArgumentParser:
         "indistinguishable from genuine negatives, so the ceiling is strict.",
     )
     mined.add_argument(
+        "--arm-variant",
+        default=None,
+        help="Label appended to each mined arm name, so two mining strategies "
+        "sharing a model and policy do not collide on one arm (their records "
+        "would overwrite each other and the report could not compare them).",
+    )
+    mined.add_argument(
+        "--prompt-variant",
+        default="v1",
+        choices=PROMPT_VARIANTS,
+        help="Prompt A variant: 'v1' (original) or 'v2' (rebalanced few-shots, "
+        "silence negatives, and a verifiable evidence span). Default: v1.",
+    )
+    mined.add_argument(
+        "--require-evidence",
+        action="store_true",
+        help="Reject an answer whose cited evidence span is absent from the "
+        "response. Needs --prompt-variant v2, which has the evidence slot.",
+    )
+    mined.add_argument(
         "--resume",
         action="store_true",
         help="Reuse existing successful per-cell records whose run configuration "
@@ -329,7 +350,7 @@ def _expand_arms(args, parser) -> list[str]:
                 )
         for model in args.models:
             for policy in policies:
-                arms.append(format_arm(model, policy))
+                arms.append(format_arm(model, policy, args.arm_variant))
     elif args.pair_policies:
         parser.error("--pair-policies needs --models to name the model(s) to sweep.")
 
@@ -467,6 +488,8 @@ def main(argv: list[str] | None = None) -> int:
                 discourse=args.discourse,
                 sense_menu=args.sense_menu,
                 reconcile=args.reconcile,
+                prompt_variant=args.prompt_variant,
+                require_evidence=args.require_evidence,
                 resume=args.resume,
                 show_progress=args.show_progress,
             )
