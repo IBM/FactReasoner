@@ -21,12 +21,18 @@
 import copy
 import json
 import os
+import re
+from unittest.mock import MagicMock
 
 import pytest
 
-from fact_reasoner.experiments.mock import brute_force_run_merlin
-from fact_reasoner.lcs.lcs_scorer import LCSScorer
+from fact_reasoner.experiments.mock import brute_force_run_merlin, dry_run_patches
+from fact_reasoner.lcs import candidate_pairs as cp
+from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
+from fact_reasoner.locoeval import cli
 from fact_reasoner.locoeval import gold_graph as gg
+from fact_reasoner.locoeval import mined_graph as mg
+from fact_reasoner.locoeval import models as lm
 from fact_reasoner.locoeval import report as rp
 from fact_reasoner.locoeval import runner as rn
 
@@ -718,3 +724,710 @@ def test_relation_graph_skips_unknown_couplings():
 
 def test_relation_graph_handles_no_atoms():
     assert "no atoms" in rp._relation_graph({"num_atoms": 0, "relations": []})
+
+
+# ---------------------------------------------------------------------------
+# Mined arms: naming, validation and the model inventory.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_arm_returns_none_for_gold_arms():
+    assert mg.parse_arm("gold") is None
+    assert mg.parse_arm("gold_valid") is None
+
+
+def test_parse_arm_extracts_model_and_policy():
+    spec = mg.parse_arm("mined:llama-3.3-70b-instruct:windowed")
+    assert spec == mg.MinedArm(model="llama-3.3-70b-instruct",
+                               pair_policy="windowed")
+    # The arm name round-trips, so records and report labels agree.
+    assert spec.arm == "mined:llama-3.3-70b-instruct:windowed"
+
+
+def test_parse_arm_rejects_unknown_pair_policy():
+    # RelationMiner does not validate pair_policy; catching it at parse time is
+    # what keeps a typo from costing a whole cell of tokens.
+    with pytest.raises(mg.MinedArmError, match="Unknown pair policy"):
+        mg.parse_arm("mined:some-model:sliding")
+
+
+@pytest.mark.parametrize("arm", ["mined:onlytwo", "mined:a:b:c", "mined::windowed"])
+def test_parse_arm_rejects_malformed_arms(arm):
+    with pytest.raises(mg.MinedArmError):
+        mg.parse_arm(arm)
+
+
+def test_format_arm_matches_parse_arm():
+    arm = mg.format_arm("m1", "all_pairs")
+    assert mg.parse_arm(arm) == mg.MinedArm(model="m1", pair_policy="all_pairs")
+
+
+def test_count_call_exceptions_tallies_by_type():
+    outs = [object(), ValueError("x"), RuntimeError("y"), ValueError("z"), None]
+    total, kinds = mg.count_call_exceptions(outs)
+    assert total == 3
+    assert kinds == {"ValueError": 2, "RuntimeError": 1}
+
+
+def test_load_model_specs_reads_the_repo_inventory():
+    specs = lm.load_model_specs("configs/rits_models.json")
+    spec = lm.resolve_model("llama-3.3-70b-instruct", specs)
+    assert spec.model_id == "meta-llama/llama-3-3-70b-instruct"
+    assert spec.backend == "rits"
+    # A RITS endpoint must be explicit: the catalog cannot see RITS without
+    # mellea_ibm installed, and a friendly-name lookup can 404.
+    assert spec.base_url and spec.base_url.endswith("llama-3-3-70b-instruct")
+    assert spec.has_logprobs is True
+
+
+def test_resolve_model_rejects_an_unknown_name():
+    specs = lm.load_model_specs("configs/rits_models.json")
+    with pytest.raises(ValueError, match="Unknown model"):
+        lm.resolve_model("gpt-oss-120b", specs)  # served name is -a100
+
+
+def test_load_model_specs_rejects_duplicate_names(tmp_path):
+    p = tmp_path / "dup.json"
+    p.write_text(json.dumps([
+        {"name": "m", "model_id": "x", "backend": "rits"},
+        {"name": "m", "model_id": "y", "backend": "rits"},
+    ]))
+    with pytest.raises(ValueError, match="duplicate model name"):
+        lm.load_model_specs(str(p))
+
+
+# ---------------------------------------------------------------------------
+# Mined vs gold: edge-level agreement.
+# ---------------------------------------------------------------------------
+
+
+def test_compare_to_gold_is_perfect_on_gold_itself(item):
+    """Feeding gold's own relations back in must recover everything.
+
+    The identity test: any bug in key construction (direction handling, coupling
+    spelling, ordering-only filtering) shows up here as a shortfall.
+    """
+    result = gg.build_gold_result(item)
+    comp = mg.compare_to_gold(item, result.relations)
+    assert comp["gold_edges_total"] == 5
+    assert comp["gold_edges_scorable"] == 4  # the Precedence produces no factor
+    for level in ("pair", "coupling", "sense"):
+        assert comp[level]["precision"] == 1.0
+        assert comp[level]["recall"] == 1.0
+        assert comp[level]["fn"] == 0
+
+
+def test_compare_to_gold_matches_undirected_edges_written_either_way(item):
+    """An undirected coupling is one edge regardless of which way it is written.
+
+    This is what keeps a forward-only pair policy from being charged for the
+    ordering of a symmetric relation it did find.
+    """
+    result = gg.build_gold_result(item)
+    flipped = []
+    for rel in result.relations:
+        if not rel.directed:
+            rel = copy.copy(rel)
+            rel.source_id, rel.target_id = rel.target_id, rel.source_id
+        flipped.append(rel)
+    comp = mg.compare_to_gold(item, flipped)
+    assert comp["coupling"]["recall"] == 1.0
+    assert comp["coupling"]["fp"] == 0
+
+
+def test_compare_to_gold_requires_direction_for_directed_couplings(item):
+    """A reversed entailment is a different claim, so it must not match."""
+    result = gg.build_gold_result(item)
+    reversed_rels = []
+    for rel in result.relations:
+        if rel.directed:
+            rel = copy.copy(rel)
+            rel.source_id, rel.target_id = rel.target_id, rel.source_id
+        reversed_rels.append(rel)
+    comp = mg.compare_to_gold(item, reversed_rels)
+    # Pair-level still matches (same two atoms); coupling-level does not.
+    assert comp["pair"]["recall"] == 1.0
+    assert comp["coupling"]["recall"] < 1.0
+
+
+def test_compare_to_gold_excludes_ordering_only_from_the_denominator(item):
+    comp = mg.compare_to_gold(item, [])
+    assert comp["gold_edges_scorable"] == 4
+    assert comp["coupling"]["fn"] == 4  # not 5: the Precedence is not scorable
+    assert comp["coupling"]["recall"] == 0.0
+
+
+def test_compare_to_gold_counts_non_relation_violations(item):
+    """An edge on a pair the item declares UNrelated is a measurable error."""
+    result = gg.build_gold_result(item)
+    intruder = copy.copy(result.relations[0])
+    intruder.source_id, intruder.target_id = "a0", "a4"  # the declared non-relation
+    comp = mg.compare_to_gold(item, [*result.relations, intruder])
+    assert comp["non_relation_pairs"] == 1
+    assert comp["non_relation_violations"] == 1
+    assert comp["non_relation_violation_rate"] == 1.0
+
+
+def test_compare_to_gold_stratifies_recall(item):
+    comp = mg.compare_to_gold(item, gg.build_gold_result(item).relations)
+    # a1->a0 and a3->a2 run backward in atom order; a2->a3 and a3->a4 forward.
+    assert comp["recall_by_direction"]["backward"]["total"] == 2
+    assert comp["recall_by_direction"]["forward"]["total"] == 2
+    assert comp["recall_by_validity"]["invalid"]["total"] == 1
+    assert comp["recall_by_coupling"]["entailment"]["total"] == 1
+    assert all(
+        cell["recall"] == 1.0
+        for cell in comp["recall_by_coupling"].values()
+    )
+
+
+def test_count_duplicate_unordered_pairs(item):
+    """all_pairs can label a pair in both directions; factors are not deduped."""
+    rels = gg.build_gold_result(item).relations
+    assert mg.count_duplicate_unordered_pairs(rels) == 1  # a2<->a3 twice in gold
+    assert mg.count_duplicate_unordered_pairs([]) == 0
+
+
+def test_aggregate_comparisons_micro_averages(item):
+    comp = mg.compare_to_gold(item, gg.build_gold_result(item).relations)
+    agg = mg.aggregate_comparisons([comp, comp])
+    assert agg["num_items"] == 2
+    assert agg["coupling"]["tp"] == 2 * comp["coupling"]["tp"]
+    assert agg["coupling"]["recall"] == 1.0
+    assert agg["gold_edges_scorable"] == 8
+    # Stratified cells are summed, then divided once (micro, not a mean of means).
+    assert agg["recall_by_direction"]["backward"]["total"] == 4
+
+
+def test_aggregate_comparisons_handles_no_blocks():
+    assert mg.aggregate_comparisons([])["num_items"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Pair-policy reach. No LLM and no Merlin: selection is pure.
+# ---------------------------------------------------------------------------
+
+
+def _sixteen_atoms():
+    from fact_reasoner.core.base import Atom
+
+    return {f"a{i}": Atom(id=f"a{i}", text=f"Sentence number {i} about topic {i}.")
+            for i in range(16)}
+
+
+def test_all_pairs_and_windowed_differ_in_reach():
+    """Pins the pair arithmetic the cost estimate and the report prose rest on.
+
+    `windowed` is NOT simply the order window. Response-grounded refinement both
+    promotes out-of-window forward pairs the prose links and demotes in-window
+    pairs it does not, so the selected count is `num_window_pairs + promoted -
+    demoted` and is bounded by the forward pairs, never by the window alone.
+    """
+    atoms = _sixteen_atoms()
+    response = " ".join(a.text for a in atoms.values())
+    all_pairs, acov = cp.select(atoms, response=response, policy="all_pairs")
+    windowed, wcov = cp.select(atoms, response=response, policy="windowed", window=4)
+
+    assert len(all_pairs) == 16 * 15 == 240  # every ordered pair, both directions
+    assert acov["discourse_anchored"] is False  # all_pairs skips refinement
+
+    assert wcov["num_window_pairs"] == 54  # sum_i min(4, 15-i)
+    assert wcov["discourse_anchored"] is True
+    assert len(windowed) == 54 + wcov["num_promoted"] - wcov["num_demoted"]
+    assert len(windowed) <= wcov["forward_pairs_possible"] == 120
+    # Whatever refinement does, windowed stays strictly cheaper than all_pairs.
+    assert len(windowed) < len(all_pairs)
+
+
+def test_all_pairs_visits_each_unordered_pair_twice():
+    """Why all_pairs scores a denser MRF: two factors per pair are possible."""
+    atoms = _sixteen_atoms()
+    response = " ".join(a.text for a in atoms.values())
+    pairs, _ = cp.select(atoms, response=response, policy="all_pairs")
+    unordered = {tuple(sorted(p)) for p in pairs}
+    assert len(pairs) == 2 * len(unordered)
+
+
+def test_windowed_is_forward_only():
+    """The structural reason a backward DIRECTED gold edge is unreachable.
+
+    Discourse refinement can push a pair past the window radius, but never
+    reverses one: every selected pair still runs source-before-target. So a
+    directed gold edge written backward in atom order cannot be recovered under
+    this policy no matter what the prose says -- a property of the policy, not a
+    miner failure, and the reason recall is reported split by direction.
+    """
+    atoms = _sixteen_atoms()
+    response = " ".join(a.text for a in atoms.values())
+    pairs, _ = cp.select(atoms, response=response, policy="windowed", window=4)
+    idx = lambda aid: int(aid[1:])  # noqa: E731
+    assert pairs
+    assert all(idx(t) - idx(s) > 0 for s, t in pairs)
+
+
+def test_all_pairs_reaches_backward_pairs_that_windowed_cannot():
+    """The contrast that makes the policy comparison legible."""
+    atoms = _sixteen_atoms()
+    response = " ".join(a.text for a in atoms.values())
+    all_pairs, _ = cp.select(atoms, response=response, policy="all_pairs")
+    windowed, _ = cp.select(atoms, response=response, policy="windowed", window=4)
+    idx = lambda aid: int(aid[1:])  # noqa: E731
+    assert any(idx(t) - idx(s) < 0 for s, t in all_pairs)
+    assert not any(idx(t) - idx(s) < 0 for s, t in windowed)
+
+
+# ---------------------------------------------------------------------------
+# The mined cell in the runner (mock LLM + brute-force Merlin).
+# ---------------------------------------------------------------------------
+
+
+MINED_ARM = "mined:m1:windowed"
+
+
+@pytest.fixture
+def mined_specs():
+    return {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+
+
+@pytest.fixture
+def mock_llm():
+    """Stub only the LLM; the autouse fixture already routes Merlin to the oracle."""
+    with dry_run_patches(patch_merlin=False):
+        yield
+
+
+def _mined_runner(dataset, out, specs, **kw):
+    data_dir, root = dataset
+    return rn.GoldEvalRunner(
+        data_dir=data_dir,
+        output_dir=str(root / out),
+        merlin_path="unused",
+        model_specs=specs,
+        backend_factory=lambda spec: MagicMock(name=spec.name),
+        **kw,
+    )
+
+
+def test_runner_rejects_a_mined_arm_without_an_inventory():
+    with pytest.raises(ValueError, match="not in the model inventory"):
+        rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m", arms=(MINED_ARM,)
+        )
+
+
+def test_runner_rejects_a_mined_arm_with_a_bad_policy(mined_specs):
+    with pytest.raises(mg.MinedArmError, match="Unknown pair policy"):
+        rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=("mined:m1:sliding",), model_specs=mined_specs,
+        )
+
+
+def test_bad_gold_arm_is_still_rejected(mined_specs):
+    """The mined-arm parser must not have widened the gold vocabulary."""
+    with pytest.raises(ValueError, match="Unknown arm"):
+        rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=("gold", "bogus"), model_specs=mined_specs,
+        )
+
+
+def test_record_filename_slugifies_a_mined_arm():
+    name = rn.GoldEvalRunner._record_filename(
+        "it/1", "mined:llama-3.3-70b-instruct:windowed"
+    )
+    assert name == "it_1__mined_llama-3_3-70b-instruct_windowed.json"
+    assert ":" not in name and "/" not in name
+
+
+def test_mined_cell_scores_all_readouts_with_fixed_priors(
+    dataset, mined_specs, mock_llm
+):
+    runner = _mined_runner(
+        dataset, "mined1", mined_specs, arms=("gold", MINED_ARM), max_concurrency=4
+    )
+    results = runner.run()
+    mined = [r for r in results["records"] if r["arm"] == MINED_ARM]
+    assert len(mined) == 2  # two items in the dataset fixture
+    for rec in mined:
+        assert "error" not in rec, rec.get("error")
+        assert rec["relation_source"] == "mined"
+        assert rec["model"] == "m1"
+        assert rec["pair_policy"] == "windowed"
+        # Every readout computed, and the priors are the item's own 0.9/0.1 with
+        # nothing defaulted to the scorer's uniform 0.5.
+        for method in LCS_METHODS:
+            assert rec["lcs"][method] is not None
+        assert set(rec["node_priors"].values()) <= {0.9, 0.1}
+        # "auto" is resolved inside the miner, so the record must show the real one.
+        assert rec["strength_method"] in (
+            "surrogate_logprobs", "surrogate_sampled", "verbalized"
+        )
+        assert rec["comparison"]["gold_edges_scorable"] > 0
+
+
+def test_gold_cells_carry_no_comparison_block(dataset, mined_specs, mock_llm):
+    runner = _mined_runner(dataset, "mined2", mined_specs, arms=("gold", MINED_ARM))
+    results = runner.run()
+    for rec in results["records"]:
+        if rec["arm"] == "gold":
+            assert "comparison" not in rec
+            assert rec["pair_policy"] == "gold"
+            assert rec["model"] is None
+
+
+def test_mining_summary_micro_averages_per_arm(dataset, mined_specs, mock_llm):
+    runner = _mined_runner(dataset, "mined3", mined_specs, arms=("gold", MINED_ARM))
+    results = runner.run()
+    summary = results["mining"]
+    assert set(summary) == {MINED_ARM}
+    block = summary[MINED_ARM]
+    assert block["num_items"] == 2
+    assert block["model"] == "m1"
+    assert block["pair_policy"] == "windowed"
+    assert block["num_call_exceptions"] == 0
+    assert "coupling" in block and "recall_by_direction" in block
+
+
+def test_mined_cell_fails_when_the_atom_set_changes(item, monkeypatch, mock_llm):
+    """A dropped atom would silently send its prior to the scorer's 0.5 default.
+
+    Patches the MINER (not the function under test) so the real guard runs.
+    """
+    import asyncio
+
+    from fact_reasoner.lcs.relation_miner import RelationMiner
+
+    real_mine = RelationMiner.amine_from_atoms
+
+    async def _losing_an_atom(self, atoms, response, **kw):
+        result = await real_mine(self, atoms, response, **kw)
+        result.atoms.pop("a0")  # as a duplicate-id collapse would
+        return result
+
+    monkeypatch.setattr(RelationMiner, "amine_from_atoms", _losing_an_atom)
+    with pytest.raises(mg.MinedArmError, match="atom set changed"):
+        asyncio.run(
+            mg.abuild_mined_result(
+                item, backend=MagicMock(), pair_policy="windowed",
+                nli_method="logprobs",
+            )
+        )
+
+
+def test_mined_cell_requires_a_response(mined_specs, mock_llm, tmp_path):
+    """Mining is always response-grounded, so an empty response must be an error."""
+    import asyncio
+    bad = {"id": "x", "response": "   ", "atoms": [{"id": "a0", "text": "t",
+                                                    "factual": True}]}
+    with pytest.raises(mg.MinedArmError, match="response-grounded"):
+        asyncio.run(
+            mg.abuild_mined_result(bad, backend=MagicMock(),
+                                   pair_policy="windowed", nli_method="logprobs")
+        )
+
+
+def test_mined_cell_refuses_a_high_call_error_rate(
+    dataset, mined_specs, monkeypatch, mock_llm
+):
+    """A throttled endpoint must fail the cell, not quietly report a sparse graph."""
+    real = mg.abuild_mined_result
+
+    async def _with_errors(itm, **kw):
+        result = await real(itm, **kw)
+        cov = dict(result.coverage or {})
+        cov["llm_calls"] = 100
+        cov["llm_call_errors"] = 50
+        cov["llm_call_errors_by_type"] = {"TimeoutError": 50}
+        result.coverage = cov
+        return result
+
+    monkeypatch.setattr(rn, "abuild_mined_result", _with_errors)
+    runner = _mined_runner(dataset, "mined4", mined_specs, arms=(MINED_ARM,))
+    results = runner.run()
+    for rec in results["records"]:
+        assert "error" in rec
+        assert "LLM calls failed" in rec["error"]
+
+
+def test_call_error_rate_below_the_ceiling_is_recorded_not_fatal(
+    dataset, mined_specs, monkeypatch, mock_llm
+):
+    real = mg.abuild_mined_result
+
+    async def _one_error(itm, **kw):
+        result = await real(itm, **kw)
+        cov = dict(result.coverage or {})
+        cov["llm_calls"] = 1000
+        cov["llm_call_errors"] = 1  # 0.1%, under the 2% default
+        result.coverage = cov
+        return result
+
+    monkeypatch.setattr(rn, "abuild_mined_result", _one_error)
+    runner = _mined_runner(dataset, "mined5", mined_specs, arms=(MINED_ARM,))
+    results = runner.run()
+    for rec in results["records"]:
+        assert "error" not in rec
+        assert rec["num_call_exceptions"] == 1
+        assert rec["call_error_rate"] == pytest.approx(0.001)
+
+
+# ---------------------------------------------------------------------------
+# Resume.
+# ---------------------------------------------------------------------------
+
+
+def test_resume_reuses_a_completed_record(dataset, mined_specs, mock_llm):
+    runner = _mined_runner(dataset, "res1", mined_specs, arms=(MINED_ARM,))
+    runner.run()
+
+    again = _mined_runner(dataset, "res1", mined_specs, arms=(MINED_ARM,), resume=True)
+    calls = []
+    orig = again._run_cell
+    again._run_cell = lambda i, a: (calls.append((i["id"], a)), orig(i, a))[1]
+    results = again.run()
+    assert calls == []  # nothing re-run
+    assert len(results["records"]) == 2
+
+
+def test_resume_reruns_a_failed_record(dataset, mined_specs, mock_llm):
+    data_dir, root = dataset
+    out = root / "res2"
+    (out / "records").mkdir(parents=True)
+    fname = rn.GoldEvalRunner._record_filename("t-f001-r0", "gold")
+    (out / "records" / fname).write_text(json.dumps({"error": "boom"}))
+
+    runner = _mined_runner(dataset, "res2", mined_specs, arms=("gold",), resume=True)
+    results = runner.run()
+    assert all("error" not in r for r in results["records"])
+
+
+def test_resume_discards_a_stale_fingerprint(dataset, mined_specs, mock_llm, capsys):
+    runner = _mined_runner(dataset, "res3", mined_specs, arms=(MINED_ARM,), window=4)
+    runner.run()
+    # Same cells, different mining configuration: the cache must not be trusted.
+    again = _mined_runner(
+        dataset, "res3", mined_specs, arms=(MINED_ARM,), window=6, resume=True
+    )
+    again.run()
+    assert "discarding" in capsys.readouterr().out
+
+
+def test_run_fingerprint_tracks_the_mining_knobs(mined_specs):
+    def fp(**kw):
+        return rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            model_specs=mined_specs, **kw,
+        )._run_fingerprint()
+
+    base = fp()
+    assert fp() == base  # deterministic
+    assert fp(window=6) != base
+    assert fp(strength_method="verbalized") != base
+    assert fp(ibound=8) != base
+
+
+# ---------------------------------------------------------------------------
+# Report: mined arms, generalized deltas, new tables.
+# ---------------------------------------------------------------------------
+
+
+def _mined_results(dataset, out, specs, arms, **kw):
+    runner = _mined_runner(dataset, out, specs, arms=arms, **kw)
+    results = runner.run()
+    return results, runner.output_dir
+
+
+def test_arm_label_describes_a_mined_arm():
+    assert rp._arm_label("gold") == "all gold edges"
+    label = rp._arm_label("mined:llama-3.3-70b-instruct:all_pairs")
+    assert "llama-3.3-70b-instruct" in label and "all pairs" in label
+    # A name that does not parse must not raise from inside the report.
+    assert rp._arm_label("something-else") == "something-else"
+
+
+def test_report_renders_every_arm(dataset, mined_specs, mock_llm):
+    arms = ("gold", "gold_valid", MINED_ARM)
+    results, out_dir = _mined_results(dataset, "rep1", mined_specs, arms)
+    tex = open(rp.write_report(results, out_dir)).read()
+
+    assert tex.count(r"\begin{document}") == 1
+    assert tex.count(r"\end{document}") == 1
+    # One scores table and one ladder table per arm, mined included.
+    for arm in arms:
+        assert r"\label{tab:scores-" + rp._key(arm) + "}" in tex
+    assert r"\label{tab:mining-pr}" in tex
+    assert r"\label{tab:policy-lcs}" in tex
+    assert r"\label{tab:ladder-by-arm}" in tex
+    # A raw colon must never reach a LaTeX label.
+    for label in re.findall(r"\\label\{([^}]*)\}", tex):
+        assert ":" not in label.split(":", 1)[1] if ":" in label else True
+
+
+def test_report_arm_delta_generalizes_to_mined_arms(dataset, mined_specs, mock_llm):
+    results, out_dir = _mined_results(
+        dataset, "rep2", mined_specs, ("gold", "gold_valid", MINED_ARM)
+    )
+    tex = open(rp.write_report(results, out_dir)).read()
+    # The original gold-vs-gold_valid delta survives...
+    assert r"\label{tab:arm-delta-gold-gold-valid}" in tex
+    # ...and the mined arm gets its own, with mined-specific prose.
+    assert r"\label{tab:arm-delta-gold-" + rp._key(MINED_ARM) + "}" in tex
+    assert "mined-versus-labelled comparison" in tex
+
+
+def test_report_states_the_policy_asymmetry(dataset, mined_specs, mock_llm):
+    """The interpretive caveat must be in the report, not just in the plan."""
+    results, out_dir = _mined_results(dataset, "rep3", mined_specs, ("gold", MINED_ARM))
+    tex = open(rp.write_report(results, out_dir)).read()
+    assert "do not have the same reach" in tex
+    assert "unreachable" in tex
+    assert "do not build equally dense networks" in tex
+
+
+def test_report_survives_a_mined_only_run(dataset, mined_specs, mock_llm):
+    """No gold arm: sections that describe gold must degrade, not crash."""
+    results, out_dir = _mined_results(dataset, "rep4", mined_specs, (MINED_ARM,))
+    tex = open(rp.write_report(results, out_dir)).read()
+    assert tex.count(r"\end{document}") == 1
+    assert r"\label{tab:mining-pr}" in tex
+
+
+def test_report_survives_when_every_mined_cell_failed(
+    dataset, mined_specs, monkeypatch, mock_llm
+):
+    async def _boom(*a, **k):
+        raise RuntimeError("no endpoint")
+
+    monkeypatch.setattr(rn, "abuild_mined_result", _boom)
+    results, out_dir = _mined_results(dataset, "rep5", mined_specs, ("gold", MINED_ARM))
+    tex = open(rp.write_report(results, out_dir)).read()
+    assert tex.count(r"\end{document}") == 1
+    assert "cells failed" in tex
+
+
+def test_new_tables_have_matching_column_counts(dataset, mined_specs, mock_llm):
+    """Guards the hardcoded `tabular` specs against a column being added."""
+    results, out_dir = _mined_results(
+        dataset, "rep6", mined_specs, ("gold", "gold_valid", MINED_ARM)
+    )
+    tex = open(rp.write_report(results, out_dir)).read()
+    checked = 0
+    for m in re.finditer(
+        r"\\label\{(tab:(?:mining|policy|ladder-by|arm-delta|scores)[^}]*)\}"
+        r".*?\\begin\{tabular\}\{([^}]*)\}(.*?)\\end\{tabular\}",
+        tex,
+        re.S,
+    ):
+        label, spec, body = m.group(1), m.group(2), m.group(3)
+        ncols = len(re.findall(r"[lrc]|p\{[^}]*\}", spec))
+        header = next(
+            line for line in body.split("\n")
+            if line.strip() and not line.strip().startswith("\\")
+        )
+        assert header.count("&") + 1 == ncols, f"{label}: {spec}"
+        checked += 1
+    assert checked >= 6
+
+
+def test_baseline_repro_section_reports_a_clean_match(dataset, mined_specs, mock_llm):
+    results, out_dir = _mined_results(dataset, "rep7", mined_specs, ("gold",))
+    text = rp._baseline_repro_section(results, results)  # identical by construction
+    assert "reproduce to within" in text
+
+
+def test_baseline_repro_section_flags_a_drift(dataset, mined_specs, mock_llm):
+    results, out_dir = _mined_results(dataset, "rep8", mined_specs, ("gold",))
+    drifted = copy.deepcopy(results)
+    drifted["records"][0]["lcs"]["mean_marginal"] += 0.01
+    text = rp._baseline_repro_section(results, drifted)
+    assert "differ by more than the tolerance" in text
+
+
+def test_baseline_repro_section_handles_disjoint_runs(dataset, mined_specs, mock_llm):
+    results, _ = _mined_results(dataset, "rep9", mined_specs, ("gold",))
+    other = {"records": [{"item_id": "nope", "arm": "gold", "lcs": {"reified": 0.5}}]}
+    assert "no reproduction check" in rp._baseline_repro_section(results, other)
+
+
+# ---------------------------------------------------------------------------
+# CLI.
+# ---------------------------------------------------------------------------
+
+
+def test_cli_expands_models_and_policies_into_arms():
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["--arms", "gold", "--models", "m1,m2", "--pair-policies", "windowed,all_pairs"]
+    )
+    arms = cli._expand_arms(args, parser)
+    assert arms == [
+        "gold",
+        "mined:m1:windowed", "mined:m1:all_pairs",
+        "mined:m2:windowed", "mined:m2:all_pairs",
+    ]
+
+
+def test_cli_defaults_to_windowed_when_only_models_given():
+    parser = cli.build_parser()
+    args = parser.parse_args(["--models", "m1"])
+    assert cli._expand_arms(args, parser) == [
+        "gold", "gold_valid", "mined:m1:windowed"
+    ]
+
+
+def test_cli_dedupes_arms():
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["--arms", "gold,mined:m1:windowed", "--models", "m1",
+         "--pair-policies", "windowed"]
+    )
+    assert cli._expand_arms(args, parser) == ["gold", "mined:m1:windowed"]
+
+
+def test_cli_rejects_pair_policies_without_models():
+    parser = cli.build_parser()
+    args = parser.parse_args(["--pair-policies", "windowed"])
+    with pytest.raises(SystemExit):
+        cli._expand_arms(args, parser)
+
+
+def test_cli_defaults_do_not_target_the_gold_baseline():
+    """The published gold run must not be a default output directory."""
+    args = cli.build_parser().parse_args([])
+    assert args.out_dir != "results/locobench_claude_5_fixed_lcs"
+    assert args.data_dir == "data/locobench-claude-5-test"
+    assert os.path.isdir(args.data_dir)  # and it actually exists
+
+
+def test_cli_rejects_mined_arms_without_a_rits_key(monkeypatch, tmp_path):
+    monkeypatch.delenv("RITS_API_KEY", raising=False)
+    with pytest.raises(SystemExit):
+        cli.main([
+            "--models", "llama-3.3-70b-instruct",
+            "--merlin-path", str(tmp_path),
+            "--out-dir", str(tmp_path / "o"),
+        ])
+
+
+def test_cli_rejects_an_unknown_model(monkeypatch):
+    with pytest.raises(SystemExit):
+        cli.main(["--models", "gpt-oss-120b", "--estimate-only"])
+
+
+def test_cli_estimate_only_exits_zero_and_prints_counts(capsys):
+    rc = cli.main([
+        "--models", "llama-3.3-70b-instruct",
+        "--pair-policies", "windowed,all_pairs",
+        "--estimate-only",
+    ])
+    out = capsys.readouterr().out
+    assert rc == 0
+    # The exact pair counts for this dataset: 264 windowed, 2400 all_pairs.
+    assert "264 pairs" in out and "2400 pairs" in out
+
+
+def test_cli_estimate_only_is_silent_about_llm_for_gold_arms(capsys):
+    rc = cli.main(["--estimate-only"])
+    assert rc == 0
+    assert "make no LLM calls" in capsys.readouterr().out

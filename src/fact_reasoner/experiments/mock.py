@@ -282,10 +282,11 @@ def dry_run_patches(
     surrogate_p_yes: float = 0.8,
     verbalized_p: float = 0.7,
     patch_assessor_merlin: bool = False,
+    patch_merlin: bool = True,
 ):
     """Context manager installing the dry-run stubs.
 
-    Patches ``mellea.stdlib.functional.ainstruct`` (mining) and
+    Patches ``mellea.stdlib.functional.ainstruct`` (mining) and, by default,
     ``fact_reasoner.lcs.lcs_scorer.run_merlin`` (scoring) for the duration, so the
     real ``RelationMiner`` / ``LCSScorer`` run end-to-end with no external services.
 
@@ -300,17 +301,24 @@ def dry_run_patches(
             refuses networks above ``MAX_BRUTEFORCE_VARS`` variables, and a
             factuality network counts contexts as well as atoms -- keep two-stage
             fixtures small.
+        patch_merlin: Whether to replace the coherence scorer's Merlin call with the
+            brute-force oracle. Set False to stub only the LLM and score with the
+            REAL Merlin: the oracle refuses networks above
+            ``MAX_BRUTEFORCE_VARS`` variables, so a realistically-sized item
+            (16 atoms plus the scorer's auxiliary variables) can only be exercised
+            offline this way.
     """
     import mellea.stdlib.functional as mfuncs
 
     from fact_reasoner.lcs import lcs_scorer as lcs_scorer_mod
 
     orig_ainstruct = mfuncs.ainstruct
-    orig_merlin = lcs_scorer_mod.run_merlin
     mfuncs.ainstruct = make_mock_ainstruct(
         surrogate_p_yes=surrogate_p_yes, verbalized_p=verbalized_p
     )
-    lcs_scorer_mod.run_merlin = brute_force_run_merlin
+    orig_merlin = lcs_scorer_mod.run_merlin
+    if patch_merlin:
+        lcs_scorer_mod.run_merlin = brute_force_run_merlin
 
     assessor_mod = None
     orig_assessor_merlin = None

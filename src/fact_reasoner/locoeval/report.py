@@ -39,7 +39,8 @@ from fact_reasoner.locoeval.gold_graph import (
     PRIOR_FACTUAL,
     PRIOR_NOT_FACTUAL,
 )
-from fact_reasoner.locoeval.runner import GOLD_ARMS, GRADED_READOUTS
+from fact_reasoner.locoeval.mined_graph import parse_arm
+from fact_reasoner.locoeval.runner import GOLD_ARMS, GRADED_READOUTS, TIE_TOLERANCE
 
 # Level-1 coupling -> TikZ edge style. Directed single-headed arrows for the
 # asymmetric couplings, double-headed for the symmetric ones.
@@ -68,6 +69,19 @@ _ARM_LABEL = {
     "gold": "all gold edges",
     "gold_valid": "valid edges only",
 }
+
+
+def _arm_label(arm: str) -> str:
+    """A human-readable caption for one arm, gold or mined."""
+    if arm in _ARM_LABEL:
+        return _ARM_LABEL[arm]
+    try:
+        spec = parse_arm(arm)
+    except ValueError:
+        return str(arm)
+    if spec is None:
+        return str(arm)
+    return f"mined by {spec.model}, {spec.pair_policy.replace('_', ' ')}"
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +202,7 @@ def _setup_section(results: Mapping[str, Any]) -> str:
             r"\paragraph{Arms.} "
             "Each item is scored under "
             + " and ".join(
-                f"\\textbf{{\\texttt{{{_tex(a)}}}}} ({_tex(_ARM_LABEL.get(a, a))})"
+                f"\\textbf{{\\texttt{{{_tex(a)}}}}} ({_tex(_arm_label(a))})"
                 for a in arms
             )
             + ". The second arm drops the deliberately-planted invalid relations, "
@@ -334,7 +348,7 @@ def _scores_table(records: Sequence[Mapping[str, Any]], arm: str) -> str:
         [
             r"\begin{table}[htbp]", r"\centering", r"\small",
             r"\caption{LCS readouts, arm \texttt{" + _tex(arm) + r"} ("
-            + _tex(_ARM_LABEL.get(arm, arm))
+            + _tex(_arm_label(arm))
             + r"). Higher is more coherent for every readout. \textbf{Rel} is the "
             r"number of edge-producing relations in the MRF.}",
             r"\label{tab:scores-" + _key(arm) + r"}",
@@ -347,54 +361,107 @@ def _scores_table(records: Sequence[Mapping[str, Any]], arm: str) -> str:
     )
 
 
-def _arm_delta_section(records: Sequence[Mapping[str, Any]]) -> str:
-    """What dropping the planted-invalid edges does to each readout."""
-    gold = {r["item_id"]: r for r in _sorted_records(records, "gold")}
-    valid = {r["item_id"]: r for r in _sorted_records(records, "gold_valid")}
-    shared = [i for i in gold if i in valid]
-    if not shared:
-        return ""
-    rows = []
-    for iid in shared:
-        g, v = gold[iid], valid[iid]
-        gl, vl = g.get("lcs") or {}, v.get("lcs") or {}
-        cells = []
-        for m in LCS_METHODS:
-            a, b = gl.get(m), vl.get(m)
-            cells.append("--" if (a is None or b is None) else f"{b - a:+.3f}")
-        rows.append(
-            " & ".join(
-                [
-                    f"\\texttt{{{_tex(g.get('family_id'))}}}",
-                    str(g.get("rung_index")),
-                    f"{g.get('num_relations')} $\\to$ {v.get('num_relations')}",
-                    *cells,
-                ]
-            )
-            + r" \\"
-        )
-    heads = " & ".join(f"\\textbf{{{_tex(_READOUT_SHORT[m])}}}" for m in LCS_METHODS)
-    return "\n".join(
-        [
+def _arm_delta_lead(baseline: str, arm: str) -> str:
+    """The paragraph that explains one baseline-vs-arm comparison."""
+    if baseline == "gold" and arm == "gold_valid":
+        return (
             "Removing the deliberately-invalid gold relations is the clearest "
             "single-number effect in this evaluation. The planted errors are "
             "predominantly conflict edges attached to a false endpoint, so deleting "
             "them removes active contradictions: the conflict-sensitive readouts "
             "move sharply, while \\texttt{mean\\_marginal} --- an average over atom "
-            "marginals already pinned near their $0.9/0.1$ priors --- barely moves.",
-            "",
-            r"\begin{table}[htbp]", r"\centering", r"\small",
-            r"\caption{Change in each readout from arm \texttt{gold} to arm "
-            r"\texttt{gold\_valid} (valid edges only). Positive means the "
-            r"intended-correct subgraph scores as more coherent.}",
-            r"\label{tab:arm-delta}",
-            r"\begin{tabular}{llrrrrr}", r"\toprule",
-            r"Family & Rung & Rel & " + heads + r" \\",
-            r"\midrule",
-            *rows,
-            r"\bottomrule", r"\end{tabular}", r"\end{table}",
-        ]
+            "marginals already pinned near their $0.9/0.1$ priors --- barely moves."
+        )
+    if parse_arm(arm) is not None:
+        return (
+            "This is the mined-versus-labelled comparison: identical atoms, "
+            "identical priors and identical readouts, with the relation graph the "
+            "only thing that changed. A positive delta means the graph the miner "
+            "recovered from the prose scores as \\emph{more} coherent than the one "
+            "the corpus asserts --- which, given the corpus deliberately plants "
+            "conflict edges, is the expected direction whenever the miner misses "
+            "them. Read it alongside the recall tables in "
+            "Section~\\ref{sec:mining}: a large positive delta with low conflict "
+            "recall means the readout moved because edges are missing, not because "
+            "the text is more coherent."
+        )
+    return (
+        f"Change in each readout from arm \\texttt{{{_tex(baseline)}}} to arm "
+        f"\\texttt{{{_tex(arm)}}}."
     )
+
+
+def _arm_delta_section(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    baseline: str = "gold",
+    comparison_arms: Sequence[str] | None = None,
+) -> str:
+    """Per-readout deltas from one baseline arm to each comparison arm.
+
+    One table per comparison arm. The column count is unchanged from the
+    two-arm original (family, rung, relations, then the four readouts), so the
+    `tabular` spec below still matches its header.
+    """
+    base = {r["item_id"]: r for r in _sorted_records(records, baseline)}
+    if not base:
+        return ""
+    if comparison_arms is None:
+        seen: list[str] = []
+        for r in _ok(records):
+            arm = str(r.get("arm"))
+            if arm != baseline and arm not in seen:
+                seen.append(arm)
+        comparison_arms = seen
+
+    heads = " & ".join(f"\\textbf{{{_tex(_READOUT_SHORT[m])}}}" for m in LCS_METHODS)
+    blocks: list[str] = []
+    for arm in comparison_arms:
+        other = {r["item_id"]: r for r in _sorted_records(records, arm)}
+        shared = [i for i in base if i in other]
+        if not shared:
+            continue
+        rows = []
+        for iid in shared:
+            g, v = base[iid], other[iid]
+            gl, vl = g.get("lcs") or {}, v.get("lcs") or {}
+            cells = []
+            for m in LCS_METHODS:
+                a, b = gl.get(m), vl.get(m)
+                cells.append("--" if (a is None or b is None) else f"{b - a:+.3f}")
+            rows.append(
+                " & ".join(
+                    [
+                        f"\\texttt{{{_tex(g.get('family_id'))}}}",
+                        str(g.get("rung_index")),
+                        f"{g.get('num_relations')} $\\to$ {v.get('num_relations')}",
+                        *cells,
+                    ]
+                )
+                + r" \\"
+            )
+        blocks.extend(
+            [
+                _arm_delta_lead(baseline, arm),
+                "",
+                r"\begin{table}[htbp]", r"\centering", r"\small",
+                r"\caption{Change in each readout from arm \texttt{"
+                + _tex(baseline)
+                + r"} to arm \texttt{"
+                + _tex(arm)
+                + r"} ("
+                + _tex(_arm_label(arm))
+                + r"). Positive means the latter scores as more coherent.}",
+                r"\label{tab:arm-delta-" + _key(baseline) + "-" + _key(arm) + r"}",
+                r"\begin{tabular}{llrrrrr}", r"\toprule",
+                r"Family & Rung & Rel & " + heads + r" \\",
+                r"\midrule",
+                *rows,
+                r"\bottomrule", r"\end{tabular}", r"\end{table}",
+                "",
+            ]
+        )
+    return "\n".join(blocks).strip()
 
 
 def _ladder_section(results: Mapping[str, Any]) -> str:
@@ -759,6 +826,328 @@ def _example_section(
     return "\n\n".join(blocks)
 
 
+def _pct(x: Any) -> str:
+    """Format a ratio as a percentage, or ``--``."""
+    if x is None:
+        return "--"
+    try:
+        return f"{100.0 * float(x):.1f}"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def _mining_quality_section(results: Mapping[str, Any]) -> str:
+    """Mined-vs-gold edge agreement, with the policy asymmetry stated up front."""
+    mining = results.get("mining") or {}
+    if not mining:
+        return ""
+    arms = list(mining)
+
+    # -- the interpretive caveats, before any number ------------------------
+    lead = (
+        "A mined arm is scored on exactly the atoms and priors the gold arms use, so "
+        "the tables below isolate relation mining. Two properties of the candidate-"
+        "pair policies must be read alongside them, because both are definitional "
+        "rather than empirical.",
+        "",
+        r"\paragraph{The policies do not have the same reach.} "
+        "\\texttt{windowed} selects only \\emph{forward} pairs (source before target "
+        "in atom order), refined by what the response actually links; "
+        "\\texttt{all\\_pairs} selects every one of the $n(n-1)$ ordered pairs. A "
+        "gold relation that is \\emph{directed} and runs backward in atom order is "
+        "therefore unreachable under \\texttt{windowed} no matter what the prose "
+        "says. Undirected couplings (equivalence, exclusive, co-necessity) are "
+        "matched on the unordered pair, so they are not affected. Recall is reported "
+        "split by direction below for exactly this reason: the backward-directed "
+        "shortfall is a property of the policy, not a miner failure.",
+        "",
+        r"\paragraph{The policies do not build equally dense networks.} "
+        "\\texttt{all\\_pairs} visits each unordered pair twice, once in each "
+        "direction, and the graph builder does not deduplicate edges. A pair the "
+        "model couples both ways therefore contributes \\emph{two} factors over the "
+        "same two variables. The \\textbf{dup} column counts this. Neither "
+        "\\texttt{windowed} (forward-only) nor gold (one relation per pair) can do "
+        "it, so a comparison of LCS values across policies conflates coverage, "
+        "directionality and network density --- it is not a clean coverage ablation.",
+        "",
+    )
+
+    # -- table 1: precision/recall at the three match levels ----------------
+    rows = []
+    for arm in arms:
+        m = mining[arm]
+        rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(m.get('pair_policy'))}}}",
+                    str(m.get("mined_edges_total")),
+                    str(m.get("gold_edges_scorable")),
+                    _pct((m.get("pair") or {}).get("precision")),
+                    _pct((m.get("pair") or {}).get("recall")),
+                    _pct((m.get("coupling") or {}).get("precision")),
+                    _pct((m.get("coupling") or {}).get("recall")),
+                    _pct((m.get("sense") or {}).get("recall")),
+                    str(m.get("duplicate_unordered_pairs")),
+                ]
+            )
+            + r" \\"
+        )
+    pr_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Mined-versus-gold edge agreement, micro-averaged over items "
+        r"(percentages). \textbf{Pair} ignores the coupling and asks only whether "
+        r"the two atoms were related at all; \textbf{coupling} additionally requires "
+        r"the Level-1 coupling, with direction required only for the asymmetric "
+        r"ones, and is the level the MRF actually uses; \textbf{sense} additionally "
+        r"requires the Level-2 discourse sense. \textbf{Gold} counts only "
+        r"edge-producing relations. \textbf{dup} is unordered pairs related twice.}",
+        r"\label{tab:mining-pr}",
+        r"\begin{tabular}{lrrrrrrrr}", r"\toprule",
+        r"Policy & Mined & Gold & Pair P & Pair R & Coup P & Coup R & Sense R "
+        r"& dup \\",
+        r"\midrule",
+        *rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+
+    # -- table 2: recall stratified by direction and window admission -------
+    strat_rows = []
+    for arm in arms:
+        m = mining[arm]
+        d = m.get("recall_by_direction") or {}
+        w = m.get("recall_by_window_admission") or {}
+        f = m.get("recall_by_directed_flag") or {}
+        strat_rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(m.get('pair_policy'))}}}",
+                    _pct((d.get("forward") or {}).get("recall")),
+                    _pct((d.get("backward") or {}).get("recall")),
+                    _pct((f.get("True") or {}).get("recall")),
+                    _pct((f.get("False") or {}).get("recall")),
+                    _pct((w.get("window") or {}).get("recall")),
+                    _pct((w.get("gate") or {}).get("recall")),
+                ]
+            )
+            + r" \\"
+        )
+    strat_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Coupling-level recall (\%) stratified by the gold edge's own "
+        r"properties. \textbf{Fwd}/\textbf{Bwd} is the sign of the target-minus-"
+        r"source atom index; \textbf{Dir}/\textbf{Undir} is whether the coupling is "
+        r"asymmetric; \textbf{win}/\textbf{gate} is the generator's own "
+        r"\texttt{window\_admission} label, i.e. whether it expected the edge inside "
+        r"a radius-4 window. A forward-only policy is structurally capped in the "
+        r"\textbf{Bwd}$\times$\textbf{Dir} cell.}",
+        r"\label{tab:mining-recall-strat}",
+        r"\begin{tabular}{lrrrrrr}", r"\toprule",
+        r"Policy & Fwd & Bwd & Dir & Undir & win & gate \\",
+        r"\midrule",
+        *strat_rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+
+    # -- table 3: validity split (read inverted) + declared non-relations ---
+    val_rows = []
+    for arm in arms:
+        m = mining[arm]
+        v = m.get("recall_by_validity") or {}
+        val_rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(m.get('pair_policy'))}}}",
+                    _pct((v.get("valid") or {}).get("recall")),
+                    _pct((v.get("invalid") or {}).get("recall")),
+                    f"{m.get('non_relation_violations')}/{m.get('non_relation_pairs')}",
+                    _pct(m.get("non_relation_violation_rate")),
+                ]
+            )
+            + r" \\"
+        )
+    val_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Coupling-level recall (\%) on valid versus deliberately-invalid "
+        r"gold edges, and violations of the declared non-relations. The "
+        r"\textbf{invalid} column reads \emph{inverted}: those edges are planted "
+        r"errors and the miner reads the response, so failing to recover them is "
+        r"arguably correct --- lower is better. \textbf{Non-rel} counts pairs the "
+        r"item explicitly declares unrelated that the miner nevertheless coupled; "
+        r"unlike precision against all unlabelled pairs, this denominator is a real "
+        r"negative set.}",
+        r"\label{tab:mining-validity}",
+        r"\begin{tabular}{lrrrr}", r"\toprule",
+        r"Policy & valid R & invalid R & Non-rel & rate \\",
+        r"\midrule",
+        *val_rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+
+    caveat = ""
+    if any(
+        ((mining[a].get("recall_by_window_admission") or {}).get("gate") or {}).get(
+            "total"
+        )
+        for a in arms
+    ):
+        caveat = (
+            "One confound to note in Table~\\ref{tab:mining-recall-strat}: in this "
+            "dataset every \\texttt{gate}-admitted gold edge is also marked "
+            "\\texttt{invalid}, so the \\textbf{gate} column and the "
+            "\\textbf{invalid} column of Table~\\ref{tab:mining-validity} are not "
+            "independent."
+        )
+
+    return "\n".join(
+        [*lead, *pr_table, "", *strat_table, "", *val_table, "", caveat]
+    ).strip()
+
+
+def _policy_comparison_section(results: Mapping[str, Any]) -> str:
+    """Per-arm mean readouts and constraint pass rates, gold and mined together."""
+    records = results.get("records", []) or []
+    cfg = results.get("config") or {}
+    arms = cfg.get("arms") or list(GOLD_ARMS)
+    families = results.get("families") or []
+    if len(arms) < 2:
+        return ""
+
+    def _mean(arm: str, method: str) -> float | None:
+        vals = [
+            r["lcs"][method]
+            for r in _sorted_records(records, arm)
+            if (r.get("lcs") or {}).get(method) is not None
+        ]
+        return sum(vals) / len(vals) if vals else None
+
+    rows = []
+    for arm in arms:
+        cells = [_fmt(_mean(arm, m)) for m in LCS_METHODS]
+        n = len(_sorted_records(records, arm))
+        rows.append(
+            " & ".join(
+                [
+                    f"\\texttt{{{_tex(arm)}}}",
+                    str(n),
+                    *cells,
+                ]
+            )
+            + r" \\"
+        )
+    heads = " & ".join(f"\\textbf{{{_tex(_READOUT_SHORT[m])}}}" for m in LCS_METHODS)
+    lcs_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Each readout averaged over items, per arm. Averaging across the "
+        r"rungs of a ladder deliberately collapses the ordering the ladder is built "
+        r"to test, so this table is a level comparison only; the ordering question "
+        r"is Table~\ref{tab:ladder-by-arm}.}",
+        r"\label{tab:policy-lcs}",
+        r"\begin{tabular}{lrrrrr}", r"\toprule",
+        r"Arm & Cells & " + heads + r" \\",
+        r"\midrule",
+        *rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+
+    ladder_rows = []
+    fam_ids = [str(f.get("family_id")) for f in families]
+    for arm in arms:
+        cells = []
+        passed = total = 0
+        for f in families:
+            summary = ((f.get("arms") or {}).get(arm) or {}).get("summary") or {}
+            p, t = summary.get("passed"), summary.get("total")
+            if p is None or t is None:
+                cells.append("--")
+                continue
+            cells.append(f"{p}/{t}")
+            passed += int(p)
+            total += int(t)
+        rate = _pct(passed / total) if total else "--"
+        ladder_rows.append(
+            " & ".join([f"\\texttt{{{_tex(arm)}}}", *cells, f"{passed}/{total}", rate])
+            + r" \\"
+        )
+    ladder_table = [
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\caption{Ordering constraints satisfied per arm. With "
+        + str(len(fam_ids) * 14)
+        + r" assertions per arm this is the only comparison here with enough "
+        r"observations to be more than anecdote: it asks whether the readouts order "
+        r"the rungs correctly, which is what the ladder was built to test.}",
+        r"\label{tab:ladder-by-arm}",
+        r"\begin{tabular}{l" + "r" * (len(fam_ids) + 2) + r"}", r"\toprule",
+        "Arm & "
+        + " & ".join(f"\\texttt{{{_tex(fid)}}}" for fid in fam_ids)
+        + r" & total & \% \\",
+        r"\midrule",
+        *ladder_rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}",
+    ]
+    return "\n".join([*lcs_table, "", *ladder_table])
+
+
+def _baseline_repro_section(
+    results: Mapping[str, Any], baseline: Mapping[str, Any]
+) -> str:
+    """Check that this run's gold cells reproduce an earlier run's, cell by cell."""
+    records = _ok(results.get("records", []) or [])
+    old = {
+        (str(r.get("item_id")), str(r.get("arm"))): r
+        for r in (baseline.get("records") or [])
+        if "error" not in r and r.get("lcs")
+    }
+    if not old:
+        return ""
+
+    compared = 0
+    worst = 0.0
+    mismatches: list[str] = []
+    for rec in records:
+        key = (str(rec.get("item_id")), str(rec.get("arm")))
+        ref = old.get(key)
+        if ref is None:
+            continue
+        for method in LCS_METHODS:
+            a, b = (rec.get("lcs") or {}).get(method), (ref.get("lcs") or {}).get(
+                method
+            )
+            if a is None or b is None:
+                continue
+            compared += 1
+            diff = abs(float(a) - float(b))
+            worst = max(worst, diff)
+            if diff > TIE_TOLERANCE:
+                mismatches.append(
+                    f"\\item \\texttt{{{_tex(key[0])}}} / \\texttt{{{_tex(key[1])}}} / "
+                    f"\\texttt{{{_tex(method)}}}: {_fmt(a, 6)} vs {_fmt(b, 6)}"
+                )
+    if not compared:
+        return (
+            "The baseline results share no (item, arm) cell with this run, so no "
+            "reproduction check was possible."
+        )
+    name = _tex((baseline.get("config") or {}).get("output_dir") or "the baseline run")
+    if not mismatches:
+        return (
+            f"All \\textbf{{{compared}}} readout values shared with "
+            f"\\texttt{{{name}}} reproduce to within "
+            f"${worst:.1e}$ (tolerance ${TIE_TOLERANCE:g}$). The arms added by this "
+            "revision therefore leave the previously-published gold numbers "
+            "unchanged."
+        )
+    return "\n".join(
+        [
+            f"\\textbf{{{len(mismatches)}}} of {compared} readout values shared with "
+            f"\\texttt{{{name}}} differ by more than the tolerance "
+            f"${TIE_TOLERANCE:g}$ (largest ${worst:.2e}$):",
+            r"\begin{itemize}",
+            *mismatches[:20],
+            r"\end{itemize}",
+        ]
+    )
+
+
 def _findings_section(results: Mapping[str, Any]) -> str:
     """What the numbers show, stated plainly."""
     records = results.get("records", []) or []
@@ -837,19 +1226,20 @@ def _findings_section(results: Mapping[str, Any]) -> str:
                 "of this dataset could not provide."
             )
 
-    lo_mm, hi_mm = spread(gold, "mean_marginal")
-    lo_c, hi_c = spread(gold, "consistency")
-    bullets.append(
-        r"\item \textbf{The readouts differ sharply in sensitivity.} Across the "
-        f"{len(gold)} scored items \\texttt{{mean\\_marginal}} spans only "
-        f"$[{_fmt(lo_mm)}, {_fmt(hi_mm)}]$, while \\texttt{{consistency}} spans "
-        f"$[{_fmt(lo_c)}, {_fmt(hi_c)}]$. With atom priors pinned at $0.9/0.1$ the "
-        "mean marginal is dominated by those priors and moves little; the "
-        "conflict-sensitive readouts are what register the contradiction structure. "
-        "For a benchmark whose families vary conflict structure, "
-        "\\texttt{consistency} and \\texttt{log\\_partition} are the discriminating "
-        "readouts."
-    )
+    if gold:
+        lo_mm, hi_mm = spread(gold, "mean_marginal")
+        lo_c, hi_c = spread(gold, "consistency")
+        bullets.append(
+            r"\item \textbf{The readouts differ sharply in sensitivity.} Across the "
+            f"{len(gold)} scored items \\texttt{{mean\\_marginal}} spans only "
+            f"$[{_fmt(lo_mm)}, {_fmt(hi_mm)}]$, while \\texttt{{consistency}} spans "
+            f"$[{_fmt(lo_c)}, {_fmt(hi_c)}]$. With atom priors pinned at $0.9/0.1$ the "
+            "mean marginal is dominated by those priors and moves little; the "
+            "conflict-sensitive readouts are what register the contradiction "
+            "structure. For a benchmark whose families vary conflict structure, "
+            "\\texttt{consistency} and \\texttt{log\\_partition} are the "
+            "discriminating readouts."
+        )
 
     deltas = []
     gold_by = {r["item_id"]: r for r in gold}
@@ -887,20 +1277,117 @@ def _findings_section(results: Mapping[str, Any]) -> str:
             "them separately for that reason."
         )
 
+    bullets.extend(_mining_findings(results))
     return r"\begin{itemize}" + "\n" + "\n".join(bullets) + "\n" + r"\end{itemize}"
+
+
+def _mining_findings(results: Mapping[str, Any]) -> list[str]:
+    """Findings bullets that only exist when the run included a mined arm."""
+    mining = results.get("mining") or {}
+    if not mining:
+        return []
+    bullets: list[str] = []
+
+    best = max(
+        mining.items(),
+        key=lambda kv: ((kv[1].get("coupling") or {}).get("recall") or 0.0),
+    )
+    arm, block = best
+    coup = block.get("coupling") or {}
+    pair = block.get("pair") or {}
+    bullets.append(
+        r"\item \textbf{Recovering the graph is harder than scoring it.} The best "
+        f"mined arm (\\texttt{{{_tex(block.get('pair_policy'))}}}) reaches "
+        f"{_pct(pair.get('recall'))}\\% recall at the pair level but only "
+        f"{_pct(coup.get('recall'))}\\% once the Level-1 coupling has to match, at "
+        f"{_pct(coup.get('precision'))}\\% precision. The gold arms show the readouts "
+        "behave correctly on a correct graph; these numbers are what the pipeline "
+        "actually delivers from prose, and the gap between the two is the finding."
+    )
+
+    directional = []
+    for a, b in mining.items():
+        d = b.get("recall_by_direction") or {}
+        fwd = (d.get("forward") or {}).get("recall")
+        bwd = (d.get("backward") or {}).get("recall")
+        if fwd is not None and bwd is not None:
+            directional.append((b.get("pair_policy"), fwd, bwd))
+    if directional:
+        parts = "; ".join(
+            f"\\texttt{{{_tex(p)}}} {_pct(f)}\\% forward vs {_pct(b)}\\% backward"
+            for p, f, b in directional
+        )
+        bullets.append(
+            r"\item \textbf{The direction split is a policy property, not a model "
+            r"property.} "
+            f"{parts}. A forward-only policy cannot emit a backward ordered pair at "
+            "all, so its backward recall is bounded by the undirected couplings it can "
+            "still match on the unordered pair. Any comparison of the two policies' "
+            "coupling recall is therefore partly a comparison of their reach."
+        )
+
+    dups = {
+        b.get("pair_policy"): b.get("duplicate_unordered_pairs") for b in mining.values()
+    }
+    if any(dups.values()):
+        listed = ", ".join(f"\\texttt{{{_tex(k)}}} {v}" for k, v in dups.items())
+        bullets.append(
+            r"\item \textbf{One policy scores a denser network than the others.} "
+            f"Duplicate unordered pairs: {listed}. Because edges are not "
+            "deduplicated, each duplicate puts a second factor on the same variable "
+            "pair, so that pair's influence is applied twice. Readout differences "
+            "between the policies cannot be attributed to coverage alone."
+        )
+
+    viol = [
+        (b.get("pair_policy"), b.get("non_relation_violations"),
+         b.get("non_relation_pairs"))
+        for b in mining.values()
+    ]
+    viol = [v for v in viol if v[2]]
+    if viol:
+        listed = ", ".join(f"\\texttt{{{_tex(p)}}} {n}/{d}" for p, n, d in viol)
+        bullets.append(
+            r"\item \textbf{The declared negatives are a cleaner precision signal "
+            r"than the unlabelled pairs.} Violations of the item's own "
+            f"\\texttt{{non\\_relations}}: {listed}. Precision against every "
+            "unlabelled pair is dominated by pairs of unknown status, whereas these "
+            "are pairs the corpus asserts are unrelated."
+        )
+
+    errs = sum(int(b.get("num_call_exceptions") or 0) for b in mining.values())
+    calls = sum(int(b.get("num_llm_calls") or 0) for b in mining.values())
+    if calls:
+        bullets.append(
+            r"\item \textbf{The mined numbers are not built on dropped calls.} "
+            f"{errs} of {calls} LLM calls failed across the mined arms. This matters "
+            "because a failed call is parsed as \\emph{no relation} --- "
+            "indistinguishable from a genuine negative --- so an unmeasured failure "
+            "rate would silently depress recall and inflate every readout. The run "
+            "refuses a cell whose failure rate exceeds the configured ceiling."
+        )
+    return bullets
 
 
 def _threats_section(results: Mapping[str, Any]) -> str:
     """Limits of this evaluation, stated without hedging."""
     ds = results.get("dataset") or {}
     families = results.get("families") or []
+    has_mined = bool(results.get("mining"))
     items = [
         r"\item \textbf{Gold relations are labels, not measurements.} The factor "
         r"probability is a band midpoint, so a \texttt{strong} edge enters at "
-        r"exactly 0.925 whatever the underlying text supports. Nothing here tests "
-        r"the miner's calibration: this evaluates the MRF encoding and the readouts "
-        r"\emph{given} perfect relation labels. Treat these scores as a reference "
-        r"point for a mined arm, not as a mining result.",
+        r"exactly 0.925 whatever the underlying text supports. The gold arms "
+        r"therefore evaluate the MRF encoding and the readouts \emph{given} perfect "
+        r"relation labels."
+        + (
+            r" They are the reference point the mined arms are measured against, not "
+            r"a mining result in themselves."
+            if has_mined
+            else r" Nothing in a gold-only run tests the miner's calibration; treat "
+            r"these scores as a reference point for a mined arm, not as a mining "
+            r"result."
+        ),
         r"\item \textbf{Two families is a small sample.} The dataset has "
         f"{len(families)} families over {ds.get('num_items')} items, all generated "
         "by one model. The spreads quoted above describe this dataset; no "
@@ -930,6 +1417,28 @@ def _threats_section(results: Mapping[str, Any]) -> str:
         r"log-partition also depends on a MAP floor and a contradiction-free "
         r"ceiling, so it is the readout most sensitive to any approximation.",
     ]
+    if has_mined:
+        items.extend(
+            [
+                r"\item \textbf{The policy comparison is not a coverage ablation.} "
+                r"\texttt{windowed} and \texttt{all\_pairs} differ in three ways at "
+                r"once: which pairs they reach, whether they consider both "
+                r"directions, and --- because duplicate edges are not merged --- how "
+                r"dense a network they build. A readout difference between them "
+                r"cannot be attributed to coverage alone. Isolating coverage would "
+                r"need one policy at two window radii.",
+                r"\item \textbf{A failed call and a genuine negative look the same.} "
+                r"The miner parses a captured exception as \emph{no relation}. This "
+                r"run counts those failures and refuses a cell that exceeds a "
+                r"threshold, so the reported numbers are not built on dropped calls "
+                r"--- but the underlying ambiguity is a property of the pipeline, and "
+                r"a run without that accounting would show no symptom.",
+                r"\item \textbf{One mined observation per cell.} Mining is sampled "
+                r"once per (item, arm) at the model's default temperature, so no "
+                r"run-to-run variance is measured. Differences between mined arms of "
+                r"a similar size should not be read as reliable.",
+            ]
+        )
     return r"\begin{itemize}" + "\n" + "\n".join(items) + "\n" + r"\end{itemize}"
 
 
@@ -949,7 +1458,7 @@ _PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta}
 \title{LoCoBench: Logical Coherence Score Evaluation\\
-\large The gold-relation arm on generated items}
+\large Gold-relation and mined arms on generated items}
 \author{FactReasoner --- LoCoBench evaluation}
 \date{\today}
 """
@@ -996,6 +1505,7 @@ def write_report(
     *,
     filename: str = "report.tex",
     example_ids: Sequence[str] | None = None,
+    baseline: Mapping[str, Any] | None = None,
 ) -> str:
     """Write the evaluation report's LaTeX source.
 
@@ -1006,6 +1516,9 @@ def write_report(
         filename: The `.tex` file name.
         example_ids: Which items to write up as worked examples. Defaults to each
             family's base rung, so a two-family dataset yields two examples.
+        baseline: An earlier run's results dict. When given, a reproduction section
+            checks that every shared (item, arm) cell still scores the same, which
+            turns "the published numbers are unchanged" into a checked claim.
 
     Returns:
         The path to the written `.tex` file.
@@ -1029,12 +1542,34 @@ def write_report(
     body.append(_dataset_section(results))
 
     body.append(r"\section{LCS scores}")
-    for arm in (results.get("config") or {}).get("arms", GOLD_ARMS):
+    arms = list((results.get("config") or {}).get("arms", GOLD_ARMS))
+    for arm in arms:
         body.append(_scores_table(records, arm))
-    delta = _arm_delta_section(records)
-    if delta:
-        body.append(r"\subsection{Effect of the planted invalid relations}")
-        body.append(delta)
+
+    if "gold" in arms and "gold_valid" in arms:
+        delta = _arm_delta_section(
+            records, baseline="gold", comparison_arms=["gold_valid"]
+        )
+        if delta:
+            body.append(r"\subsection{Effect of the planted invalid relations}")
+            body.append(delta)
+
+    mined = [a for a in arms if a not in GOLD_ARMS]
+    if mined and "gold" in arms:
+        delta = _arm_delta_section(records, baseline="gold", comparison_arms=mined)
+        if delta:
+            body.append(r"\subsection{Mined relations versus the gold labels}")
+            body.append(delta)
+
+    quality = _mining_quality_section(results)
+    if quality:
+        body.append(r"\section{Mining quality}\label{sec:mining}")
+        body.append(quality)
+
+    policy = _policy_comparison_section(results)
+    if policy:
+        body.append(r"\section{Arm comparison}\label{sec:arms}")
+        body.append(policy)
 
     body.append(r"\section{Ladder ordering constraints}\label{sec:ladder}")
     graded = ", ".join(f"\\texttt{{{_tex(r)}}}" for r in GRADED_READOUTS)
@@ -1055,6 +1590,12 @@ def write_report(
         )
         for iid in examples:
             body.append(_example_section(by_item[iid], records))
+
+    if baseline:
+        repro = _baseline_repro_section(results, baseline)
+        if repro:
+            body.append(r"\section{Baseline reproduction}")
+            body.append(repro)
 
     body.append(r"\section{Findings}")
     body.append(_findings_section(results))

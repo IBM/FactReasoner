@@ -37,7 +37,7 @@ import asyncio
 import json
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -74,7 +74,11 @@ from fact_reasoner.lcs.taxonomy import (
     coupling_from_string,
 )
 from fact_reasoner.markov_network import MarkovNetwork
-from fact_reasoner.utils import extract_logprobs_from_output, run_throttled
+from fact_reasoner.utils import (
+    MAX_CONCURRENT_REQUESTS,
+    extract_logprobs_from_output,
+    run_throttled,
+)
 
 # Methods for estimating the type confidence P(tau|a_i,a_j), mirroring core/nli.py.
 MINER_METHODS = ("logprobs", "simbauq")
@@ -332,6 +336,7 @@ class RelationMiner:
         strength_method: str = "auto",
         strength_samples: int = 8,
         strength_calibrator: StrengthCalibrator | None = None,
+        max_concurrency: int = MAX_CONCURRENT_REQUESTS,
         show_progress: bool = False,
     ):
         """Initialize the relation miner.
@@ -379,6 +384,11 @@ class RelationMiner:
             strength_calibrator: Optional post-hoc calibrator applied to the raw
                 strength (e.g. a fitted :class:`TemperatureCalibrator`). Defaults
                 to the identity (no-op).
+            max_concurrency: Ceiling on in-flight LLM calls while mining one
+                response. Lower it for an endpoint that throttles under the
+                default: a rate-limited call is captured by ``run_throttled`` and
+                parsed as "no relation", so throttling silently costs recall
+                rather than raising.
             show_progress: If True, show a tqdm bar as pairs are mined.
 
         Raises:
@@ -430,6 +440,7 @@ class RelationMiner:
         self.strength_method = strength_method
         self.strength_samples = strength_samples
         self.strength_calibrator = strength_calibrator or IdentityCalibrator()
+        self.max_concurrency = max(1, int(max_concurrency))
         self.show_progress = show_progress
 
         # Response-grounded prompts: each takes a {{response}} context block so the
@@ -612,6 +623,39 @@ class RelationMiner:
 
     # -- core mining ---------------------------------------------------------
 
+    def _reset_call_errors(self) -> None:
+        """Clear the per-run LLM failure tally."""
+        self._call_errors: dict[str, Any] = {
+            "calls": 0,
+            "errors": 0,
+            "by_stage": {},
+            "by_type": {},
+        }
+
+    def _record_call_errors(self, stage: str, outputs: Sequence[Any]) -> None:
+        """Tally how many of one stage's outputs are captured Exceptions.
+
+        ``run_throttled`` returns the Exception in place of a result, and both
+        output parsers treat an Exception as "nothing here" -- so without this
+        tally a throttled run reports a sparse graph instead of a failure.
+        """
+        if not hasattr(self, "_call_errors"):
+            self._reset_call_errors()
+        errs = 0
+        for out in outputs:
+            if isinstance(out, Exception):
+                errs += 1
+                name = type(out).__name__
+                self._call_errors["by_type"][name] = (
+                    self._call_errors["by_type"].get(name, 0) + 1
+                )
+        self._call_errors["calls"] += len(outputs)
+        self._call_errors["errors"] += errs
+        if errs:
+            self._call_errors["by_stage"][stage] = (
+                self._call_errors["by_stage"].get(stage, 0) + errs
+            )
+
     async def _mine(
         self,
         atoms: dict[str, Atom],
@@ -620,6 +664,7 @@ class RelationMiner:
         node_priors: Mapping[str, float] | None = None,
     ) -> MiningResult:
         """Select pairs, mine each, discount concessions, build the MRF."""
+        self._reset_call_errors()
         # 1. candidate pairs (response-anchored; grounding is always on)
         pairs, coverage = _cp.select(
             atoms,
@@ -658,6 +703,13 @@ class RelationMiner:
         coverage["pairs_scored"] = len(pairs)
         coverage["dropped_none"] = dropped_none
         coverage["relations_kept"] = len(relations)
+        # LLM calls that failed and were parsed as "nothing here". Non-zero means
+        # `dropped_none` overstates the number of genuine negatives.
+        errs = dict(getattr(self, "_call_errors", {}) or {})
+        coverage["llm_calls"] = errs.get("calls", 0)
+        coverage["llm_call_errors"] = errs.get("errors", 0)
+        coverage["llm_call_errors_by_stage"] = errs.get("by_stage", {})
+        coverage["llm_call_errors_by_type"] = errs.get("by_type", {})
 
         # `prior` stays a FLOAT: it is JSON-serialized and read as
         # `float(config["prior"])` by LCSScorer, so it holds the uniform fallback.
@@ -741,11 +793,20 @@ class RelationMiner:
             on_progress = bar.update
         try:
             sense_outputs = await run_throttled(
-                sense_factory, pairs, on_progress=on_progress
+                sense_factory,
+                pairs,
+                max_concurrency=self.max_concurrency,
+                on_progress=on_progress,
             )
         finally:
             if bar is not None:
                 bar.close()
+
+        # A failed call arrives here as an Exception (run_throttled captures rather
+        # than raises) and `_parse_sense_output` maps it to None -- the same value a
+        # genuine "unrelated" produces. Count them before that information is lost,
+        # so a caller can tell a quiet endpoint from a sparse graph.
+        self._record_call_errors("sense", sense_outputs)
 
         # Parse Prompt A → (sense, coupling, type_conf); compile to Level 1.
         interim: list[dict[str, Any] | None] = []
@@ -816,7 +877,9 @@ class RelationMiner:
                     atoms, interim[idx], response=response
                 ),
                 edge_indices,
+                max_concurrency=self.max_concurrency,
             )
+            self._record_call_errors("strength_verbalized", outputs)
             for idx, out in zip(edge_indices, outputs):
                 strengths[idx] = self._parse_strength_output(out)
             return strengths
@@ -827,7 +890,9 @@ class RelationMiner:
                     atoms, interim[idx], logprobs=True, response=response
                 ),
                 edge_indices,
+                max_concurrency=self.max_concurrency,
             )
+            self._record_call_errors("strength_surrogate_logprobs", outputs)
             for idx, out in zip(edge_indices, outputs):
                 strengths[idx] = self._parse_surrogate_logprobs(out)
             return strengths
@@ -840,7 +905,9 @@ class RelationMiner:
                 atoms, interim[job[0]], logprobs=False, response=response
             ),
             jobs,
+            max_concurrency=self.max_concurrency,
         )
+        self._record_call_errors("strength_surrogate_sampled", outputs)
         per_edge: dict[int, list[str]] = {idx: [] for idx in edge_indices}
         for (idx, _s), out in zip(jobs, outputs):
             per_edge[idx].append(_output_text(out))
