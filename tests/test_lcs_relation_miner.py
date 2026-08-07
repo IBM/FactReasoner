@@ -962,3 +962,186 @@ class TestMinerEndToEnd:
             miner.mine_from_atoms(atoms, "   ")  # empty response
         with pytest.raises(ValueError):
             miner.mine_from_response("")  # empty raw response
+
+
+# ---------------------------------------------------------------------------
+# The bidirectional pair policy, restricted sense menus, and strict reconcile.
+#
+# A forward-only policy cannot emit an arc that runs backward in atom order, so a
+# directed gold relation pointing "backward" is unreachable under it whatever the
+# model says. These pin the opt-in machinery that lifts that restriction, and pin
+# that the defaults still reproduce the historical behaviour exactly.
+# ---------------------------------------------------------------------------
+
+
+class TestBidirectionalPolicy:
+    @staticmethod
+    def _atoms(n=6):
+        from fact_reasoner.core.base import Atom
+
+        return {
+            f"a{i}": Atom(id=f"a{i}", text=f"Claim number {i} concerning topic {i}.")
+            for i in range(n)
+        }
+
+    def _select(self, **kw):
+        from fact_reasoner.lcs import candidate_pairs as cp
+
+        atoms = self._atoms()
+        response = " ".join(a.text for a in atoms.values())
+        return cp.select(atoms, response=response, **kw)
+
+    def test_bidirectional_is_a_registered_policy(self):
+        from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
+
+        assert "bidirectional" in PAIR_POLICIES
+
+    def test_emits_both_arc_directions(self):
+        pairs, cov = self._select(
+            policy="bidirectional", max_distance=1, discourse=False
+        )
+        n = 6
+        # Every adjacent pair, twice: (i,j) and (j,i).
+        assert len(pairs) == 2 * (n - 1) == 10
+        assert ("a0", "a1") in pairs and ("a1", "a0") in pairs
+        assert cov["max_distance"] == 1
+        assert cov["discourse_anchored"] is False
+
+    def test_respects_max_distance(self):
+        for d in (1, 2, 3):
+            pairs, _ = self._select(
+                policy="bidirectional", max_distance=d, discourse=False
+            )
+            dist = [abs(int(t[1:]) - int(s[1:])) for s, t in pairs]
+            assert dist and max(dist) == d
+            assert min(dist) >= 1  # never a self-pair
+
+    def test_max_distance_defaults_to_window(self):
+        a, _ = self._select(policy="bidirectional", window=2, discourse=False)
+        b, _ = self._select(
+            policy="bidirectional", window=9, max_distance=2, discourse=False
+        )
+        assert set(a) == set(b)
+
+    def test_discourse_refinement_is_opt_in_for_bidirectional(self):
+        off, cov_off = self._select(
+            policy="bidirectional", max_distance=2, discourse=False
+        )
+        on, cov_on = self._select(
+            policy="bidirectional", max_distance=2, discourse=True
+        )
+        assert "num_demoted" not in cov_off
+        assert cov_on["num_demoted"] >= 0
+        assert len(on) <= len(off)  # refinement only ever demotes here
+
+    def test_existing_policies_are_unchanged(self):
+        """Regression lock: the new kwargs must not perturb the old policies."""
+        from fact_reasoner.lcs import candidate_pairs as cp
+
+        atoms = self._atoms()
+        response = " ".join(a.text for a in atoms.values())
+        for policy in ("all_pairs", "windowed", "gated"):
+            old, _ = cp.select(atoms, response=response, policy=policy, gate="none")
+            new, _ = cp.select(
+                atoms,
+                response=response,
+                policy=policy,
+                gate="none",
+                max_distance=None,
+                discourse=True,
+            )
+            assert old == new, policy
+
+
+class TestSenseMenuAndReconcile:
+    def _miner(self, **kw):
+        from unittest.mock import MagicMock
+
+        from fact_reasoner.lcs.relation_miner import RelationMiner
+
+        return RelationMiner(MagicMock(), **kw)
+
+    def _parse(self, miner, text):
+        """Run the Prompt-A parser over a canned model output."""
+        from unittest.mock import MagicMock
+
+        out = MagicMock()
+        out.success = True
+        out.result = text
+        return miner._parse_sense_output(("a0", "a1"), out)
+
+    def test_gold9_rejects_a_sense_the_corpus_never_uses(self):
+        m = self._miner(sense_menu="gold9")
+        got = self._parse(m, "[sense=Instantiation] [coupling=entailment]")
+        assert got is None
+        assert m._drop_reasons["inadmissible_sense"] == 1
+
+    def test_gold9_admits_a_legal_pair(self):
+        m = self._miner(sense_menu="gold9")
+        got = self._parse(m, "[sense=Evidence] [coupling=entailment]")
+        assert got is not None and got["level1_type"] == "entailment"
+
+    def test_gold9_rejects_a_sense_coupling_mismatch(self):
+        m = self._miner(sense_menu="gold9")
+        assert self._parse(m, "[sense=Evidence] [coupling=contradiction]") is None
+
+    def test_full_menu_still_admits_instantiation(self):
+        """The default must not change: Instantiation is legal under 'full'."""
+        m = self._miner(sense_menu="full")
+        got = self._parse(m, "[sense=Instantiation] [coupling=entailment]")
+        assert got is not None and got["level1_type"] == "entailment"
+
+    def test_ratchet_promotes_a_hedged_none_to_an_edge(self):
+        """Historical behaviour, kept as the default."""
+        m = self._miner(reconcile="ratchet")
+        got = self._parse(m, "[sense=Cause-Effect] [coupling=none]")
+        assert got is not None and got["level1_type"] == "entailment"
+
+    def test_strict_respects_an_explicit_none(self):
+        m = self._miner(reconcile="strict")
+        assert self._parse(m, "[sense=Cause-Effect] [coupling=none]") is None
+        # An explicit none is the model's ANSWER, not missing data, so it is not
+        # counted as an unparseable coupling.
+        assert "unparseable_coupling" not in m._drop_reasons
+
+    def test_strict_refuses_to_invent_a_coupling_for_an_unknown_one(self):
+        m = self._miner(reconcile="strict")
+        assert self._parse(m, "[sense=Cause-Effect] [coupling=unclear]") is None
+        assert m._drop_reasons["unparseable_coupling"] == 1
+
+    def test_ratchet_would_have_promoted_that_unknown_coupling(self):
+        m = self._miner(reconcile="ratchet")
+        got = self._parse(m, "[sense=Cause-Effect] [coupling=unclear]")
+        assert got is not None and got["level1_type"] == "entailment"
+
+    def test_unknown_knobs_are_rejected_up_front(self):
+        import pytest as _pytest
+
+        for kw in (
+            {"sense_menu": "gold10"},
+            {"reconcile": "lenient"},
+            {"pair_policy": "sliding"},
+        ):
+            with _pytest.raises(ValueError):
+                self._miner(**kw)
+
+    def test_config_records_every_new_knob(self):
+        m = self._miner(
+            pair_policy="bidirectional",
+            max_distance=2,
+            sense_menu="gold9",
+            reconcile="strict",
+        )
+        assert m.max_distance == 2
+        assert m.sense_menu == "gold9"
+        assert m.reconcile == "strict"
+        # bidirectional defaults the correlated refinement off.
+        assert m.discourse is False
+
+    def test_discourse_defaults_on_for_forward_policies(self):
+        assert self._miner(pair_policy="windowed").discourse is True
+        assert self._miner(pair_policy="gated").discourse is True
+        assert self._miner(pair_policy="bidirectional").discourse is False
+        assert (
+            self._miner(pair_policy="bidirectional", discourse=True).discourse is True
+        )

@@ -278,6 +278,10 @@ class GoldEvalRunner:
         strength_samples: int = 8,
         max_concurrency: int | None = None,
         max_call_error_rate: float = DEFAULT_MAX_CALL_ERROR_RATE,
+        max_distance: int | None = None,
+        discourse: bool | None = None,
+        sense_menu: str = "full",
+        reconcile: str = "ratchet",
         resume: bool = False,
         show_progress: bool = False,
     ):
@@ -357,6 +361,10 @@ class GoldEvalRunner:
         self.strength_samples = strength_samples
         self.max_concurrency = max_concurrency
         self.max_call_error_rate = max_call_error_rate
+        self.max_distance = max_distance
+        self.discourse = discourse
+        self.sense_menu = sense_menu
+        self.reconcile = reconcile
         self.resume = resume
         self.show_progress = show_progress
         # Backends are built once per model and shared across that model's arms and
@@ -637,6 +645,10 @@ class GoldEvalRunner:
                 strength_samples=self.strength_samples,
                 concession_discount=self.concession_discount,
                 max_concurrency=self.max_concurrency,
+                max_distance=self.max_distance,
+                discourse=self.discourse,
+                sense_menu=self.sense_menu,
+                reconcile=self.reconcile,
                 show_progress=self.show_progress,
             )
         )
@@ -657,8 +669,14 @@ class GoldEvalRunner:
                 "strength_method": (result.config or {}).get("strength_method"),
                 "strength_samples": self.strength_samples,
                 "max_concurrency": self.max_concurrency,
+                "max_distance": self.max_distance,
+                "discourse": (result.config or {}).get("discourse"),
+                "sense_menu": self.sense_menu,
+                "reconcile": self.reconcile,
                 "num_pairs_scored": cov.get("pairs_scored"),
                 "num_dropped_none": cov.get("dropped_none"),
+                "num_inadmissible_sense": cov.get("num_inadmissible_sense"),
+                "num_unparseable_coupling": cov.get("num_unparseable_coupling"),
                 "num_llm_calls": calls,
                 "num_call_exceptions": errors,
                 "call_exceptions_by_stage": cov.get("llm_call_errors_by_stage"),
@@ -813,11 +831,23 @@ class GoldEvalRunner:
                     "strength_samples": self.strength_samples,
                 }
             )
+            # These change what the model is asked and what is admitted, so a
+            # cached record produced under different values is stale. They enter
+            # the hash only when set away from the historical default, so adding
+            # them does not invalidate records mined before they existed.
+            if self.sense_menu != "full":
+                payload["sense_menu"] = self.sense_menu
+            if self.reconcile != "ratchet":
+                payload["reconcile"] = self.reconcile
+            if self.discourse is not None:
+                payload["discourse"] = self.discourse
             policy = spec.pair_policy if spec is not None else None
             if arm is None or policy in ("windowed", "gated"):
                 payload["window"] = self.window
             if arm is None or policy == "gated":
                 payload["gate"] = self.gate
+            if arm is None or policy == "bidirectional":
+                payload["max_distance"] = self.max_distance
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True).encode()
         ).hexdigest()[:12]

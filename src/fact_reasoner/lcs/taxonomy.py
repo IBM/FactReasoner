@@ -262,3 +262,99 @@ def coupling_from_string(value: str) -> str:
         return LEVEL1_EQUIVALENCE
     # neutral / none / independent / no relation -> NONE
     return LEVEL1_NONE
+
+
+# Coupling strings that mean "the model answered none", as opposed to "the model
+# answered something this module does not recognise". `coupling_from_string` maps
+# both to NONE, which loses the distinction -- and that matters, because the
+# miner's reconcile step treats NONE as *missing data* and substitutes the sense's
+# coupling. Substituting for a genuine "none" overrides the model's own
+# conservative answer; substituting for an unrecognised string invents an answer
+# nobody gave. `is_explicit_none` lets a caller tell the two apart.
+_EXPLICIT_NONE_TOKENS = (
+    "none",
+    "no relation",
+    "no_relation",
+    "unrelated",
+    "neutral",
+    "independent",
+    "n/a",
+    "na",
+)
+
+
+def is_explicit_none(value: str) -> bool:
+    """Whether a raw coupling string is an explicit "no relation" answer.
+
+    Distinguishes a deliberate `none` from an unrecognised/garbled coupling: both
+    normalize to :data:`LEVEL1_NONE`, but only the former is the model's answer.
+    """
+    if value is None:
+        return False
+    v = str(value).strip().lower().strip(".!\"'")
+    if not v:
+        return False
+    return any(tok == v or tok in v.split() for tok in _EXPLICIT_NONE_TOKENS)
+
+
+# The (sense, coupling) pairs the LoCoBench corpora actually use. The generator's
+# mapping is a bijection -- 9 senses onto 9 couplings, no cross-talk -- so a mined
+# pair outside this set cannot be scored against gold and is pure false positive.
+#
+# `Instantiation` and `Condition` are the notable absences: both compile to
+# entailment and both are semantically broad, so a model reaching for "these two
+# sentences are related somehow" lands on them readily. They accounted for 13% of
+# one measured arm's edges while appearing zero times in gold.
+#
+# The senses remain in `Level2Sense` and in `COMPILE` -- removing them would break
+# `from_string` round-trips and stored results. This is an admissibility filter,
+# applied per call, not a change to the taxonomy.
+GOLD9_SENSES: tuple[Level2Sense, ...] = (
+    Level2Sense.CAUSE_EFFECT,
+    Level2Sense.EFFECT_CAUSE,
+    Level2Sense.EVIDENCE,
+    Level2Sense.RESTATEMENT,
+    Level2Sense.CONTRAST,
+    Level2Sense.CONCESSION,
+    Level2Sense.ALTERNATIVE,
+    Level2Sense.DISJUNCTION,
+    Level2Sense.PRECEDENCE,
+)
+
+LEGAL_SENSE_COUPLING: frozenset[tuple[str, str]] = frozenset(
+    (s.value, COMPILE[s].level1) for s in GOLD9_SENSES
+)
+
+# Sense-menu names accepted by the miner / prompt builder.
+SENSE_MENUS = ("full", "gold9")
+
+
+def menu_senses(menu: str = "full") -> tuple[Level2Sense, ...]:
+    """The senses a given menu offers.
+
+    Raises:
+        ValueError: If `menu` is not in :data:`SENSE_MENUS`.
+    """
+    if menu == "full":
+        return tuple(Level2Sense)
+    if menu == "gold9":
+        return GOLD9_SENSES
+    raise ValueError(f"Unknown sense menu {menu!r} (expected one of {list(SENSE_MENUS)}).")
+
+
+def is_admissible(sense, coupling: str, menu: str = "full") -> bool:
+    """Whether a (sense, coupling) answer is admissible under a sense menu.
+
+    Under ``"full"`` everything the taxonomy can express is admissible. Under
+    ``"gold9"`` only the 9 combinations the corpus uses are -- which both removes
+    the two never-in-gold senses and rejects a sense/coupling mismatch outright
+    rather than silently trusting one side of it.
+    """
+    if menu == "full":
+        return True
+    if menu != "gold9":
+        raise ValueError(
+            f"Unknown sense menu {menu!r} (expected one of {list(SENSE_MENUS)})."
+        )
+    name = sense.value if isinstance(sense, Level2Sense) else str(sense)
+    return (name, str(coupling)) in LEGAL_SENSE_COUPLING

@@ -1631,3 +1631,150 @@ def test_runner_is_a_context_manager(dataset, mined_specs, mock_llm):
         runner._run_async(_noop())
         assert runner._loop is not None
     assert runner._loop is None
+
+
+# ---------------------------------------------------------------------------
+# The bidirectional arm and the new mining knobs.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_arm_accepts_bidirectional():
+    spec = mg.parse_arm("mined:m1:bidirectional")
+    assert spec == mg.MinedArm(model="m1", pair_policy="bidirectional")
+
+
+def test_parse_arm_still_rejects_unknown_policies():
+    with pytest.raises(mg.MinedArmError, match="Unknown pair policy"):
+        mg.parse_arm("mined:m1:sideways")
+
+
+def test_fingerprint_defaults_are_backward_compatible(mined_specs):
+    """Adding knobs must not invalidate records mined before they existed.
+
+    The knobs enter the hash only when set away from the historical default, so a
+    cached arm keeps its fingerprint and `--resume` still serves it. Without this,
+    merely adding a parameter would silently re-spend thousands of LLM calls.
+    """
+    arms = ("gold", MINED_ARM)
+
+    def fp(**kw):
+        r = rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=arms, model_specs=mined_specs, **kw,
+        )
+        return {a: r._run_fingerprint(a) for a in arms}
+
+    base = fp()
+    assert fp(sense_menu="full", reconcile="ratchet", discourse=None) == base
+
+
+def test_fingerprint_changes_for_each_new_knob(mined_specs):
+    """The stale-resume trap: a changed strategy must not reuse a cached record."""
+    arms = ("gold", MINED_ARM)
+
+    def fp(**kw):
+        r = rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=arms, model_specs=mined_specs, **kw,
+        )
+        return {a: r._run_fingerprint(a) for a in arms}
+
+    base = fp()
+    for kw in ({"sense_menu": "gold9"}, {"reconcile": "strict"},
+               {"discourse": False}):
+        changed = fp(**kw)
+        assert changed[MINED_ARM] != base[MINED_ARM], kw
+        # A gold arm reads no mining knob, so it must be untouched.
+        assert changed["gold"] == base["gold"], kw
+
+
+def test_max_distance_only_invalidates_the_bidirectional_arm(mined_specs):
+    specs = {"m1": lm.ModelSpec(name="m1", model_id="m1", backend="rits")}
+    arms = ("gold", "mined:m1:windowed", "mined:m1:bidirectional")
+
+    def fp(**kw):
+        r = rn.GoldEvalRunner(
+            data_dir=".", output_dir=".", merlin_path="m",
+            arms=arms, model_specs=specs, **kw,
+        )
+        return {a: r._run_fingerprint(a) for a in arms}
+
+    base, changed = fp(max_distance=1), fp(max_distance=2)
+    assert changed["mined:m1:bidirectional"] != base["mined:m1:bidirectional"]
+    assert changed["mined:m1:windowed"] == base["mined:m1:windowed"]
+    assert changed["gold"] == base["gold"]
+
+
+def test_a_backward_directed_gold_edge_needs_the_reversed_arc():
+    """Pins the finding that motivated the bidirectional policy.
+
+    A directed gold relation running backward in atom order is NOT matched by the
+    forward arc, and IS matched by the reversed one. So a forward-only candidate
+    pool cannot recover it however well the model labels it.
+    """
+    from fact_reasoner.lcs.relation_miner import MinedRelation
+
+    item = {
+        "id": "t-bd",
+        "relations": [
+            {
+                "id": "r0", "source_id": "a3", "target_id": "a1",  # backward
+                "level2_sense": "Evidence", "level1_coupling": "entailment",
+                "directed": True, "validity": "valid",
+                "window_admission": "window",
+            }
+        ],
+        "non_relations": [],
+    }
+
+    def rel(src, trg):
+        return MinedRelation(
+            source_id=src, target_id=trg, level2_sense="Evidence",
+            level1_type="entailment", probability=0.9, type_confidence=1.0,
+            strength=0.9, directed=True,
+        )
+
+    forward_only = mg.compare_to_gold(item, [rel("a1", "a3")])
+    assert forward_only["coupling"]["recall"] == 0.0
+
+    reversed_arc = mg.compare_to_gold(item, [rel("a3", "a1")])
+    assert reversed_arc["coupling"]["recall"] == 1.0
+
+
+def test_mined_record_carries_the_new_provenance(dataset, mined_specs, mock_llm):
+    arm = "mined:m1:bidirectional"
+    runner = _mined_runner(
+        dataset, "bidi1", mined_specs, arms=(arm,),
+        max_distance=1, sense_menu="gold9", reconcile="strict",
+    )
+    results = runner.run()
+    for rec in results["records"]:
+        assert "error" not in rec, rec.get("error")
+        assert rec["pair_policy"] == "bidirectional"
+        assert rec["max_distance"] == 1
+        assert rec["sense_menu"] == "gold9"
+        assert rec["reconcile"] == "strict"
+        assert rec["discourse"] is False  # off by default for this policy
+        assert rec["num_inadmissible_sense"] is not None
+
+
+def test_cli_exposes_the_new_flags():
+    args = cli.build_parser().parse_args(
+        ["--max-distance", "2", "--sense-menu", "gold9", "--reconcile", "strict",
+         "--no-discourse"]
+    )
+    assert args.max_distance == 2
+    assert args.sense_menu == "gold9"
+    assert args.reconcile == "strict"
+    assert args.discourse is False
+
+
+def test_cli_discourse_defaults_to_policy_choice():
+    assert cli.build_parser().parse_args([]).discourse is None
+    assert cli.build_parser().parse_args(["--discourse"]).discourse is True
+
+
+def test_cli_rejects_unknown_menu_or_reconcile():
+    for flag, value in (("--sense-menu", "gold10"), ("--reconcile", "lenient")):
+        with pytest.raises(SystemExit):
+            cli.build_parser().parse_args([flag, value])

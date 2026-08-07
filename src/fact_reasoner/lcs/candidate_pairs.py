@@ -51,7 +51,7 @@ import re
 
 from fact_reasoner.core.base import Atom
 
-PAIR_POLICIES = ("all_pairs", "windowed", "gated")
+PAIR_POLICIES = ("all_pairs", "windowed", "gated", "bidirectional")
 GATE_METHODS = ("embedding", "entity", "none")
 
 # Discourse connectives that, when they open an atom's originating sentence,
@@ -202,6 +202,8 @@ def select(
     embedding_model: str = "all-MiniLM-L6-v2",
     discourse_gate_threshold: float = 0.2,
     discourse_sentence_span: int = 2,
+    max_distance: int | None = None,
+    discourse: bool = True,
 ) -> tuple[list[tuple[str, str]], dict[str, object]]:
     """Select candidate ordered atom pairs for relation mining.
 
@@ -209,13 +211,16 @@ def select(
     is refined with discourse-adjacency signals derived from the response ---
     out-of-window pairs the response relates (shared entity, connective, near
     sentences) are PROMOTED, and in-window pairs the response does not relate are
-    DEMOTED. (The ``all_pairs`` policy takes every ordered pair regardless.)
+    DEMOTED. (The ``all_pairs`` and ``bidirectional`` policies skip refinement.)
 
     Args:
         atoms: The atoms, keyed by id. Source order is taken from the ids.
         response: The original response the atoms were decomposed from (REQUIRED;
             used for the discourse-adjacency refinement).
-        policy: One of ``PAIR_POLICIES``.
+        policy: One of ``PAIR_POLICIES``. ``"bidirectional"`` emits BOTH arc
+            directions within ``max_distance`` (see below) -- unlike
+            ``"windowed"``/``"gated"``, which are forward-only and therefore cannot
+            express a directed relation that runs backward in atom order.
         window: Order-window radius (used by ``"windowed"`` and ``"gated"``): a
             pair ``(a_i, a_j)`` with ``0 < j - i <= window`` is inside the window.
         gate: The long-range gate for ``"gated"``: ``"embedding"`` (cosine
@@ -228,6 +233,16 @@ def select(
             out-of-window pair counts as a shared-entity discourse callback.
         discourse_sentence_span: Sentence-distance radius within which two atoms
             count as sentence-adjacent for the discourse signal.
+        max_distance: Order-distance radius for ``"bidirectional"``: a pair is
+            emitted (in both directions) when ``0 < |j - i| <= max_distance``.
+            Defaults to ``window`` when None.
+        discourse: Whether to apply the response-anchored promote/demote
+            refinement. Defaults True (today's behaviour) but is off for
+            ``"bidirectional"``: the refinement selects for the same surface
+            adjacency the sense prompt reads as "related", so it is a correlated
+            filter rather than an independent one -- which is why the forward-only
+            windowed policy asserts a relation on ~72% of the pairs it keeps while
+            all_pairs asserts on ~36%.
 
     Returns:
         A tuple ``(pairs, coverage)``:
@@ -277,6 +292,59 @@ def select(
             discourse_anchored=False,  # all_pairs takes every pair, no refinement
         )
         return pairs, coverage
+
+    # bidirectional: every SHORT-RANGE pair, in BOTH directions.
+    #
+    # The forward-only policies cannot emit an arc that runs backward in atom
+    # order, so a gold relation that is directed and backward is unreachable under
+    # them no matter what the model says -- and the model does in fact identify
+    # many of those relations correctly, only for the arc to be dropped for
+    # pointing the "wrong" way. Emitting both directions lets the model choose,
+    # which is the decision it is actually competent to make.
+    #
+    # Short-range because relation density falls off sharply with order distance:
+    # widening the radius adds candidate pairs far faster than it adds recoverable
+    # relations, and precision pays for it.
+    if policy == "bidirectional":
+        radius = window if max_distance is None else max_distance
+        pairs = [
+            (ids[i], ids[j])
+            for i in range(n)
+            for j in range(n)
+            if i != j and abs(j - i) <= radius
+        ]
+        coverage.update(
+            pairs_selected=len(pairs),
+            pairs_pruned=total_ordered_pairs - len(pairs),
+            window=None,
+            max_distance=radius,
+            gate=None,
+            # Refinement deliberately skipped: see the `discourse` arg.
+            discourse_anchored=bool(discourse),
+        )
+        if not discourse:
+            return pairs, coverage
+        # Opt-in refinement, applied symmetrically (demote only; a bidirectional
+        # pool already reaches every short-range pair, so promotion is a no-op).
+        token_sets_b = [_content_tokens(a.text) for a in ordered]
+        sent_idx_b = _map_atoms_to_sentences(ordered, response)
+        index_b = {ids[i]: i for i in range(n)}
+
+        def _related_b(i: int, j: int) -> bool:
+            if _jaccard(token_sets_b[i], token_sets_b[j]) >= discourse_gate_threshold:
+                return True
+            si, sj = sent_idx_b[i], sent_idx_b[j]
+            return (
+                si is not None
+                and sj is not None
+                and abs(sj - si) <= discourse_sentence_span
+            )
+
+        kept_b = [p for p in pairs if _related_b(index_b[p[0]], index_b[p[1]])]
+        coverage.update(
+            num_demoted=len(pairs) - len(kept_b), pairs_selected=len(kept_b)
+        )
+        return kept_b, coverage
 
     # windowed / gated: forward window pairs (source before target).
     window_pairs: list[tuple[str, str]] = []

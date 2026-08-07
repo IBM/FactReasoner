@@ -179,6 +179,10 @@ async def abuild_mined_result(
     strength_samples: int = 8,
     concession_discount: float = DEFAULT_CONCESSION_DISCOUNT,
     max_concurrency: int | None = None,
+    max_distance: int | None = None,
+    discourse: bool | None = None,
+    sense_menu: str = "full",
+    reconcile: str = "ratchet",
     show_progress: bool = False,
 ) -> MiningResult:
     """Mine one item's relations with its atoms and priors held fixed.
@@ -201,6 +205,12 @@ async def abuild_mined_result(
         concession_discount: Lambda for a resolved concession, matching the gold
             arms so the two are comparable.
         max_concurrency: Concurrent LLM calls per item. None uses the miner default.
+        max_distance: Order-distance radius for the `bidirectional` policy.
+        discourse: Whether to apply the response-anchored pair refinement. None
+            keeps the policy default.
+        sense_menu: `"full"` or `"gold9"` (restrict to the combinations the corpus
+            uses).
+        reconcile: `"ratchet"` or `"strict"` (see `RelationMiner`).
         show_progress: Whether the miner prints a per-item progress bar.
 
     Returns:
@@ -238,6 +248,10 @@ async def abuild_mined_result(
         concession_discount=concession_discount,
         strength_method=strength_method,
         strength_samples=strength_samples,
+        max_distance=max_distance,
+        discourse=discourse,
+        sense_menu=sense_menu,
+        reconcile=reconcile,
         show_progress=show_progress,
         **kwargs,
     )

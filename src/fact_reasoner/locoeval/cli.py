@@ -59,6 +59,8 @@ import os
 
 from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
+from fact_reasoner.lcs.relation_miner import RECONCILE_MODES
+from fact_reasoner.lcs.taxonomy import SENSE_MENUS
 from fact_reasoner.locoeval.gold_graph import DEFAULT_CONCESSION_DISCOUNT, item_atoms
 from fact_reasoner.locoeval.mined_graph import (
     DEFAULT_MAX_CALL_ERROR_RATE,
@@ -160,6 +162,45 @@ def build_parser() -> argparse.ArgumentParser:
         "--gate",
         default="none",
         help="Long-range gate for the gated policy (default: none).",
+    )
+    mined.add_argument(
+        "--max-distance",
+        type=int,
+        default=None,
+        help="Order-distance radius for the bidirectional policy, which emits BOTH "
+        "arc directions within it (default: --window). A forward-only policy "
+        "cannot express a directed relation that runs backward in atom order.",
+    )
+    mined.add_argument(
+        "--discourse",
+        dest="discourse",
+        action="store_true",
+        default=None,
+        help="Force the response-anchored pair refinement ON (default: on for "
+        "windowed/gated, off for bidirectional).",
+    )
+    mined.add_argument(
+        "--no-discourse",
+        dest="discourse",
+        action="store_false",
+        help="Force the refinement OFF. It selects for the same surface adjacency "
+        "the sense prompt reads as 'related', so it is a correlated filter.",
+    )
+    mined.add_argument(
+        "--sense-menu",
+        default="full",
+        choices=SENSE_MENUS,
+        help="Which senses the model may choose and which answers are admitted. "
+        "'gold9' restricts to the 9 (sense, coupling) combinations the LoCoBench "
+        "corpora use (default: full).",
+    )
+    mined.add_argument(
+        "--reconcile",
+        default="ratchet",
+        choices=RECONCILE_MODES,
+        help="What to do when the model names a relation-bearing sense but a "
+        "none/unrecognised coupling: 'ratchet' substitutes the sense's coupling "
+        "(default, historical), 'strict' leaves the pair dropped.",
     )
     mined.add_argument(
         "--nli-method",
@@ -328,6 +369,12 @@ def _estimate(args, arms: list[str], parser) -> None:
                 policy=spec.pair_policy,
                 window=args.window,
                 gate=args.gate,
+                max_distance=args.max_distance,
+                discourse=(
+                    (spec.pair_policy != "bidirectional")
+                    if args.discourse is None
+                    else args.discourse
+                ),
             )
             pairs += len(selected)
         # Prompt A once per pair; Prompt B once per edge found (10-50% of pairs).
@@ -416,6 +463,10 @@ def main(argv: list[str] | None = None) -> int:
                 strength_samples=args.strength_samples,
                 max_concurrency=args.max_concurrency,
                 max_call_error_rate=args.max_call_error_rate,
+                max_distance=args.max_distance,
+                discourse=args.discourse,
+                sense_menu=args.sense_menu,
+                reconcile=args.reconcile,
                 resume=args.resume,
                 show_progress=args.show_progress,
             )

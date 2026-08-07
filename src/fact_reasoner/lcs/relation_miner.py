@@ -69,9 +69,12 @@ from fact_reasoner.lcs.strength import (
 from fact_reasoner.lcs.taxonomy import (
     LEVEL1_CONFLICT_COUPLINGS,
     LEVEL1_NONE,
+    SENSE_MENUS,
     Level2Sense,
     compile_sense,
     coupling_from_string,
+    is_admissible,
+    is_explicit_none,
 )
 from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.utils import (
@@ -91,6 +94,11 @@ MINER_METHODS = ("logprobs", "simbauq")
 # "auto" resolves to surrogate_logprobs when logprobs are available, else
 # surrogate_sampled.
 STRENGTH_METHODS = ("surrogate_logprobs", "surrogate_sampled", "verbalized")
+
+# What to do when the model names a relation-bearing sense but a none/unrecognised
+# coupling. "ratchet" substitutes the sense's coupling (historical behaviour);
+# "strict" leaves the pair dropped. See the `reconcile` argument.
+RECONCILE_MODES = ("ratchet", "strict")
 
 # Confidence used when a probability cannot be determined from the output.
 _UNKNOWN_PROBABILITY = 0.5
@@ -337,6 +345,12 @@ class RelationMiner:
         strength_samples: int = 8,
         strength_calibrator: StrengthCalibrator | None = None,
         max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+        max_distance: int | None = None,
+        discourse: bool | None = None,
+        discourse_gate_threshold: float = 0.2,
+        discourse_sentence_span: int = 2,
+        sense_menu: str = "full",
+        reconcile: str = "ratchet",
         show_progress: bool = False,
     ):
         """Initialize the relation miner.
@@ -389,6 +403,27 @@ class RelationMiner:
                 default: a rate-limited call is captured by ``run_throttled`` and
                 parsed as "no relation", so throttling silently costs recall
                 rather than raising.
+            max_distance: Order-distance radius for ``pair_policy="bidirectional"``
+                (both arc directions within ``|j-i| <= max_distance``). None uses
+                ``window``.
+            discourse: Whether to apply the response-anchored promote/demote
+                refinement to candidate pairs. None keeps each policy's default
+                (on for windowed/gated, off for bidirectional).
+            discourse_gate_threshold: Content-token Jaccard above which two atoms
+                count as discourse-linked. Previously hardcoded in
+                ``candidate_pairs``; exposed so it can be swept and recorded.
+            discourse_sentence_span: Sentence-distance radius for the same signal.
+            sense_menu: Which senses the model may choose from, and which
+                (sense, coupling) answers are admitted. ``"full"`` is the whole
+                taxonomy (default, today's behaviour); ``"gold9"`` restricts to the
+                9 combinations the LoCoBench corpora use, dropping answers built on
+                senses those corpora never label.
+            reconcile: What to do when the model names a relation-bearing sense but
+                a ``none``/unrecognised coupling. ``"ratchet"`` (default, today's
+                behaviour) substitutes the sense's coupling, so the pair becomes an
+                edge. ``"strict"`` leaves the pair dropped -- respecting an explicit
+                "none" as the model's answer rather than treating it as missing
+                data, and refusing to invent a coupling for an unrecognised one.
             show_progress: If True, show a tqdm bar as pairs are mined.
 
         Raises:
@@ -413,6 +448,24 @@ class RelationMiner:
             raise ValueError(
                 f"Unknown strength_method: {strength_method!r} "
                 f"(expected one of {list(STRENGTH_METHODS)} or 'auto')."
+            )
+        # `pair_policy` is validated here rather than left to `candidate_pairs`,
+        # which only sees it after the atoms are prepared -- a typo should not cost
+        # an atomization.
+        if pair_policy not in _cp.PAIR_POLICIES:
+            raise ValueError(
+                f"Unknown pair_policy: {pair_policy!r} "
+                f"(expected one of {list(_cp.PAIR_POLICIES)})."
+            )
+        if sense_menu not in SENSE_MENUS:
+            raise ValueError(
+                f"Unknown sense_menu: {sense_menu!r} "
+                f"(expected one of {list(SENSE_MENUS)})."
+            )
+        if reconcile not in RECONCILE_MODES:
+            raise ValueError(
+                f"Unknown reconcile: {reconcile!r} "
+                f"(expected one of {list(RECONCILE_MODES)})."
             )
 
         self.backend = backend
@@ -441,7 +494,20 @@ class RelationMiner:
         self.strength_samples = strength_samples
         self.strength_calibrator = strength_calibrator or IdentityCalibrator()
         self.max_concurrency = max(1, int(max_concurrency))
+        self.max_distance = max_distance
+        # The refinement is a correlated filter, not an independent one: it selects
+        # for the surface adjacency the sense prompt reads as "related". Off by
+        # default for the bidirectional policy, on for the others (as before).
+        self.discourse = (
+            (pair_policy != "bidirectional") if discourse is None else bool(discourse)
+        )
+        self.discourse_gate_threshold = discourse_gate_threshold
+        self.discourse_sentence_span = discourse_sentence_span
+        self.sense_menu = sense_menu
+        self.reconcile = reconcile
         self.show_progress = show_progress
+        # Why parsed answers were refused, reset per mining run.
+        self._drop_reasons: dict[str, int] = {}
 
         # Response-grounded prompts: each takes a {{response}} context block so the
         # model asserts only relations the response actually draws (pruning
@@ -665,6 +731,7 @@ class RelationMiner:
     ) -> MiningResult:
         """Select pairs, mine each, discount concessions, build the MRF."""
         self._reset_call_errors()
+        self._drop_reasons = {}
         # 1. candidate pairs (response-anchored; grounding is always on)
         pairs, coverage = _cp.select(
             atoms,
@@ -674,6 +741,10 @@ class RelationMiner:
             gate_threshold=self.gate_threshold,
             embedding_model=self.embedding_model,
             response=source_response,
+            discourse_gate_threshold=self.discourse_gate_threshold,
+            discourse_sentence_span=self.discourse_sentence_span,
+            max_distance=self.max_distance,
+            discourse=self.discourse,
         )
 
         # 2. mine each pair (Prompt A, then Prompt B when the coupling has an edge)
@@ -710,6 +781,12 @@ class RelationMiner:
         coverage["llm_call_errors"] = errs.get("errors", 0)
         coverage["llm_call_errors_by_stage"] = errs.get("by_stage", {})
         coverage["llm_call_errors_by_type"] = errs.get("by_type", {})
+        # Why parsed answers were refused. `dropped_none` alone conflates a genuine
+        # "unrelated", an inadmissible sense, and a failed call.
+        drops = dict(getattr(self, "_drop_reasons", {}) or {})
+        coverage["drops_by_reason"] = drops
+        coverage["num_inadmissible_sense"] = drops.get("inadmissible_sense", 0)
+        coverage["num_unparseable_coupling"] = drops.get("unparseable_coupling", 0)
 
         # `prior` stays a FLOAT: it is JSON-serialized and read as
         # `float(config["prior"])` by LCSScorer, so it holds the uniform fallback.
@@ -722,8 +799,14 @@ class RelationMiner:
             "strength_samples": self.strength_samples,
             "pair_policy": self.pair_policy,
             "window": self.window,
+            "max_distance": self.max_distance,
             "gate": self.gate,
             "gate_threshold": self.gate_threshold,
+            "discourse": self.discourse,
+            "discourse_gate_threshold": self.discourse_gate_threshold,
+            "discourse_sentence_span": self.discourse_sentence_span,
+            "sense_menu": self.sense_menu,
+            "reconcile": self.reconcile,
             "prior": default_prior,
             "prior_source": "per_atom" if per_atom else "uniform",
             "concession_discount": self.concession_discount,
@@ -1040,10 +1123,30 @@ class RelationMiner:
         # Reconcile: if the sense implies a different coupling, trust the sense's
         # compiled coupling when the raw coupling is NONE/ambiguous, else keep the
         # explicit coupling (it is the span we measured confidence on).
+        #
+        # Under "strict" this substitution does not happen. It only ever pushes
+        # none -> relation, never the reverse, so it is a one-way ratchet: a model
+        # that names a causal sense but answers `coupling=none` -- i.e. "there is a
+        # causal flavour here but the response does not assert it" -- has that
+        # answer overridden into an edge. It also fires for any coupling string the
+        # taxonomy does not recognise, inventing a coupling nobody supplied. And
+        # because `_type_confidence` reads the logprobs of the coupling span, the
+        # confidence then attached belongs to the DISCARDED answer.
         compiled_level1, _, spec = compile_sense(sense, None)
-        if level1 == LEVEL1_NONE and compiled_level1 != LEVEL1_NONE:
-            level1 = compiled_level1
+        if self.reconcile == "ratchet":
+            if level1 == LEVEL1_NONE and compiled_level1 != LEVEL1_NONE:
+                level1 = compiled_level1
+        elif level1 == LEVEL1_NONE and not is_explicit_none(coupling_str):
+            # Unrecognised coupling under "strict": record it, then drop.
+            self._note_drop("unparseable_coupling")
         if level1 == LEVEL1_NONE:
+            return None
+
+        # Admissibility: under a restricted menu, an answer built on a sense the
+        # target corpora never label cannot be scored against them and is a
+        # guaranteed false positive. Drop it rather than let it reach the MRF.
+        if not is_admissible(sense, level1, self.sense_menu):
+            self._note_drop("inadmissible_sense")
             return None
 
         type_conf = self._type_confidence(output.result, text, coupling_span)
@@ -1057,6 +1160,15 @@ class RelationMiner:
             "directed": spec.directed,
             "is_concession": spec.is_concession,
         }
+
+    def _note_drop(self, reason: str) -> None:
+        """Tally why a parsed answer was refused, so drops stay attributable.
+
+        Without this, an answer refused on admissibility is indistinguishable in
+        `dropped_none` from one the model genuinely called unrelated -- and from a
+        failed LLM call.
+        """
+        self._drop_reasons[reason] = self._drop_reasons.get(reason, 0) + 1
 
     def _type_confidence(
         self, thunk: ModelOutputThunk, text: str, coupling_span: tuple[int, int]
