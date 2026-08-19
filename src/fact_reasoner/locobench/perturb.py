@@ -251,6 +251,14 @@ def ladder_for(family: str) -> Ladder:
 _SPECIAL: dict[tuple[str, int, int, str], str] = {
     # Finding 1: the concession discount raises the both-true cell mass, so a readout
     # that counts conflict ACTIVITY dips while belief-readers rise.
+    #
+    # The prediction survives the two-term `consistency` revision, because the dip
+    # lives entirely in its conflict term: on the AeroParts ladder the readout still
+    # falls at this rung (0.654 -> 0.582) while its entailment/equivalence support
+    # term is nearly flat (0.495 -> 0.502). The margin is narrower than the
+    # single-term readout's was (0.072 vs 0.152), so an item whose effect size sits
+    # near the noise floor may now land `indeterminate` rather than `decrease` --
+    # the direction is unchanged, the headroom is not.
     ("CONFLICT", 1, 2, "consistency"): DECREASE,
     ("CONFLICT", 2, 3, "consistency"): UNCONSTRAINED,
     # Defect 1: the same edit is weight-only, so the normalized log partition is

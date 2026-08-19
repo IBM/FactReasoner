@@ -38,6 +38,7 @@ import pytest
 
 from fact_reasoner.core.base import Atom
 from fact_reasoner.experiments.mock import (
+    MAX_BRUTEFORCE_VARS,
     brute_force_run_merlin as _brute_force_run_merlin,
 )
 from fact_reasoner.fact_graph import FactGraph
@@ -62,8 +63,16 @@ def _result(relations=AEROPARTS_BASE, prior=0.5):
 
 @pytest.fixture
 def scorer(monkeypatch):
-    """An LCSScorer whose Merlin helper is the exact brute-force oracle."""
+    """An LCSScorer whose Merlin helper is the exact brute-force oracle.
+
+    The oracle enumerates 2^n worlds and refuses more than
+    ``MAX_BRUTEFORCE_VARS`` variables, so the scorer's aux-var batching cap is
+    lowered to match; production keeps the high default (see ``LCSScorer``).
+    """
     monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
+    monkeypatch.setattr(
+        lcs_scorer_mod, "DEFAULT_MAX_NETWORK_VARS", MAX_BRUTEFORCE_VARS
+    )
     return LCSScorer("/fake/merlin")
 
 
@@ -86,7 +95,10 @@ class TestUniformInvariance:
         """The published AeroParts values, read through the new code path."""
         s = scorer.score_all(_result(), methods=LCS_METHODS)
         assert s["mean_marginal"] == pytest.approx(0.587, abs=1e-3)
-        assert s["consistency"] == pytest.approx(0.813, abs=1e-3)
+        # Two-term consistency: conflict 0.813 (contradiction-only) + support 0.495.
+        assert s["consistency"] == pytest.approx(0.6539, abs=1e-3)
+        assert s["consistency_conflict"] == pytest.approx(0.8128, abs=1e-3)
+        assert s["consistency_support"] == pytest.approx(0.4951, abs=1e-3)
         assert s["reified"] == pytest.approx(0.150, abs=2e-3)
         assert s["log_z"] == pytest.approx(-9.75, abs=0.05)
         assert s["log_z_max"] == pytest.approx(-8.25, abs=0.05)
@@ -185,12 +197,29 @@ class TestScoreAllSharesInference:
             assert shared[m] == pytest.approx(per_method, abs=1e-12), m
 
     def test_invocation_count_is_irreducible(self, monkeypatch):
-        """All four readouts: 6 Merlin runs, not the 12 of per-method scoring."""
+        """All four readouts: 7 Merlin runs, not the 13 of per-method scoring.
+
+        Deliberately does NOT lower ``max_network_vars``, so the consistency
+        support term takes its production shape -- one batch, one MAR. (Under the
+        brute-force oracle's 20-variable cap it splits into several batched MARs;
+        that is a property of the offline oracle, not of the readout.) The
+        single-batch support network exceeds what the oracle will enumerate, so
+        this counts calls against a stub: the assertion is about how many runs
+        happen, and the values are pinned by the other tests in this file.
+        """
         tasks = []
 
         def counting(network, merlin_path, **kwargs):
-            tasks.append(kwargs.get("task", "MAR"))
-            return _brute_force_run_merlin(network, merlin_path, **kwargs)
+            task = kwargs.get("task", "MAR")
+            tasks.append(task)
+            if task == "MAR":
+                return {
+                    "marginals": [
+                        {"variable": v, "probabilities": [0.5, 0.5]}
+                        for v in kwargs.get("query_variables") or network.nodes
+                    ]
+                }
+            return {"log_z": -9.0}
 
         monkeypatch.setattr(lcs_scorer_mod, "run_merlin", counting)
         s = LCSScorer("/fake/merlin")
@@ -202,10 +231,14 @@ class TestScoreAllSharesInference:
             s.score(_result(), method=m)
         per_method = list(tasks)
 
-        assert len(shared) == 6, shared
-        assert len(per_method) == 12, per_method
-        # base MAR + base PR + U-chain MAR + reified MAR + ceiling PR + base MAP.
-        assert shared.count("MAR") == 3
+        assert len(shared) == 7, shared
+        # 4 methods x (base MAR + base PR) = 8, plus each method's own extras:
+        # mean_marginal 0, consistency 2 (conflict + support), reified 1,
+        # log_partition 2 (ceiling PR + base MAP).
+        assert len(per_method) == 13, per_method
+        # base MAR + base PR + conflict U-chain MAR + support MAR + reified MAR
+        # + ceiling PR + base MAP.
+        assert shared.count("MAR") == 4
         assert shared.count("PR") == 2
         assert shared.count("MAP") == 1
 

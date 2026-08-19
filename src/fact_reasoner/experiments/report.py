@@ -694,11 +694,13 @@ def _coherent_example_section(records, example_id: str, example_name: str) -> st
         f"mean-marginal averages {_fmt(coherent_mm)}"
         + (f" (versus {_fmt(all_mm)} under all-pairs)" if (has_all and has_win) else "")
         + ", and crucially the consistency readout averages "
-        f"{_fmt(coherent_cons)} --- i.e. essentially no contradiction edge is active, "
-        "which is exactly the signature expected of a contradiction-free causal "
-        "chain and distinguishes this example from the deliberately incoherent ones "
-        "(the contradicted biography and the adversarially-ordered \\emph{Renda} "
-        "summary), whose consistency is markedly lower.\n\n"
+        f"{_fmt(coherent_cons)} --- the two-term readout's conflict half is "
+        "saturated (essentially no contradiction edge is active) while its support "
+        "half credits the satisfied causal spine, which is exactly the signature "
+        "expected of a contradiction-free causal chain and distinguishes this "
+        "example from the deliberately incoherent ones (the contradicted biography "
+        "and the adversarially-ordered \\emph{Renda} summary), whose consistency is "
+        "markedly lower.\n\n"
     )
     if has_all and has_win:
         narrative += (

@@ -528,7 +528,10 @@ Let $q_i=P(a_i{=}1)$ be the posterior marginals from inference on
 Eq.~\eqref{eq:joint}.
 \begin{enumerate}[leftmargin=*,label=(\alph*)]
   \item \textbf{Mean marginal support} $\ \mathrm{LCS}=\frac1n\sum_i q_i$.
-  \item \textbf{Consistency probability} $\ P\big(\bigwedge_{r:\ \tau_r\in\{\textsc{contradict},\textsc{exclusive}\}}\neg(a_{s_r}\wedge a_{t_r})\big)$ (no conflict coupling has both endpoints true).
+  \item \textbf{Consistency} --- the mean of a \textsc{contradict}-only conflict term
+        $P\big(\bigwedge_{r:\ \tau_r=\textsc{contradict}}\neg(a_{s_r}\wedge a_{t_r})\big)$
+        and a support term crediting actively-upheld \textsc{entail}/\textsc{equiv}/%
+        \textsc{exclusive} relations (Section~\ref{sec:consistency}).
   \item \textbf{Reified coherence node} $P(R{=}1)$ for an added variable $R$ tied to relation
         satisfaction.
   \item \textbf{Normalized log-partition} $\big(\log Z - \log Z_{\min}\big)/\big(\log Z_{\max}-\log Z_{\min}\big)$.
@@ -536,7 +539,9 @@ Eq.~\eqref{eq:joint}.
 We evaluated all four by exact inference across a family of variants
 (Table~\ref{tab:variants}). Findings: (b) is \emph{non-monotone} under the concession
 discount --- softening a contradiction makes both endpoints co-occur \emph{more}, so
-``consistency'' can fall even as coherence rises; (c) required a tuning constant and, in
+``consistency'' can fall even as coherence rises, and adding a well-behaved support term
+narrows that dip without changing its sign (Section~\ref{sec:consistency}); (c) required a
+tuning constant and, in
 several natural parameterizations, saturated or inverted under the same discount; (d) is
 monotone and very contradiction-sensitive but needs a reference pair $Z_{\min},Z_{\max}$ to
 land in $[0,1]$. Only (a) satisfies R1--R5 with no free constants. Section~\ref{sec:others}
@@ -582,54 +587,106 @@ five variants of Section~\ref{sec:change} (from least to most coherent:
 \toprule
 \textbf{Variant} & (a) mean supp. & (b) $P(\text{cons})$ & (c) $P(R{=}1)$ & (d) $\log Z$ & (d) norm.\\
 \midrule
-worse        & $0.586$ & $0.738$ & $0.116$ & $-10.54$ & $0.68$\\
-base         & $0.607$ & $0.828$ & $0.148$ & $-9.64$  & $0.78$\\
-concession   & $0.612$ & $\mathbf{0.666}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$\\
-fixcasualty  & $0.613$ & $0.865$ & $0.156$ & $-8.95$  & $0.89$\\
-coherent     & $0.620$ & $1.000$ & $0.181$ & $-8.25$  & $1.00$\\
+worse        & $0.586$ & $\mathbf{0.778}$ & $0.116$ & $-10.54$ & $0.68$\\
+base         & $0.607$ & $0.781$ & $0.148$ & $-9.64$  & $0.78$\\
+concession   & $0.612$ & $\mathbf{0.772}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$\\
+fixcasualty  & $0.613$ & $\mathbf{0.764}$ & $0.156$ & $-8.95$  & $0.89$\\
+coherent     & $0.620$ & $\mathbf{0.752}$ & $0.181$ & $-8.25$  & $1.00$\\
 \midrule
 \textbf{monotone?} & \textbf{yes} & no (bold) & no (bold) & \textbf{yes} & \textbf{yes}\\
 \bottomrule
 \end{tabular}
 \caption{All four candidate scores across the coherence-ordered family (exact, $2^{16}$
-worlds). Only (a) and (d) are monotone; (b) and (c) both \emph{dip} at the \emph{concession}
-variant (bold) --- the shared quirk explained in Section~\ref{sec:quirk}. Candidate (c) uses
-the noisy-AND reified node with $\rho{=}0.5$.}
+worlds). Only (a) and (d) are monotone; (c) \emph{dips} at the \emph{concession} variant
+(bold) --- the shared quirk explained in Section~\ref{sec:quirk} --- and (b) fails harder
+\emph{on this family specifically}: because both of its conflicts are \textsc{exclusive}, the
+revised (b)'s conflict term $\mathcal K$ is pinned at $1.000$ throughout and only its support
+term varies, so removing an exclusion removes support credit and the score runs \emph{backwards}
+($0.778\to0.752$). On the 3-coupling variants of the same response, where the conflicts are
+\textsc{contradict} and $\mathcal K$ is live, (b) instead runs
+$0.576\to0.654\to\mathbf{0.582}\to0.672\to0.752$ --- ordered apart from the concession dip.
+Either way it is non-monotone, which is what disqualifies it; see
+Section~\ref{sec:consistency}. Candidate (c) uses the noisy-AND reified node with $\rho{=}0.5$.}
 \label{tab:allcands}
 \end{table}
 
 % -------------------------------------------------------------------------------------
-\subsection{(b) Consistency probability}
+\subsection{(b) Consistency}
 \label{sec:consistency}
 
-\paragraph{What it is.} The probability, under the joint $P(\mathbf a)$, that \emph{no}
-conflict coupling is jointly active --- i.e.\ for every \textsc{contradict} \emph{or}
-\textsc{exclusive} edge $r=(s,t)$ not both endpoints are true:
+\paragraph{What it is.} Two terms, averaged: a \emph{conflict} term asking whether any
+opposition is live, and a \emph{support} term asking how much of the argument's inferential
+structure the response actually upholds.
 \begin{equation}
   \mathrm{LCS}_{\text{(b)}}
   \;=\;
-  P\!\Big(\textstyle\bigwedge_{r:\,\tau_r\in\{\textsc{contradict},\textsc{exclusive}\}}\ \neg\big(a_{s_r}\wedge a_{t_r}\big)\Big)
-  \;=\;
-  \frac{1}{Z}\sum_{\mathbf a}\ \mathbb 1\!\big[\text{no conflict active in }\mathbf a\big]
-  \prod_i\phi_i\!\prod_r\psi_r .
+  \tfrac12\big(\mathcal K + \mathcal S\big),
+  \qquad
+  \mathcal K \;=\; P\!\Big(\textstyle\bigwedge_{r:\,\tau_r=\textsc{contradict}}\ \neg\big(a_{s_r}\wedge a_{t_r}\big)\Big),
+  \qquad
+  \mathcal S \;=\; \frac{\sum_{r\in\mathcal R_{\mathcal S}} p_r\,U_r}{\sum_{r\in\mathcal R_{\mathcal S}} p_r},
   \label{eq:cons}
 \end{equation}
-(For \textsc{exclusive} we take ``active'' as the both-true world, the incoherent half of the
-exclusion; the both-false half is a separate, milder defect the marginals already see.)
+where $\mathcal R_{\mathcal S}$ ranges over \textsc{entail}, \textsc{equiv} and
+\textsc{exclusive}, and $U_r$ is the probability that $r$ is \emph{actively upheld}:
+$P(a_{s_r}{=}1\wedge a_{t_r}{=}1)$ for \textsc{entail}/\textsc{equiv}, and
+$P(a_{s_r}\neq a_{t_r})$ for \textsc{exclusive}. When no \textsc{contradict} edge exists
+$\mathcal K{=}1$; when no supported relation exists $\mathcal S{=}0$.
 
-\paragraph{How it is computed.} It is the marginal of a derived event, so it needs no new
-factors: either (i) sum the joint over the worlds satisfying the indicator (the brute-force
-oracle), or (ii) in production, add \emph{one} deterministic AND-style query variable
-$U=\bigvee_r (a_{s_r}\wedge a_{t_r})$ and read $P(U{=}0)$ from Merlin. On the example
-$\mathrm{LCS}_{\text{(b)}}$ runs $0.738\to0.828\to\mathbf{0.666}\to0.865\to1.000$.
+\textsc{contradict} alone drives the conflict term. An \textsc{exclusive} is an exhaustive
+exclusion whose incoherence covers \emph{both} same-value worlds, so reading only its
+both-true half would describe half the coupling while silently reporting the other half as
+fine; it earns its credit in $\mathcal S$ instead, where its exactly-one world is both where
+the exclusion is honoured and where it is informative. \textsc{co-nec} enters neither term.
 
-\paragraph{Why it is rejected.} It is \emph{not monotone}: the \emph{concession} variant
-\emph{drops} to $0.67$ even though softening the resolved tension makes the response
-\emph{more} coherent. Root cause in Section~\ref{sec:quirk}. It also ignores
-entailment/equivalence entirely --- a response with a beautifully satisfied causal spine and
-a response that is a disconnected bag of atoms score identically at $1.0$ if neither has an
-active contradiction. Good as a \emph{diagnostic} ("is there a live contradiction?"), poor
-as the headline score.
+\paragraph{Why ``actively upheld'' and not ``satisfied''.} This is the subtle part, and
+getting it wrong inverts the score. An entailment $s\to t$ is \emph{satisfied} in the vacuous
+world $a_s{=}0$, but a response earns no coherence credit for an implication whose antecedent
+it never asserts. Crediting satisfaction rather than upholding makes the readout a product
+over relations, and an empty product is $1$: a response with \emph{no} relations at all then
+scores perfectly. We measured this. Extending the conflict event to ``$P(\text{all relations
+honoured})$'' on the AeroParts family scores the disconnected bag of atoms at $1.000$ and the
+beautifully satisfied causal spine at $0.221$ --- it converts the old tie into an
+\emph{inversion}. Every count-normalizing repair fails too: the geometric mean $\mathrm{raw}^{1/m}$
+gives $0.883$ at \emph{base} against $0.882$ at \emph{coherent} (non-monotone) and still
+$1.000$ on the bag; the expected fraction satisfied gives $0.857$ vs $0.852$ with the same
+defect; normalizing against a prior-only ceiling leaves $[0,1]$ entirely ($8.82$, $5.46$) and
+runs backwards. The common cause is that ``are the mined relations honoured?'' is a property
+of the \emph{relation set} rather than of the response: removing a contradiction removes a
+term instead of improving one. Restricting credit to the informative world is what fixes it,
+because a bag of atoms upholds nothing and scores $\mathcal S{=}0$.
+
+\paragraph{How it is computed.} $\mathcal K$ is the marginal of a derived event: add one
+deterministic AND variable per \textsc{contradict} edge, chain a running OR
+$U=\bigvee_r (a_{s_r}\wedge a_{t_r})$, and read $P(U{=}0)$. $\mathcal S$ is a weighted sum of
+\emph{pairwise joints}, i.e.\ a linear functional of $P(\mathbf a)$ rather than an event
+probability, so it needs its own MAR: one deterministic indicator variable per supported edge,
+all read together. Total cost for all four readouts rises from six Merlin runs to seven. On
+the coherence-ordered family $\mathrm{LCS}_{\text{(b)}}$ runs
+$0.576\to0.654\to\mathbf{0.582}\to0.672\to0.752$, with the satisfied spine at $0.752$ against
+the disconnected bag at $0.500$.
+
+\paragraph{A caveat on \textsc{exclusive}-only responses.} Because $\mathcal K$ keys on
+\textsc{contradict} alone, a response whose every opposition is \textsc{exclusive} has
+$\mathcal K{=}1$ identically, and $\mathcal S$ alone carries the score. There $\mathcal S$
+works against the coherence order: an exclusion contributes support credit when upheld, so
+\emph{removing} one to make the response more coherent also removes its credit and the score
+falls (Table~\ref{tab:allcands}, where (b) runs $0.778\to0.752$ across the family). This is
+the price of taking ``only \textsc{contradict} is a live conflict'' seriously, and it is why
+(b) is a diagnostic: read $\mathcal K$ and $\mathcal S$ separately --- the scorer reports both
+--- rather than trusting their mean on a family whose conflicts are all exclusions.
+
+\paragraph{Why it is still rejected.} The revision fixes the structural blindness --- (b) now
+separates a satisfied spine from a bag of atoms, which it demonstrably could not before --- but
+it does \emph{not} restore monotonicity, and that was always the disqualifying defect. The
+\emph{concession} variant still \emph{dips} ($0.654\to0.582$) even though softening the
+resolved tension makes the response more coherent, because the dip lives in $\mathcal K$ and
+$\mathcal S$ is nearly flat across that edit ($0.495\to0.502$). Root cause in
+Section~\ref{sec:quirk}. Averaging in a well-behaved term narrows the dip (a margin of $0.072$
+where the single-term readout gave $0.152$) without changing its sign: a conflict-activity
+reading cannot be repaired by adding belief to it. (b) remains the right \emph{diagnostic}
+---and $\mathcal K$ in isolation is still the cleanest ``is there a live contradiction?''
+probe --- but (a) is the headline.
 
 % -------------------------------------------------------------------------------------
 \subsection{(c) Reified coherence node $P(R{=}1)$}
@@ -865,13 +922,16 @@ companion, as in Table~\ref{tab:variants}.
 \label{sec:quirk}
 
 Candidates (b) and (c) both dip at the \emph{concession} variant; (a) and (d) do not. The
-reason is precise. The concession edit \emph{softens} the resolved conflict
-$a_{11}\!\oplus\!a_{12}$ from $p{=}0.80$ to $p{=}0.55$. A weaker \textsc{exclusive} factor
-puts \emph{more} mass on the both-true cell (its $(1,1)$ entry is $1{-}p$, exactly as for
-\textsc{contradict}): for a lone edge with uniform priors the with-priors table gives
+reason is precise. The concession edit \emph{softens} the resolved conflict between $a_{11}$
+and $a_{12}$ from $p{=}0.80$ to $p{=}0.55$. A weaker conflict factor puts \emph{more} mass on
+the both-true cell --- its $(1,1)$ entry is $1{-}p$, identically for \textsc{contradict} and
+\textsc{exclusive} --- so for a lone edge with uniform priors the with-priors table gives
 \[
   P(a_{11}{=}1,a_{12}{=}1)\ =\ 0.10\ \ (p{=}0.80)\qquad\longrightarrow\qquad 0.225\ \ (p{=}0.55).
 \]
+(Stated for a \textsc{contradict} edge, which is what the revised (b) keys on; the arithmetic
+is identical for the \textsc{exclusive} coupling this pair carries in the 5-coupling variants,
+since only the $(1,1)$ entry matters here.)
 Scores that read ``\emph{is} the conflict active'' --- (b) counts the event, (c) charges
 $1{-}p$ for it --- therefore register the softened edge as \emph{more often active}, and dip.
 Scores that read ``\emph{how strongly do we believe} each atom'' --- (a) the marginals, (d)
@@ -880,6 +940,13 @@ crux of the selection: a coherence score should track \emph{belief}, not \emph{e
 activity}, and (a) does so with no tunable constant. The concession discount itself remains
 the right modeling move (Eq.~\ref{eq:concession}); the lesson is only about which read-out
 sits on top of it.
+
+The revised (b) of Section~\ref{sec:consistency} is a useful confirmation of exactly this
+point. Averaging the conflict term with a belief-like support term \emph{narrows} the dip
+(a margin of $0.072$ against the single-term readout's $0.152$ on the 3-coupling family)
+because the support term barely moves across the edit ($0.495\to0.502$) --- but it cannot
+remove it. Diluting an event-activity reading with belief does not convert it into one; the
+quirk is a property of what the conflict term measures, not of how much weight it carries.
 
 % =====================================================================================
 \section{Baseline algorithm to compute the LCS}

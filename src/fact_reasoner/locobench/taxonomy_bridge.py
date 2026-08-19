@@ -34,7 +34,13 @@ LEGAL_SENSES: tuple[str, ...] = tuple(s.value for s in Level2Sense)
 # The 5 couplings plus `none`.
 LEGAL_COUPLINGS: tuple[str, ...] = tuple(LEVEL1_COUPLINGS)
 
-# Conflict couplings define the "active conflict" event the consistency readout keys on.
+# The couplings with a both-true world to soften -- which is what the concession
+# discount needs, and why `exclusive` belongs here alongside `contradiction`.
+#
+# NOTE this is no longer the same set as the `consistency` readout's conflict event:
+# that readout keys on `contradiction` alone and credits `exclusive` in its support
+# term instead (see `lcs/lcs_scorer.py`). Do not treat this alias as "what
+# consistency counts as a conflict".
 CONFLICT_COUPLINGS: tuple[str, ...] = tuple(LEVEL1_CONFLICT_COUPLINGS)
 
 # The senses with no gold data in any existing dataset -- the reason the benchmark

@@ -95,8 +95,8 @@ are shared by construction.
 
 **Several readouts cost one set of inference runs.** Each readout needs the base
 marginals and the base `log Z`, so scoring them one at a time repeats that pair
-per method: 12 Merlin invocations for all four. `methods=(...)` runs the shared
-pair once, for the irreducible 6.
+per method: 13 Merlin invocations for all four. `methods=(...)` runs the shared
+pair once, for the irreducible 7.
 
 ## Interpreting the output
 

@@ -30,6 +30,7 @@ import pytest
 
 from fact_reasoner.core.base import Atom
 from fact_reasoner.experiments.mock import (
+    MAX_BRUTEFORCE_VARS,
     brute_force_marginals,
     brute_force_run_merlin as _brute_force_run_merlin,
 )
@@ -58,8 +59,15 @@ from tests.test_lcs_relation_miner import (  # noqa: E402
 
 @pytest.fixture
 def fake_merlin(monkeypatch):
-    """Route the scorer's Merlin helper to the exact brute-force oracle."""
+    """Route the scorer's Merlin helper to the exact brute-force oracle.
+
+    Also lowers the aux-var batching cap to the oracle's own 2^n limit, so the
+    consistency support term fits; production keeps the high default.
+    """
     monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
+    monkeypatch.setattr(
+        lcs_scorer_mod, "DEFAULT_MAX_NETWORK_VARS", MAX_BRUTEFORCE_VARS
+    )
 
 
 class _StubMiner:
@@ -181,7 +189,7 @@ class TestCoherencePipeline:
         ).run("resp")
         assert set(out.scores) == set(LCS_METHODS)
         assert out.scores["mean_marginal"] == pytest.approx(0.587, abs=1e-3)
-        assert out.scores["consistency"] == pytest.approx(0.813, abs=1e-3)
+        assert out.scores["consistency"] == pytest.approx(0.6539, abs=1e-3)
         assert out.lcs == out.scores[LCS_METHODS[0]]
         assert out.diagnostics["log_z"] == pytest.approx(-9.75, abs=0.05)
 
@@ -427,7 +435,7 @@ class TestMRFCoherenceModel:
             _aeroparts_result(AEROPARTS_BASE), methods=("mean_marginal", "consistency")
         )
         assert scores["mean_marginal"] == pytest.approx(0.587, abs=1e-3)
-        assert scores["consistency"] == pytest.approx(0.813, abs=1e-3)
+        assert scores["consistency"] == pytest.approx(0.6539, abs=1e-3)
 
     def test_accepts_a_prebuilt_scorer(self, fake_merlin):
         model = MRFCoherenceModel(scorer=LCSScorer("/fake/merlin"))

@@ -317,8 +317,13 @@ def dry_run_patches(
         surrogate_p_yes=surrogate_p_yes, verbalized_p=verbalized_p
     )
     orig_merlin = lcs_scorer_mod.run_merlin
+    orig_max_vars = lcs_scorer_mod.DEFAULT_MAX_NETWORK_VARS
     if patch_merlin:
         lcs_scorer_mod.run_merlin = brute_force_run_merlin
+        # The consistency support term adds one aux var per supported edge and
+        # batches them to fit the backend. Production takes them in one batch; the
+        # oracle enumerates 2^n worlds, so cap the batches at what it will accept.
+        lcs_scorer_mod.DEFAULT_MAX_NETWORK_VARS = MAX_BRUTEFORCE_VARS
 
     assessor_mod = None
     orig_assessor_merlin = None
@@ -332,5 +337,6 @@ def dry_run_patches(
     finally:
         mfuncs.ainstruct = orig_ainstruct
         lcs_scorer_mod.run_merlin = orig_merlin
+        lcs_scorer_mod.DEFAULT_MAX_NETWORK_VARS = orig_max_vars
         if assessor_mod is not None:
             assessor_mod._run_merlin_shared = orig_assessor_merlin

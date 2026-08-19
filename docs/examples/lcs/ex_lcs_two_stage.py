@@ -117,7 +117,7 @@ def run(args: argparse.Namespace) -> None:
         merlin_path=args.merlin_path,
         prior_provider=prior_provider,
         # All four readouts share the base inference runs, so asking for every one
-        # costs 6 Merlin invocations rather than 12.
+        # costs 7 Merlin invocations rather than 13.
         methods=("mean_marginal", "consistency", "reified", "log_partition"),
     )
 

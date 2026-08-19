@@ -33,7 +33,7 @@ def score_all_lcs(
 
     A thin adapter over :meth:`LCSScorer.score_all`, which reads all the requested
     readouts off the same base network while running the shared base MAR and base
-    PR only once (6 Merlin invocations for all four readouts rather than 12).
+    PR only once (7 Merlin invocations for all four readouts rather than 13).
 
     Args:
         result: The mined :class:`MiningResult`.

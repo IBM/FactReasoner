@@ -26,7 +26,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fact_reasoner.experiments.mock import brute_force_run_merlin, dry_run_patches
+from fact_reasoner.experiments.mock import (
+    MAX_BRUTEFORCE_VARS,
+    brute_force_run_merlin,
+    dry_run_patches,
+)
 from fact_reasoner.lcs import candidate_pairs as cp
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
 from fact_reasoner.locoeval import cli
@@ -117,9 +121,17 @@ def item():
 
 @pytest.fixture(autouse=True)
 def _offline_merlin(monkeypatch):
-    """Route the scorer's inference through the exact brute-force oracle."""
+    """Route the scorer's inference through the exact brute-force oracle.
+
+    Also lowers the consistency support term's aux-var batching cap to the
+    oracle's 2^n limit; production keeps the high default.
+    """
     monkeypatch.setattr(
         "fact_reasoner.lcs.lcs_scorer.run_merlin", brute_force_run_merlin
+    )
+    monkeypatch.setattr(
+        "fact_reasoner.lcs.lcs_scorer.DEFAULT_MAX_NETWORK_VARS",
+        MAX_BRUTEFORCE_VARS,
     )
 
 

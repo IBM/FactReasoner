@@ -73,10 +73,21 @@ Phase 1's seven decisions, in brief:
 4. **A machine-readable relation plan replaces prose "logical statements"** — gold becomes an
    *input* to generation, gated by an independent round-trip recovery check.
 5. **Per-readout ordering contracts** (C1/C2/C3) — see the finding below.
-   Scoring is scoped to **three** readouts — `mean_marginal` (belief), `consistency` (event
-   activity) and `log_partition` (mass), one per way of reading the network. `reified` is
-   excluded: it duplicates `consistency`'s event-activity signal and carries a tunable prior
-   (§5.1). The scorer still computes it; it just enters no metric.
+   Scoring is scoped to **three** readouts — `mean_marginal` (belief), `consistency` (conflict
+   activity, plus inferential support) and `log_partition` (mass). `reified` is excluded: it
+   duplicates the conflict-activity signal and carries a tunable prior (§5.1). The scorer
+   still computes it; it just enters no metric.
+
+   **`consistency` is now a hybrid, and grading it needs care.** It was a pure event-activity
+   readout when this was written; it is now the mean of a contradiction-only conflict term and
+   an entailment/equivalence support term (`coherence_mrf_deepdive.tex` §"(b) Consistency").
+   Two consequences for this benchmark: (i) the "one readout per way of reading the network"
+   framing no longer holds cleanly, and neither does the stated ground for excluding `reified`
+   (its tunable prior is now the stronger reason); (ii) on an item whose oppositions are **all
+   `exclusive`**, the conflict term is pinned at 1.0 and only the support term moves — which
+   runs *against* the coherence order, because removing an exclusion removes its support
+   credit. The scorer reports `consistency_conflict` and `consistency_support` separately;
+   prefer them to the mean when grading an exclusive-only family.
 6. **Two strict invariance tests** (ordering-only, direction-reversal), which are the design's
    sharpest instruments because a prediction of *no effect* cannot be satisfied by accident.
 7. **A superset schema** — the 9 fixtures in `data/lcs/` become the dev split with no format
@@ -91,7 +102,10 @@ Both were verified against source and both change what the benchmark may assert:
   `coherence_mrf_deepdive.tex` §"The shared concession quirk" proves `consistency` *inverts* at
   the concession rung while `mean_marginal` and `log_partition` rise. A global monotonicity
   contract would fail a correct implementation, so §5 uses per-readout contracts and turns the
-  inversion into a positive test.
+  inversion into a positive test. The inversion **survives** the two-term revision of
+  `consistency` — the dip lives in its conflict term — but the margin narrows (0.072 where the
+  single-term readout gave 0.152), so an item near the noise floor may now read
+  `indeterminate` rather than `decrease`. The direction is unchanged; the headroom is not.
 - **`Restatement`'s 0.90 strength prior is unreachable in production.** The only
   `compile_sense` call site (`relation_miner.py:976`) passes `raw_p=None` *and discards the
   effective-strength return value*; strength comes from Prompt B alone. The prior can only be

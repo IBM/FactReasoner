@@ -80,13 +80,21 @@ so per-method scoring repeats that pair four times:
 | readout | base MAR | base PR | extra |
 |---|---|---|---|
 | mean_marginal | 1 | 1 | — |
-| consistency | 1 | 1 | 1 MAR (U-chain) |
+| consistency | 1 | 1 | 1 MAR (conflict U-chain) + 1 MAR (support) |
 | reified | 1 | 1 | 1 MAR (R node) |
 | log_partition | 1 | 1 | 1 PR (ceiling) + 1 MAP (floor) |
 
-`LCSScorer.score_all` runs the shared pair once: **1 MAR + 1 PR + 1 MAR + 1 MAR +
-1 PR + 1 MAP = 6**. `score(method=...)` is now a projection of it, so existing
+`LCSScorer.score_all` runs the shared pair once: **1 MAR + 1 PR + 2 MAR + 1 MAR +
+1 PR + 1 MAP = 7**. `score(method=...)` is now a projection of it, so existing
 callers are unaffected, and the LCS experiment sweep gets the cut for free.
+
+`consistency` needs two MARs because its two terms are different functionals: the
+conflict term is the probability of a derived event (readable from one accumulator
+variable), while the support term is a weighted sum of *pairwise joints* and needs
+one indicator variable per supported edge. On a backend that cannot take the whole
+augmented network at once — notably the offline brute-force oracle, capped at 20
+variables — the support MAR splits into several small batched MARs. The per-edge
+indicators are mutually independent, so batching is exact, not an approximation.
 
 **Not done, deliberately.** Stage 1's retrieval and atom↔context NLI are independent
 of stage-2 mining *once the atoms exist*, so the two could overlap — worth roughly
@@ -109,8 +117,13 @@ uniform-prior ceiling. `_node_priors` now resolves one prior set (explicit →
 fact-graph node → uniform fallback) that every network in a run is built from.
 Because the miner writes the same value to the nodes *and* to `config["prior"]`, the
 uniform case resolves to exactly the old mapping — the validated AeroParts numbers
-(mean_marginal 0.587, log Z −9.75, consistency 0.813, reified 0.150, log_partition
-0.7831) are unchanged, and a test asserts it directly.
+(mean_marginal 0.587, log Z −9.75, consistency 0.654, reified 0.150, log_partition
+0.7831) are unchanged, and a test asserts it directly. (`consistency` reads 0.654
+rather than the 0.813 recorded when this plan was written, because the readout was
+subsequently revised into two terms — a contradiction-only conflict term, still
+0.813 on this fixture, averaged with an entailment/equivalence support term of
+0.495. See `coherence_mrf_deepdive.tex` §"(b) Consistency". Nothing about the
+prior-resolution work changed it.)
 
 **Early exit crashed `score()`.** When `early_exit_evaluator` returns
 `continue_pipeline_execution: False`, `build()` returns leaving `fact_graph = None`

@@ -118,7 +118,7 @@ class CoherenceRunner:
             coherence MRF and the factuality stage are solved with it.
         methods: Which LCS readouts to compute; the first is the headline. Several
             readouts share the base inference runs, so asking for all four costs
-            6 Merlin calls rather than 12.
+            7 Merlin calls rather than 13.
         formulation: Which coherence model to score with — ``"mrf"`` (default) or
             ``"mln"`` (the research branch, which raises when scored).
         reified_prior: Bernoulli prior on the reified coherence node (only used by

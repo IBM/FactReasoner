@@ -68,6 +68,7 @@ from fact_reasoner.lcs.strength import (
 # The brute-force MRF oracle and synthetic-logprobs helper are shared with the
 # experiment harness's offline mode; import the canonical copies from there.
 from fact_reasoner.experiments.mock import (
+    MAX_BRUTEFORCE_VARS,
     brute_force_marginals as _brute_force_marginals,
     brute_force_run_merlin as _brute_force_run_merlin,
     yesno_logprob_meta as _yesno_logprob_meta,
@@ -542,11 +543,18 @@ def _patch_fake_merlin(monkeypatch):
     """Replace the scorer's Merlin helper with the exact brute-force oracle.
 
     Enumerates every variable in whatever network it is handed (base, U-chain,
-    reified R, or contradiction-free), so all four scoring methods -- including
-    the MAP-based log Zmin floor -- route through the same exact oracle instead of
-    the real Merlin executable.
+    support aux vars, reified R, or contradiction-free), so all four scoring
+    methods -- including the MAP-based log Zmin floor -- route through the same
+    exact oracle instead of the real Merlin executable.
+
+    Also lowers the scorer's default ``max_network_vars`` to the oracle's own cap,
+    so the consistency support term batches its aux vars to fit. Production keeps
+    the high default (one batch, one MAR); only this offline oracle is limited.
     """
     monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
+    monkeypatch.setattr(
+        lcs_scorer_mod, "DEFAULT_MAX_NETWORK_VARS", MAX_BRUTEFORCE_VARS
+    )
 
 
 class TestLCSScorer:
@@ -568,20 +576,127 @@ class TestLCSScorer:
         assert scores["log_partition"] is None
 
     def test_consistency_matches_deepdive(self, monkeypatch):
-        """(b) consistency probability = 0.813 on the AeroParts base (Table 3)."""
+        """(b) consistency = 0.654 on the AeroParts base (revised, two terms).
+
+        The mean of a contradiction-only conflict term (0.813 -- the pre-revision
+        readout, unchanged on this fixture because it has no `exclusive` edges) and
+        an actively-upheld entailment/equivalence support term (0.495).
+        """
         _patch_fake_merlin(monkeypatch)
         result = _aeroparts_result(AEROPARTS_BASE)
         scores = LCSScorer("/fake/merlin").score(result, method="consistency")
         assert scores["method"] == "consistency"
-        assert scores["consistency"] == pytest.approx(0.813, abs=1e-3)
+        assert scores["consistency"] == pytest.approx(0.6539, abs=1e-3)
+        assert scores["consistency_conflict"] == pytest.approx(0.8128, abs=1e-3)
+        assert scores["consistency_support"] == pytest.approx(0.4951, abs=1e-3)
         assert scores["lcs"] == scores["consistency"]
 
-    def test_consistency_is_one_without_contradictions(self, monkeypatch):
+    def test_conflict_term_is_one_without_contradictions(self, monkeypatch):
+        """Removing the contradictions saturates the CONFLICT term, not the score.
+
+        Pre-revision the whole readout hit exactly 1.0 here -- which was the
+        documented defect (deep-dive Section 7(b)): with no live contradiction, a
+        satisfied causal spine was indistinguishable from a disconnected bag. Now
+        only the conflict term saturates; the support term still grades the spine.
+        """
         _patch_fake_merlin(monkeypatch)
         coherent = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
-        result = _aeroparts_result(coherent)
-        scores = LCSScorer("/fake/merlin").score(result, method="consistency")
-        assert scores["consistency"] == pytest.approx(1.0, abs=1e-9)
+        scores = LCSScorer("/fake/merlin").score(
+            _aeroparts_result(coherent), method="consistency"
+        )
+        assert scores["consistency_conflict"] == pytest.approx(1.0, abs=1e-9)
+        assert scores["consistency"] == pytest.approx(0.7518, abs=1e-3)
+        assert scores["consistency"] < 1.0
+
+    def test_consistency_ranks_satisfied_spine_above_disconnected_bag(
+        self, monkeypatch
+    ):
+        """The defect the two-term revision exists to fix.
+
+        The deep-dive's complaint about candidate (b): "a response with a
+        beautifully satisfied causal spine and a response that is a disconnected
+        bag of atoms score identically at 1.0 if neither has an active
+        contradiction." Both used to score exactly 1.0; the spine must now win.
+
+        This is also the regression guard for the vacuous-truth trap that sank the
+        obvious fix: scoring "P(all relations honoured)" instead puts the BAG on
+        top (1.0 vs 0.22), because an empty product is 1. Crediting only ACTIVELY
+        upheld relations -- the informative (1,1) world, not the vacuous (0,*) --
+        is what makes the ranking come out right.
+        """
+        _patch_fake_merlin(monkeypatch)
+        spine = [r for r in AEROPARTS_BASE if r[2] != "contradiction"]
+        scorer = LCSScorer("/fake/merlin")
+        s_spine = scorer.score(_aeroparts_result(spine), method="consistency")
+        s_bag = scorer.score(_aeroparts_result([]), method="consistency")
+
+        # Both are contradiction-free, so the conflict term cannot separate them.
+        assert s_spine["consistency_conflict"] == pytest.approx(1.0, abs=1e-9)
+        assert s_bag["consistency_conflict"] == pytest.approx(1.0, abs=1e-9)
+        # The support term is what does: the bag upholds nothing.
+        assert s_bag["consistency_support"] == pytest.approx(0.0, abs=1e-9)
+        assert s_spine["consistency_support"] == pytest.approx(0.5036, abs=1e-3)
+        assert s_spine["consistency"] == pytest.approx(0.7518, abs=1e-3)
+        assert s_bag["consistency"] == pytest.approx(0.5000, abs=1e-3)
+        assert s_spine["consistency"] > s_bag["consistency"]
+
+    def test_consistency_treats_exclusive_as_support_not_conflict(self, monkeypatch):
+        """`exclusive` is credited in the support term, never as a live conflict.
+
+        On the 5-coupling AeroParts both conflicts are `exclusive`, so the
+        contradiction-only conflict event is empty and that term saturates. The
+        readout still grades, because the exclusions feed the support term (upheld
+        in their exactly-one world) -- without that, this fixture would flatten to
+        a constant 1.0 and LoCoBench's `exclusive` items would be unscoreable.
+        """
+        _patch_fake_merlin(monkeypatch)
+        scores = LCSScorer("/fake/merlin").score(
+            _aeroparts_result(AEROPARTS_BASE_5), method="consistency"
+        )
+        assert scores["consistency_conflict"] == pytest.approx(1.0, abs=1e-9)
+        assert scores["consistency_support"] == pytest.approx(0.5617, abs=1e-3)
+        assert scores["consistency"] == pytest.approx(0.7809, abs=1e-3)
+
+    def test_consistency_dips_at_the_concession_variant(self, monkeypatch):
+        """The concession quirk survives the revision (LoCoBench's C2 contract).
+
+        Softening the resolved conflict raises the both-true cell mass, so a
+        readout that reads conflict ACTIVITY dips even though the response is more
+        coherent (deep-dive sec:quirk). The support term barely moves, so the
+        conflict term still drives the dip -- narrower than before (0.072 vs 0.152)
+        but intact, which is what `locobench/perturb.py` predicts.
+        """
+        _patch_fake_merlin(monkeypatch)
+        scorer = LCSScorer("/fake/merlin")
+        base = scorer.score(_aeroparts_result(AEROPARTS_BASE), method="consistency")
+        conc = scorer.score(
+            _aeroparts_result(AEROPARTS_CONCESSION), method="consistency"
+        )
+        assert conc["consistency"] < base["consistency"]
+        assert conc["consistency"] == pytest.approx(0.5818, abs=1e-3)
+        # The dip comes from the conflict term; support is nearly flat.
+        assert conc["consistency_conflict"] < base["consistency_conflict"]
+        assert conc["consistency_support"] == pytest.approx(
+            base["consistency_support"], abs=0.01
+        )
+
+    def test_consistency_support_batches_exactly(self, monkeypatch):
+        """Aux-var batching is exact, not an approximation.
+
+        The support term adds one aux var per supported edge, batched to fit a
+        variable-limited backend. The per-edge aux vars are mutually independent,
+        so any batch size must give the same answer -- and none may exceed the cap.
+        """
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        # 12 supported edges over 16 atoms: 1 batch is impossible under the oracle
+        # cap of 20, so this genuinely exercises the multi-batch path.
+        tight = LCSScorer("/fake/merlin", max_network_vars=MAX_BRUTEFORCE_VARS)
+        tighter = LCSScorer("/fake/merlin", max_network_vars=18)
+        a = tight.score(result, method="consistency")["consistency_support"]
+        b = tighter.score(result, method="consistency")["consistency_support"]
+        assert a == pytest.approx(b, abs=1e-12)
+        assert a == pytest.approx(0.4951, abs=1e-3)
 
     def test_reified_matches_deepdive(self, monkeypatch):
         """(c) reified P(R=1) = 0.150 on the AeroParts base, rho=0.5 (Table 3)."""

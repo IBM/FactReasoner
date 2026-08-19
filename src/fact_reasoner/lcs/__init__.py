@@ -36,7 +36,7 @@ Quick start::
 
     lcs = LCSScorer(merlin_path).score(result)   # {"lcs": ..., "log_z": ...}
 
-    # Several readouts at once share the base inference runs (6 Merlin calls, not 12):
+    # Several readouts at once share the base inference runs (7 Merlin calls, not 13):
     all_scores = LCSScorer(merlin_path).score_all(result)
 
     # From pre-extracted atoms, pass the response they came from:

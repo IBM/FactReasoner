@@ -18,7 +18,8 @@
 # FOUR candidate scores over the coherence MRF that ``RelationMiner`` builds:
 #
 #   (a) mean_marginal  -- LCS = (1/n) sum_i P(a_i=1)               (Eq. 4, DEFAULT)
-#   (b) consistency    -- P( no CONTRADICT edge jointly active )    (Eq. 5)
+#   (b) consistency    -- mean of a contradiction-conflict term and an
+#       entailment/equivalence SUPPORT term (Eq. 5, revised -- see below)
 #   (c) reified        -- P(R=1) for an added coherence node R      (Eqs. 6-7)
 #   (d) log_partition  -- normalized (log Z - log Zmin)/(log Zmax - log Zmin) (Eq. 8),
 #       graded in [0,1] between a maximally-coherent ceiling (contradictions
@@ -35,6 +36,45 @@
 # ``factors.build_markov_network``. This scorer only reads / augments the MRF; it
 # does not define or duplicate the factuality scoring in ``assessor.py``.
 #
+# THE CONSISTENCY READOUT (b), AND WHY IT HAS TWO TERMS.
+#
+#   consistency = (conflict_term + support_term) / 2
+#
+#   conflict_term = P( no CONTRADICTION edge is jointly active )
+#   support_term  = sum_r p_r * U_r / sum_r p_r    over entailment/equivalence/exclusive,
+#                   U_r = P(a_s=1 AND a_t=1)   for entailment / equivalence
+#                       = P(a_s != a_t)        for exclusive
+#
+# The original readout was the conflict term alone, over {contradiction, exclusive}.
+# It had a documented defect (deep-dive Section 7(b)): it ignores entailment and
+# equivalence entirely, so "a response with a beautifully satisfied causal spine and
+# a response that is a disconnected bag of atoms score identically at 1.0 if neither
+# has an active contradiction."
+#
+# The fix is NOT the obvious one. Extending the conflict event to "P(all relations
+# honoured)" makes things WORSE, and measurably so: on the AeroParts family the
+# disconnected bag scores 1.0 while the satisfied spine scores 0.22, turning a tie
+# into an inversion. The cause is structural -- "are the mined relations honoured?"
+# is a product over relations, an empty product is 1, and every count-normalized
+# repair (geometric mean, expected fraction satisfied) is either still 1.0 on the bag
+# or non-monotone across the coherence ladder. Such a score tracks the RELATION SET,
+# not the response.
+#
+# What works is crediting a relation only when it is ACTIVELY upheld -- the
+# informative world (s=1,t=1), not the vacuous (s=0,*). A bag of atoms upholds
+# nothing, so its support term is 0 rather than 1. Measured on the AeroParts ladder
+# (worse < base < concession < fixcasualty < coherent):
+#
+#   conflict:  0.686  0.813  0.661  0.849  1.000
+#   support:   0.466  0.495  0.502  0.495  0.504
+#   -> LCS(b): 0.576  0.654  0.582  0.672  0.752
+#   satisfied spine 0.752  vs  disconnected bag 0.500
+#
+# The two terms are averaged, not multiplied: they measure different things (absence
+# of conflict vs. presence of support) and neither should be able to zero out the
+# other. The concession dip at rung 3 survives (0.654 -> 0.582), so LoCoBench's C2
+# inversion contract still holds -- see ``locobench/perturb.py``.
+#
 # PER-ATOM PRIORS. Every readout resolves its unary priors through
 # ``_node_priors``, which takes (1) an explicit ``node_priors`` argument, else
 # (2) the atom's own probability on the fact-graph node (what the miner baked in),
@@ -47,8 +87,12 @@
 #
 # INFERENCE SHARING. ``score(method=...)`` answers one readout; ``score_all`` answers
 # several while running the base MAR and the base PR only ONCE. Per-method calls cost
-# 12 Merlin invocations for all four readouts (each re-running the shared base pair);
-# ``score_all`` costs the irreducible 6.
+# 14 Merlin invocations for all four readouts (each re-running the shared base pair);
+# ``score_all`` costs the irreducible 7: base MAR, base PR, the consistency conflict
+# U-chain MAR, the consistency SUPPORT MAR, the reified-R MAR, the contradiction-free
+# ceiling PR, and the base MAP floor. The support term is a different functional of
+# the joint (a weighted sum of pairwise joints, not an event probability), so it
+# cannot be read off the conflict U-chain and needs its own MAR.
 
 import math
 from collections.abc import Sequence
@@ -58,22 +102,61 @@ from fact_reasoner.fact_graph import Edge, FactGraph, Node
 from fact_reasoner.factors import build_markov_network
 from fact_reasoner.inference import run_merlin
 from fact_reasoner.lcs.relation_miner import MiningResult, _atom_sort_key
-from fact_reasoner.lcs.taxonomy import LEVEL1_CONFLICT_COUPLINGS
+from fact_reasoner.lcs.taxonomy import (
+    LEVEL1_CONFLICT_COUPLINGS,
+    LEVEL1_CONTRADICTION,
+    LEVEL1_ENTAILMENT,
+    LEVEL1_EQUIVALENCE,
+    LEVEL1_EXCLUSIVE,
+)
 from fact_reasoner.markov_network import MarkovNetwork
 
 # The four LCS readouts. ``mean_marginal`` is the default headline (deep-dive Eq. 4).
 LCS_METHODS = ("mean_marginal", "consistency", "reified", "log_partition")
 
 # Conflict couplings whose both-true world is the incoherent configuration the
-# consistency / conflict-free readouts key on: contradiction and exclusive (both
-# down-weight (1,1)). co_necessity is a positive coupling and is NOT a conflict.
+# conflict-free (log-partition ceiling) readout keys on: contradiction and
+# exclusive (both down-weight (1,1)). co_necessity is a positive coupling and is
+# NOT a conflict.
+#
+# NOTE: this set belongs to ``_contradiction_free_graph`` (the log_partition
+# ceiling) ONLY. The consistency readout deliberately uses its own, narrower sets
+# below -- narrowing THIS constant would silently move log_z_max / log_partition.
 _CONFLICT_TYPES = frozenset(LEVEL1_CONFLICT_COUPLINGS)
+
+# -- the consistency readout's two coupling sets ------------------------------
+#
+# The conflict EVENT keys on contradiction alone. An `exclusive` is an exhaustive
+# exclusion: its incoherence is spread over BOTH same-value worlds, so reading only
+# its both-true half ("active") describes half the coupling and mis-reports the
+# other half as fine. Contradiction is the one coupling whose incoherence is
+# exactly the both-true world, so it alone defines "a live conflict".
+_CONSISTENCY_CONFLICT_TYPES = frozenset({LEVEL1_CONTRADICTION})
+
+# Entailment / equivalence / exclusive enter through the SUPPORT term instead: they
+# are the couplings a coherent response actively upholds. `exclusive` is upheld in
+# its exactly-one world, which is also where its exclusion is honoured -- so it
+# contributes positively here rather than as a conflict. `co_necessity` is credited
+# in neither term (its defect is the both-false world, which the marginals see).
+_CONSISTENCY_SUPPORT_TYPES = frozenset(
+    {LEVEL1_ENTAILMENT, LEVEL1_EQUIVALENCE, LEVEL1_EXCLUSIVE}
+)
 
 # Prefix for derived / auxiliary variables (consistency U-chain, reified R). It
 # sorts after atom ids "a..." under Merlin's (cardinality, name) ordering, so the
 # atom marginals keep their positions and the derived variable is addressable by
 # its exact name.
 _AUX = "z"
+
+# Default cap on an augmented network's variable count, used to size the support
+# term's aux-var batches. Set high enough that any real network is a single batch
+# (one MAR); callers on a variable-limited backend lower it (see ``LCSScorer``).
+DEFAULT_MAX_NETWORK_VARS = 1_000_000
+
+# How many support aux vars to add per MAR when ``max_network_vars`` binds. Small on
+# purpose: a variable-limited backend is typically one that enumerates, where each
+# extra variable doubles the work, so several cheap MARs beat one at the ceiling.
+_SUPPORT_BATCH_SLACK = 2
 
 
 def _binary_entropy(p: float) -> float:
@@ -92,19 +175,41 @@ class LCSScorer:
     alternatives.
     """
 
-    def __init__(self, merlin_path: str, *, ibound: int = 6, verbose: bool = False):
+    def __init__(
+        self,
+        merlin_path: str,
+        *,
+        ibound: int = 6,
+        verbose: bool = False,
+        max_network_vars: int | None = None,
+    ):
         """Initialize the scorer.
 
         Args:
             merlin_path: Path to the Merlin executable.
             ibound: The i-bound for Merlin's weighted mini-bucket inference.
             verbose: Whether the Merlin helper prints its progress.
+            max_network_vars: Cap on the variable count of an augmented network,
+                which the consistency support term uses to size its aux-var
+                batches. Defaults to :data:`DEFAULT_MAX_NETWORK_VARS`, far above
+                any real network, so production builds ONE batch and issues one
+                MAR. Lower it to match an inference backend that cannot take the
+                full network at once -- the offline brute-force oracle caps at 20
+                variables. Batching is exact either way (the per-edge aux vars are
+                mutually independent), so this only trades variables for MAR calls.
         """
         if not merlin_path:
             raise ValueError("merlin_path is required to run inference.")
+        # Read the module global at call time (not as a default argument) so an
+        # offline oracle can lower the cap by patching DEFAULT_MAX_NETWORK_VARS.
+        if max_network_vars is None:
+            max_network_vars = DEFAULT_MAX_NETWORK_VARS
+        if max_network_vars < 1:
+            raise ValueError("max_network_vars must be at least 1.")
         self.merlin_path = merlin_path
         self.ibound = ibound
         self.verbose = verbose
+        self.max_network_vars = max_network_vars
 
     # -- public API ----------------------------------------------------------
 
@@ -147,6 +252,8 @@ class LCSScorer:
               * ``"mean_marginal"``: Eq. 4 value (always computed).
               * ``"consistency"`` / ``"reified"`` / ``"log_partition"``: the
                 alternative scores, populated when selected (else ``None``).
+              * ``"consistency_conflict"`` / ``"consistency_support"``: the two
+                terms ``consistency`` averages, for diagnostics (else ``None``).
               * ``"marginals"``: ``{atom_id: P(a_i=1)}`` from the base network.
               * ``"num_atoms"``, ``"num_below_prior"``, ``"avg_norm_entropy"``.
               * ``"node_priors"``: the resolved per-atom priors actually used.
@@ -189,10 +296,12 @@ class LCSScorer:
         All four readouts sit on the same base network, and each needs its
         marginals (for the per-atom diagnostics) and its ``log Z``. Running them
         one at a time via :meth:`score` therefore repeats one MAR and one PR per
-        method -- 12 Merlin invocations for all four. This runs the shared pair
+        method -- 14 Merlin invocations for all four. This runs the shared pair
         once and adds only each method's own extra inference, for the irreducible
-        6: base MAR, base PR, the consistency U-chain MAR, the reified-R MAR, the
-        contradiction-free ceiling PR, and the base MAP floor.
+        7: base MAR, base PR, the consistency conflict U-chain MAR, the consistency
+        support MAR, the reified-R MAR, the contradiction-free ceiling PR, and the
+        base MAP floor. (A low ``max_network_vars`` splits the support MAR into
+        several batched MARs; see :meth:`__init__`.)
 
         Args:
             result: The :class:`MiningResult` from ``RelationMiner``.
@@ -228,6 +337,8 @@ class LCSScorer:
             "lcs": 0.0,
             "mean_marginal": 0.0,
             "consistency": None,
+            "consistency_conflict": None,
+            "consistency_support": None,
             "reified": None,
             "log_partition": None,
             "marginals": {},
@@ -265,7 +376,11 @@ class LCSScorer:
 
         # -- per-method extras.
         if "consistency" in methods:
-            out["consistency"] = self._consistency_probability(result, priors)
+            (
+                out["consistency"],
+                out["consistency_conflict"],
+                out["consistency_support"],
+            ) = self._consistency_probability(result, priors)
         if "reified" in methods:
             out["reified"] = self._reified_coherence(result, reified_prior, priors)
         if "log_partition" in methods:
@@ -328,26 +443,45 @@ class LCSScorer:
             print(f"[LCSScorer] MAP (log Zmin) task unavailable: {e}")
             return None
 
-    # -- (b) consistency probability -----------------------------------------
+    # -- (b) consistency: conflict term + support term ------------------------
 
     def _consistency_probability(
         self, result: MiningResult, priors: dict[str, float] | None = None
-    ) -> float:
-        """P( no CONFLICT edge is jointly active ) — deep-dive Eq. 5.
+    ) -> tuple[float, float, float]:
+        """The consistency readout — deep-dive Eq. 5 (revised, two terms).
 
-        A conflict coupling is a ``contradiction`` OR an ``exclusive`` (both
-        down-weight the both-true cell). Adds, on a copy of the base network, one
-        AND aux-var per conflict edge (``u_r = a_s AND a_t``) and a running-OR
-        accumulator ``U = OR_r u_r``, then reads ``P(U=0)``. For ``exclusive`` we
-        take "active" as the both-true world (the incoherent half of the
-        exclusion); the both-false half is a milder defect the marginals see.
-        ``co_necessity`` is NOT a conflict here. All aux factors are deterministic
-        and at most ternary (no 2^k blow-up). Returns 1.0 when no conflict edges.
+        Returns ``(consistency, conflict_term, support_term)`` where the headline
+        is the arithmetic mean of the two terms. See the module docstring for the
+        definition, the measured ladder, and why a single "all relations honoured"
+        event does not work.
+
+        The two terms are averaged rather than multiplied so that neither can zero
+        out the other: a live contradiction should not erase a well-supported
+        spine, and a relation-free response should not inherit a perfect score.
+        """
+        conflict = self._conflict_free_probability(result, priors)
+        support = self._support_term(result, priors)
+        return (conflict + support) / 2.0, conflict, support
+
+    def _conflict_free_probability(
+        self, result: MiningResult, priors: dict[str, float] | None = None
+    ) -> float:
+        """P( no CONTRADICTION edge is jointly active ) — the conflict term.
+
+        Adds, on a copy of the base network, one AND aux-var per contradiction edge
+        (``u_r = a_s AND a_t``) and a running-OR accumulator ``U = OR_r u_r``, then
+        reads ``P(U=0)``. All aux factors are deterministic and at most ternary (no
+        2^k blow-up). Returns 1.0 when there are no contradiction edges.
+
+        Only ``contradiction`` counts here (``_CONSISTENCY_CONFLICT_TYPES``).
+        ``exclusive`` is an exhaustive exclusion whose incoherence covers both
+        same-value worlds, so reading its both-true half alone would describe half
+        the coupling; it is credited in the support term instead.
         """
         contradictions = [
             r
             for r in result.relations
-            if r.level1_type in _CONFLICT_TYPES
+            if r.level1_type in _CONSISTENCY_CONFLICT_TYPES
         ]
         if not contradictions:
             return 1.0
@@ -376,6 +510,79 @@ class LCSScorer:
         p_u = self._marginals(network, [acc])
         p_active = p_u.get(acc, 0.0)  # P(U=1) = some contradiction active
         return 1.0 - p_active
+
+    def _support_term(
+        self, result: MiningResult, priors: dict[str, float] | None = None
+    ) -> float:
+        """Confidence-weighted mass of ACTIVELY upheld entailment/equivalence.
+
+        ``sum_r p_r * U_r / sum_r p_r`` over ``_CONSISTENCY_SUPPORT_TYPES``, where
+        ``U_r`` is the probability that relation ``r`` is actively upheld:
+
+          * entailment / equivalence -> ``P(a_s=1 AND a_t=1)``
+          * exclusive               -> ``P(a_s != a_t)``
+
+        "Actively" is the whole point. An entailment ``s -> t`` is *satisfied* in
+        the vacuous world (s=0), but a response earns no coherence credit for an
+        implication whose antecedent it never asserts -- and crediting satisfaction
+        rather than upholding is exactly what makes a relation-free response score
+        perfectly (see the module docstring). So the credited world is the
+        informative one.
+
+        Each ``U_r`` is a PAIRWISE joint, so the term is a weighted sum of pairwise
+        joints -- a linear functional of the joint, not an event probability. That
+        is why it needs its own MAR rather than another accumulator chain: one
+        deterministic aux var per supported edge, all read in a single MAR.
+
+        Returns 0.0 when there are no supported relations: a response with nothing
+        upheld gets no support credit (it does not get a free 1.0).
+        """
+        supported = [
+            r
+            for r in result.relations
+            if r.level1_type in _CONSISTENCY_SUPPORT_TYPES
+        ]
+        weight_total = sum(r.probability for r in supported)
+        if not supported or weight_total <= 0.0:
+            return 0.0
+
+        # One aux var per supported edge, added in batches so the augmented network
+        # stays within `max_network_vars`. Real Merlin has no such limit (one batch,
+        # one MAR); the offline brute-force oracle caps at 20 variables, and the
+        # batches are what keep the diagnostic examples scoreable there. Each u_r is
+        # independent of the others, so batching is exact -- not an approximation.
+        #
+        # `max_network_vars` is a CEILING, not a target. Filling it exactly is the
+        # worst choice for an enumerating backend, whose cost is 2^n: a 13-atom base
+        # padded to 20 costs 2^20 per batch, several times over. When the cap binds,
+        # add only a few aux vars per MAR so each stays near the base network's own
+        # cost -- more MARs, but each one cheap. Uncapped (the production default)
+        # this is a single batch.
+        # The base network carries one variable per fact-graph NODE, which is what
+        # the aux vars are added on top of (``result.atoms`` can in principle differ).
+        n_base = len(result.fact_graph.get_nodes())
+        if self.max_network_vars >= n_base + len(supported):
+            room = len(supported)  # fits in one batch: the production path
+        else:
+            room = max(1, min(_SUPPORT_BATCH_SLACK, self.max_network_vars - n_base))
+        weighted = 0.0
+        for start in range(0, len(supported), room):
+            batch = supported[start : start + room]
+            network = self._base_network(result, priors)
+            queries: list[tuple[str, float]] = []
+            for i, rel in enumerate(batch):
+                u = f"{_AUX}s{start + i}"
+                network.add_factor(
+                    [u, rel.source_id, rel.target_id],
+                    [2, 2, 2],
+                    _upheld_factor(rel.level1_type),
+                )
+                queries.append((u, rel.probability))
+            upheld = self._marginals(network, [u for u, _ in queries])
+            for u, p_r in queries:
+                weighted += p_r * upheld.get(u, 0.0)
+
+        return weighted / weight_total
 
     # -- (c) reified coherence node ------------------------------------------
 
@@ -577,6 +784,42 @@ def _or_factor() -> list[float]:
         for a in (0, 1):
             for b in (0, 1):
                 vals.append(1.0 if w == (1 if (a == 1 or b == 1) else 0) else 0.0)
+    return vals
+
+
+def _upheld_factor(level1_type: str) -> list[float]:
+    """Deterministic "``r`` is actively upheld" indicator over [u, s, t].
+
+    Row-major, 8 values, 1.0 iff ``u`` equals the upheld indicator at (s, t):
+
+      * entailment / equivalence -> upheld at (1, 1): the response asserts both
+        ends, so the implication / identity is doing work. NOTE this is narrower
+        than :func:`_satisfied`, which also accepts the vacuous (s=0) worlds --
+        see :meth:`LCSScorer._support_term` for why upholding, not satisfaction,
+        is what earns coherence credit.
+      * exclusive -> upheld at (s != t): exactly one endpoint holds, which is both
+        where the exclusion is honoured and where it is informative.
+
+    Raises:
+        ValueError: If ``level1_type`` is not a support-credited coupling.
+    """
+    if level1_type in (LEVEL1_ENTAILMENT, LEVEL1_EQUIVALENCE):
+        def upheld(s: int, t: int) -> bool:
+            return s == 1 and t == 1
+    elif level1_type == LEVEL1_EXCLUSIVE:
+        def upheld(s: int, t: int) -> bool:
+            return s != t
+    else:
+        raise ValueError(
+            f"{level1_type!r} is not a support-credited coupling "
+            f"(expected one of {sorted(_CONSISTENCY_SUPPORT_TYPES)})."
+        )
+
+    vals = []
+    for u in (0, 1):
+        for s in (0, 1):
+            for t in (0, 1):
+                vals.append(1.0 if u == (1 if upheld(s, t) else 0) else 0.0)
     return vals
 
 

@@ -122,7 +122,8 @@ score readouts. Its empirical basis is:
   \item nine hand-authored fixtures in \texttt{data/lcs/*.json}, carrying atoms and prose
         \texttt{notes} but \emph{no machine-readable gold relations};
   \item one regression oracle --- the AeroParts model, whose exact values
-        ($\readout{mean\_marginal}=0.587$, $\log Z=-9.75$, $\readout{consistency}=0.813$,
+        ($\readout{mean\_marginal}=0.587$, $\log Z=-9.75$, $\readout{consistency}=0.654$
+        --- its conflict term $0.813$ averaged with its support term $0.495$ ---
         $\readout{log\_partition}=0.7831$) are pinned by a test;
   \item an evaluation \emph{plan} (\texttt{research\_plan.md}~\S9) naming perturbation
         ladders, Spearman-versus-human correlation, and three baselines
@@ -583,9 +584,11 @@ Condition     & \cEnt  & ---    & yes & --- & ---\\
 (\coverageLegend) so the property matrix and the inventory can be read together. Restatement is
 the only sense with a fixed strength prior --- and see Finding~2
 (Section~\ref{sec:finding-prior}) for why that prior is not reachable in production. Conflict
-couplings, which define the ``active conflict'' event for
-\readout{consistency}, are exactly \{\cCon, \cExc\}; \cCoN\ is a
-\emph{positive} coupling and is not a conflict.}
+couplings --- those with a both-true world to soften, which is what the concession discount
+needs --- are exactly \{\cCon, \cExc\}; \cCoN\ is a \emph{positive} coupling and is not a
+conflict. Note this is no longer the same set as \readout{consistency}'s ``active conflict''
+event: that readout keys on \cCon\ alone and credits \cExc\ in its support term instead
+(deep-dive \S``(b) Consistency'').}
 \label{tab:compile}
 \end{table}
 
@@ -853,10 +856,12 @@ LoCoBench grades \textbf{three} readouts:
 \readout{mean\_marginal} & belief &
   the shipped default headline (deep-dive Eq.~4): MRF-native, monotone, constant-free, in
   $[0,1]$, read straight off Merlin's MAR marginals\\
-\readout{consistency}    & event activity &
-  $P(\text{no conflict edge jointly active})$ (Eq.~5). The only in-scope readout that reads
-  conflict \emph{activity} rather than belief, which is what makes the concession quirk of
-  Finding~1 observable at all\\
+\readout{consistency}    & conflict activity &
+  the mean of $P(\text{no \cCon\ edge jointly active})$ and an actively-upheld
+  \cEnt/\cEqv/\cExc\ support term (Eq.~5, revised). Its conflict half is the only in-scope
+  quantity that reads conflict \emph{activity} rather than belief, which is what makes the
+  concession quirk of Finding~1 observable at all; grade an \cExc-only family on that half
+  alone, since there the conflict term is pinned at $1.0$\\
 \readout{log\_partition} & mass &
   the normalized $\log Z$ readout (Eq.~8), graded in $[0,1]$ between a contradiction-free
   ceiling and a saturated floor\\
@@ -933,7 +938,12 @@ contract is stated per readout. Three classes:
   \item[C2 --- quirk chain] (\readout{consistency}): require
         $\rho(r_0)<\rho(r_1)$ and $\rho(r_3)<\rho(r_4)$; \textbf{assert the inversion}
         $\rho(r_2) \leq \rho(r_1)$ as a positive prediction; leave $r_2 \to r_3$
-        unconstrained.
+        unconstrained. The inversion survives the readout's two-term revision --- it lives in
+        the conflict term --- but the margin narrows (0.072 against the single-term readout's
+        0.152), so more items will fall below the $2\sigma$ rule below and score as
+        \emph{indeterminate}. Where the family's oppositions are all \cExc, grade
+        \texttt{consistency\_conflict} rather than the mean, whose support half moves against
+        the coherence order.
   \item[C3 --- endpoints] (all three readouts): $\rho(r_0) < \rho(r_4)$, strict. The weakest and
         most robust claim; it survives every quirk, and is therefore the headline ranking
         number.

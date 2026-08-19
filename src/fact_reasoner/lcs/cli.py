@@ -100,7 +100,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default="mean_marginal",
         help="Comma-separated LCS readouts to compute, or 'all'. The first is the "
         f"headline. Choices: {', '.join(LCS_METHODS)}. Several readouts share the "
-        "base inference runs, so asking for all four costs 6 Merlin calls, not 12.",
+        "base inference runs, so asking for all four costs 7 Merlin calls, not 13.",
     )
     s.add_argument(
         "--formulation",
