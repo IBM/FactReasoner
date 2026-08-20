@@ -1,0 +1,121 @@
+% Relation graphs for the AeroParts running example.
+% Edges transcribe AEROPARTS_BASE_5 / its conflict-free subset exactly
+% (tests/test_lcs_relation_miner.py:83-119). Line width grows with p.
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    >={Stealth[length=1.7mm]},
+    atom/.style={circle,draw,fill=blue!5,inner sep=0.5pt,minimum size=6.2mm,font=\scriptsize},
+    conf/.style={circle,draw,fill=red!8,draw=red!60!black,inner sep=0.5pt,
+                 minimum size=6.2mm,font=\scriptsize},
+    hold/.style={circle,draw,fill=green!10,draw=green!45!black,inner sep=0.5pt,
+                 minimum size=6.2mm,font=\scriptsize},
+    ent/.style={-{Stealth[length=1.7mm]},blue!70!black},
+    equ/.style={-{Stealth[length=1.7mm]},teal!70!black},
+    xcl/.style={{Stealth[length=1.7mm]}-{Stealth[length=1.7mm]},red!75!black,dashed},
+    x=13.5mm, y=12.5mm]
+
+  % ---- the entailment spine, left to right ----
+  \node[atom] (a1) at (0,0)   {$a_1$};
+  \node[atom] (a2) at (1,0)   {$a_2$};
+  \node[atom] (a3) at (2,0)   {$a_3$};
+  \node[atom] (a4) at (3,0)   {$a_4$};
+  \node[atom] (a5) at (4,0)   {$a_5$};
+  \node[atom] (a6) at (5,0)   {$a_6$};
+  \node[atom] (a8) at (6,0)   {$a_8$};
+  % ---- branches ----
+  \node[atom] (a9)  at (2.4,1.15) {$a_9$};
+  \node[conf] (a7)  at (3.6,1.15) {$a_7$};
+  \node[atom] (a14) at (0,-1.15)  {$a_{14}$};
+  \node[atom] (a15) at (1,-1.15)  {$a_{15}$};
+  \node[atom] (a16) at (4,-1.15)  {$a_{16}$};
+  % ---- the blame sub-argument ----
+  \node[conf] (a10) at (5.1,1.15)  {$a_{10}$};
+  \node[conf] (a11) at (2.6,-2.15) {$a_{11}$};
+  \node[conf] (a12) at (3.9,-2.15) {$a_{12}$};
+  \node[hold] (a13) at (5.2,-2.15) {$a_{13}$};
+
+  \draw[ent,line width=1.50pt] (a1) -- (a2);
+  \draw[ent,line width=1.42pt] (a2) -- (a3);
+  \draw[ent,line width=1.10pt] (a3) -- (a4);
+  \draw[ent,line width=1.30pt] (a4) -- (a5);
+  \draw[ent,line width=1.22pt] (a5) -- (a6);
+  \draw[ent,line width=0.94pt] (a4) -- (a7);
+  \draw[ent,line width=1.14pt] (a9) -- (a4);
+  \draw[equ,line width=1.46pt] (a6) -- (a8);
+  \draw[ent,line width=1.26pt] (a1) -- (a14);
+  \draw[ent,line width=1.10pt] (a14) -- (a15);
+  \draw[ent,line width=0.86pt] (a5) -- (a16);
+  \draw[ent,line width=1.42pt] (a13) -- (a12);
+
+  % ---- the two conflicts: what makes this response incoherent ----
+  \draw[xcl,line width=1.58pt] (a7) -- (a10)
+        node[midway,above,font=\tiny,red!70!black]{$0.93$};
+  \draw[xcl,line width=1.30pt] (a11) -- (a12)
+        node[midway,below,font=\tiny,red!70!black]{$0.80$};
+\end{tikzpicture}}
+\caption{\textbf{Incoherent} (base). Two \coupling{exclusive} conflicts (dashed):
+  $a_7\!\leftrightarrow\!a_{10}$ is \emph{unresolved}; $a_{11}\!\leftrightarrow\!a_{12}$
+  is a concession the holding $a_{13}$ (green) resolves.
+  $\readout{mm}=0.607$, $\log Z=-9.64$.}
+\label{fig:aero-incoherent}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    >={Stealth[length=1.7mm]},
+    atom/.style={circle,draw,fill=blue!5,inner sep=0.5pt,minimum size=6.2mm,font=\scriptsize},
+    hold/.style={circle,draw,fill=green!10,draw=green!45!black,inner sep=0.5pt,
+                 minimum size=6.2mm,font=\scriptsize},
+    ent/.style={-{Stealth[length=1.7mm]},blue!70!black},
+    equ/.style={-{Stealth[length=1.7mm]},teal!70!black},
+    x=13.5mm, y=12.5mm]
+
+  \node[atom] (a1) at (0,0)   {$a_1$};
+  \node[atom] (a2) at (1,0)   {$a_2$};
+  \node[atom] (a3) at (2,0)   {$a_3$};
+  \node[atom] (a4) at (3,0)   {$a_4$};
+  \node[atom] (a5) at (4,0)   {$a_5$};
+  \node[atom] (a6) at (5,0)   {$a_6$};
+  \node[atom] (a8) at (6,0)   {$a_8$};
+  \node[atom] (a9)  at (2.4,1.15) {$a_9$};
+  \node[atom] (a7)  at (3.6,1.15) {$a_7$};
+  \node[atom] (a14) at (0,-1.15)  {$a_{14}$};
+  \node[atom] (a15) at (1,-1.15)  {$a_{15}$};
+  \node[atom] (a16) at (4,-1.15)  {$a_{16}$};
+  \node[atom] (a10) at (5.1,1.15)  {$a_{10}$};
+  \node[atom] (a11) at (2.6,-2.15) {$a_{11}$};
+  \node[atom] (a12) at (3.9,-2.15) {$a_{12}$};
+  \node[hold] (a13) at (5.2,-2.15) {$a_{13}$};
+
+  \draw[ent,line width=1.50pt] (a1) -- (a2);
+  \draw[ent,line width=1.42pt] (a2) -- (a3);
+  \draw[ent,line width=1.10pt] (a3) -- (a4);
+  \draw[ent,line width=1.30pt] (a4) -- (a5);
+  \draw[ent,line width=1.22pt] (a5) -- (a6);
+  \draw[ent,line width=0.94pt] (a4) -- (a7);
+  \draw[ent,line width=1.14pt] (a9) -- (a4);
+  \draw[equ,line width=1.46pt] (a6) -- (a8);
+  \draw[ent,line width=1.26pt] (a1) -- (a14);
+  \draw[ent,line width=1.10pt] (a14) -- (a15);
+  \draw[ent,line width=0.86pt] (a5) -- (a16);
+  \draw[ent,line width=1.42pt] (a13) -- (a12);
+\end{tikzpicture}}
+\caption{\textbf{Coherent}. The identical support structure with both conflict edges
+  removed; $a_{10}$ and $a_7$ are no longer suppressed.
+  $\readout{mm}=0.620$, $\log Z=-8.25$, $\readout{lp}=1.00$.}
+\label{fig:aero-coherent}
+\end{subfigure}
+\caption{Relation graphs for the AeroParts recall report
+  (\S\ref{sec-examples}). Solid blue: \coupling{entailment}; teal:
+  \coupling{equivalence}; dashed red, double-headed: \coupling{exclusive}. Line
+  width grows with the relation weight $p$. \textbf{The two panels differ only in
+  the two conflict edges}, so the $0.607\!\to\!0.620$ lift and the $1.39$ nats of
+  recovered mass are attributable to conflict structure alone.}
+\label{fig:aero-graphs}
+\end{figure}

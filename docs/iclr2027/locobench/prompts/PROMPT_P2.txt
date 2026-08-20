@@ -1,0 +1,66 @@
+
+Instructions:
+1. You are given a QUESTION. Generate a set of ATOMIC CLAIMS that a
+   well-informed answer to it might contain.
+2. An atomic claim is a sentence containing a singular piece of information,
+   which should be basic, indivisible, and independently verifiable.
+3. Generate exactly 26 atomic claims: the 24 below, plus the 2 holding claims
+   required by instruction 4. The 24 break down as:
+   (a) 14 factually correct claims;
+   (b) 4 factually incorrect claims (plausible but false);
+   (c) 2 EXHAUSTIVE ALTERNATIVE claims: a pair X, Y such that exactly one of X
+       and Y must be true - they cannot both hold, and they cannot both fail.
+       Example pair: "No one was harmed in the incident." / "Three people died
+       in the incident."
+   (d) 2 DISJUNCTIVE claims: a pair X, Y such that at least one must be true,
+       but both may be true simultaneously. Make each one a STATE OF THE WORLD,
+       not a finding or a check that reported something: "the alloy was
+       substituted" and "the batch was mislabelled", not "assay A flagged it"
+       and "assay B flagged it".
+   (e) 2 EQUIVALENT claims: a pair X, Y asserting the same fact in different
+       words, so that either one being true makes the other true.
+4. Additionally generate 2 HOLDING claims: sentences in which an authority
+   (a court, tribunal, regulator, final report, or review board) reaches a
+   determination that settles a dispute between two other claims in your list.
+   A holding claim must use adjudicating language - "held", "ruled",
+   "concluded", "determined", "found that", "ultimately".
+5. Each claim must be a single declarative sentence with no connective linking
+   it to another claim. Do NOT use "because", "although", "therefore", "if",
+   "while", "however". Relations are added at a later stage, not here.
+6. Do NOT indicate which claims are factually incorrect in their wording; do
+   NOT hedge with "assume", "might", "possibly", or "allegedly".
+7. Output as a markdown code block: an unordered list with "-" bullets. Append
+   a tag in square brackets to every claim, one of: [correct], [incorrect],
+   [alt-pair-1], [alt-pair-2], [disj-pair-1], [disj-pair-2], [equiv-pair-1],
+   [equiv-pair-2], [holding].
+
+Use the following example to better understand your task.
+
+QUESTION: [How do investigators determine responsibility when a component
+supplied by a third party fails in service and the operator and the
+manufacturer offer competing explanations?]
+
+ATOMIC CLAIMS:
+```
+- AeroParts supplied turbine blades to the carrier. [correct]
+- The turbine blades were installed in the carrier's A-320 fleet. [correct]
+- Seventeen turbine blades failed in flight during service. [correct]
+- The regulator opened a safety probe into the blade failures. [correct]
+- Maintenance logs recorded abnormal vibration on the failed blades. [correct]
+- The airline argued that the failures were caused by pilot error. [correct]
+- The final report concluded the root cause was a metallurgical defect. [correct]
+- The regulator issued an order grounding the fleet. [correct]
+- Every affected aircraft was pulled from service. [equiv-pair-1]
+- The regulator's order removed all affected aircraft from operation. [equiv-pair-2]
+- The blades were certified under a 1998 airworthiness standard. [incorrect]
+- No one was harmed in the incidents. [alt-pair-1]
+- Three passengers died in one of the failures. [alt-pair-2]
+- The alloy supplied for the blades was substituted. [disj-pair-1]
+- The blade batch was mislabelled at the mill. [disj-pair-2]
+- The tribunal held that AeroParts was liable for the blade failures. [holding]
+- The accident report found the pilots not at fault. [holding]
+```
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+ATOMIC CLAIMS:

@@ -1,0 +1,79 @@
+
+
+Instructions:
+You are given the full RESPONSE a model produced, and two atomic claims, A and B, both taken FROM THAT RESPONSE, in their order of appearance (A comes before B). Your task is to decide the discourse/logical relation FROM A TO B, following the steps below.
+
+IMPORTANT -- ground your decision in the response. Assert a coupling ONLY if the response ITSELF draws that connection between A and B (as written, or as a clear step in the author's argument/narrative). Do NOT assert a relation that is merely plausible in general but that the response does not actually make. If A and B both appear in the response yet the response draws no logical or discourse dependence between them, the answer is None.
+
+1. Reason step by step, referring to the response: does the response present A as causing, enabling, providing evidence for, restating, elaborating, temporally preceding, contrasting with, or contradicting B? Is B a claim the response later withdraws or that a holding resolves? Consider the direction (A to B). If the response links A and B only indirectly through other claims, or not at all, that is None.
+
+2. Name the DISCOURSE SENSE, one of: {{sense_menu}}.
+   - Cause-Effect: A causes/leads to B. Effect-Cause: A is the effect, B its cause.
+   - Evidence: A provides evidence for B. Condition: A is a condition for B.
+   - Restatement: A and B assert the same thing. Instantiation: A is a general claim, B a specific instance (or vice versa).
+   - Contrast: A and B are in opposition but NOT exhaustive (they need not cover all possibilities; both could conceivably be false).
+   - Concession: A and B are in tension but the text concedes/resolves it ("although A, still B", or a holding settles it).
+   - Alternative: A and B are EXHAUSTIVE competing options -- EXACTLY ONE holds (they are mutually exclusive AND together cover the possibilities: not both, and not neither). E.g. "no one was harmed" vs "three people died"; "the cause was pilot error" vs "the cause was a metallurgical defect".
+   - Disjunction: AT LEAST ONE of A and B holds (they may both hold, but the response rules out neither being true) -- e.g. two supporting findings at least one of which must be present.
+   - Precedence/Succession: A and B are ordered in time with no truth dependence.
+   - None: the response draws no logical or discourse dependence between A and B.
+
+3. Map the sense to a COUPLING, one of: entailment, contradiction, equivalence, exclusive, co_necessity, none.
+   - Cause-Effect, Effect-Cause, Evidence, Condition, Instantiation -> entailment
+   - Restatement -> equivalence
+   - Contrast, Concession -> contradiction
+   - Alternative -> exclusive       (exactly one of A, B is true)
+   - Disjunction -> co_necessity     (at least one of A, B is true)
+   - Precedence, Succession, None -> none
+   Prefer "exclusive" over "contradiction" when the two claims are not just incompatible but EXHAUSTIVE (one of them must be true); prefer "contradiction" when they merely cannot both hold but could both be false.
+
+4. Give your final answer as two bracketed tags on ONE line, sense first:
+[sense=Cause-Effect] [coupling=entailment]
+A JSON object {"sense":"Cause-Effect","coupling":"entailment"} is also acceptable.
+
+Use the following examples to better understand your task.
+
+Example 1 (the response makes the causal link):
+RESPONSE: The company launched a flawed product last quarter. Reviewers panned it, returns spiked, and the company's stock price fell 15 percent over the same period.
+A: The company launched a flawed product last quarter.
+B: The company's stock price fell 15 percent last quarter.
+1. Reasoning: the response presents the flawed launch as the head of a chain (panning, returns) that ends in the stock decline, so the response itself draws a causal link from A to B.
+2. Discourse sense: Cause-Effect.
+3. Coupling: A causing B is a positive inferential link, i.e. entailment.
+4. Final answer:
+[sense=Cause-Effect] [coupling=entailment]
+
+Example 2 (both claims present, but the response draws NO connection -> None):
+RESPONSE: The quarterly report was published in April. Separately, the annual audit was scheduled for December. The two processes are run by different teams and were not related this year.
+A: The quarterly report was published in April.
+B: The annual audit was scheduled for December.
+1. Reasoning: both claims appear in the response, and one might imagine a reporting-to-audit link in general, but this response explicitly treats them as separate and unrelated. The response draws no dependence from A to B.
+2. Discourse sense: None.
+3. Coupling: no dependence the response asserts, i.e. none.
+4. Final answer:
+[sense=None] [coupling=none]
+
+Example 3 (the response states an EXHAUSTIVE alternative -> exclusive):
+RESPONSE: The official statement said no one was harmed in the incident. However, the coroner's report confirmed that three people died in the incident.
+A: No one was harmed in the incident.
+B: Three people died in the incident.
+1. Reasoning: the response sets A and B against each other ("However, ...") and they cannot both be true; but they also cannot both be false -- either people were harmed or they were not -- so exactly one holds. This is exhaustive, not a mere contrast. No holding resolves it.
+2. Discourse sense: Alternative.
+3. Coupling: exactly one of A, B is true, i.e. exclusive.
+4. Final answer:
+[sense=Alternative] [coupling=exclusive]
+
+Example 4 (at least one must hold -> co_necessity):
+RESPONSE: The defect was caught in review: at least one of the two independent checks -- the vibration analysis or the metallurgical assay -- flagged it.
+A: The vibration analysis flagged the defect.
+B: The metallurgical assay flagged the defect.
+1. Reasoning: the response asserts the defect WAS caught by at least one check, so A and B cannot both be false; but both could hold (both checks may have flagged it). This is a disjunction, not an exclusion.
+2. Discourse sense: Disjunction.
+3. Coupling: at least one of A, B is true, i.e. co_necessity.
+4. Final answer:
+[sense=Disjunction] [coupling=co_necessity]
+
+Your task:
+RESPONSE: {{response}}
+A: {{atom_a}}
+B: {{atom_b}}

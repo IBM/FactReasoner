@@ -1,0 +1,84 @@
+
+Instructions:
+1. You are given a QUESTION and a RELATION PLAN in JSON. Write a RESPONSE that
+   answers the question and realizes the plan exactly.
+2. Assert every planned atom EXACTLY ONCE, in the plan's POSITION order,
+   preserving each atom's factual content. Do not restate an atom you have
+   already asserted in order to attach a later relation to it - refer back with
+   a pronoun or a short noun phrase instead. Name that phrase after the thing
+   the atom is about, not after its status as a finding: "the primitive carpal
+   morphology" or "that wrist evidence", not "the analysis's flagging of
+   primitive traits"; "these two accounts" or "either possibility", not "the two
+   claims in circulation". A summary phrase covering both endpoints of one
+   connective is fine - "at least one of these must hold: X, or Y". You may
+   adjust surface wording for fluency but must not change what is asserted.
+   Quantifiers, determiners, numbers, dates, polarity and modals are CONTENT,
+   not wording: keep "all", "only", "no", "some", "each", "never" and every
+   figure exactly as the atom has them. "All tools were crafted by a single
+   culture" may become "every one of the tools came from a single culture", but
+   never "the tools were crafted by a single culture" - dropping "All" weakens
+   the claim and counts as changing it.
+   Never let one atom absorb another: each must stay separately true or false.
+   Joining two atoms with a connective is fine and often required - "either X or
+   Y" and "although X, Y" both assert two atoms and are exactly what instruction
+   3 asks for.
+3. Realize every planned RELATION so a careful reader could recover it from the
+   text alone, using language appropriate to its sense:
+   - Cause-Effect / Effect-Cause: "caused", "led to", "resulted from", "because"
+   - Evidence: "indicates", "confirms", "as shown by"
+   - Condition: "if", "provided that", "only when"
+   - Restatement: "that is", "in other words", "equivalently"
+   - Instantiation: "for example", "specifically", "in one case"
+   - Contrast: "by contrast", "whereas", "on the other hand"
+   - Concession: "although", "despite", "even though"
+   - Alternative: make the exhaustiveness EXPLICIT - "either ... or", "one of
+     these accounts must be wrong", "the two cannot both be true, and one of
+     them must hold"
+   - Disjunction: make the at-least-one reading EXPLICIT - "at least one of",
+     "one or both", "perhaps both". Say "perhaps both", never "possibly both".
+     A bare "X, or Y" is NOT enough for either of these two senses: on its own it
+     leaves a reader unable to tell whether both claims could hold, which is the
+     only thing separating Alternative from Disjunction. Every such pair needs its
+     marker - "either X or Y" when exactly one holds, "at least one of X or Y,
+     perhaps both" when both may.
+   - Precedence / Succession: state the sequence EXPLICITLY in one sentence
+     joining both claims - "before", "after", "subsequently", "earlier than",
+     "which postdates" - while keeping the ordering purely chronological, so a
+     reader sees only when things happened and infers nothing from it. Write
+     "X, which predates Y" or "Y came after X", not "X and therefore Y".
+     Asserting the two claims in separate sentences leaves this relation
+     unrealized: an ordering a reader cannot see is the same as no ordering.
+4. For each planned NON-RELATION, assert both atoms but draw no dependence
+   between them. Separate them by DISTANCE and PARAGRAPHING, not by a marker:
+   put other material between them, or place them in different paragraphs, and
+   simply use no connective. Do NOT announce the absence of a link - phrases
+   like "In an unrelated matter", "Separately", or "On a different note" read as
+   stitched-together annotation rather than prose and will be marked down.
+5. For a resolved Concession, assert the resolver atom after both endpoints and
+   present it as settling the tension.
+6. Write it as a continuous expository answer to the QUESTION - an argument a
+   domain expert would publish, organized into 3-5 paragraphs, in which the
+   planned relations are simply how the argument hangs together. Do NOT walk the
+   plan relation by relation: a reader must not be able to tell that a plan
+   exists. Restate a subject to carry an argument forward ("the radiocarbon
+   date", "that attribution"), never the earlier sentence as a step ("the
+   finding just reported", "the provision just stated", "the ordering just
+   described"). Use precise and formal language, avoiding vague generalizations
+   and rhetorical fillers. Aim for 550-650 words. The 500-word floor is a hard
+   requirement checked by an automated reader, which rejects a shorter answer
+   outright however good it is, so give each atom and each relation the space to
+   be argued rather than compressing them into a summary.
+7. Do NOT mention the relation plan, the senses, the strength bands, the
+   validity labels, or the fact that some content is incorrect. Do NOT hedge
+   with "assume", "might", "possibly", "allegedly", "supposedly",
+   "reportedly", or "it is claimed" around planned-invalid relations - assert
+   them in the same register as the valid ones. Do NOT add headings, bullet
+   lists, or annotations.
+8. Wrap the RESPONSE in a code block whose contents are the prose itself, as you
+   would publish it. The block holds the answer, not a JSON object or any other
+   payload with the prose inside a field.
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+RELATION PLAN: [PLAN_PLACEHOLDER]
+RESPONSE:

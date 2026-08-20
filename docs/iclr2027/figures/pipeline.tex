@@ -1,0 +1,53 @@
+% The two-stage pipeline: FactReasoner posteriors become coherence-MRF priors.
+\begin{figure}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.4pt,
+                minimum height=8.5mm},
+    s1/.style={box,fill=blue!5},
+    s2/.style={box,fill=orange!8},
+    fin/.style={box,fill=green!10},
+    ar/.style={-{Stealth[length=1.9mm]},thick},
+    node distance=3.2mm]
+
+  \node[s1] (resp) {response $y$};
+  \node[s1,right=of resp] (atom) {atomize\\+ revise};
+  \node[s1,right=of atom] (ret)  {retrieve\\contexts $\mathcal{C}$};
+  \node[s1,right=of ret]  (nli)  {NLI\\$p^\ast$};
+  \node[s1,right=of nli]  (fmrf) {factuality\\MRF};
+  \node[fin,right=of fmrf] (post) {$q_i=\pr{a_i{=}1\mid\mathcal{C}}$};
+
+  \draw[ar] (resp) -- (atom);
+  \draw[ar] (atom) -- (ret);
+  \draw[ar] (ret)  -- (nli);
+  \draw[ar] (nli)  -- (fmrf);
+  \draw[ar] (fmrf) -- (post);
+
+  \node[s2,below=10mm of atom] (mine) {mine relations\\(Prompt A / B)};
+  \node[s2,right=of mine] (comp) {compile $\mathcal{C}$\\sense $\to$ coupling};
+  \node[s2,right=of comp] (cmrf) {coherence MRF\\unaries $[1{-}q_i,q_i]$};
+  \node[fin,right=of cmrf] (lcs) {$\mathrm{LCS}(y)$};
+
+  \draw[ar] (atom.south) -- ++(0,-4mm) -| (mine.north);
+  \draw[ar] (mine) -- (comp);
+  \draw[ar] (comp) -- (cmrf);
+  \draw[ar] (cmrf) -- (lcs);
+  \draw[ar,dashed] (post.south) -- ++(0,-5mm) -| (cmrf.north)
+        node[pos=0.28,above,font=\scriptsize]{priors};
+
+  \node[left=1mm of mine,font=\scriptsize\itshape,align=right,text width=13mm]
+       {Stage 2\\coherence};
+  \node[left=1mm of resp,font=\scriptsize\itshape,align=right,text width=13mm,
+        yshift=0mm] {Stage 1\\factuality};
+\end{tikzpicture}}
+\caption{The two-stage pipeline. Stage 1 (\S\ref{sec-factuality}) is FactReasoner
+  \citep{factreasoner}: it grounds each atom against retrieved evidence and returns a
+  posterior marginal $q_i$. Stage 2 (\S\ref{sec-coherence}) builds a second MRF over
+  the atoms \emph{alone}, takes $q_i$ as its unary priors, and adds one pairwise factor
+  per mined atom--atom relation. Atomization is shared, so the response is decomposed
+  once. Setting $q_i\!\equiv\!\tfrac12$ recovers a pure coherence score that consults no
+  external evidence.}
+\label{fig:pipeline}
+\end{figure}

@@ -1,0 +1,26 @@
+
+Let's define a function named check_atom_coverage(response: str,
+atoms: list[str]).
+For each atom, the function decides whether the response asserts it, returning a
+JSON list of objects:
+  {"index": i,
+   "status": one of ["asserted", "altered", "missing", "merged"],
+   "span": the quoted span of the response that asserts it, or null,
+   "position": the 1-based index of that span among the response's sentences}
+
+- "asserted": the response asserts the atom's full content, in any wording.
+- "altered": the response asserts something related but changes the atom's
+  content (a different number, date, entity, or polarity).
+- "missing": the response does not assert the atom.
+- "merged": the atom's content has been absorbed into another atom's, so it is no
+  longer separately assertable - you could not negate this atom alone and leave
+  the other standing. Reserve this for genuine loss of content.
+  Two atoms joined by a connective are NOT merged: "either X or Y", "at least one
+  of X or Y", "although X, Y", "X, whereas Y", and "X; that is, Y" each assert
+  BOTH atoms, because each remains independently true or false. Mark both
+  "asserted", with the span covering the part that asserts each one.
+
+Return the JSON list only. Note that your response will be passed to the python
+interpreter, SO NO OTHER WORDS!
+
+check_atom_coverage(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])

@@ -1,0 +1,44 @@
+
+Instructions:
+1. You are given a RESPONSE, its RELATION PLAN, and one PERTURBATION to apply.
+2. Apply ONLY the named perturbation. Change the minimum number of words
+   needed. Every other relation, atom, and sentence must be preserved verbatim.
+3. The perturbations are defined as follows.
+   - wrong_sense(edge, new_sense): rewrite the connective realizing that edge so
+     the text draws new_sense instead. Keep both atoms' content unchanged.
+   - direction_reversal(edge): rewrite so the relation runs from the target to
+     the source. Keep both atoms' content unchanged.
+   - exhaustiveness_flip(edge): if the edge is Alternative, rewrite so the two
+     claims merely oppose without being exhaustive (both could be false). If it
+     is Contrast, rewrite so exactly one must hold.
+   - remove_resolution(edge): delete the resolver sentence and any reference to
+     it, leaving the conceded tension unresolved. Change nothing else.
+   - inject_contradiction(atom): add ONE new sentence asserting a claim that
+     directly contradicts the named atom. Place it at least two sentences later.
+   - break_chain(edge): remove or negate the link realizing that edge so the
+     causal chain no longer connects, keeping both endpoint atoms present.
+   - shuffle_order(level): reorder the response's sentences without changing any
+     wording. level=full permutes all sentences; level=block permutes paragraph
+     blocks; level=adjacent swaps one adjacent pair.
+   - spurious_relation(atom_a, atom_b): add a connective asserting a causal or
+     contradictory link between two atoms the original response kept separate.
+     Add no new factual content.
+   - drop_relation(edge): remove the connective realizing that edge so the two
+     atoms are merely adjacent assertions. Keep both atoms.
+   - ordering_only(edge): rewrite a Precedence edge as Succession, or the
+     reverse, preserving the actual chronology and adding NO causal or
+     inferential language. The truth of neither atom may become dependent on
+     the other.
+4. Do not change the response's length by more than 15 percent, except for
+   inject_contradiction (which adds one sentence) and remove_resolution /
+   break_chain (which remove one).
+5. Output the perturbed RESPONSE in a code block, then a second code block
+   containing a JSON diff:
+   {"operator": "...", "target": ..., "sentences_changed": [...],
+    "relations_added": [...], "relations_removed": [...],
+    "relations_relabeled": [...]}
+
+Your Task:
+RESPONSE: [RESPONSE_PLACEHOLDER]
+RELATION PLAN: [PLAN_PLACEHOLDER]
+PERTURBATION: [OPERATOR_PLACEHOLDER]

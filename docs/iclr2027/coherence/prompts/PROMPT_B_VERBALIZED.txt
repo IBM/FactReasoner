@@ -1,0 +1,40 @@
+
+
+Instructions:
+You are given the full RESPONSE and two claims A and B drawn from it. Assume claim A is TRUE and, IN THE CONTEXT OF THIS RESPONSE, estimate how strongly A determines B under a {{coupling}} relation from A to B.
+
+- For an entailment or equivalence coupling: how likely is B to be TRUE given A?
+- For a contradiction or exclusive coupling: how likely is B to be FALSE given A? (exclusive = A and B are exhaustive alternatives, so A true forces B false.)
+- For a co_necessity coupling (at least one of A, B holds): how likely is B to be TRUE when A is FALSE?
+
+Answer with a single probability in [0, 1] to two decimals, after one short sentence of justification. A near-certain link is close to 1.00; a merely plausible link is around 0.60-0.70. End your answer with the probability wrapped in brackets on its own, exactly in the form: [p=0.NN]
+
+Example 1:
+RESPONSE: The new alloy is chemically identical to the certified reference alloy, so it meets the certified reference specification.
+A: The new alloy is chemically identical to the certified reference alloy.
+B: The new alloy meets the certified reference specification.
+coupling: entailment
+Justification: chemical identity to a certified reference almost guarantees the specification is met, so B follows very strongly from A.
+[p=0.95]
+
+Example 2:
+RESPONSE: The company launched a flawed product last quarter, and its stock price fell 15 percent over the same period.
+A: The company launched a flawed product last quarter.
+B: The company's stock price fell 15 percent last quarter.
+coupling: entailment
+Justification: a flawed product can plausibly drive a stock decline, but many other factors affect price, so the link is only moderate.
+[p=0.65]
+
+Example 3:
+RESPONSE: The official statement said no one was harmed, but three people died in the incident.
+A: No one was harmed in the incident.
+B: Three people died in the incident.
+coupling: contradiction
+Justification: if no one was harmed, it is almost certain that B (three deaths) is false.
+[p=0.93]
+
+Your task:
+RESPONSE: {{response}}
+A: {{atom_a}}
+B: {{atom_b}}
+coupling: {{coupling}}

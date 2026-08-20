@@ -1,0 +1,1277 @@
+\input{preamble.tex}
+
+\title{LoCoBench: A Benchmark of Coherence Ladders for\\
+       Evaluating Logical Coherence Measures}
+
+\author{Anonymous authors\\Paper under double-blind review}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Measuring whether a long-form response \emph{hangs together} --- whether the claims it asserts form a
+consistent argument rather than a bag of individually-checkable facts --- requires evaluation data that
+no existing resource provides. Two documents that differ in coherence almost always differ in topic,
+length and content as well, so any score difference is unattributable; human coherence ratings supply a
+target but not a controlled contrast; and nothing supplies a gold \emph{relation graph}, without which
+a measure's errors cannot be separated from its relation extractor's. We introduce
+\textbf{LoCoBench}, a benchmark built from \emph{coherence ladders}: families of five responses over one
+claim set whose relative coherence ordering is declared in advance, each rung carrying its own
+machine-readable relation graph derived from a base plan by explicit perturbation operators. A measure
+is scored not on agreement with a rating but on whether it recovers the declared orderings, and because
+rungs share a claim set the result is attributable to coherence alone. The corpus targets a documented
+gap: six of the twelve discourse senses in our annotation scheme --- including every exhaustive
+alternative and every resolved concession --- have no gold data in any existing dataset. We specify the
+generation pipeline as five prompted stages over a $36$-topic inventory, all eight prompts reproduced
+verbatim, with every acceptance threshold centralized and enforced by an independent three-model
+validation committee that the generator is excluded from; families are admitted whole or not at all,
+since four of five rungs carry no standalone claim. We report the benchmark's own validation, including
+a construction defect we found and fixed whose effect was to make the benchmark silently untestable:
+when every rung of a family shared the base plan's relation graph, gold-relation ordering agreement was
+$2/28$, and deriving each rung's graph from its own operators raised it to $22/28$ on identical topics
+and generator. On the released corpus, measures scored from gold graphs satisfy $78.6\%$ of declared
+constraints against $35.7$--$53.6\%$ from mined graphs, and relation extraction tops out at $56.3\%$
+coupling-level F1 --- locating the field's bottleneck in extraction rather than scoring.
+\end{abstract}
+
+%% ================================================================
+\section{Introduction}
+\label{sec-intro}
+%% ================================================================
+
+Long-form factuality evaluation decomposes a response into atomic claims and verifies each against
+retrieved evidence \citep{factscore,safe,veriscore}. The paradigm cannot see whether the claims form an
+argument. A response asserting both that no one was harmed in an incident and that three people died
+contains one true claim and one false one, and per-claim verification reports exactly that, without
+registering that the response contradicts itself; a chain of true statements joined by a spurious
+``therefore'' has no unsupported atom in it at all. \citet{lorefact} quantify the omission: on
+logic-related samples, SAFE, VeriScore and FactCheck-GPT miss the logical dimension on $60\%$, $78\%$
+and $48\%$ of cases respectively.
+
+Measures of \emph{logical coherence} that address this exist or can be built --- from entity grids
+\citep{barzilay} and their neural successors \citep{li} through discourse-representation scores
+\citep{discoscore} to LLM judges \citep{geval} and probabilistic models over claim-relation graphs. What
+does not exist is the data to evaluate them on. This paper builds it.
+
+\paragraph{Why ordinary corpora will not do.} Suppose we wish to know whether a candidate measure
+tracks coherence. The natural experiment --- score a set of documents and correlate against human
+coherence ratings --- has three defects that compound. First, \emph{confounding}: two documents that
+differ in coherence differ in topic, length, register and claim content as well, so a measure that
+merely tracks length or claim count can correlate respectably with human ratings for reasons unrelated
+to coherence. Second, \emph{no ground truth for the mechanism}: a rating tells us a document is
+incoherent, not \emph{which claims} are in tension, so a measure that gets the right answer for the
+wrong reason is indistinguishable from one that is right. Third, and most consequential for the class
+of measures that build an explicit relation graph, \emph{no separation of error sources}: such a
+measure both extracts relations and scores them, and a rating cannot say which of the two failed.
+
+\paragraph{What LoCoBench provides instead.} We build families of responses --- \emph{ladders} --- over
+a single claim set, where the rungs differ only in a controlled structural respect and their relative
+ordering is \emph{declared before any measurement}. A conflict ladder holds topic, claims and every
+unperturbed relation fixed while varying only the conflict structure: a rung with a spurious conflict
+added, the base, a rung whose conceded tension is resolved, a rung with one conflict removed, and a
+fully coherent rung. A measure is then scored on the fraction of declared ordering constraints it
+satisfies. Because the rungs share a claim set, satisfying them is attributable to coherence and
+nothing else --- and because we also declare, per family, the orderings that must \emph{not} hold and
+one family type in which every rung must score \emph{identically}, the benchmark can detect a measure
+that is tracking edit count rather than coherence, which is the most likely way such a measure is
+secretly wrong.
+
+Every rung ships with a machine-readable relation graph: which claims are related, by which discourse
+sense, in which direction, at what strength, and whether the relation genuinely holds or is a planted
+error. This is what makes the third defect above tractable. A measure can be run twice --- once on its
+own extracted relations, once on the gold graph --- and the difference is its extractor's contribution,
+isolated by construction rather than estimated after the fact. In our experiments that difference is
+large ($78.6\%$ against $53.6\%$ of declared constraints), which is itself the most actionable finding
+the benchmark produces.
+
+\paragraph{A documented gap in existing annotation.} The relation vocabulary matters here beyond
+bookkeeping. Six of the twelve discourse senses in our scheme --- \sense{Instantiation},
+\sense{Restatement}, \sense{Contrast}, \sense{Concession}, \sense{Alternative} and \sense{Disjunction}
+--- have no gold data in any existing dataset we are aware of. Two of them are exactly the cases that
+adjudicative prose turns on: an \sense{Alternative} is a pair of \emph{exhaustive} competing claims of
+which precisely one must hold, and a \sense{Concession} is a tension the text itself resolves. A measure
+cannot be evaluated on relations nobody has labelled, and a measure that conflates a mere opposition
+with an exhaustive one mis-scores every incident investigation and every contested judgment. Creating
+labelled data for these six is a primary purpose of the corpus, and it drives design decisions
+throughout: the topic-allocation policy of \S\ref{sec-corpus} steers surplus families toward
+adjudicated subjects precisely because that is where exhaustive alternatives and resolving holdings
+occur naturally.
+
+Our contributions are as follows.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt,topsep=3pt]
+\item \textbf{The coherence-ladder construction} (\S\ref{sec-ladders}): a formal definition, four
+  family types varying different structural dimensions, three classes of declared ordering constraint
+  including predicted \emph{inversions} and a control family that must be flat, and whole-family
+  admission with its justification.
+\item \textbf{A fully specified generation pipeline} (\S\ref{sec-generation}): five prompted stages from
+  topic to perturbed rung, six perturbation operators realized as ten parameterized calls, the
+  derivation of each rung's gold graph from the base plan, and the per-stage failure policy that
+  determines whether a defect is retried, regenerated, or grounds for rejecting the family.
+\item \textbf{Committee validation with centralized thresholds} (\S\ref{sec-validation}): three
+  validators run by a model committee that excludes the generator, every threshold in one table, with
+  the empirical calibration of each and an account of two gates that were unsatisfiable as first
+  specified.
+\item \textbf{The item schema and evaluation harness} (\S\ref{sec-schema}--\S\ref{sec-harness}):
+  arms that hold the scorer fixed and swap only the relation graph, three nested match levels, stratified
+  recall, and declared \emph{non-relations} as a genuine negative set.
+\item \textbf{Validation of the benchmark itself} (\S\ref{sec-experiments}), including the per-rung
+  relation-graph defect that made an earlier version untestable and the measurements that establish the
+  ladder discriminates between measures at all.
+\item \textbf{All eight prompts verbatim} (Appendix~\ref{app-prompts}), extracted programmatically from
+  the released code, with their instruction counts and placeholder contracts.
+\end{itemize}
+
+%% ================================================================
+\section{Related work}
+\label{sec-related}
+%% ================================================================
+
+\paragraph{Factuality benchmarks and their blind spot.} FActScore \citep{factscore} pairs biography
+prompts with a knowledge source and scores per-atom precision; SAFE \citep{safe} contributes
+LongFact-Objects and search-augmented verification with the $F_1@K$ metric; VeriScore
+\citep{veriscore} restricts to verifiable claims. Each supplies claims and evidence, and none supplies
+inter-claim structure, so none can serve as evaluation data for a coherence measure. \citet{lorefact}
+is the closest prior art and the source of our motivating statistic; it constructs data for
+\emph{logic-related} fact-checking and labels dependencies between claims, but as a classification
+target rather than as a graded ordering over controlled variants.
+
+\paragraph{Perturbation-based coherence evaluation.} Evaluating coherence models against synthetic
+perturbations is long-established: entity-grid work \citep{barzilay} discriminates a document from its
+sentence permutations, and neural coherence models \citep{li} extend the practice with insertion and
+replacement perturbations. LoCoBench inherits this methodology and changes one thing. There, the
+perturbation is an operation on \emph{text} whose effect on coherence is assumed; here it is an
+operation on a \emph{declared relation graph}, whose effect on the graph is computed and recorded per
+rung. Consequently the benchmark can state not only that rung $k+1$ should score higher than rung $k$
+but also \emph{why}, which relation changed, and --- for the ordering-only and control operators ---
+that certain rungs must score \emph{identically} because no factor changed at all. Sentence shuffling
+alone cannot express that distinction.
+
+\paragraph{Discourse annotation as precedent.} Our sense inventory is grounded in PDTB~3.0
+\citep{pdtb} and RST \citep{mann}, and the debt is methodological as well as terminological: both
+establish that discourse relations can be annotated reliably from surface cues, which is what makes
+V1 of \S\ref{sec-validation} a reasonable gate to impose. The departure is that PDTB annotates
+naturally-occurring text, where the relation inventory's distribution is whatever the corpus happens to
+contain --- which is precisely why six of our senses have no gold data. A generated corpus can
+\emph{require} the rare relations, and ours does: every plan must contain at least one
+\sense{Alternative}, one \sense{Disjunction}, one \sense{Restatement}, one \sense{Concession} and one
+temporal ordering.
+
+\paragraph{LLM-generated corpora and their validity risks.} Using a language model to generate
+evaluation data is now common, and the known risks are circularity (the generator's biases become the
+benchmark's ground truth), leakage (artifacts revealing the generation procedure), and unverifiable
+labels. We address these structurally rather than by assertion: the validating committee excludes the
+generating model (\S\ref{sec-validation}), one validator's sole purpose is to detect leakage spans, and
+the V1 gate requires an independent model to \emph{recover} the planned relations from the prose before
+the item is admitted, so a plan the text fails to realize is rejected rather than shipped with
+aspirational labels. \S\ref{sec-limitations} states plainly what this does not fix.
+
+%% ================================================================
+\section{The annotation scheme}
+\label{sec-scheme}
+%% ================================================================
+
+An item's gold annotation is a graph over its claims, and the edge labels come from a two-level scheme:
+an interpretable \emph{discourse sense} that an annotator can read off surface cues, and an inferential
+\emph{coupling} that says what the relation asserts about the joint truth of its endpoints. The two
+levels are connected by a deterministic map, and that map --- not the annotator, and not the generator
+--- is the authority on what a sense means.
+
+\subsection{Level one: inferential couplings}
+
+\begin{definition}[Inferential couplings]
+\label{def-couplings}
+A coupling $\tau$ is specified by the set $V(\tau)\subseteq\{0,1\}^2$ of joint truth assignments
+$(a_s,a_t)$ of its source and target claims that it \emph{penalizes} --- the configurations at which the
+relation is violated:
+\begin{center}\small
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Coupling & Reading & Directed & Penalized set $V(\tau)$ \\
+\midrule
+\ent            & $a_s \Rightarrow a_t$              & yes & $\{(1,0)\}$ \\
+\con            & $a_s \Rightarrow \neg a_t$         & yes & $\{(1,1)\}$ \\
+\eqv            & $a_s \Leftrightarrow a_t$          & no  & $\{(0,1),(1,0)\}$ \\
+\exc            & exactly one of $a_s,a_t$ holds     & no  & $\{(0,0),(1,1)\}$ \\
+\cnc            & at least one of $a_s,a_t$ holds    & no  & $\{(0,0)\}$ \\
+\coupling{none} & no truth coupling                  & --- & $\varnothing$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The two couplings whose penalized set contains the both-true world, $\{\con,\exc\}$, are the
+\emph{conflict} couplings.
+\end{definition}
+
+The distinction between \con{} and \exc{} is the one the scheme exists to draw, and it is the
+exhaustiveness question. \con{} forbids only the both-true world: two claims that cannot both hold but
+might both fail. \exc{} additionally forbids the both-false world, which is what an exhaustive pair
+asserts --- ``no one was harmed'' and ``three people died'' can neither both hold nor both fail. \cnc{}
+is the dual, forbidding only the both-false world, which is what a disjunction asserts. An annotation
+scheme that offers only \con{} cannot express either, and any measure evaluated against such a scheme
+is untested on precisely the relations that adjudicated disputes turn on.
+
+\subsection{Level two: discourse senses, and the compile map}
+
+\begin{definition}[Compile map]
+\label{def-compile}
+The compile map $\mathcal{C}$ assigns to each discourse sense a coupling, a strength prior ($\bot$
+meaning ``use the estimated value''), and the flags \emph{directed}, \emph{concession} and
+\emph{ordering-only}. It is total and deterministic, and is given in Table~\ref{tab:compile}.
+\end{definition}
+
+\begin{table}[t]
+\centering\small
+\caption{The compile map $\mathcal{C}$ of Def.~\ref{def-compile}. \emph{Ordering-only} senses record
+  assertion order but carry \textbf{no truth coupling}, so they produce no factor in any scorer that
+  consumes this scheme --- which is what makes the ordering-only perturbation of
+  \S\ref{sec-generation} a meaning-preserving edit whose score must not move. \sense{Concession} marks a
+  conflict the text may itself resolve. The nine senses marked $\star$ are the combinations the corpus
+  actually labels; \textbf{bold} marks the six senses for which we are aware of no gold data in any
+  existing dataset.}
+\label{tab:compile}
+\begin{tabular}{@{}llccll@{}}
+\toprule
+Level-2 sense & $\mathcal{C}$ coupling & prior & dir. & flag & gloss \\
+\midrule
+\sense{Cause-Effect}$^\star$   & \ent & $\bot$ & yes & & source brings target about \\
+\sense{Effect-Cause}$^\star$   & \ent & $\bot$ & yes & & source is the effect, target the cause \\
+\sense{Evidence}$^\star$       & \ent & $\bot$ & yes & & source is evidence for target \\
+\sense{Condition}              & \ent & $\bot$ & yes & & source conditions target \\
+\textbf{\sense{Instantiation}} & \ent & $\bot$ & yes & & target instantiates source \\
+\textbf{\sense{Restatement}}$^\star$ & \eqv & $0.90$ & no & & definitional identity \\
+\textbf{\sense{Contrast}}$^\star$    & \con & $\bot$ & no & & opposed, \emph{not} exhaustive \\
+\textbf{\sense{Concession}}$^\star$  & \con & $\bot$ & yes & conc. & a tension the text resolves \\
+\textbf{\sense{Alternative}}$^\star$ & \exc & $\bot$ & no & & exhaustive: exactly one holds \\
+\textbf{\sense{Disjunction}}$^\star$ & \cnc & $\bot$ & no & & at least one holds \\
+\sense{Precedence}$^\star$     & \coupling{none} & --- & yes & ord. & temporal order only \\
+\sense{Succession}             & \coupling{none} & --- & yes & ord. & temporal order only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Five senses collapse onto \ent{}, which is a deliberate loss of information at the inferential level:
+whether one claim causes another or merely evidences it makes no difference to what the pair asserts
+about joint truth. The sense is retained alongside the coupling so that error analysis can distinguish
+``related, but mislabelled'' from ``not related'', and so that the corpus remains useful to work that
+cares about the discourse layer for its own sake.
+
+\paragraph{The compile map is the authority, and it is enforced.} A gold relation carries both a sense
+and a coupling, which invites inconsistency. The schema validator rejects any item in which
+$\text{coupling}\neq\mathcal{C}(\text{sense})$, and likewise re-derives directedness, ordering-only
+status and exhaustiveness from the sense rather than trusting the generator's assertion of them. This
+matters for a generated corpus in a way it would not for a hand-annotated one: an LLM asked for both a
+sense and a coupling will occasionally emit a pair that no reading of the scheme licenses, and silently
+keeping such an edge would place a factor in the graph that the sense does not justify. Nine
+$(\text{sense},\text{coupling})$ combinations occur in the corpus and the mapping among them is a
+bijection, so an edge outside that set cannot be scored against gold at all.
+
+%% ================================================================
+\section{Coherence ladders}
+\label{sec-ladders}
+%% ================================================================
+
+\begin{definition}[Coherence ladder]
+\label{def-ladder}
+A \emph{ladder} is a tuple $(\mathcal{P},\langle\rho_0,\dots,\rho_4\rangle,\Gamma)$ where $\mathcal{P}$
+is a base \emph{relation plan} --- a selected claim set with a declared relation graph over it --- each
+rung $\rho_k$ is a sequence of perturbation operator calls applied to $\mathcal{P}$, yielding a response
+text together with its \emph{own} gold relation graph, and $\Gamma$ is a set of constraints on the
+relative ordering of the rungs' scores. A ladder is \emph{admitted} only if all five rungs pass every
+validation gate of \S\ref{sec-validation}.
+\end{definition}
+
+\paragraph{Whole-family admission.} A ladder is admitted entire or not at all. This follows from what
+the rungs are for: four of the five carry no standalone claim, only a claim relative to their
+neighbours, so a ladder missing a rung is not a partial success but a broken comparison. The gate
+therefore sits at family granularity, and a family whose fourth rung fails V3 is rejected together with
+the four rungs that passed.
+
+\begin{table}[t]
+\centering\small
+\caption{The four family types. Each holds the claim set, the topic and every unperturbed relation
+  fixed, varying one structural dimension. \famtype{control} is the false-positive check: every one of its
+  edits is meaning-preserving and adds no factor, so a measure showing any monotone trend across it is
+  tracking edit count rather than coherence. Counts are the target allocation at a corpus of $120$
+  families.}
+\label{tab:ladders}
+\begin{tabular}{@{}lp{2.4cm}p{4.4cm}p{2.9cm}r@{}}
+\toprule
+Type & Dimension varied & Rungs, $\rho_0 \to \rho_4$ & Required pattern & $n$ \\
+\midrule
+\famtype{conflict} & conflict structure
+  & \rung{worse}, \rung{base}, \rung{concession\_resolved}, \rung{fix\_one\_conflict}, \rung{coherent}
+  & strictly increasing & 55 \\[3pt]
+\famtype{chain} & entailment-chain integrity
+  & \rung{break\_3}, \rung{break\_2}, \rung{break\_1}, \rung{base}, \rung{coherent}
+  & strictly increasing & 25 \\[3pt]
+\famtype{order} & assertion order
+  & \rung{shuffle\_full}, \rung{shuffle\_block}, \rung{shuffle\_adjacent}, \rung{base},
+    \rung{ordering\_only}
+  & increasing, then \emph{exactly flat} at $\rho_4$ & 25 \\[3pt]
+\famtype{control} & nothing (meaning-preserving)
+  & \rung{ordering\_only}, \rung{direction\_reversal}, \rung{base}, \rung{direction\_reversal},
+    \rung{ordering\_only}
+  & \textbf{flat throughout} & 15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ladders} gives the four types. \famtype{conflict} is the reference ladder and the one the
+released corpus instantiates: only the conflict structure varies, which is what makes an ordering
+attributable to coherence rather than to content. \famtype{chain} tests a different failure mode, breaking
+$N$ links of an entailment chain and repairing them, where the defect is a \emph{missing} relation
+rather than a present conflict --- a distinction that matters because a measure built on contradiction
+detection alone will do well on the first ladder and fail the second. \famtype{order} varies assertion order
+at three granularities and then adds a rung that must be flat.
+
+\famtype{control} deserves emphasis because it is the type most benchmarks of this shape omit. Every rung
+applies a meaning-preserving edit --- exchanging a \sense{Precedence} for a \sense{Succession}, which
+Table~\ref{tab:compile} maps to no coupling at all, or reversing the direction of a symmetric relation
+--- so the required pattern is a flat line. A measure that trends monotonically across \famtype{control} has
+demonstrated that it responds to \emph{having been edited}, which is a false positive no
+increasing-order ladder can detect. We regard this as the single most important experiment the protocol
+specifies, and we are candid in \S\ref{sec-limitations} that the released corpus does not yet contain
+it.
+
+\subsection{Ordering constraints}
+\label{sec-constraints}
+
+A family declares its constraints in three classes, each asserted per readout of the measure under test.
+
+\textbf{C1, strict increase.} Consecutive rungs must be strictly ordered. Listed per readout per pair,
+so a family can assert that one readout must increase between two rungs while another is unconstrained
+there --- which is needed because different readouts of the same model legitimately have different
+sensitivities.
+
+\textbf{C2, predicted inversion or invariance.} A constraint that a score must \emph{decrease}, or must
+be \emph{exactly invariant}. This class is what distinguishes a declared-ordering benchmark from a
+monotonicity test, and it has two sources. Some measures are expected to dip when a conceded tension is
+resolved, because softening a conflict raises the probability of the very configuration the conflict
+forbids; asserting that dip positively turns a known peculiarity into a falsifiable prediction rather
+than an excuse offered after the fact. And an ordering-only edit \emph{must} be exactly flat, since
+Table~\ref{tab:compile} gives it no coupling: here C2 asserts an equality, and a measure that moves at
+all has been caught reading assertion order directly.
+
+\textbf{C3, endpoint separation.} The extreme rungs must separate, for all readouts. This is the robust
+headline claim, insensitive to the fine structure of the intermediate rungs, and the one we would report
+if only one constraint class could be.
+
+A measure is scored on the fraction of declared constraints satisfied, with $14$ constraints per family
+in the \famtype{conflict} type.
+
+%% ================================================================
+\section{The generation pipeline}
+\label{sec-generation}
+%% ================================================================
+
+Generation is a five-stage prompted pipeline followed by validation, and the stages are separated so
+that a defect can be attributed to one of them and repaired there. Each stage's prompt is fixed,
+versioned, and reproduced verbatim in Appendix~\ref{app-prompts}; the instruction count and placeholder
+set of each is declared in a specification table and asserted by a test, so a prompt cannot drift from
+the document that describes it without the test failing.
+
+\begin{figure}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  st/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=blue!5},
+  vd/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=orange!10},
+  fin/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=green!12},
+  ar/.style={-{Stealth[length=1.9mm]},thick}, node distance=3.4mm]
+  \node[st] (t) {topic};
+  \node[st,right=of t] (p1) {\textbf{P1}\\question};
+  \node[st,right=of p1] (p2) {\textbf{P2}\\26 claims};
+  \node[st,right=of p2] (p3) {\textbf{P3}\\relation plan};
+  \node[st,right=of p3] (p4) {\textbf{P4}\\base response};
+  \node[st,right=of p4] (p5) {\textbf{P5}\\$\times4$ rungs};
+  \foreach \a/\b in {t/p1,p1/p2,p2/p3,p3/p4,p4/p5} \draw[ar] (\a) -- (\b);
+  \node[vd,below=9mm of p3] (v1) {\textbf{V1} recover\\relations};
+  \node[vd,right=of v1] (v3) {\textbf{V3} prose\\audit};
+  \node[vd,right=of v3] (v4) {\textbf{V4} claim\\coverage};
+  \node[fin,right=of v4] (adm) {admit family\\(all 5 rungs)};
+  \draw[ar] (p5.south) -- ++(0,-3mm) -| (v1.north);
+  \draw[ar] (v1) -- (v3); \draw[ar] (v3) -- (v4); \draw[ar] (v4) -- (adm);
+  \node[left=1mm of v1,font=\scriptsize\itshape,align=right,text width=15mm] {committee\\(3 models)};
+  \node[left=1mm of t,font=\scriptsize\itshape,align=right,text width=15mm] {generator\\(1 model)};
+\end{tikzpicture}}
+\caption{The pipeline. Five generation stages produce a family of five rungs from one topic; three
+  validators, run by a committee that excludes the generating model, gate admission. A family is
+  admitted whole or rejected whole (Def.~\ref{def-ladder}).}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{P1: topic to question}
+
+Given a topic from the inventory of \S\ref{sec-corpus}, emit one open-ended question. Three of the nine
+instructions are doing real work. The question must \emph{elicit} diverse logical structure, and the
+prompt enumerates the target relations so that the question is chosen with the downstream plan in mind
+rather than for topical interest. It must prefer adjudicative domains --- incident investigations,
+litigation, diagnostic reasoning, attribution disputes, competing scientific hypotheses --- because
+these are the settings in which exhaustive alternatives and resolving holdings arise naturally, and
+those are the scarce relations of Table~\ref{tab:compile}. And it must \emph{not} contain the words
+``cause'', ``condition'', ``alternative'' or ``contrast'', so that the relations the answer draws are not
+primed lexically by the question: without this constraint the generator tends to echo the question's
+vocabulary and the resulting relations are an artifact of the prompt rather than of the subject.
+
+\subsection{P2: question to tagged claims}
+
+Emit exactly $26$ atomic claims, each a single declarative sentence with no connective joining it to
+another --- relations are added at the next stage, not here, so that the claim set and the relation graph
+are independently controlled. The composition is specified rather than left to chance: $14$ factually
+correct claims; $4$ plausible-but-false claims; an \emph{exhaustive alternative} pair, of which exactly
+one must be true; a \emph{disjunctive} pair, of which at least one must be true but both may be; an
+\emph{equivalent} pair asserting one fact in different words; and two \emph{holding} claims in which an
+authority reaches a determination settling a dispute, marked by adjudicating language. Each claim carries
+a tag recording which of these roles it fills.
+
+Two details prevent the composition from being defeated. The disjunctive pair must be phrased as states
+of the world rather than as findings --- ``the alloy was substituted'' and ``the batch was mislabelled'',
+not ``assay A flagged it'' and ``assay B flagged it'' --- because a pair of \emph{reports} is trivially
+compatible and yields no real disjunction. And the false claims must not be signalled in their wording:
+no hedging with ``allegedly'' or ``possibly'', since a response that flags its own false content is not
+the artifact the benchmark needs.
+
+\subsection{P3: claims to relation plan}
+
+The planning stage, and the most constrained. Select $14$--$16$ of the claims and renumber them to
+consecutive assertion positions, then plan exactly ten relations over distinct claim pairs, each carrying
+a sense from Table~\ref{tab:compile}, an intended strength band (strong, moderate, or weak), and a
+\emph{validity} label. Four requirements shape the output.
+
+\emph{At least two false claims must be selected}, so the response asserts false content alongside true.
+Without this quota the planner selected none and the shipped corpus was entirely factual --- which would
+make coherence and factuality perfectly correlated in the data and so unable to distinguish a measure of
+one from a measure of the other. The quota is two rather than four because P2 writes four false claims
+among $26$ and P3 selects about $15$, so roughly $2.3$ are expected under indifferent sampling: the quota
+sits just below the natural rate, and demanding all four would force the planner's hand on four of
+fifteen slots and collide with the required-sense quota below.
+
+\emph{Five senses are required}: at least one \sense{Alternative}, one \sense{Disjunction}, one
+\sense{Restatement}, one \sense{Concession}, and one temporal ordering. These are the scarce facets of
+\S\ref{sec-intro}, and requiring them is what makes the corpus supply gold data for relations existing
+corpora lack.
+
+\emph{Exactly six relations valid and four invalid}, with each invalid relation carrying an error kind
+--- \gate{wrong\_sense}, \gate{wrong\_direction}, \gate{false\_endpoint} or \gate{spurious}. The count is
+stated as a count rather than a proportion because a planner asked for ``about $60\%$ valid'' computes a
+percentage and rounds unpredictably. Planted invalid relations are what make the corpus a test of
+\emph{precision} as well as recall: a relation extractor that recovers every gold edge including the
+deliberately wrong ones has not demonstrated good judgement.
+
+\emph{Four to six declared non-relations}: pairs of selected claims, within four positions of each other,
+between which the response must draw no dependence. These are the distractors, and they are the corpus's
+most useful and least obvious feature. Precision measured against all unlabelled pairs is close to
+meaningless, since most unlabelled pairs are simply unannotated rather than known to be unrelated; a
+violated \emph{declared} non-relation, by contrast, is a genuine false positive against a real negative
+set. The two lists are required to be disjoint.
+
+Relations are also kept local by default --- preferring pairs within four positions --- with long-range
+pairs permitted where the two claims share a named entity. This is not a claim about discourse in
+general but a deliberate bias toward graphs that a local reader can recover, so that a failure of the V1
+gate indicates a defective realization rather than an unreasonable demand.
+
+\subsection{P4: plan to response}
+
+Write prose realizing the plan exactly: assert every planned claim once, in position order, and realize
+every planned relation so that a careful reader could recover it from the text alone. This stage carries
+the pipeline's hardest instruction, because two requirements pull against each other --- the text must be
+recoverable as a relation graph, and it must read as publishable expert prose rather than as an
+annotation walked sentence by sentence.
+
+Several instructions exist to resolve that tension. Referring back to an already-asserted claim must use
+a pronoun or a short noun phrase named after \emph{the thing the claim is about}, not after its status as
+a finding: ``the primitive carpal morphology'', not ``the analysis's flagging of primitive traits'' ---
+the latter is precisely the register that reads as stitched-together annotation. Quantifiers,
+determiners, numbers, dates, polarity and modals are declared to be \emph{content} rather than wording,
+so ``all tools were crafted by a single culture'' may be reworded but not weakened to ``the tools were'',
+which would silently change the claim being asserted and defeat V4. Exhaustive and disjunctive pairs must
+make their logical strength \emph{explicit}, since a bare ``X, or Y'' leaves a reader unable to tell
+whether both could hold --- which is the only thing separating \sense{Alternative} from
+\sense{Disjunction}. Temporal orderings must be stated within a single sentence joining both claims,
+because an ordering a reader cannot see is the same as no ordering. Non-relations must be separated by
+distance and paragraphing rather than by an explicit marker: announcing ``in an unrelated matter'' would
+both leak the plan and, ironically, constitute drawing attention to a relation.
+
+\subsection{P5: response to rung}
+
+Apply exactly one perturbation to the base response, changing the minimum number of words and preserving
+everything else verbatim. Table~\ref{tab:operators} gives the ten calls, grouped by the six operators
+they realize.
+
+\begin{table}[t]
+\centering\small
+\caption{The six perturbation operators and the ten parameterized calls realizing them. Each call also
+  has a declared effect on the rung's \emph{gold relation graph}, so a rung's edges are the base edges
+  with its own perturbations applied (\S\ref{sec-goldedges}). The two \famtype{o6} calls are
+  factor-invariant by design: they are what the \famtype{order} and \famtype{control} ladders exist to check.}
+\label{tab:operators}
+\begin{tabular}{@{}lp{3.3cm}p{6.6cm}@{}}
+\toprule
+Op & Calls & Effect on the text \\
+\midrule
+\famtype{o1} relabel & \gate{wrong\_sense}, \gate{direction\_\-reversal}, \gate{exhaustive\-ness\_flip}
+  & rewrite the connective so the text draws a different sense, reverses the relation, or flips
+    \sense{Contrast}$\leftrightarrow$\sense{Alternative} \\
+\famtype{o2} add conflict & \gate{inject\_\-contradiction}, \gate{spurious\_\-relation}
+  & add one sentence directly contradicting a named claim, at least two sentences later; or assert a link
+    between two claims the response kept separate \\
+\famtype{o3} break chain & \gate{break\_chain}
+  & remove or negate the link realizing an edge so the chain no longer connects, keeping both endpoints \\
+\famtype{o4} drop relation & \gate{drop\_relation}
+  & remove the connective realizing an edge, leaving the two claims as adjacent assertions \\
+\famtype{o5} resolve & \gate{add\_\-resolution}, \gate{remove\_\-resolution}
+  & add or delete the holding sentence that settles a conceded tension \\
+\famtype{o6} reorder & \gate{shuffle\_\-order}, \gate{ordering\_\-only}
+  & permute sentences at full, block or adjacent granularity; or exchange
+    \sense{Precedence}$\leftrightarrow$\sense{Succession} preserving chronology --- \emph{no coupling
+    changes} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The stage also emits a structured diff naming the operator, its target, the sentences changed, and the
+relations added, removed or relabelled. Length drift is capped at $15\%$, except for the three calls that
+add or remove a sentence by definition.
+
+\subsection{Deriving each rung's gold relation graph}
+\label{sec-goldedges}
+
+A rung's gold graph is the base plan's graph with that rung's operator calls applied. Three mechanisms
+make this well defined.
+
+First, \emph{target assignment}. Each call in a rung is assigned a distinct eligible edge, so a rung
+composing two \gate{drop\_relation} calls drops two \emph{different} edges. Eligibility is
+call-dependent: a \gate{drop\_relation} in a conflict ladder targets an unresolved conflict edge, an
+\gate{add\_resolution} targets a resolvable one. A \famtype{conflict} plan therefore needs three unresolved
+conflict edges to support its full ladder --- one for the resolution and two for the drops --- and a plan
+with fewer is rejected at generation time rather than silently emitting a rung that duplicates its
+neighbour.
+
+Second, \emph{derived-field re-derivation}. When a call changes an edge's sense, the coupling,
+directedness, ordering-only status and exhaustiveness are re-derived from the new sense through
+$\mathcal{C}$ rather than carried over, so a transformed edge cannot contradict the compile map.
+
+Third, an \emph{adjacency gate}. A family is rejected when two \emph{adjacent} rungs build the same edge
+set while the higher rung's calls claim a change. Adjacency rather than parentage is the right comparison:
+every \famtype{conflict} rung declares the base as its parent, so a parent-only check passes a rung that
+duplicates the rung immediately below it, which is exactly the defect that made an earlier version of the
+corpus untestable (\S\ref{sec-perrung}). The two factor-invariant calls of \famtype{o6} are exempt, since
+they are \emph{intended} to leave the edge set unchanged.
+
+\subsection{The failure policy}
+\label{sec-failure}
+
+What happens when a stage's output is defective is a specification decision, not an implementation
+detail, and the policy is per stage with four outcomes. A \textbf{retry} handles a transient parse
+failure where the inputs are sound: call again. Because a byte-identical prompt re-sent to a
+temperature-zero backend cannot produce a different parse, retries are issued at successively higher
+sampling temperatures, which is what makes a retry budget worth more than one. A \textbf{regenerate}
+handles an artifact that is wrong while its inputs are fine: redo that artifact. A \textbf{drop edge}
+applies to V1 alone --- an unrecovered relation must never be retained as gold, since gold that the prose
+does not realize is exactly the defect the gate exists to catch. A \textbf{reject} applies when the
+family cannot carry its ranking claim, and stores the family with its reason rather than discarding it,
+so that rejection rates are auditable and the rejected set is available for analysis.
+
+One further guard concerns output length. P4's floor is $500$ words with a target of $550$--$650$, which
+exceeds the default completion-token grant of some gateways; a model that hits the cap returns prose
+stopped mid-sentence, which every parser rejects --- but for the wrong stated reason, reporting a
+malformed response where the actual fault is a truncated generation. The ceiling is therefore raised
+explicitly rather than left to the backend default.
+
+%% ================================================================
+\section{Validation}
+\label{sec-validation}
+%% ================================================================
+
+An item is admitted only if an independent committee certifies it. Three properties of the arrangement
+matter more than the individual gates.
+
+\paragraph{The committee excludes the generator.} Validation is run by a panel of models, and the model
+that generated the family is removed from its own panel before voting. Without this, the dominant failure
+of an LLM-generated benchmark --- the generator certifying its own idiosyncrasies as ground truth --- is
+structurally unaddressed. Each gate is decided by \emph{majority} of the remaining panel, and a facet is
+counted as failed only when a majority objects, so a single unusually strict auditor cannot reject a
+sound family.
+
+\paragraph{Every threshold lives in one place.} All acceptance thresholds are defined in a single table
+(Table~\ref{tab:thresholds}) and nowhere else. This is a reproducibility property: a benchmark whose
+thresholds are scattered across the code that applies them cannot be replicated from its description,
+and cannot be re-run at a different operating point without a search for the constants.
+
+\paragraph{Generation is rejected, never repaired.} A family that fails a gate is stored with its reason
+and discarded from the corpus. No stage attempts to patch a defective artifact into an acceptable one,
+because a repaired item's gold labels no longer describe a process we can state.
+
+\begin{table}[t]
+\centering\small
+\caption{Every acceptance threshold. V1 rates are computed over the \emph{valid} planned relations only.
+  Rules in the rightmost column are the committee decision rule for that gate.}
+\label{tab:thresholds}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Gate & Quantity & Threshold & Rule \\
+\midrule
+V1 & planned relations recovered with correct coupling & $\ge 0.80$ & majority \\
+V1 & \dots\ and with correct sense & $\ge 0.70$ & majority \\
+V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority \\
+V3 & leakage and hedging span lists & must be empty & majority \\
+V4 & claim coverage over gating statuses & $=1.00$ & majority \\
+V4 & gating statuses & \gate{missing}, \gate{merged} & --- \\
+\midrule
+P3 & claims selected & $14$--$16$ & --- \\
+P3 & relations planned & $8$--$12$ & --- \\
+P3 & declared non-relations & $4$--$6$ & --- \\
+P3 & fraction of relations valid & $0.55 \pm 0.15$ & --- \\
+P3 & false claims selected & $\ge 2$ & --- \\
+P3 & preferred relation locality (recorded, not enforced) & $\le 4$ positions & --- \\
+P5 & length drift & $\le 15\%$ & --- \\
+\midrule
+Corpus & families per topic & $\ge 3$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{V1: relation recovery --- the load-bearing gate}
+
+Given the response and its claims, an independent model is asked to recover the relations the response
+\emph{itself} draws, emitting for each ordered pair a sense, a coupling, a strength band, and a
+resolved flag. Admission requires that at least $0.80$ of the \emph{valid} planned relations come back
+with the correct coupling and at least $0.70$ with the correct sense.
+
+This is the gate that makes the corpus's labels mean something. Everything else in the pipeline produces
+a plan; V1 certifies that the \emph{prose realizes it}, so the gold graph describes the response rather
+than the generator's intention. Without it the corpus would ship aspirational annotations: a relation the
+planner intended and the writer failed to express would still appear in the gold graph, and a relation
+extractor would then be penalized for correctly not finding it.
+
+Two design decisions inside V1 are worth stating because both were arrived at by measuring a failure.
+
+\emph{The rates are computed over valid relations only.} Planted-invalid relations are deliberately
+wrong, so requiring an independent model to recover them would gate admission on the model's willingness
+to assert relations that do not hold --- rewarding exactly the over-assertion the corpus is built to
+detect. With the mandated six valid relations the denominator is six, making these integer gates: $0.80$
+needs five of six, and so does $0.70$, since four of six falls below both. One relation therefore decides
+admission. It follows that the coupling threshold must not be raised above $0.834$, at which point it
+silently becomes unanimity-of-six --- a fresh unsatisfiable gate of exactly the species that scoring the
+planted errors used to be. Measured across seven raters and two items, valid-only recovery rates ranged
+$0.833$--$1.00$, so the gates clear with one relation to spare.
+
+\emph{Recovery is graded at three levels, not one.} A recovered relation is \emph{identified} by its
+unordered claim pair, independently of its sense; direction, coupling and sense are then graded
+separately. Deriving the identity key from the sense instead --- ordered keys for directed senses,
+unordered for symmetric ones --- puts a planned and a recovered relation over the \emph{same two claims}
+into different key spaces whenever their senses disagree about directedness, so the pair becomes
+unmatchable and scores zero on sense \emph{and} zero on coupling. Measured live: one model recovered a
+planned \sense{Concession}$(7,12)$ as \sense{Contrast}$(7,12)$ --- same endpoints, and both senses compile
+to \con{} --- and earned nothing, because the two senses keyed differently. That counts ``recovered with
+the wrong sense'' as ``not recovered'', which is precisely the distinction V1 exists to measure. Direction
+is not discarded by the fix, it moves: endpoint order is compared separately and credit withheld when a
+directed planned relation was recovered reversed, so a wrong-direction error is visible as a matched pair
+that failed on direction rather than as an absence.
+
+\subsection{V3: prose audit}
+
+The response is scored for fluency, formality and organization, each on $1$--$5$ with a floor of $4$, and
+three span lists are collected: \emph{leakage}, \emph{hedging} and \emph{artifacts}. Leakage and hedging
+must be empty; artifacts are recorded but do not gate.
+
+Leakage is the interesting one, and its definition is deliberately narrow. It covers naming a relation
+type or sense, naming the plan or its labels, referring to ``claims'' or ``atoms'' as the objects the text
+was assembled from, and any bracketed marker or numeric index. It explicitly does \emph{not} cover the
+connectives that \emph{realize} relations --- ``either X or Y'', ``at least one of these must hold'',
+``although X, Y'', ``which postdates'' --- because P4 is required to use them, and a coupling over two
+claims' joint truth cannot be expressed without one. An earlier, broader reading of leakage rejected
+correctly-written responses for containing the very markers the pipeline demands. Every reported span
+must be quoted verbatim from the response, which makes a hallucinated objection checkable and therefore
+discardable.
+
+Hedging is defined by a \emph{closed} list of seven words. The reason is the same: uncertainty a writer is
+required to express is not hedging, so ``at least one of X or Y, perhaps both'' states a relation's logical
+strength rather than doubt about content, and an open-ended reading flags it.
+
+\subsection{V4: claim coverage}
+
+For each claim, an independent model decides whether the response asserts it, returning one of
+\gate{asserted}, \gate{altered}, \gate{missing} or \gate{merged} with a quoted span. Coverage must be
+perfect over the \emph{gating} statuses, which are \gate{missing} and \gate{merged}.
+
+\gate{altered} is deliberately non-gating, and this is a calibration decision rather than a lax one. It is
+the judgment most sensitive to the surface rewording P4 explicitly licenses, and three of five live V4
+rejections were a single claim called \gate{altered} where the rewording was permitted. \gate{missing} and
+\gate{merged} are structural losses --- the claim is not separately assertable any more --- and those are
+what coverage is for. The prompt also states explicitly that two claims joined by a connective are
+\emph{not} merged, since ``either X or Y'' asserts both and each remains independently true or false;
+without that clarification the validator counted every realized \sense{Alternative} as a merge, which
+would have rejected every family containing the corpus's scarcest relation.
+
+%% ================================================================
+\section{Corpus composition}
+\label{sec-corpus}
+%% ================================================================
+
+\begin{table}[t]
+\centering\small
+\caption{The topic inventory: $36$ topics across four domains. Surplus families beyond the per-topic floor
+  are allocated in priority order to the five \textbf{bold} topics, which are the adjudicated subjects
+  where exhaustive alternatives and resolving holdings occur naturally.}
+\label{tab:topics}
+\begin{tabular}{@{}lp{9.6cm}r@{}}
+\toprule
+Domain & Topics & $n$ \\
+\midrule
+Natural Sciences & Astronomy, Biology, Botany, Chemistry, Geology, Human Biology,
+  \textbf{Medicine}, Meteorology, Oceanography, Physics, Zoology & 11 \\
+Humanities & Archaeology, Art, Culture, \textbf{Ethics}, Gender Studies, History, Linguistics,
+  Literature, Philosophy, Religion & 10 \\
+Engineering \& Technology & Artificial Intelligence, \textbf{Civil Engineering}, Computer Science,
+  Cybersecurity, Electrical Engineering, Mechanical Engineering, Renewable Energy Technologies,
+  Robotics & 8 \\
+Social Sciences & Anthropology, Economics, Education, \textbf{Law},
+  \textbf{Political Science}, Psychology, Sociology & 7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:topics} gives the inventory. Allocation is floor-then-surplus: every topic contributes at
+least three families without exception, and the remainder is distributed round-robin over five priority
+topics. The floor exists so that no measure can be tuned to a topic distribution; the priority list
+exists because the scarce relations of Table~\ref{tab:compile} are not uniformly available across
+subjects. Litigation, medicine and civil engineering produce exhaustive alternatives and authoritative
+holdings as a matter of course, whereas botany and art history mostly do not, so a uniform allocation
+would leave \sense{Alternative} and \sense{Concession} underrepresented exactly where the corpus is
+supposed to supply them.
+
+Five topics are named differently in the source whose topic list ours extends; the alias mapping is
+recorded with the corpus so that a topic list can be diffed against either source rather than silently
+diverging.
+
+\paragraph{The released corpus.} What we release and report on here is smaller than the design target: two
+\famtype{conflict} families, ten items, on the canonical topics Anthropology and Archaeology, sixteen
+claims per item, generated by \texttt{claude-opus-5} with a validation committee of \texttt{gpt-5.6},
+\texttt{gemini-3.1-pro} and \texttt{claude-sonnet-5}. The \famtype{chain}, \famtype{order} and
+\famtype{control} ladders are specified, implemented and gate-checked but not generated at scale.
+\S\ref{sec-limitations} states the consequences; we report the released corpus's numbers as measurements
+of a pilot rather than of the design.
+
+%% ================================================================
+\section{Item schema and release format}
+\label{sec-schema}
+%% ================================================================
+
+\begin{table}[t]
+\centering\small
+\caption{The item schema. Every field is machine-readable and validated on load; fields marked
+  \emph{derived} are re-computed from the sense through $\mathcal{C}$ rather than trusted as written
+  (\S\ref{sec-scheme}).}
+\label{tab:schema}
+\begin{tabular}{@{}p{3.6cm}p{1.7cm}p{6.4cm}@{}}
+\toprule
+Field & Type & Meaning \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Item level}} \\
+\texttt{id}, \texttt{name} & string & stable identifier and human-readable label \\
+\texttt{source} & string & generating model \\
+\texttt{response} & string & the prose \\
+\texttt{num\_atoms} & int & claim count \\
+\texttt{notes} & string & free-text provenance note \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Per claim} (\texttt{atoms})} \\
+\texttt{id}, \texttt{text} & string & claim identifier and its exact text \\
+\texttt{label} & string & P2 tag: correct, incorrect, alt-pair, disj-pair, equiv-pair, holding \\
+\texttt{factual} & bool & whether the claim is true --- \emph{false} for planted-false claims \\
+\texttt{role} & string & structural role in the plan \\
+\texttt{pos} & int & 1-based assertion position \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Per relation} (\texttt{relations})} \\
+\texttt{id} & string & edge identifier, referenced by perturbation targets \\
+\texttt{source\_id}, \texttt{target\_id} & string & endpoint claims, ordered \\
+\texttt{level2\_sense} & string & one of the twelve senses \\
+\texttt{level1\_coupling} & string & \emph{derived}: $\mathcal{C}(\text{sense})$ \\
+\texttt{directed} & bool & \emph{derived}: whether endpoint order is meaningful \\
+\texttt{ordering\_only} & bool & \emph{derived}: carries no truth coupling, produces no factor \\
+\texttt{exhaustive} & bool & \emph{derived}: true iff the coupling is \exc{} \\
+\texttt{intended\_strength\_\-band} & string & strong, moderate, or weak \\
+\texttt{strength\_range} & [float, float] & the band's numeric interval \\
+\texttt{validity} & string & \gate{valid} or \gate{invalid} \\
+\texttt{error\_kind} & string$|$null & for invalid edges: wrong\_sense, wrong\_direction,
+  false\_endpoint, spurious \\
+\texttt{is\_concession} & bool & whether the relation is a conceded tension \\
+\texttt{is\_resolved\_\-concession} & bool & whether the text resolves it \\
+\texttt{resolver\_atom\_id} & string$|$null & the holding claim that resolves it \\
+\texttt{position\_distance} & int & signed target-minus-source position gap \\
+\texttt{window\_admission} & string & whether the pair falls inside the locality window \\
+\texttt{provenance} & object & which stage planned or transformed the edge \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Negative set and expectations}} \\
+\texttt{non\_relations} & list & declared-unrelated claim pairs with their position distance \\
+\texttt{expected.family\_id},\newline \texttt{expected.family} & string & ladder membership and type \\
+\texttt{expected.rung\_index},\newline \texttt{expected.rung\_name} & int, string & position in the ladder \\
+\texttt{expected.perturbation} & object & the calls applied, their targets, their parent rung, and the
+  declared \texttt{edge\_effects} \\
+\texttt{meta} & object & canonical topic, domain, framing, split, word count, generator \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:schema} gives the schema. The release is four files per corpus: \texttt{items.jsonl}, one
+item per line; \texttt{families.json}, the manifest carrying each family's declared ordering constraints;
+\texttt{state.json}, the generation log; and a \texttt{rejected/} directory holding every family that
+failed a gate together with the gate, the threshold, the observed value and --- where the failure was a
+parse --- the raw model output. The rejected set is part of the release rather than an artifact of
+development: reported admission rates are only auditable if the denominator is available.
+
+Two schema decisions carry weight. Derived fields are re-computed rather than trusted, so the corpus
+cannot contain an edge whose coupling contradicts its sense (\S\ref{sec-scheme}). And
+\texttt{ordering\_only} is explicit, so a consumer can partition the gold graph into the edges that
+produce factors and the edges that record order alone --- which is what allows the \famtype{order} and
+\famtype{control} predictions of \S\ref{sec-ladders} to be checked mechanically.
+
+%% ================================================================
+\section{The evaluation harness}
+\label{sec-harness}
+%% ================================================================
+
+\subsection{Arms: holding the scorer fixed}
+
+An \emph{arm} determines where the relation graph comes from while holding everything else identical --- the
+claims, the priors, and the scoring procedure. Three arms are defined. \textsc{gold} takes each item's own
+labelled relations. \textsc{gold\_valid} takes only those labelled \gate{valid}, which quantifies what the
+planted errors cost at a fixed rung. A \textsc{mined} arm, written
+\texttt{mined:$\langle$model$\rangle$:$\langle$policy$\rangle$}, runs a relation extractor on the response
+text.
+
+This is the harness's central device. Because the scorer is byte-identical across arms, any shortfall of a
+mined arm below the gold arm is attributable to relation extraction and not to scoring, and the two error
+sources need never be disentangled after the fact. The gold arm additionally requires no LLM at all, so it
+is deterministic and cheap, which makes it usable as a regression test on the corpus itself.
+
+\subsection{What a scorer must expose}
+
+The harness is agnostic about the measure under test, requiring only that it map a relation graph over
+claims to one or more scalar readouts. For concreteness we describe the family of measures we use to
+validate the corpus, which builds a Markov random field over claim truth variables: one binary variable per
+claim with unary factor $[1-\pi_i,\pi_i]$, and one pairwise factor per relation determined by its coupling
+and weight, penalizing the assignments $V(\tau)$ of Def.~\ref{def-couplings}. Four readouts over the
+resulting joint are used: the mean posterior marginal $\tfrac1n\sum_i\pr{a_i{=}1}$; a two-term consistency
+probability combining the probability that no conflict is jointly active with the confidence-weighted mass
+of actively-upheld support relations; the marginal of an added coherence node tied to relation satisfaction;
+and the partition function normalized between a conflict-free ceiling and the base network's most-probable
+world. Gold graphs are scored with $\pi_i=0.9$ for claims the item marks factual and $0.1$ otherwise, so
+that the planted-false claims enter the graph already doubted.
+
+The relevant point for the benchmark is that these four readouts have \emph{different} declared
+expectations under C2. One of them is expected to dip when a conceded tension is resolved --- softening a
+conflict raises the probability of the configuration the conflict forbids, so a readout that measures
+whether a conflict is active must register the softened conflict as more often active --- and the manifest
+asserts that dip positively rather than treating it as noise. A benchmark that only asserted monotonicity
+could not express this, and would score a correctly-behaving measure as failing.
+
+\subsection{Metrics over relation graphs}
+
+Mined relations are matched to gold at three nested levels: \textbf{pair}, which asks only whether the two
+claims were related at all; \textbf{coupling}, which additionally requires the Level-1 coupling with
+direction required for the asymmetric couplings; and \textbf{sense}, which additionally requires the
+Level-2 sense. Coupling is the level to report, since it is the level at which a scorer selects a factor,
+and it is materially stricter than pair level.
+
+Beyond micro-averaged precision, recall and F1 at each level, the harness stratifies recall by properties
+of the gold relation itself: by whether it runs forward or backward in claim order, by whether its coupling
+is directed, by its locality-window admission label, and by its validity. The stratification is not
+decoration. Forward/backward recall is what exposes a candidate-pair policy that cannot emit backward arcs
+at all, and validity-stratified recall must be read \emph{inverted} on the invalid subset --- those
+relations are planted errors, so a grounded extractor \emph{failing} to recover them is arguably correct,
+and lower is better.
+
+Precision against the declared non-relations is reported separately from precision against all unlabelled
+pairs, for the reason given in \S\ref{sec-generation}: the former has a real negative denominator and the
+latter does not. The harness also counts edges outside the nine admissible $(\text{sense},\text{coupling})$
+combinations, which cannot be scored against gold at all and are pure false positives.
+
+Finally, the ordering-constraint checker reads each family's manifest, evaluates every declared C1, C2 and
+C3 assertion against the scored rungs, and reports both the per-constraint outcome and the fraction
+satisfied. It records the observed direction and magnitude alongside the expectation, so a near-miss on a
+strict-increase constraint is distinguishable from an inversion.
+
+%% ================================================================
+\section{Validating the benchmark}
+\label{sec-experiments}
+%% ================================================================
+
+A benchmark paper owes two demonstrations: that the instrument discriminates, and that its own
+construction is sound. We give the second first, because in our case it nearly failed.
+
+\paragraph{Scale and sampling, stated first.} All numbers below are on the released corpus: two
+\famtype{conflict} families, ten items, sixteen claims each, with relations mined by
+\texttt{llama-3.3-70b-instruct}. Mining is sampled once per cell at the model's default temperature, and
+repeated runs of an identical configuration moved coupling-level F1 by up to $0.06$; across five
+independent samples the two revised extraction strategies span $0.49$--$0.58$, every one above the
+unrevised $0.36$, so the gap to the original exceeds the sampling noise while the ordering \emph{between}
+the two revisions does not. With $28$ ordering assertions per arm, the constraint-satisfaction figures are
+the only comparison here with enough observations to be more than indicative. These are measurements, not
+significance claims.
+
+\subsection{The per-rung relation-graph defect}
+\label{sec-perrung}
+
+An earlier version of the generator perturbed each rung's \emph{text} but re-attached the base plan's
+relation graph to all five rungs, and passed every gate while doing so. The consequence is worth stating
+carefully because it is the failure mode a benchmark of this shape is most exposed to. If every rung of a
+family carries identical gold relations, then any measure computed \emph{from gold relations} returns an
+identical score for all five rungs --- so the strict-increase constraints of C1 cannot hold, not because
+the measure is wrong but because the corpus cannot express the difference it declares. The benchmark was
+silently untestable from gold, and the symptom was a gold-arm constraint satisfaction of $2/28$: not a
+measure failing, but an instrument reading nothing.
+
+\begin{table}[t]
+\centering\small
+\caption{The per-rung relation-graph fix, holding the generator, the topics, the claim count and every
+  prompt constant. Only the derivation of each rung's gold graph changed (\S\ref{sec-goldedges}).}
+\label{tab:perrung}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Property & Before & After \\
+\midrule
+Relations per item & uniformly $10$ & $8$--$11$, varying by rung \\
+Distinct edge sets per family (of 5 rungs) & 1 & 5 \\
+Adjacent rung pairs with identical edge sets & 4 of 4 & 0 of 4 \\
+Ordering constraints satisfied, gold arm, per family & $1/14$ & $11/14$ \\
+Ordering constraints satisfied, gold arm, corpus & $2/28$ & $\mathbf{22/28}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:perrung} reports the fix: deriving each rung's edges from its own operator calls
+(\S\ref{sec-goldedges}), assigning each call a distinct target, and adding the adjacency gate. Everything
+else is held constant --- same generator, same two canonical topics, same sixteen claims per item, five
+distinct response texts per family in both versions. Gold-arm agreement moves from $2/28$ to $22/28$.
+
+We report this at length for three reasons. It is the strongest available evidence that the ladder is a
+genuine test of a measure rather than a measurement of the corpus: after the fix each rung's labels
+describe the response that ships with them, so the constraints have something to be right or wrong about.
+It establishes the diagnostic value of the gold arm --- an instrument whose gold arm scores near zero is
+broken, whatever its mined arms report. And it is a warning to anyone building a benchmark of this shape:
+the defect passed every content gate, because every individual item was well-formed and only the
+\emph{relationship between} items was degenerate.
+
+\subsection{The benchmark discriminates between relation extractors}
+
+\begin{table}[t]
+\centering\small
+\caption{Relation extraction against gold, over $86$ edge-producing gold relations, micro-averaged.
+  \textbf{Fwd}/\textbf{Bwd} split coupling-level recall by relation direction in claim order.
+  \textbf{Non-rel} counts violations of the $48$ declared non-relations. \textbf{Illegal} counts edges
+  outside the nine admissible (sense, coupling) combinations. \textbf{Calls} is LLM calls issued.}
+\label{tab:mining}
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+Extraction policy & Edges & Pair R & Coup P & Coup R & Coup F1 & Fwd & Bwd & Non-rel & Calls \\
+\midrule
+windowed         & 190 & 83.7 & 25.8 & 57.0 & 35.5 & 75.0 & 23.3 & 7/48 & 454 \\
+gated            & 321 & 83.7 & 14.6 & 54.7 & 23.1 & 69.6 & 26.7 & 8/48 & 1062 \\
+all pairs        & 867 & 95.3 &  9.3 & 82.6 & 16.8 & 87.5 & 73.3 & 10/48 & 3267 \\
+bidirectional    & 205 & 83.7 & 39.0 & 66.3 & 49.1 & 71.4 & 56.7 & 5/48 & 505 \\
+bidirectional v2 & 173 & 73.3 & 48.3 & 67.4 & \textbf{56.3} & 85.7 & 33.3 & \textbf{0/48} & 473 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:mining} shows the corpus separating five extraction configurations across a range of
+$39.5$ F1 points, which is the primary evidence that the annotation is informative. Three findings are
+corpus properties rather than facts about any one extractor.
+
+The declared non-relations work as intended. Violations range from $10/48$ to $0/48$ across
+configurations, and the best-precision configuration is the only one that reaches zero --- so this small,
+explicitly-labelled negative set ranks the configurations in the same order as coupling precision while
+being interpretable in a way that precision against unlabelled pairs is not.
+
+The locality metadata exposes a structural limitation rather than a tuning one. Backward-running gold
+relations are recovered at $23$--$27\%$ by the three forward-only policies and $73.3\%$ by all-pairs,
+because $20$ of the $86$ gold relations are both directed and backward and a forward-only candidate set
+cannot emit them at all. A benchmark that did not record each relation's signed position distance could
+not distinguish this from a model failure.
+
+The admissibility metadata catches a failure mode that F1 alone hides. Illegal-vocabulary emissions ---
+edges whose (sense, coupling) pair no reading of the scheme licenses --- run from $93$ down to $0$ across
+configurations. These cannot be scored against gold at all, so an extractor emitting many of them is
+being flattered by any metric computed over the scorable remainder.
+
+\begin{table}[t]
+\centering\small
+\caption{Declared ordering constraints satisfied, $28$ assertions per arm ($14$ per family $\times$ two
+  families). \textsc{gold\_valid} is near-flat by construction --- a conflict-fixing rung removes the
+  planted-invalid conflicts this arm has already discarded --- so its shortfall is expected and carries
+  no information about the measure; \textsc{gold} is what the constraints test.}
+\label{tab:ladder}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Arm & f001 & f002 & \% satisfied \\
+\midrule
+\textsc{gold}                          & 11/14 & 11/14 & \textbf{78.6} \\
+\textsc{gold\_valid}                   &  7/14 &  4/14 & 39.3 \\
+\textsc{mined}, windowed               &  4/14 &  9/14 & 46.4 \\
+\textsc{mined}, gated                  &  7/14 &  8/14 & 53.6 \\
+\textsc{mined}, all pairs              &  7/14 &  5/14 & 42.9 \\
+\textsc{mined}, bidirectional          &  5/14 &  5/14 & 35.7 \\
+\textsc{mined}, bidirectional v2       &  6/14 &  8/14 & 50.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ladder} gives the ordering results. The gold arm satisfies $78.6\%$ of declared
+constraints and the mined arms $35.7$--$53.6\%$. Since the arms differ in nothing but the relation graph,
+the $25$--$43$ point gap is the extraction contribution, isolated by construction --- and it is consistent
+with Table~\ref{tab:mining}, since at $56.3\%$ coupling F1 roughly half the relations in a mined graph are
+wrong or missing, and a ladder whose consecutive rungs differ by one or two relations cannot survive that.
+
+We are explicit about what these numbers do \emph{not} establish. The ordering of the mined arms does not
+track their coupling F1 --- the gated policy scores best among them at the second-worst F1 --- and at $28$
+assertions per arm we read that as sampling noise rather than signal. Ranking extraction policies on
+ladder agreement requires a substantially larger corpus, and Table~\ref{tab:mining} is the better
+instrument for that comparison today.
+
+\paragraph{Why the gold arm is not at $100\%$.} Six of the $28$ gold-arm constraints fail, and each is
+attributable to a specific declared assertion rather than to a diffuse inadequacy. Three are C1
+strict-increase assertions on the mean-marginal readout where the observed change is $-0.000$ to three
+decimal places: an \emph{invariance} where a strict increase was declared. Those three are statements about
+the declared expectation --- the perturbation at that rung pair happens not to move that particular
+readout --- rather than inversions. Two are C2 assertions where a predicted invariance of the
+log-partition readout came out as a decrease of $-0.000$ and $-0.002$, again at the resolution limit. The
+sixth is a genuine inversion: a C3 endpoint separation on the consistency readout, $-0.004$ in the wrong
+direction, which is exactly the failure mode \S\ref{sec-harness} anticipates for that readout on families
+whose conflicts are all \exc{}. A benchmark whose gold arm scored $28/28$ would have constraints too weak
+to be informative; the useful property is that five of the six failures are resolution-limited near-misses
+and the sixth is a predicted defect of one readout.
+
+%% ================================================================
+\section{Limitations}
+\label{sec-limitations}
+%% ================================================================
+
+\paragraph{Scale.} The released corpus is two families and ten items against a design target of $120$
+families. Every figure in \S\ref{sec-experiments} should be read at that scale: the $28$ ordering
+assertions per arm are enough to establish that the instrument discriminates and not enough to rank
+extraction policies, and single-sample mining with measured run-to-run movement of $0.06$ F1 means the
+second decimal of any single cell is not meaningful.
+
+\paragraph{Three of four ladder types are ungenerated.} \famtype{chain}, \famtype{order} and
+\famtype{control} are specified, implemented and gate-checked, but not generated at scale, so no result
+here speaks to them. The most consequential absence is \famtype{control}, whose entire purpose is to catch
+a measure that responds to having been edited rather than to coherence --- arguably the single most
+important experiment the protocol specifies. Until it is run, a measure can satisfy every ordering
+constraint we report while being a sophisticated edit-counter, and this benchmark would not know.
+Similarly, \famtype{chain} is the type on which contradiction-detection approaches should fail, so its
+absence means we have not yet demonstrated the corpus separates the two mechanisms it is designed to
+separate.
+
+\paragraph{The corpus is LLM-generated, including its labels.} Questions, claims, relation plans,
+responses, perturbations and gold relation labels are all model output, validated by a model committee.
+The structural mitigations of \S\ref{sec-validation} address the most obvious circularity --- the
+generator is excluded from its own committee, and V1 requires an independent model to recover the planned
+relations from the prose before admission --- but they do not address a bias \emph{shared} between
+generator and committee, and current frontier models are not independent in the relevant sense. Human
+verification of a sample is required before the corpus is treated as ground truth, and we have not
+performed it. This is the limitation we would most want addressed before the benchmark is used to make
+comparative claims about published measures.
+
+\paragraph{Declared orderings are assumptions, not observations.} A ladder's constraints encode our
+judgement that, for instance, resolving a conceded tension increases coherence. That judgement is
+defensible and is the premise of the whole construction, but it is a premise: a measure could satisfy
+every constraint and still disagree with human readers if our declared orderings are not the ones readers
+perceive. The remedy is human coherence ratings on the same items, correlated against the measures ---
+which the corpus supports and which we have not collected.
+
+\paragraph{Genre and length are narrow.} Every item is $550$--$650$ words of formal expository prose
+answering an analytical question, with $14$--$16$ claims. Conclusions do not transfer automatically to
+dialogue, to summarization of a source document, to much longer arguments where a conflict may span
+thousands of words, or to informal registers where relations are signalled differently. The locality bias
+of P3 --- preferring related pairs within four positions --- additionally means the corpus
+under-represents genuinely long-range discourse dependencies.
+
+\paragraph{One generator, one extraction model.} The released corpus comes from a single generating model
+and its mined arms from a single extraction model. Generator-specific artifacts are therefore not
+controlled for by variation, only by the V3 leakage gate, and the extraction results characterize one
+model rather than the state of the art.
+
+%% ================================================================
+\section{Conclusion}
+%% ================================================================
+
+Evaluating a coherence measure requires contrasts that vary coherence while holding content fixed, and
+ordinary corpora do not provide them. LoCoBench provides them as ladders: families of responses over one
+claim set, with a declared relative ordering, per-rung machine-readable relation graphs, an explicitly
+labelled negative set, and a family type whose required pattern is no trend at all. The construction makes
+two things possible that a rating-correlation study cannot. It attributes a score difference to coherence
+rather than to content, because the content is held constant. And by scoring a measure twice --- once on
+its own extracted relations and once on gold --- it isolates extraction error from scoring error by
+construction rather than estimating it after the fact.
+
+Applying that separation to the released corpus locates the field's bottleneck. Measures scored from gold
+relation graphs satisfy $78.6\%$ of declared ordering constraints; the same measures scored from graphs
+mined out of the response text satisfy $35.7$--$53.6\%$, and the best extraction configuration reaches
+$56.3\%$ coupling-level F1. The scoring models are adequate to the task as posed, and grounded relation
+extraction is where the loss is. That is a narrower and more tractable target than ``measure coherence''.
+
+We also report a construction defect at length, because it generalizes. An earlier version of the corpus
+attached the same relation graph to every rung of each family, passed every content gate while doing so,
+and was thereby rendered untestable from gold --- $2/28$ constraints satisfied, rising to $22/28$ once each
+rung's graph was derived from its own perturbations. Every individual item was well-formed; only the
+relationship between items was degenerate. Any benchmark that grades a measure on comparisons rather than
+on absolute values is exposed to the same class of defect, and the gold arm is the instrument that detects
+it.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection*{AI use statement}
+
+This is a benchmark constructed \emph{by} generative AI, and the disclosure is correspondingly extensive.
+Every artifact in the released corpus --- the questions, the atomic claims, the relation plans, the
+response prose, the perturbed rungs, and the gold relation labels --- is the output of a large language
+model driven by the prompts of Appendix~\ref{app-prompts}, and every acceptance decision is the majority
+vote of a committee of three further language models. \S\ref{sec-limitations} states plainly what this does
+and does not establish, and we regard human verification of a sample as a precondition for treating the
+corpus as ground truth. Separately, we used AI assistants for code implementation and for editorial
+assistance on this manuscript. All LLM-generated code was reviewed by the authors and is covered by a test
+suite that asserts, among other things, the instruction count and placeholder set of each of the eight
+prompts against the specification this paper reports. The benchmark design --- the ladder construction, the
+constraint classes, the operator inventory, the gate thresholds and their calibration, the schema and the
+metrics --- is the authors' own. We take responsibility for the final content of this work.
+
+\subsection*{Ethics statement}
+
+\paragraph{Intended use.} LoCoBench is intended for evaluating measures of logical coherence in long-form
+generated text. It is not a factuality benchmark and must not be used as one: coherence and factuality are
+distinct properties, and a response can be perfectly coherent and entirely false. It is not a training
+corpus for text generation, and at ten items it is not suitable as one.
+
+\paragraph{Deliberately false content.} Every item asserts at least two factually false claims, and every
+relation plan contains four deliberately invalid relations. This is essential to the design --- without
+false content, coherence and factuality would be perfectly correlated in the data --- and it makes the
+corpus hazardous if mishandled. The false claims are labelled at the claim level and the invalid relations
+at the edge level, and \textbf{the corpus must not be redistributed with those labels stripped}. Extracted
+prose from these items should not be treated as a source of factual information on any topic.
+
+\paragraph{Human subjects and content.} No human subjects were involved and no personally identifying data
+is present. Topics span academic and professional domains; the adjudicative framing of many items concerns
+generic incident and dispute scenarios rather than real cases or identifiable individuals.
+
+\paragraph{Compute.} Generating one family requires on the order of a few dozen model calls across
+generation and validation, and a scored mined arm on ten items requires several hundred more. This is
+modest, but it is not free, and a benchmark that requires an LLM committee to extend is less accessible than
+one that does not --- a real cost of the validation design we chose.
+
+\subsection*{Reproducibility statement}
+
+The pipeline is specified in the paper and the prompts are reproduced verbatim. Appendix~\ref{app-prompts}
+gives all eight, extracted programmatically from the released source so that the appendix cannot drift from
+the code, each with its character count, instruction count and placeholder set; Appendix~\ref{app-spec}
+gives the specification table these are asserted against and the substitution contract.
+Table~\ref{tab:thresholds} gives every acceptance threshold in one place, Table~\ref{tab:operators} the
+perturbation operators, Table~\ref{tab:schema} the item schema field by field, and \S\ref{sec-goldedges} the
+derivation of each rung's gold graph. \S\ref{sec-corpus} names the generating and committee models and the
+topics used. The release comprises the items, the family manifests with their declared constraints, the
+generation log, and the rejected families with their rejection reasons, so that reported admission rates
+are auditable. The gold-arm evaluation requires no LLM access and is deterministic.
+
+\bibliography{ref}
+\bibliographystyle{iclr2027_conference}
+
+\appendix
+
+%% ================================================================
+\section{The generation and validation prompts, verbatim}
+\label{app-prompts}
+%% ================================================================
+
+All eight prompts follow, reproduced exactly as issued and extracted programmatically from the released
+source. Placeholders have the form \verb|[NAME_PLACEHOLDER]| and are substituted by the contract of
+Appendix~\ref{app-spec}. Line numbers are added for reference and are not part of the prompt.
+
+\subsection{P1 --- topic to question}
+$1{,}904$ characters, $38$ lines, $9$ numbered instructions. Placeholder:
+\verb|[TOPIC_PLACEHOLDER]|.
+\promptfile{prompts/PROMPT_P1.txt}
+
+\subsection{P2 --- question to tagged claims}
+$3{,}754$ characters, $66$ lines, $7$ numbered instructions. Placeholder:
+\verb|[QUESTION_PLACEHOLDER]|.
+\promptfile{prompts/PROMPT_P2.txt}
+
+\subsection{P3 --- claims to relation plan}
+$7{,}495$ characters, $130$ lines, $10$ numbered instructions. Placeholders:
+\verb|[QUESTION_PLACEHOLDER]|, \verb|[CLAIMS_PLACEHOLDER]|. The longest prompt in the pipeline, and the one
+carrying the plan's structural quotas.
+\promptfile{prompts/PROMPT_P3.txt}
+
+\subsection{P4 --- plan to response}
+$5{,}573$ characters, $84$ lines, $8$ numbered instructions. Placeholders:
+\verb|[QUESTION_PLACEHOLDER]|, \verb|[PLAN_PLACEHOLDER]|.
+\promptfile{prompts/PROMPT_P4.txt}
+
+\subsection{P5 --- response to perturbed rung}
+$2{,}594$ characters, $44$ lines, $5$ numbered instructions. Placeholders:
+\verb|[RESPONSE_PLACEHOLDER]|, \verb|[PLAN_PLACEHOLDER]|, \verb|[OPERATOR_PLACEHOLDER]|. Instruction 3
+defines all ten perturbation calls of Table~\ref{tab:operators}.
+\promptfile{prompts/PROMPT_P5.txt}
+
+\subsection{V1 --- relation recovery}
+$4{,}088$ characters, $67$ lines. Placeholders: \verb|[RESPONSE_PLACEHOLDER]|, \verb|[ATOMS_PLACEHOLDER]|.
+The three validators use a function-signature idiom rather than numbered instructions, so their instruction
+count is zero by construction and their contract is the signature line. Note that this prompt states the
+compile map explicitly in its final rule, so the coupling a validator emits is required to be the one its
+chosen sense compiles to.
+\promptfile{prompts/PROMPT_V1.txt}
+
+\subsection{V3 --- prose audit}
+$2{,}457$ characters, $40$ lines. Placeholder: \verb|[RESPONSE_PLACEHOLDER]|. The extensive list of spans
+that must \emph{not} be flagged as leakage is the calibration described in \S\ref{sec-validation}.
+\promptfile{prompts/PROMPT_V3.txt}
+
+\subsection{V4 --- claim coverage}
+$1{,}405$ characters, $26$ lines. Placeholders: \verb|[RESPONSE_PLACEHOLDER]|,
+\verb|[ATOMS_PLACEHOLDER]|.
+\promptfile{prompts/PROMPT_V4.txt}
+
+%% ================================================================
+\section{The prompt specification and substitution contract}
+\label{app-spec}
+%% ================================================================
+
+Each prompt's numbered-instruction count and required placeholder set are declared in a specification
+table, and a test asserts the declaration against the prompt strings themselves. The mechanism matters
+because the alternative failure is silent: a corpus generated by prompts that no document describes.
+
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Prompt & Instructions & Required placeholders \\
+\midrule
+P1 & 9  & \texttt{TOPIC} \\
+P2 & 7  & \texttt{QUESTION} \\
+P3 & 10 & \texttt{CLAIMS}, \texttt{QUESTION} \\
+P4 & 8  & \texttt{PLAN}, \texttt{QUESTION} \\
+P5 & 5  & \texttt{OPERATOR}, \texttt{PLAN}, \texttt{RESPONSE} \\
+V1 & 0  & \texttt{ATOMS}, \texttt{RESPONSE} \\
+V3 & 0  & \texttt{RESPONSE} \\
+V4 & 0  & \texttt{ATOMS}, \texttt{RESPONSE} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Instructions are counted by matching lines that begin at column one with a digit followed by a period and a
+space, so indented sub-items --- P3's per-sense glosses, P5's per-call definitions, P2's lettered
+composition breakdown --- do not inflate the count. Placeholders are extracted by matching
+\verb|[A-Z_]+_PLACEHOLDER| in brackets, deduplicated and sorted.
+
+Substitution enforces a \emph{bidirectional} exact match between the placeholders a prompt declares and the
+values supplied: a missing name and an extra name are both errors. The reason is that a typo in either
+direction otherwise ships a prompt containing a literal \verb|[FOO_PLACEHOLDER]|, which a model will
+dutifully treat as content --- a failure that produces plausible output and no error.
+
+\paragraph{A validator that was specified and removed.} The original design included a fourth validator to
+adjudicate exhaustiveness, deciding whether an opposition was \exc{} or merely \con{}. It is deliberately
+absent. Those couplings are derived from the relation sense by the compile map of
+Table~\ref{tab:compile}, which every other part of the harness treats as authoritative, so the validator
+would have re-derived from prose what the taxonomy fixes by construction --- and, worse, could have
+contradicted it. Exhaustiveness is instead a property of the sense the planner chose and the writer was
+required to realize explicitly, checked by V1's sense-recovery rate rather than adjudicated separately.
+
+\end{document}

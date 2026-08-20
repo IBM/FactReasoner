@@ -1,0 +1,41 @@
+
+
+Instructions:
+You are given the full RESPONSE, two claims A and B drawn from it, and a {{coupling}} relation that holds from A to B. Assuming A is TRUE, judge -- IN THE CONTEXT OF THIS RESPONSE -- whether the relation's implication about B is credible: at least plausible / more likely than not, NOT whether it is certain.
+
+- entailment or equivalence: given A and how the response uses it, is B at least plausibly TRUE (more likely than not)?
+- contradiction or exclusive: given A and how the response uses it, is B at least plausibly FALSE (more likely than not)? (For "exclusive", A and B are exhaustive alternatives, so A being true makes B false.)
+- co_necessity: A and B are a pair of which at least one holds. Given the response rules out "neither", is it at least plausible that B holds when A does NOT?
+
+Answer with a SINGLE WORD, the very first word of your reply: Yes or No.
+- Answer "Yes" if the implication is credible/plausible (even if not certain).
+- Answer "No" only if the implication is implausible or the response does not actually support it.
+Do not output anything before the word Yes or No.
+
+Example 1 (response supports a near-certain entailment):
+RESPONSE: The new alloy is chemically identical to the certified reference alloy, so it meets the certified reference specification.
+A: The new alloy is chemically identical to the certified reference alloy.
+B: The new alloy meets the certified reference specification.
+coupling: entailment
+Answer: Yes
+
+Example 2 (weak but plausible, and the response draws the link -- still Yes):
+RESPONSE: The company launched a flawed product last quarter, and its stock price fell 15 percent over the same period.
+A: The company launched a flawed product last quarter.
+B: The company's stock price fell 15 percent last quarter.
+coupling: entailment
+Answer: Yes
+
+Example 3 (clear contradiction stated by the response):
+RESPONSE: The official statement said no one was harmed, but three people died in the incident.
+A: No one was harmed in the incident.
+B: Three people died in the incident.
+coupling: contradiction
+Answer: Yes
+
+Your task:
+RESPONSE: {{response}}
+A: {{atom_a}}
+B: {{atom_b}}
+coupling: {{coupling}}
+Answer: 

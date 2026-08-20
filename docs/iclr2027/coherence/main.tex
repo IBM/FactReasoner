@@ -1,0 +1,1583 @@
+\input{preamble.tex}
+
+\title{Beyond Individual Claims: Probabilistic Logical Coherence\\
+       for Long-Form LLM Evaluation}
+
+\author{Anonymous authors\\Paper under double-blind review}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Long-form factuality assessment decomposes a response into atomic claims and verifies each
+against retrieved evidence. The paradigm is effective and now standard, but it embeds an
+assumption --- that the truth of each claim can be settled in isolation --- which discards the
+structure that makes prose an argument. A response can therefore pass per-claim verification
+while contradicting itself, and two responses built from \emph{identical} claims can differ in
+coherence because of the order in which they assert them. We formalize \emph{logical coherence}
+as a property of the joint distribution over claim truth values induced by a Markov random field
+whose pairwise factors are the relations the response itself draws. The relation vocabulary is a
+two-level taxonomy: twelve interpretable discourse senses, grounded in PDTB~3.0 and RST, that
+compile through a deterministic map onto five inferential couplings, each of which fixes a factor
+table by naming the joint assignment it penalizes. We characterize the factor tables coherence
+requires by a row-stochasticity property and show that the tables used for claim--evidence
+factuality are wrong here, collapsing the measure's dynamic range. We then define four candidate
+coherence readouts over the model --- the mean posterior marginal, a two-term consistency
+probability, a reified coherence node, and a normalized log-partition --- give the exact
+auxiliary-variable construction each requires, and evaluate all four against five stated criteria
+by exact inference. Only two are monotone in conflict resolution, and the two that fail do so for
+one shared and instructive reason: they measure whether a conflict is \emph{active} rather than
+what the reader should \emph{believe}. A third natural candidate is worse still, since a score
+asking whether asserted relations are honoured is maximized by asserting nothing. Claim priors
+come from an existing factuality pipeline, making coherence and factuality two stages over one
+decomposition rather than competing scores. Empirically, on a corpus of response families whose
+relative coherence ordering is fixed by construction, the readouts recover $78.6\%$ of the
+declared orderings from gold relation graphs and $53.6\%$ from graphs mined out of the response
+text; since the two conditions differ only in the relation graph, the gap localizes the open
+problem in relation extraction rather than in the probabilistic model.
+\end{abstract}
+
+%% ================================================================
+\section{Introduction}
+\label{sec-intro}
+%% ================================================================
+
+The dominant paradigm for assessing the factuality of long-form generation is
+decompose-then-verify: split a response into atomic claims, check each against retrieved
+evidence, and aggregate the verdicts \citep{factscore,safe,veriscore}. It is effective, it is now
+standard, and it embeds an assumption. Treating each claim as independently checkable discards
+precisely the structure that distinguishes an \emph{argument} from a \emph{list}.
+
+Consider two failure modes that per-claim verification cannot see. A report may assert both that
+no passengers were harmed in an incident and that a wire service reported three deaths. One of
+these claims is true and one is false, and per-claim verification will say so --- but it will not
+register the more basic defect, that the response contradicts \emph{itself}, asserting two things
+that cannot both hold. Separately, the inferential links a response draws may fail even when
+their endpoints are individually true: a chain of accurate statements joined by a spurious
+``therefore'' is not a sound argument, and every atom in it verifies. \citet{lorefact} quantify
+how often this matters: on logic-related samples, SAFE, VeriScore and FactCheck-GPT omit the
+logical dimension on $60\%$, $78\%$ and $48\%$ of cases respectively.
+
+\paragraph{Factuality and coherence are orthogonal axes.} A response can be a bag of true facts
+that is incoherent, and it can be internally impeccable while being entirely false. The sharpest
+demonstration in our fixtures is a pair of summaries of one appellate judgment, built from the
+\emph{same} set of claims and differing only in whether self-serving assertions are stated before
+or after the findings that qualify them. Every atom is identical, so every per-atom check returns
+an identical verdict; yet one summary is a faithful account and the other is not, and our measure
+separates them ($0.95$ against $0.90$). No amount of grounding individual claims against evidence
+can make that distinction, because the distinction is not about the claims.
+
+\paragraph{Coherence is a statement about a joint distribution.} This paper measures the second
+axis, and the central modelling commitment is that the right object is a joint distribution rather
+than a tally. Given what a response asserts and how it links its assertions, we ask: how much of
+what it asserts does the argument, taken as a whole, uphold? That question is answered by a
+\emph{marginal} in a probabilistic graphical model whose variables are claim truth values and
+whose factors are the asserted relations --- not by counting how many rules a configuration
+violates. The distinction is not stylistic. A conflict between two claims should propagate: it
+should depress belief in both endpoints, and through them in whatever those endpoints support.
+Counting violated rules cannot propagate, and as we show in \S\ref{sec-readouts}, scoring rule
+satisfaction directly produces a measure that a response can maximize by asserting no relations
+at all.
+
+Our contributions are as follows.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt,topsep=3pt]
+\item \textbf{A coherence MRF and a formal two-level relation taxonomy}
+  (\S\ref{sec-coherence}). Twelve discourse senses compile through a deterministic map onto five
+  inferential couplings, each defined by the joint assignment it penalizes, which fixes its factor
+  table. Separating the interpretable layer from the inferential one lets the annotation
+  vocabulary be rich while the probabilistic model stays a closed three-parameter pairwise family
+  that no relation type can extend.
+\item \textbf{A characterization of why factuality's factor tables are wrong for coherence}
+  (\S\ref{sec-potentials}). The tables that are correct for claim--evidence factuality charge a
+  premise for being a premise. We characterize the tables coherence requires by a
+  row-stochasticity property, and show the alternative collapses the measure: the root of an
+  entailment chain falls to $\pr{a_1{=}1}=0.19$ and the mean marginal moves only from $0.490$ to
+  $0.498$ when every conflict edge is deleted, against $0.607$ to $0.620$ for the correct tables.
+\item \textbf{Four readouts, their exact constructions, and a selection argument}
+  (\S\ref{sec-readouts}). We give the deterministic auxiliary-variable constructions that make two
+  of them tractable without a $2^{|\mathcal{R}|}$ table, evaluate all four by exact inference
+  across a coherence-ordered family, and establish why the mean posterior marginal is the one to
+  report: it alone satisfies all five criteria, and the two failures share a diagnosable cause
+  (Prop.~\ref{prop-quirk}).
+\item \textbf{Two-stage composition with factuality} (\S\ref{sec-twostage}), taking posterior
+  marginals from an existing factuality pipeline as the coherence model's priors, so one
+  decomposition and one inference stack serve both axes and either can be read alone.
+\item \textbf{Measurements} (\S\ref{sec-experiments}) that separate relation-extraction error from
+  scoring error by holding the readouts fixed and swapping only the relation graph, plus a worked
+  incoherent/coherent pair with exact values (\S\ref{sec-examples}) and a Markov-logic
+  correspondence establishing what the pairwise encoding does and does not buy
+  (Appendix~\ref{app-mln}).
+\end{itemize}
+
+%% ================================================================
+\section{Related work}
+\label{sec-related}
+%% ================================================================
+
+\paragraph{Atomic factuality.} FActScore \citep{factscore} introduced per-atom precision against a
+knowledge source, decomposing a biography into atomic facts and reporting the fraction supported.
+SAFE \citep{safe} added search-augmented verification with a multi-step reasoning agent per claim
+and the $F_1@K$ metric that trades precision against a recall target. VeriScore
+\citep{veriscore} restricted attention to \emph{verifiable} claims, on the argument that many
+decomposed atoms are not checkable in principle. FactVerify \citep{factverify} reasons over
+retrieved evidence with an undecided verdict class. All four aggregate independent per-claim
+verdicts, and all four are therefore blind to inter-claim structure by construction.
+
+FactReasoner \citep{factreasoner} replaced verdict counting with probabilistic inference: it
+builds a factor graph over claim and evidence variables with pairwise factors derived from
+natural-language-inference relations, and reports posterior marginals rather than a tally. This is
+the closest antecedent of our model, and we reuse its decomposition, its relation extractor and
+its inference stack (\S\ref{sec-factuality}), and take its marginals as our priors
+(\S\ref{sec-twostage}). The question it asks is nonetheless different: its factors run between a
+claim and the \emph{evidence} retrieved for it, so its graph has no claim--claim edges and its
+marginals cannot express internal consistency. Coherence is a different question asked of the same
+decomposition.
+
+\paragraph{The logic gap.} \citet{lorefact} states the problem we address: decompose-then-verify
+pipelines verify atoms individually and overlook the logical dependencies among them, so a text
+combining true facts through a false dependency is misjudged as factual. Their remedy classifies
+dependencies as a labelling task over claim pairs. Our departure is to treat the dependencies as
+\emph{factors in a joint distribution}, which is what allows a local conflict to propagate to
+distant claims and what makes the resulting score a functional of the whole graph rather than a
+per-edge average.
+
+\paragraph{Discourse coherence.} Entity-grid models \citep{barzilay} score coherence from the
+distribution of entity mentions across sentences, and their neural successors \citep{li} learn the
+same signal with distributed representations. Both are trained and evaluated against
+\emph{synthetic perturbations} --- sentence shuffling and, in later work, contradiction injection
+--- a methodology we extend in \S\ref{sec-locobench} by making the perturbation an operator on a
+declared relation graph rather than on raw text, so its intended effect on the score is known per
+item. DiscoScore \citep{discoscore} scores generated text using BERT-based discourse
+representations and correlates well with human coherence judgements. What these approaches share
+is that coherence is read off surface statistics or learned representations; none exposes an
+inspectable relation graph, and none yields per-claim attributions. Our relation inventory takes
+its senses from PDTB~3.0 \citep{pdtb} and RST \citep{mann}, but treats them as an interpretable
+layer that compiles to a smaller inferential vocabulary --- which is what makes discourse senses
+usable as factor types at all.
+
+\paragraph{Consistency checking and LLM judges.} SelfCheckGPT \citep{selfcheckgpt} detects
+hallucination by sampling several responses and running pairwise NLI between them; its NLI variant
+is the natural ablation isolating what global inference adds over purely local contradiction
+detection, and we propose it as such in \S\ref{sec-baselines}. G-Eval \citep{geval} is the
+practical incumbent: an LLM judge scoring a coherence dimension directly from a rubric. Judges of
+this kind are strong on aggregate correlation and weak on exactly what a graphical model provides
+--- attribution to specific claims, and a guarantee that a meaning-preserving edit cannot change
+the score.
+
+\paragraph{Relational probabilistic models.} Markov logic \citep{mln} is the natural alternative
+encoding, replacing factor tables with weighted first-order rules. Appendix~\ref{app-mln} works
+out the correspondence and finds it instructive in both directions: the obvious
+one-clause-per-relation encoding is \emph{not} equivalent to our model and is degenerate at its
+mode, while a three-clause expansion reproduces it exactly on the three-coupling fragment. We
+retain the pairwise MRF for the measure because its factor family is closed, and retain the Markov
+logic view because the beyond-pairwise rules that would address our main modelling limitation are
+expressible there.
+
+%% ================================================================
+\section{Stage one: probabilities for individual claims}
+\label{sec-factuality}
+%% ================================================================
+
+\input{figures/pipeline}
+
+The coherence model consumes claim-level probabilities and reuses the inference machinery that
+produces them, so we describe that stage before defining the model itself. It is FactReasoner
+\citep{factreasoner}; the account here is a summary sufficient to make the composition of
+\S\ref{sec-twostage} precise, and it also fixes notation and states the estimator whose
+label-span construction the relation miner reuses in \S\ref{sec-mining}.
+
+\subsection{Decomposition, retrieval, and relation extraction}
+
+A response $y$ is decomposed by an LLM \emph{atomizer} into atomic claims
+$\mathcal{A}=\{a_1,\dots,a_n\}$, each a single independently verifiable proposition. A
+\emph{reviser} then decontextualizes each one, resolving pronouns and anaphora so that the claim
+is checkable outside its original sentence; near-duplicates are collapsed. For each claim a
+retriever returns supporting passages, which are deduplicated into an evidence set
+$\mathcal{C}=\{c_1,\dots,c_m\}$.
+
+An LLM-based NLI extractor then labels admitted pairs. For a claim--evidence pair the label is
+drawn from $\{\text{entailment},\text{contradiction},\text{neutral}\}$; for an evidence--evidence
+pair both directions are scored and reconciled, with entailment in both directions relabelled
+\emph{equivalence}. Neutral verdicts are dropped rather than encoded: a claim about which the
+evidence is silent contributes no factor and is left at its prior, which is what makes the factor
+set of \S\ref{sec-coherence} contain only the relations someone actually asserted.
+
+\subsection{Reading a probability off the generation}
+\label{sec-pstar}
+
+Each retained relation carries a probability $p^\ast$. Rather than asking the model to verbalize a
+confidence, we read it from the distribution over the tokens it actually emitted. The extractor is
+prompted to end with a bracketed label; let $T$ be the set of generated tokens overlapping the
+span of that label in the decoded text. Then
+\begin{equation}
+p^\ast \;=\; \exp\!\Big(\tfrac{1}{|T|}\textstyle\sum_{t\in T}\log p_t\Big),
+\label{eq-pstar}
+\end{equation}
+the per-token geometric-mean probability of the label the model produced. Three details of this
+construction are load-bearing, and we record them because each was a source of silent error.
+
+\emph{Span alignment.} The probability is measured over exactly the span the label \emph{parser}
+reports, reconstructing the decoded string from the token list and tracking each token's character
+offsets. Measuring the same span the label came from makes the label and its probability
+structurally unable to disagree. Requiring standalone bracket-delimiter tokens instead does not
+work: tokenizers routinely fuse \texttt{[}, \texttt{]} and \texttt{"} into subwords with adjacent
+characters, so a delimiter-based rule silently fails on some backends and not others.
+
+\emph{Token-array conventions.} An earlier version of this code stripped the final entry of the
+logprob array as an end-of-sequence token. OpenAI-compatible and vLLM logprob arrays contain only
+emitted content tokens --- the stop is signalled out of band --- so dropping the last entry
+deleted a real content token, and for a bracketed label that token is the one closing the label
+whose confidence is being measured.
+
+\emph{Degenerate cases.} When the logprob array is empty, no label span is found, or no token
+aligns to it, the estimator returns $0.5$ rather than $0.0$. Returning zero would be read
+downstream as a \emph{degenerate, impossible} relation for a label the model in fact generated,
+which is a stronger claim than ``we could not measure the confidence''.
+
+\emph{Backends without logprobs.} Some serving stacks expose no token logprobs at all. There
+$p^\ast$ instead comes from SIMBA-UQ \citep{simbauq}, which samples the extractor repeatedly across
+a temperature schedule, builds a pairwise similarity matrix over the samples, and aggregates each
+sample's similarity row into a self-consistency confidence. The winning sample supplies the label
+and its aggregated confidence supplies $p^\ast$, so the downstream model is unchanged.
+
+\subsection{The factuality network and its variants}
+
+The labelled graph becomes a pairwise MRF with one binary variable per claim and per evidence
+passage. Unary factors are $\phi_X(x)=[1-\pi_X,\;\pi_X]$ with $\pi_X$ the prior on $X$; each
+retained relation contributes one pairwise factor from Table~\ref{tab:factors} below, oriented so
+the evidence passage is the premise. Marginals $\pr{A_i{=}1}$ are computed by weighted mini-bucket
+elimination \citep{wmb} with i-bound $6$, and a claim is reported supported when
+$\pr{A_i{=}1}>\tfrac12$.
+
+Three graph variants differ in which factors are admitted: \textsc{fr1} connects each claim only
+to the passages retrieved for it; \textsc{fr2} deduplicates passages and scores every claim
+against all of them; \textsc{fr3} adds evidence--evidence factors. We use \textsc{fr2}. Because
+scoring every claim against every passage is $O(nm)$ LLM calls, a candidate-pair policy can restrict
+the pairs actually scored; the calibration of that policy is instructive for the analogous choice
+in \S\ref{sec-mining}. Replaying policies against recorded verdicts on a 20-claim narrative with 60
+passages, a provenance-restricted policy with an embedding similarity gate holds recall at $1.000$
+through a threshold of $0.20$, slipping to $0.985$ at $0.30$ and $0.833$ at $0.40$. Substituting
+token-Jaccard similarity for sentence embeddings, however, loses $22$ of $72$ non-neutral relations
+and moves the factuality score by $0.05$ --- and \emph{no} threshold recovers full recall, even
+$0.05$. Cheap surrogates for semantic similarity are not safe here, and the saving is
+workload-dependent rather than constant: roughly $5\times$ on unrelated subtopics but $1.2\times$
+on a narrative where every claim shares characters.
+
+\paragraph{Conventions.} We use the with-priors factor tables (Table~\ref{tab:factors}) throughout,
+with $\pi_C=0.9$ for evidence and $\pi_A=0.5$ for claims. The published factuality model uses the
+no-priors tables and a higher evidence prior. The difference is immaterial to the coherence results
+below, which set claim priors explicitly, but the convention must be stated because the two table
+families are not interchangeable --- that is the subject of \S\ref{sec-potentials}.
+
+%% ================================================================
+\section{Stage two: the coherence Markov random field}
+\label{sec-coherence}
+%% ================================================================
+
+\subsection{The model}
+\label{sec-model}
+
+\begin{definition}[Coherence MRF]
+\label{def-mrf}
+Let $\mathcal{A}=\langle a_1,\dots,a_n\rangle$ be the atomic claims of a response in assertion
+order, each a binary variable with $a_i=1$ read as ``the claim holds''. Let
+$\mathcal{R}=\{(s_r,t_r,\tau_r,p_r)\}_{r=1}^{|\mathcal{R}|}$ be a set of \emph{relations}, where
+$s_r\neq t_r$ index claims, $\tau_r$ is an inferential coupling (Def.~\ref{def-couplings}), and
+$p_r\in[0,1]$ is the relation's weight. Given priors $\pi\in[0,1]^n$, the coherence MRF induced by
+$(\mathcal{A},\mathcal{R},\pi)$ is
+\begin{equation}
+\pr{\mathbf{a}} \;=\; \frac{1}{Z}\;
+  \prod_{i=1}^{n}\phi_i(a_i)\;
+  \prod_{r\in\mathcal{R}}\psi_{\tau_r,p_r}\!\left(a_{s_r},a_{t_r}\right),
+\qquad
+Z \;=\; \sum_{\mathbf{a}\in\{0,1\}^n}\;\prod_{i}\phi_i(a_i)\prod_{r}\psi_r ,
+\label{eq-joint}
+\end{equation}
+where $\phi_i(a_i)=[1-\pi_i,\;\pi_i]$ over the states $(0,1)$ and $\psi_{\tau,p}$ is given by
+Table~\ref{tab:factors}.
+\end{definition}
+
+Three structural properties of Definition~\ref{def-mrf} deserve statement, because each is a
+deliberate commitment rather than an implementation detail.
+
+\begin{remark}[The factor family is closed]
+\label{rem-closed}
+A coupling is nothing more than a choice of which cells of a $2\times2$ table are down-weighted
+and by how much. Every $\psi_{\tau,p}$ in Table~\ref{tab:factors} is determined by $p$, the source
+prior $\pi_s$, and the penalized set; the whole inferential vocabulary is therefore a
+three-parameter pairwise family. This is a guarantee about what the model \emph{cannot} do: no
+relation type, however elaborately named at the discourse level, can smuggle in expressiveness
+beyond a pairwise potential. Appendix~\ref{app-mln} contrasts this with Markov logic, whose rule
+vocabulary is open by design.
+\end{remark}
+
+\begin{remark}[Order-sensitivity enters only through the relations]
+\label{rem-order}
+Nothing in Eq.~\ref{eq-joint} references claim position. Assertion order enters exclusively
+through \emph{which} pairs are related and in \emph{which} direction. It follows that an edit which
+preserves the relation set --- reordering claims whose relations are symmetric, or exchanging a
+temporal \sense{Precedence} for a \sense{Succession}, which Table~\ref{tab:compile} maps to no
+factor at all --- provably cannot change any readout. This is a falsifiable prediction about the
+measure and not merely a design note; \S\ref{sec-locobench} describes the ladder built to test it.
+\end{remark}
+
+\begin{remark}[Coherence is evaluated without evidence]
+\label{rem-noevidence}
+The graph of Definition~\ref{def-mrf} contains claim variables only. No retrieved passage appears,
+and with uniform priors $\pi_i\equiv\tfrac12$ the model consults no external knowledge whatever: it
+scores how the response hangs together, not whether it is true. This is what makes the two axes
+separable, and \S\ref{sec-twostage} shows how to couple them when a joint reading is wanted.
+\end{remark}
+
+\subsection{Level one: inferential couplings}
+\label{sec-couplings}
+
+\begin{definition}[Inferential couplings]
+\label{def-couplings}
+A coupling $\tau$ is specified by the set $V(\tau)\subseteq\{0,1\}^2$ of joint assignments
+$(a_s,a_t)$ it \emph{penalizes} --- equivalently, the configurations at which the relation is
+violated. The vocabulary is:
+\begin{center}\small
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Coupling & Reading & Directed & Penalized set $V(\tau)$ \\
+\midrule
+\ent            & $a_s \Rightarrow a_t$              & yes & $\{(1,0)\}$ \\
+\con            & $a_s \Rightarrow \neg a_t$         & yes & $\{(1,1)\}$ \\
+\eqv            & $a_s \Leftrightarrow a_t$          & no  & $\{(0,1),(1,0)\}$ \\
+\exc            & exactly one of $a_s,a_t$ holds     & no  & $\{(0,0),(1,1)\}$ \\
+\cnc            & at least one of $a_s,a_t$ holds    & no  & $\{(0,0)\}$ \\
+\coupling{none} & no coupling                        & ---  & $\varnothing$ (no factor) \\
+\bottomrule
+\end{tabular}
+\end{center}
+Write $\mathcal{T}$ for the five edge-producing couplings and
+$\mathcal{T}_{\mathrm{conf}}=\{\con,\exc\}$ for the \emph{conflict} couplings, those whose
+penalized set contains the both-true world $(1,1)$.
+\end{definition}
+
+The first three couplings are exactly the NLI edge types of \S\ref{sec-factuality}, which is what
+lets a mined relation reuse the existing graph machinery unchanged. The last two are additions
+required by argumentative prose, and the distinction between them and \con{} is the one the
+taxonomy exists to draw.
+
+\paragraph{Why exhaustiveness needs its own coupling.} \con{} forbids only the both-true world: two
+claims that cannot both hold, but might both fail. \exc{} additionally forbids the both-false
+world, which is what \emph{exhaustive} alternatives assert. ``No one was harmed'' and ``three
+people died'' can neither both hold nor both fail --- either someone was harmed or no one was ---
+so a model that treats them as mere opposition has mis-described the situation in a way that
+matters for scoring: it leaves available a world in which \emph{neither} claim is true, and so
+under-penalizes. Conversely \cnc{} is the dual, penalizing only the both-false world, and is what a
+disjunction asserts (``at least one of these two findings must hold''). Adjudicated disputes ---
+incident investigations, litigation, competing hypotheses --- are precisely the domains where
+exhaustive pairs occur, because the function of a finding is to close one.
+
+\begin{example}[A \cnc{} factor in isolation]
+\label{ex-cnc}
+Take a single \cnc{} relation with $p=0.9$ over two claims with priors $\pi=0.5$, and no other
+factors. From Table~\ref{tab:factors} the pairwise table is $[1-p,\;\pi_s,\;\pi_s,\;p]
+=[0.1,0.5,0.5,0.9]$, and multiplying in the unaries and normalizing gives world masses
+\[
+\pr{0,0}=0.05,\quad \pr{0,1}=0.25,\quad \pr{1,0}=0.25,\quad \pr{1,1}=0.45 .
+\]
+The both-false world is suppressed from the $0.25$ it would receive under independent fair priors
+to $0.05$, while the three worlds satisfying ``at least one holds'' share the recovered mass in
+proportion to how many endpoints they assert. Each marginal rises from $0.5$ to $0.7$: asserting
+that at least one of two claims holds is evidence for both, which is the intended reading.
+\end{example}
+
+\subsection{The pairwise potentials, and why factuality's tables are wrong here}
+\label{sec-potentials}
+
+\begin{table}[t]
+\centering\small
+\caption{Pairwise potentials $\psi_{\tau,p}(a_s,a_t)$, listed row-major over the assignments
+  $(0,0),(0,1),(1,0),(1,1)$; $\pi_s$ is the source claim's prior and bold marks the penalized set
+  $V(\tau)$ of Def.~\ref{def-couplings}. The \emph{no-priors} family is correct for
+  claim--evidence factuality, where the source passage's own truth is at stake; the
+  \emph{with-priors} family is what coherence requires (Prop.~\ref{prop-rowstoch}) and what
+  Def.~\ref{def-mrf} uses. The two symmetric couplings \eqv{} and \exc{} coincide in both
+  families, having no source-prior term to correct.}
+\label{tab:factors}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Coupling $\tau$ & No priors & With priors & Symmetry \\
+\midrule
+\ent  & $[p,\;p,\;\mathbf{1\!-\!p},\;p]$
+      & $[1\!-\!\pi_s,\;\pi_s,\;\mathbf{1\!-\!p},\;p]$ & asymmetric \\
+\con  & $[p,\;p,\;p,\;\mathbf{1\!-\!p}]$
+      & $[1\!-\!\pi_s,\;\pi_s,\;p,\;\mathbf{1\!-\!p}]$ & asymmetric \\
+\eqv  & \multicolumn{2}{l}{$[p,\;\mathbf{1\!-\!p},\;\mathbf{1\!-\!p},\;p]$} & symmetric \\
+\exc  & \multicolumn{2}{l}{$[\mathbf{1\!-\!p},\;p,\;p,\;\mathbf{1\!-\!p}]$} & symmetric \\
+\cnc  & $[\mathbf{1\!-\!p},\;p,\;p,\;p]$
+      & $[\mathbf{1\!-\!p},\;\pi_s,\;\pi_s,\;p]$ & symmetric \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{proposition}[Row-stochasticity]
+\label{prop-rowstoch}
+Each with-priors table in Table~\ref{tab:factors} is row-stochastic in the source state: for
+$\tau\in\{\ent,\con,\cnc\}$ both rows sum to one, giving the conditional readings
+\[
+\pr{a_t{=}1 \mid a_s{=}0} = \pi_s, \qquad
+\pr{a_t{=}1 \mid a_s{=}1} = \begin{cases}
+p & \tau=\ent\\ 1-p & \tau=\con\\ p & \tau=\cnc .
+\end{cases}
+\]
+Consequently the factor asserts something about the target only when the source is true; when the
+source is false, the target is returned to its prior.
+\end{proposition}
+
+Proposition~\ref{prop-rowstoch} is the substantive modelling choice of this section, and the
+contrast with the no-priors family is worth being precise about. In the no-priors \ent{} table the
+$(1,0)$ cell is $1-p$ \emph{and the $(0,\cdot)$ cells are both $p$}, so the table charges the
+\emph{source} being true whenever the target is uncertain. That is appropriate for
+claim--evidence factuality: there the source is a retrieved passage whose own reliability is in
+question, and an entailment from a passage to a claim the model doubts is evidence against the
+passage. It is wrong for coherence, where the source is another claim of the same response, and
+where a well-supported premise must not be penalized for being a premise.
+
+The consequence is not a matter of degree. On the response of \S\ref{sec-examples} --- sixteen
+claims joined by a twelve-edge entailment backbone --- the no-priors tables drive the root of the
+backbone to $\pr{a_1{=}1}=0.19$, far below its $0.5$ prior, purely because it is the premise of a
+chain whose later members are uncertain. The mean marginal sits at $0.490$ and moves only to
+$0.498$ when every conflict edge is deleted, a range of $0.008$. Under the with-priors tables the
+same comparison runs $0.607$ to $0.620$: a range more than $1.5$ times larger, from a base that is
+not already depressed by the backbone itself. All four values are exact, by $2^{16}$ enumeration. A
+coherence measure built on the factuality tables does not merely give different numbers; it spends
+its dynamic range penalizing premises and has little left for conflicts, which are the thing being
+measured.
+
+\subsection{Level two: discourse senses and the compile map}
+\label{sec-level2}
+
+Couplings are the right vocabulary for a factor table and the wrong one for annotation. Asked
+whether two claims stand in \ent{}, an annotator --- human or model --- has been handed a question
+about logic, when the fact actually observable in the text is a question about discourse: does this
+sentence give a cause, offer evidence, concede a tension, or lay out alternatives? We therefore
+mine an interpretable layer and compile it down.
+
+\begin{definition}[Compile map]
+\label{def-compile}
+Let $\mathcal{S}$ be the set of Level-2 discourse senses. The compile map
+\[
+\mathcal{C}:\;\mathcal{S}\;\longrightarrow\;
+  \bigl(\mathcal{T}\cup\{\coupling{none}\}\bigr)\times\bigl([0,1]\cup\{\bot\}\bigr)\times\{0,1\}^3
+\]
+assigns to each sense a coupling, a strength prior ($\bot$ meaning ``use the estimator's own
+value''), and the flags \emph{directed}, \emph{concession} and \emph{ordering-only}. It is total,
+deterministic, and given in Table~\ref{tab:compile}.
+\end{definition}
+
+\begin{table}[t]
+\centering\small
+\caption{The compile map $\mathcal{C}$ of Def.~\ref{def-compile}. \emph{Ordering-only} senses
+  record assertion order but induce \textbf{no factor}, which is what makes an order-only edit
+  provably score-invariant (Rem.~\ref{rem-order}). \sense{Concession} is a conflict the text may
+  itself resolve, handled by Eq.~\ref{eq-concession}. The nine senses marked $\star$ form the
+  admissible vocabulary of \S\ref{sec-mining}.}
+\label{tab:compile}
+\begin{tabular}{@{}llccll@{}}
+\toprule
+Level-2 sense & $\mathcal{C}$ coupling & prior & dir. & flag & gloss \\
+\midrule
+\sense{Cause-Effect}$^\star$   & \ent & $\bot$ & yes & & source brings target about \\
+\sense{Effect-Cause}$^\star$   & \ent & $\bot$ & yes & & source is the effect, target the cause \\
+\sense{Evidence}$^\star$       & \ent & $\bot$ & yes & & source is evidence for target \\
+\sense{Condition}              & \ent & $\bot$ & yes & & source conditions target \\
+\sense{Instantiation}          & \ent & $\bot$ & yes & & target instantiates source \\
+\sense{Restatement}$^\star$    & \eqv & $0.90$ & no  & & definitional identity \\
+\sense{Contrast}$^\star$       & \con & $\bot$ & no  & & opposed, \emph{not} exhaustive \\
+\sense{Concession}$^\star$     & \con & $\bot$ & yes & conc. & a tension the text resolves \\
+\sense{Alternative}$^\star$    & \exc & $\bot$ & no  & & exhaustive: exactly one holds \\
+\sense{Disjunction}$^\star$    & \cnc & $\bot$ & no  & & at least one holds \\
+\sense{Precedence}$^\star$     & \coupling{none} & --- & yes & ord. & temporal order only \\
+\sense{Succession}             & \coupling{none} & --- & yes & ord. & temporal order only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several entries encode judgements worth defending. \sense{Restatement} carries a fixed strength
+prior of $0.90$ because a marked paraphrase (``in other words'', ``equivalently'') is a claim about
+identity of content, and a model asked to estimate its strength has little to add; the estimator's
+value is used when available, and the prior seeds it otherwise. Five senses collapse onto \ent{},
+which is a deliberate loss: the model does not distinguish causation from evidence, because a
+pairwise potential over truth values cannot. What survives compilation is the inferential force,
+and the sense is retained alongside it for interpretability and for error analysis.
+
+The \sense{Contrast}/\sense{Alternative} boundary is exactly the exhaustiveness question of
+\S\ref{sec-couplings}, and the two ordering-only senses are the taxonomy's way of representing a
+relation the text genuinely draws while asserting that it has no truth-functional content: a
+narrative that says one event preceded another has related the two claims, and has said nothing
+about whether either is true.
+
+\paragraph{Concession: a conflict the text resolves.} A \sense{Concession} asserts a tension and
+then overrides it. ``The airline argued pilot error, but the final report found a metallurgical
+defect'' is not an incoherence if the report's finding is presented as authoritative; treating it
+as a live contradiction would penalize a response for doing the very thing careful argument
+requires. When a resolving \emph{holding} claim $h$ is present we discount the conflict's weight,
+\begin{equation}
+p_r^{\mathrm{eff}} \;=\; p_r\,\bigl(1-\lambda\,\pi_h\bigr),
+\label{eq-concession}
+\end{equation}
+with $\lambda=0.45$; absent a resolver the relation stands at full strength and the tension counts
+against the response. Holdings are identified by adjudicative cue phrases (\emph{held},
+\emph{ruled}, \emph{concluded}, \emph{found that}, \emph{the tribunal}, \emph{ultimately}) on a
+claim that is not itself an endpoint of the relation and that maximizes lexical overlap with the
+two endpoints. This is a heuristic, and with $\lambda$ it is the one place in the design where
+hand-set constants enter; \S\ref{sec-limitations} returns to the point.
+
+\subsection{Estimating relations from the response}
+\label{sec-mining}
+
+Definition~\ref{def-mrf} takes $\mathcal{R}$ as given. In use it must be estimated from the text,
+and the estimator is the weakest link in the pipeline (\S\ref{sec-experiments}), so we specify it
+carefully.
+
+\paragraph{The estimand, decomposed.} A relation's weight factors into a type term and a strength
+term:
+\begin{equation}
+p_r \;=\; \underbrace{\pr{\tau \mid a_s,a_t,y}}_{\text{type confidence}}\;\cdot\;
+          \underbrace{\pr{a_t \mid a_s,\tau,y}}_{\text{conditional strength}} .
+\label{eq-decomp}
+\end{equation}
+The first factor asks how confident we are that this is a \emph{$\tau$-relation at all}; the second,
+given that it is, how strongly the source determines the target. Conflating them is a mistake: a
+confidently-identified weak causal link and a doubtfully-identified strong one are different
+epistemic situations that a single elicited number cannot distinguish. Two prompts estimate them
+separately (full texts in Appendix~\ref{app-prompts}).
+
+\emph{Prompt A} elicits the discourse sense and its coupling, with chain-of-thought \emph{preceding}
+the label so the model commits to a sense only after reasoning --- and so that the label's token
+logprobs, read exactly as in Eq.~\ref{eq-pstar}, measure a decision already made rather than one
+being made. \emph{Prompt B} elicits the conditional strength as a surrogate token: the answer's first
+word must be \texttt{Yes} or \texttt{No}, and the strength is the renormalized
+$\pr{\texttt{Yes}}/(\pr{\texttt{Yes}}+\pr{\texttt{No}})$ \citep{kadavath}, or the affirmative
+fraction over $N$ samples where logprobs are unavailable. The question is deliberately graded ---
+``is the implication at least plausible?'' rather than ``is it certain?'' --- so that a weak but real
+link is not forced to answer \texttt{No}; its weakness surfaces in the renormalized probability
+instead. A verbalized variant asking for \texttt{[p=0.NN]} directly is retained only as a
+comparison, verbalized confidence being weakly calibrated \citep{xiong}.
+
+\paragraph{Grounding is mandatory, not optional.} Prompt A always receives the full response, and is
+instructed to assert a coupling only where the response \emph{itself} draws the connection. This is
+the single most consequential decision in the estimator. Judging a claim pair in isolation invites
+the model to accept any abstractly plausible relation, and the failure is not a mild
+over-generation: measured relation density reaches six to nine relations per claim, including
+spurious contradictions on paragraphs that contain none. Because Eq.~\ref{eq-joint} is a product
+over relations, a graph of many soft mutually-constraining edges drives every marginal toward the
+prior, so an over-connected graph does not merely add noise --- it destroys the measure's ability to
+distinguish a coherent response from an incoherent one, in the direction of calling everything
+mediocre.
+
+Two further precision mechanisms are used, one requested and one checkable. The \emph{admissibility
+filter} restricts output to the nine $(\text{sense},\text{coupling})$ combinations marked $\star$ in
+Table~\ref{tab:compile}. \sense{Condition} and \sense{Instantiation} are the notable exclusions:
+both compile to \ent{} and both are semantically broad, so a model reaching for ``these two claims
+are related somehow'' lands on them readily --- they accounted for $13\%$ of one measured arm's
+edges while appearing zero times in gold. The \emph{evidence-span requirement} obliges the model to
+quote, verbatim from the response, the words that draw the link; the parser then verifies that the
+quotation is actually a substring of the response and drops the relation otherwise. This is the only
+precision mechanism in the estimator that is \emph{checked} rather than merely asked for. It must
+quote the response and not the claims, because claims are decontextualized rewrites and only about
+$27\%$ of them appear in the response verbatim even after normalization.
+
+\paragraph{Two prompt generations.} The first-generation Prompt A over-asserts badly: against a
+corpus in which $7.2\%$ of candidate pairs are genuinely related, it answers ``related'' on $72\%$ of
+the pairs a windowed policy hands it. Five properties push it that way, and the revision addresses
+each. (i) Its few-shot balance was three related to one unrelated; class balance in the exemplars is
+a strong prior on the answer distribution, and this one pointed the wrong way by an order of
+magnitude. The revision is two related to three unrelated. (ii) Its single negative exemplar had the
+response \emph{explicitly disavow} a link (``the two processes were not related this year''), which
+teaches that \coupling{none} requires denial, whereas real prose simply stays silent; the revision's
+negatives are all silence. (iii) It asked for grounding but gave the model nowhere to show it and
+nothing to check it --- hence the evidence span. (iv) Its first reasoning step was a leading question
+listing eight affirmative relation types before mentioning \coupling{none}; the revision asks the
+discriminating question first, whether the text draws the link or the claims are merely near each
+other. (v) It gave \coupling{none} one line against nine for relation-bearing senses; the revision
+gives it first position and equal prose. The revision also names \emph{transitivity} explicitly as a
+non-relation, since roughly $85\%$ of the first generation's false positives are the model closing a
+chain the text laid out pairwise, and $96.6\%$ of them touch an endpoint of a real relation. Both
+generations are retained permanently so that any claim about the prompt can be measured rather than
+asserted; \S\ref{sec-experiments} reports both.
+
+\paragraph{Candidate pairs.} Querying all $n(n-1)$ ordered pairs is quadratic in LLM calls and, as
+argued above, actively harmful. We define four policies:
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+\item \textsc{all\_pairs}: every ordered pair $i\neq j$.
+\item \textsc{windowed}: forward pairs with $0<j-i\le w$, default $w=4$.
+\item \textsc{gated}: the window, plus long-range forward pairs whose embedding or entity
+  similarity exceeds a threshold, to catch discourse callbacks.
+\item \textsc{bidirectional}: \emph{both} arc directions within $|j-i|\le w$.
+\end{itemize}
+The last exists because of a structural limitation, not a tuning preference. A forward-only policy
+\emph{cannot emit} an arc that runs backward in claim order, so a gold relation that is both
+directed and backward is unreachable under it no matter what the model says. In our corpus $20$ of
+$86$ edge-producing gold relations are of that kind, capping forward-only recall at $76.7\%$ before
+the model is consulted; \S\ref{sec-experiments} measures the effect.
+
+Every policy is then refined against the response itself (Algorithm~\ref{alg-pairs}). Each claim is
+aligned to its originating sentence; a pair is \emph{discourse-adjacent} if the two claims share
+content tokens above a Jaccard threshold, if their sentences are within a short span, or if the
+target's sentence opens with a discourse connective. Out-of-window pairs that are discourse-adjacent
+are \emph{promoted} into the candidate set; in-window pairs that are not are \emph{demoted} out of
+it. The refinement is a correlated filter --- it selects for the same surface adjacency that the
+sense prompt reads as evidence of relatedness --- which is why we report it as a policy component
+and measure its effect rather than treating it as a neutral preprocessing step.
+
+\begin{algorithm}[t]
+\caption{\textsc{SelectCandidatePairs}: response-anchored candidate selection.}
+\label{alg-pairs}
+\begin{algorithmic}[1]
+\Require claims $\mathcal{A}=\langle a_1,\dots,a_n\rangle$ in assertion order; response $y$;
+  policy; window $w$; gate threshold $\theta_g$; discourse thresholds $\theta_d,\delta$
+\Ensure ordered candidate pairs $P$, plus a coverage record
+\If{policy $=$ \textsc{all\_pairs}} \Return every ordered pair $(a_i,a_j)$, $i\neq j$ \EndIf
+\State $W \gets \{(a_i,a_j) : 0 < j-i \le w\}$ \Comment{forward order window}
+\If{policy $=$ \textsc{bidirectional}} $W \gets W \cup \{(a_j,a_i) : 0 < j-i \le w\}$ \EndIf
+\State $G \gets \varnothing$
+\If{policy $=$ \textsc{gated}}
+  \State $G \gets \{(a_i,a_j) : j-i > w,\ \mathrm{sim}(a_i,a_j)\ge\theta_g\}$
+\EndIf
+\State align each claim to its best-matching sentence of $y$
+\State $\mathit{Prom} \gets \{(a_i,a_j)\notin W\cup G : \textsc{DiscourseAdjacent}(i,j)\}$
+\State $\mathit{Dem} \gets \{(a_i,a_j)\in W : \neg\,\textsc{DiscourseAdjacent}(i,j)\}$
+\State \Return $\bigl(\textsc{Dedup}(W \cup G \cup \mathit{Prom}) \setminus \mathit{Dem}\bigr)$,
+  $\;(|W|,|G|,|\mathit{Prom}|,|\mathit{Dem}|)$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Failures must be counted, not absorbed.} Mining issues one LLM call per candidate pair for
+Prompt A and one more for each pair that yields an edge, run concurrently under a rate limit. A
+throttled or failed call returns no parse, and a parser that reads ``no parse'' as ``no relation''
+converts an infrastructure failure into a sparse graph --- which then scores as a \emph{more}
+coherent response, since fewer conflicts are asserted. We therefore tally call errors separately
+from genuine \coupling{none} answers and report them, and distinguish an explicit \coupling{none}
+from an unparseable coupling for the same reason.
+
+%% ================================================================
+\section{Four coherence readouts}
+\label{sec-readouts}
+%% ================================================================
+
+Definition~\ref{def-mrf} specifies a distribution; a coherence score is a functional of it, and
+several are defensible. We state five criteria, define four candidates with their exact
+constructions, and then decide between them by exact inference rather than by preference.
+
+\begin{definition}[Criteria]
+\label{def-criteria}
+A coherence readout should be:
+\textbf{(R1)} a genuine functional of the joint $\pr{\mathbf{a}}$, not of the relation list alone;
+\textbf{(R2)} valued in $[0,1]$ and interpretable;
+\textbf{(R3)} \emph{monotone} --- resolving or removing a conflict must not decrease it;
+\textbf{(R4)} sensitive to conflict without hand-tuned constants;
+\textbf{(R5)} computable from standard inference queries.
+\end{definition}
+
+R1 deserves comment, since it is the criterion that does the most work. A readout that depends only
+on $\mathcal{R}$ --- how many relations there are, what types, what weights --- is not measuring the
+response; it is measuring its own annotation. Proposition~\ref{prop-vacuous} below shows this is not
+a hypothetical concern.
+
+\subsection{(a) Mean posterior marginal}
+
+\begin{equation}
+\LCS_{\mm}(y) \;=\; \frac{1}{n}\sum_{i=1}^{n}\pr{a_i=1} .
+\label{eq-mm}
+\end{equation}
+
+The marginals come directly from a single \textsc{mar} query. The interpretation is the expected
+fraction of the response's claims that the argument, taken as a whole, upholds. A conflict
+suppresses the marginals of its endpoints; a satisfied entailment chain propagates support along
+itself; a claim no relation touches stays at its prior and contributes neutrally.
+
+Alongside the scalar we report three diagnostics that come free with the same query: the per-claim
+marginals themselves, which localize an incoherence to specific claims; the count of claims dragged
+\emph{below their own prior}, which is the sharpest single indicator of an active conflict; and the
+mean normalized binary entropy $\mathcal{E}=\tfrac1n\sum_i H_2(q_i)$, lower being more decisive.
+
+\subsection{(b) Consistency: a two-term probability}
+\label{sec-consistency}
+
+The obvious alternative to averaging marginals is to ask for the probability that the response is
+consistent. Making that precise turns out to require two terms:
+\begin{equation}
+\LCS_{\cons} = \tfrac12\bigl(\mathcal{K}+\mathcal{S}\bigr),\quad
+\mathcal{K} = \pr{\!\!\bigwedge_{r:\,\tau_r=\con}\!\!\neg\bigl(a_{s_r}\!\wedge a_{t_r}\bigr)},\quad
+\mathcal{S} = \frac{\sum_{r\in\mathcal{R}_{\mathcal{S}}} p_r\,U_r}
+                   {\sum_{r\in\mathcal{R}_{\mathcal{S}}} p_r},
+\label{eq-cons}
+\end{equation}
+where $\mathcal{R}_{\mathcal{S}}$ ranges over $\{\ent,\eqv,\exc\}$ and $U_r$ is the probability that
+relation $r$ is \emph{actively upheld}:
+\[
+U_r=\pr{a_{s_r}{=}1 \wedge a_{t_r}{=}1}\ \text{ for }\ent,\eqv,
+\qquad
+U_r=\pr{a_{s_r}\neq a_{t_r}}\ \text{ for }\exc .
+\]
+
+\paragraph{The two coupling sets are deliberately different.} The conflict event $\mathcal{K}$ keys
+on \con{} alone, even though $\mathcal{T}_{\mathrm{conf}}=\{\con,\exc\}$. The reason is that an
+\exc{} spreads its incoherence over \emph{both} same-value worlds, so reading only its both-true half
+would describe half the coupling and silently report the other half as satisfactory. \exc{} therefore
+earns credit in $\mathcal{S}$ instead, where its exactly-one world is simultaneously where the
+exclusion is honoured and where it is informative. \cnc{} enters neither term: its defect is the
+both-false world, which (a)'s marginals already see directly.
+
+\paragraph{Computing $\mathcal{K}$ exactly.} $\mathcal{K}$ is an event probability over a conjunction
+of $|\{r:\tau_r=\con\}|$ pairwise events, which a naive encoding would represent as a factor of
+exponential arity. Instead we augment the network with deterministic auxiliary variables: one
+$u_r$ per conflict edge with a ternary factor enforcing $u_r = a_{s_r}\wedge a_{t_r}$, then a chained
+running disjunction $U_k = U_{k-1}\vee u_k$ with ternary factors, and finally
+$\mathcal{K}=\pr{U_{|\cdot|}{=}0}$. Every auxiliary factor is deterministic and at most ternary, so
+no $2^{|\mathcal{R}|}$ table is ever built and the augmented network is read with one \textsc{mar}.
+
+\paragraph{Computing $\mathcal{S}$ exactly.} $\mathcal{S}$ is not an event probability but a weighted
+sum of \emph{pairwise joints} --- a linear functional of the joint --- so it cannot be read off the
+same accumulator chain. It needs one deterministic indicator variable per supported edge and its own
+\textsc{mar}. Because the indicators are mutually independent given the base network, they may be
+batched across several queries without approximation, which matters only for inference backends that
+enumerate.
+
+\paragraph{Why ``actively upheld'' and not ``satisfied''.} The definition of $U_r$ credits a relation
+only in the informative world, not in every world where it is technically satisfied. An entailment
+$a_s\Rightarrow a_t$ is satisfied vacuously whenever $a_s=0$, and crediting that is fatal:
+
+\begin{proposition}[The vacuous-truth trap]
+\label{prop-vacuous}
+Let $\mathcal{K}'=\pr{\text{every relation in }\mathcal{R}\text{ is satisfied}}$, the apparently
+natural extension of $\mathcal{K}$ to all couplings. Then a response with no mined relations
+satisfies $\mathcal{K}'=1$, the maximum attainable value.
+\end{proposition}
+
+\begin{proof}
+$\mathcal{K}'$ is the probability of an intersection of $|\mathcal{R}|$ events; for
+$\mathcal{R}=\varnothing$ the intersection is the whole space.
+\end{proof}
+
+The proposition is immediate, but its consequence is not, and it is the reason
+$\LCS_{\cons}$ has the form it does. Measured on the family of \S\ref{sec-examples}, a disconnected
+bag of claims scores $\mathcal{K}'=1.000$ while a response whose causal spine is fully satisfied
+scores $0.221$ --- an inversion, not a tie. Nor is the defect repaired by count normalization: the
+geometric mean over relations gives $0.883$ for the base response against $0.882$ for the coherent
+one, non-monotone \emph{and} still $1.000$ on the bag; the expected fraction of satisfied relations
+gives $0.857$ against $0.852$, likewise inverted; and normalizing against a prior ceiling leaves
+$[0,1]$ altogether ($8.82$ against $5.46$) while still running backwards. The common cause is that
+``are the asserted relations honoured?'' is a property of $\mathcal{R}$ rather than of $y$ --- a
+violation of R1 --- and it is maximized by asserting nothing. Crediting only the informative world
+removes the free lunch: a bag of claims upholds nothing and scores $\mathcal{S}=0$.
+
+The two terms are averaged rather than multiplied so that neither can annihilate the other. A live
+contradiction should not erase a well-supported spine, and a relation-free response should not
+inherit a perfect score from an empty conflict set.
+
+\subsection{(c) A reified coherence node}
+\label{sec-reified}
+
+The most direct reading of ``is this response coherent?'' as a single probability is to introduce a
+variable for it. Add a binary $R$ with Bernoulli prior $\rho$ and, for each relation, a ternary
+\emph{vote} factor
+\begin{equation}
+h_r(R,a_s,a_t)=\begin{cases}
+1 & R=0 \quad\text{(the branch is flat)}\\
+1 & R=1,\ (a_s,a_t)\notin V(\tau_r)\\
+1-p_r & R=1,\ (a_s,a_t)\in V(\tau_r),
+\end{cases}
+\qquad \LCS_{\rei}=\pr{R=1}.
+\label{eq-reified}
+\end{equation}
+In the $R=1$ branch each violated relation charges $1-p_r$, so $R$ behaves as a noisy-AND over
+relation satisfaction; in the $R=0$ branch nothing is charged, so $R=0$ carries no commitment. With
+no relations $R$ is decoupled and $\LCS_{\rei}=\rho$, correctly signalling that nothing was measured.
+Note that the violated set is $V(\tau)$ from Def.~\ref{def-couplings}, so \ent{} is treated as
+satisfied at $a_s=0$ --- vacuously --- which is where (c) inherits a weaker form of
+Prop.~\ref{prop-vacuous}'s problem. Appendix~\ref{app-reified} works a three-claim subnet through by
+hand, giving $\pr{R{=}1}=0.453$.
+
+\subsection{(d) Normalized log-partition}
+\label{sec-logz}
+
+The partition function measures how much probability mass the constraints leave standing, which is a
+global coherence signal requiring no marginals at all. It is unnormalized, so we grade it between two
+references built from the same edge skeleton:
+\begin{equation}
+\LCS_{\lp} \;=\; \frac{\log Z - \log Z_{\min}}{\log Z_{\max} - \log Z_{\min}} .
+\label{eq-logz}
+\end{equation}
+For the ceiling, $Z_{\max}$ is the partition function of the same network with every conflict edge
+removed: deleting constraint factors only adds mass, so $\log Z\le\log Z_{\max}$ always. For the
+floor we take the \emph{MAP world mass} of the base network,
+$Z_{\min}=\max_{\mathbf{a}}\prod_i\phi_i\prod_r\psi_r$.
+
+\begin{lemma}[The MAP world mass is a valid, coherence-graded floor]
+\label{lem-floor}
+$\log Z_{\min}\le\log Z$ for every network, and $Z_{\min}$ is non-increasing in conflict strength.
+\end{lemma}
+\begin{proof}
+$Z=\sum_{\mathbf{a}}\mathrm{mass}(\mathbf{a})$ is a sum of non-negative terms, so its single largest
+term is a lower bound. For the second claim, increasing $p_r$ on a conflict edge multiplies the mass
+of every world in $V(\tau_r)$ by a factor below one and leaves other worlds unchanged, so the maximum
+over worlds cannot increase.
+\end{proof}
+
+Lemma~\ref{lem-floor} is not a technicality; it replaces two floors that look more natural and are
+wrong. Retyping every edge to \con{}, or saturating conflicts to $p=1$, both fail to bound $\log Z$
+below for the row-stochastic tables of Prop.~\ref{prop-rowstoch}: an isolated conflict removes no
+mass at all under those tables, whereas a mass-concentrating entailment backbone concentrates a great
+deal, so a network combining a strong backbone with several soft conflicts can have a base $\log Z$
+\emph{below} either candidate floor. We observed exactly this on real graphs, which put
+Eq.~\ref{eq-logz} outside $[0,1]$ until the MAP floor replaced them. In practice we clamp the ratio
+to $[0,1]$ regardless, since approximate inference computes $\log Z$ and the MAP bound with finite
+i-bound and small tolerance violations are possible.
+
+\subsection{Deciding between the four}
+\label{sec-selection}
+
+\begin{table}[t]
+\centering\small
+\caption{All four readouts across a coherence-ordered family of five variants of one response, by
+  exact inference over $2^{16}$ worlds. The variants run from least to most coherent left to right in
+  the intended ordering. Bold marks a value that moves the \emph{wrong} way relative to its
+  predecessor. Only (a) and (d) are monotone throughout.}
+\label{tab:allcands}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Variant & (a) $\LCS_{\mm}$ & (b) $\LCS_{\cons}$ & (c) $\LCS_{\rei}$ & $\log Z$ & (d) $\LCS_{\lp}$ \\
+\midrule
+\emph{worse}       & $0.586$ & $\mathbf{0.778}$ & $0.116$ & $-10.54$ & $0.68$ \\
+\emph{base}        & $0.607$ & $0.781$          & $0.148$ & $-9.64$  & $0.78$ \\
+\emph{concession}  & $0.612$ & $\mathbf{0.772}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$ \\
+\emph{fixcasualty} & $0.613$ & $\mathbf{0.764}$ & $0.156$ & $-8.95$  & $0.89$ \\
+\emph{coherent}    & $0.620$ & $\mathbf{0.752}$ & $0.181$ & $-8.25$  & $1.00$ \\
+\midrule
+\textbf{monotone?} & \textbf{yes} & no & no & \textbf{yes} & \textbf{yes} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\caption{The four readouts against the criteria of Def.~\ref{def-criteria}, with the inference
+  queries each requires.}
+\label{tab:criteria}
+\begin{tabular}{@{}llccccc l@{}}
+\toprule
+Readout & Queries & R1 & R2 & R3 & R4 & R5 & Note \\
+\midrule
+(a) mean marginal   & \textsc{mar} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \textbf{selected} \\
+(b) consistency     & \textsc{mar}$\times2$ & \checkmark & \checkmark & $\times$ & \checkmark & \checkmark & concession dip \\
+(c) reified         & \textsc{mar} & \checkmark & \checkmark & $\times$ & $\times$ & \checkmark & free $\rho$; dip \\
+(d) norm.\ $\log Z$ & \textsc{pr}, \textsc{map} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & needs 2 references \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:allcands} settles the question empirically and Table~\ref{tab:criteria} summarizes.
+Readouts (b) and (c) both fail R3, and they fail it at the \emph{same} variant --- the one where a
+conceded tension is resolved --- for a shared reason that is worth stating precisely, because it
+looks like an implementation bug and is not.
+
+\begin{proposition}[Belief versus event activity]
+\label{prop-quirk}
+Softening a resolved conflict via Eq.~\ref{eq-concession} \emph{increases} the probability of its
+both-true world. For a single conflict edge with uniform priors, discounting $p$ from $0.80$ to
+$0.55$ moves $\pr{a_s{=}1,a_t{=}1}$ from $0.10$ to $0.225$.
+\end{proposition}
+\begin{proof}
+Under both conflict couplings the $(1,1)$ cell of Table~\ref{tab:factors} is $1-p$, which increases as
+$p$ falls. Take a lone \con{} edge with $\pi_s=\pi_t=\tfrac12$, so the with-priors table is
+$[\tfrac12,\tfrac12,p,1-p]$ and each world carries an equal unary factor of $\tfrac14$. The
+unnormalized masses are then proportional to the table itself, giving
+$\pr{1,1}=(1-p)/\bigl(\tfrac12+\tfrac12+p+(1-p)\bigr)=(1-p)/2$, which is monotone decreasing in $p$.
+Evaluating at $p=0.80$ and $p=0.55$ gives $0.100$ and $0.225$.
+\end{proof}
+
+The consequence sorts the four readouts into two kinds. A readout that asks \emph{is the conflict
+active} --- (b) counts exactly that event, (c) charges $1-p_r$ for it --- must register a softened
+conflict as \emph{more} often active, and therefore dips. A readout that asks \emph{how strongly
+should each claim be believed} --- (a) through marginals, (d) through mass --- sees less suppression
+and rises. Since resolving a concession is by construction an increase in coherence, a coherence
+score must track belief rather than event activity. That is the substantive finding of this section,
+and it is not specific to our parameterization: any readout defined as the probability of a
+conflict-free configuration will invert under any discount-based treatment of resolved concessions.
+
+\paragraph{A second failure mode of (b).} Table~\ref{tab:allcands} shows (b) failing worse than a
+single dip, and the reason is instructive about $\mathcal{K}$ and $\mathcal{S}$ jointly. In this
+family both conflicts are \exc{} rather than \con{}, so $\mathcal{K}\equiv1.000$ throughout by the
+coupling-set decision above, and the score is carried entirely by $\mathcal{S}$. But removing an
+exclusion removes \emph{support} credit as well as conflict, so the score runs backwards from
+$0.778$ to $0.752$ across the whole ladder. On three-coupling variants of the same response, where
+the conflicts are \con{} and $\mathcal{K}$ is live, (b) instead runs
+$0.576 \to 0.654 \to \mathbf{0.582} \to 0.672 \to 0.752$: correctly ordered apart from the concession
+dip. Either way it is non-monotone, and the lesson is that $\mathcal{K}$ and $\mathcal{S}$ should be
+read separately as diagnostics rather than averaged into a headline.
+
+\paragraph{Selection.} We report (a) as the headline. It satisfies all five criteria, needs a single
+\textsc{mar} query, and is the only one of the four whose value decomposes into per-claim
+contributions --- which is what makes an incoherence \emph{locatable} rather than merely detectable.
+We compute and report all four, since (d) is a genuine alternative satisfying the same criteria
+through a different route (mass rather than marginals), and $\mathcal{K}$, $\mathcal{S}$ carry
+diagnostic information the mean marginal does not expose.
+
+\subsection{Algorithm and cost}
+\label{sec-algo}
+
+\begin{algorithm}[t]
+\caption{\textsc{ComputeLCS}$(y)$ --- the end-to-end coherence score.}
+\label{alg-lcs}
+\begin{algorithmic}[1]
+\Require response $y$; relation estimator $\mathcal{M}$; discount $\lambda$; priors $\pi$
+\Ensure $\LCS\in[0,1]$, marginals $\{q_i\}$, diagnostics
+\State $\mathcal{A} \gets \textsc{AtomizeAndDecontextualize}(y)$
+\State $P \gets \textsc{SelectCandidatePairs}(\mathcal{A}, y, \dots)$ \Comment{Algorithm~\ref{alg-pairs}}
+\State $\mathcal{R} \gets \varnothing$
+\ForAll{$(a_i,a_j) \in P$} \Comment{concurrent, rate-limited}
+  \State $(\text{sense}, \tau, c) \gets \textsc{PromptA}(a_i,a_j,y)$ \Comment{$c=\pr{\tau\mid\cdot}$ from Eq.~\ref{eq-pstar}}
+  \If{$\tau = \coupling{none}$} \textbf{continue} \EndIf
+  \State $\sigma \gets \textsc{PromptB}(a_i,a_j,\tau,y)$ \Comment{surrogate-token strength}
+  \State $\mathcal{R} \gets \mathcal{R} \cup \{(i,j,\tau,\ \mathrm{clip}_{[0,1]}(c\cdot\sigma))\}$
+\EndFor
+\ForAll{$r \in \mathcal{R}$ with $\tau_r\in\mathcal{T}_{\mathrm{conf}}$ sensed as \sense{Concession}}
+  \If{a resolving holding $h$ exists} $p_r \gets p_r(1-\lambda\pi_h)$
+  \Else{} mark $r$ unresolved \EndIf
+\EndFor
+\State $\mathcal{N} \gets$ network of Eq.~\ref{eq-joint} over $(\mathcal{A},\mathcal{R},\pi)$
+  \Comment{with-priors tables}
+\State $\{q_i\} \gets \textsc{Infer}(\mathcal{N}, \textsc{mar})$
+\State \Return $\tfrac1n\sum_i q_i$, $\{q_i\}$, $\bigl(\#\{q_i<\pi_i\},\ \mathcal{E},\ \log Z\bigr)$
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg-lcs} is dominated by steps 4--9: $|P|$ Prompt-A calls plus one Prompt-B call per
+surviving edge, which the candidate policy keeps near-linear in $n$ rather than quadratic. Inference
+is negligible by comparison.
+
+Answering all four readouts requires seven inference calls: the base \textsc{mar} and \textsc{pr},
+the $\mathcal{K}$ accumulator \textsc{mar}, the $\mathcal{S}$ indicator \textsc{mar}, the reified
+\textsc{mar}, the conflict-free ceiling \textsc{pr}, and the base \textsc{map}. Computed
+independently they would cost fourteen, since each readout re-runs the shared base pair. Production
+inference is weighted mini-bucket \citep{wmb} with i-bound $6$; every \emph{exact} value reported in
+this paper instead comes from explicit $2^n$ enumeration, which we use as a regression oracle for
+$n\le20$ and which is the source of Tables~\ref{tab:allcands} and the values in
+\S\ref{sec-examples}.
+
+%% ================================================================
+\section{Composing coherence with factuality}
+\label{sec-twostage}
+%% ================================================================
+
+The priors $\pi$ of Definition~\ref{def-mrf} are a free slot, and the natural thing to put in them is
+what Stage One already computed (Figure~\ref{fig:pipeline}):
+\begin{equation}
+\pi_i \;\longleftarrow\; q_i \;=\; \pr{a_i=1 \mid \mathcal{C}} .
+\label{eq-priors}
+\end{equation}
+A claim is then credited when it is both externally supported and internally upheld, and the two
+readings compose in the natural direction: an unsupported claim enters the coherence graph already
+doubted, so an argument resting on it is penalized twice --- once for the evidence and once for what
+the argument does with it. Setting $q_i\equiv\tfrac12$ recovers the pure coherence score of
+Remark~\ref{rem-noevidence}, so the composition is an option rather than a commitment and the two
+axes remain separately reportable.
+
+\paragraph{Two stages rather than one joint network.} One could instead build a single MRF over claim
+and evidence variables with claim--claim edges added. We do not, for three reasons. Inference runs
+over $n$ variables rather than $n(1+k)$ for $k$ retrieved passages per claim, which matters because
+the augmented networks of \S\ref{sec-consistency} add further variables on top. The mined relation
+graph can be rescored under several prior sets --- uniform, factuality-derived, ablated --- without
+re-running the estimator, which makes prior ablations essentially free. And the factuality stage
+stays independently cacheable and independently reportable, which a fused model forfeits. Priors are
+applied at scoring time and never by mutating the mined graph, so one mined graph supports every
+prior condition.
+
+\paragraph{Aligning claims across stages.} The two stages must agree on which claim is which, and the
+obvious key is the wrong one. Matching proceeds by object identity first (the shared-atomization path,
+where the response is decomposed once and both stages see the same objects), then by normalized text
+(casefolded, whitespace-collapsed, terminal punctuation stripped), and only then by identifier. Text
+precedes identifier deliberately: near-duplicate removal keeps the first-seen claim and leaves the
+surviving identifier set \emph{sparse} --- $a_0, a_1, a_3, \dots$ --- so two independent
+decompositions of the same response can disagree about which claim occupies which index. Matching on
+identifiers alone would then attach a prior to the \emph{wrong} claim, which is strictly worse than
+attaching none, since it silently corrupts the score rather than degrading it. When coverage falls
+below one half the run is flagged degraded, and the configured policy is to warn, to raise, or to
+discard every prior and fall back to a clean coherence-only score rather than report a half-primed
+mixture.
+
+%% ================================================================
+\section{Evaluation protocol}
+\label{sec-locobench}
+%% ================================================================
+
+Validating a coherence measure requires responses that differ in coherence while holding content
+fixed. Natural corpora do not supply this: two documents that differ in coherence almost always
+differ in topic, length and claim set as well, so any score difference is unattributable. Human
+coherence ratings supply a target but not a controlled contrast. And no existing resource supplies
+what separates \emph{scoring} error from \emph{estimation} error --- a gold relation graph, against
+which the estimator of \S\ref{sec-mining} can be measured directly.
+
+We therefore evaluate on synthesized \emph{coherence ladders}. A ladder is a family of five responses
+over one claim set: a base response realizing a declared relation plan, and four variants produced by
+applying perturbation operators to that plan --- adding a spurious relation, resolving a conceded
+tension, dropping conflicts --- each variant carrying \emph{its own} gold relation graph derived from
+the base graph by the same operators. Each family declares the ordering its rungs must exhibit, in
+three classes: \textbf{C1}, a strict increase between consecutive rungs; \textbf{C2}, a
+\emph{predicted} decrease or invariance --- which is where Prop.~\ref{prop-quirk}'s concession dip
+becomes a falsifiable prediction rather than an excuse, and where an ordering-only edit must be
+exactly flat by Remark~\ref{rem-order}; and \textbf{C3}, endpoint separation between the extreme
+rungs. A measure is scored on the fraction of declared constraints it satisfies.
+
+\paragraph{Arms.} An \emph{arm} fixes where the relation graph comes from while holding the claims,
+the priors and the readouts identical. The \textsc{gold} arm takes each item's own labelled relations;
+\textsc{gold\_valid} keeps only those labelled valid; a \textsc{mined} arm runs the estimator of
+\S\ref{sec-mining} on the response text. This is the central experimental device of the paper. Because
+the readouts are byte-identical across arms, any shortfall of a mined arm below the gold arm is
+attributable to relation estimation and not to the probabilistic model, and the two error sources
+never have to be disentangled after the fact.
+
+\paragraph{Match levels.} Mined relations are compared to gold at three nested levels: \textbf{pair}
+(were these two claims related at all), \textbf{coupling} (pair, plus the Level-1 coupling, with
+direction required for the asymmetric couplings), and \textbf{sense} (plus the Level-2 sense). The
+coupling level is the one that matters, since it is the level at which Table~\ref{tab:factors} selects
+a factor, and it is materially stricter than pair level.
+
+\subsection{Proposed baselines}
+\label{sec-baselines}
+
+A coherence measure should be compared against controls chosen to fail in informative ways. We propose
+five families and state what each is diagnostic of.
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt,topsep=3pt]
+\item \emph{Ladder-blind controls}: claim count, relation count, response length, and number of
+  perturbation operators applied. These cost nothing and they catch the most likely way a coherence
+  measure is secretly wrong --- by tracking edit count or graph density rather than coherence. A
+  measure that cannot beat them on C3, or that fails to stay flat where they do, has not earned its
+  complexity.
+\item \emph{Local contradiction detection}: pairwise NLI over claim pairs with no global model, scored
+  as one minus the fraction of pairs labelled contradictory, in the spirit of SelfCheckGPT's NLI
+  variant \citep{selfcheckgpt}. This isolates precisely what joint inference adds over local
+  detection. The prediction is that it does creditably where the defect is a \emph{present}
+  contradiction and poorly where the defect is a \emph{missing} entailment, since a broken chain has
+  no contradictory pair to find.
+\item \emph{LLM judges}: G-Eval's coherence dimension \citep{geval} and a direct ``rate the logical
+  coherence from 1 to 5'' prompt. These are the practical incumbent and the comparison reviewers will
+  want. The ladder is a demanding test for them, since consecutive rungs differ by a few words, so a
+  judge must be sensitive at very small edit distances while remaining flat where meaning is
+  preserved.
+\item \emph{Discourse representations}: DiscoScore \citep{discoscore}, with an entity-grid model
+  \citep{barzilay} as the classical reference. Both are order-sensitive by construction, so ordering
+  ladders are where they should be strongest and conflict ladders --- where the perturbation is
+  semantic rather than positional --- where they should be weakest.
+\item \emph{Internal ablations}: uniform versus factuality priors (Eq.~\ref{eq-priors}); the four
+  readouts of \S\ref{sec-readouts}; the four candidate-pair policies; the two Prompt-A generations;
+  and the gold-relation ceiling. These separate the model's design choices from the estimator's
+  accuracy.
+\end{enumerate}
+
+Beyond ladder ordering we recommend Spearman correlation against human coherence ratings on the same
+items, reported alongside per-family ordering agreement. Ordering agreement is the sharper instrument,
+being a controlled contrast with a known answer; human correlation is what establishes that the
+construct being ordered is the one readers care about. Neither substitutes for the other.
+
+%% ================================================================
+\section{Experiments}
+\label{sec-experiments}
+%% ================================================================
+
+\paragraph{Scale and sampling, stated first.} Two bodies of data are used. The first is nine
+hand-authored fixtures --- a recall report, two biographies (one with five planted contradictions),
+a narrative, a summary, two summaries of one appellate judgment differing only in claim order, an
+incident post-mortem, and a damages opinion --- carrying claims and prose notes but no
+machine-readable gold relations. The second is a generated corpus of coherence ladders: \textbf{two
+families, ten items}, produced by \texttt{claude-opus-5} with a three-model validation committee
+(\texttt{gpt-5.6}, \texttt{gemini-3.1-pro}, \texttt{claude-sonnet-5}), on the canonical topics
+Anthropology and Archaeology, sixteen claims per item. Relations are mined by
+\texttt{llama-3.3-70b-instruct}. Mining is sampled once per cell at the model's default temperature,
+and repeated runs of an identical configuration moved coupling-level F1 by up to $0.06$; across five
+independent samples the two revised mining strategies span $0.49$--$0.58$, every one of them above the
+unrevised $0.36$. So the gap to the original exceeds the sampling noise, while the ordering
+\emph{between} the two revisions does not. These are measurements, not significance claims, and the
+second decimal place of any single cell should not be read. All exact values are by $2^{16}$
+enumeration; all corpus-scale values are by weighted mini-bucket with i-bound $6$.
+
+\subsection{Relation estimation is the bottleneck}
+
+\begin{table}[t]
+\centering\small
+\caption{Mined-versus-gold agreement over $86$ edge-producing gold relations, micro-averaged over ten
+  items. \textbf{Fwd}/\textbf{Bwd} split coupling-level recall by whether the gold relation runs
+  forward or backward in claim order. \textbf{Non-rel} counts violations of the $48$ pairs the corpus
+  explicitly declares unrelated --- a real negative set, unlike the unlabelled remainder.
+  \textbf{Illegal} counts edges outside the nine admissible (sense, coupling) combinations, which
+  cannot be scored against gold at all. \textbf{Calls} is LLM calls issued.}
+\label{tab:mining}
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+Policy / prompt & Edges & Pair R & Coup P & Coup R & Coup F1 & Fwd & Bwd & Non-rel & Illegal \\
+\midrule
+\textsc{windowed}      & 190 & 83.7 & 25.8 & 57.0 & 35.5 & 75.0 & 23.3 & 7/48 & 25 \\
+\textsc{gated}         & 321 & 83.7 & 14.6 & 54.7 & 23.1 & 69.6 & 26.7 & 8/48 & 38 \\
+\textsc{all\_pairs}    & 867 & 95.3 &  9.3 & 82.6 & 16.8 & 87.5 & 73.3 & 10/48 & 93 \\
+\textsc{bidirectional} & 205 & 83.7 & 39.0 & 66.3 & 49.1 & 71.4 & 56.7 & 5/48 & 13 \\
+\textsc{bidir.}, prompt v2 & 173 & 73.3 & 48.3 & 67.4 & \textbf{56.3} & 85.7 & 33.3 & \textbf{0/48} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:mining} measures the estimator of \S\ref{sec-mining} against gold, and three findings
+stand out.
+
+First, \textsc{all\_pairs} achieves by far the best recall ($82.6\%$ at coupling level, $95.3\%$ at
+pair level) and by far the worst precision ($9.3\%$): querying every pair finds the true relations and
+buries them, emitting $867$ edges against $86$ gold. This is not a benign precision/recall trade. Since
+Eq.~\ref{eq-joint} is a product over relations, $781$ spurious factors do not merely dilute the signal
+--- they drive every marginal toward the prior, which is exactly the collapse \S\ref{sec-mining}
+predicted. The corresponding mean marginal (Table~\ref{tab:ladder}) is $0.590$, the lowest of any arm
+including gold, on the same responses.
+
+Second, the forward-only policies are \emph{structurally} capped, as predicted: their backward recall
+is $23$--$27\%$ against $73.3\%$ for \textsc{all\_pairs}, because $20$ of the $86$ gold relations are
+both directed and backward and no forward-only candidate set can emit them. Admitting both arc
+directions within the window recovers most of that gap ($56.7\%$ backward) at $205$ edges and $505$
+calls, against \textsc{all\_pairs}' $867$ edges and $3{,}267$ calls --- a sixth of the calls for
+two-thirds the coupling recall and four times the precision.
+
+Third, the prompt revision of \S\ref{sec-mining} is where the largest gain lies. Rebalancing the
+few-shot label distribution and requiring a verifiable evidence span raises coupling F1 from $35.5$ to
+$56.3$, drives declared-non-relation violations from $7/48$ to $0/48$, and drives illegal-vocabulary
+emissions from $25$ to $0$ --- while \emph{reducing} the number of calls. Precision, not recall, is
+where a grounded relation estimator is won, and it is won in the prompt rather than in the candidate
+policy.
+
+\subsection{The model orders correctly when the graph is correct}
+
+\begin{table}[t]
+\centering\small
+\caption{Left: declared ordering constraints satisfied, $28$ assertions per arm ($14$ per family
+  $\times$ two families). Right: each readout averaged over items. \textsc{gold\_valid} is near-flat by
+  construction --- a conflict-fixing rung removes the planted-invalid conflicts that this arm has
+  already discarded --- so its failures carry no information about the readouts; the \textsc{gold} arm
+  is what the constraints test. Averaging a readout across the rungs of a ladder deliberately collapses
+  the ordering the ladder exists to test, so the right-hand block is a level comparison only.}
+\label{tab:ladder}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Arm & \multicolumn{3}{c}{Constraints satisfied} & \multicolumn{4}{c}{Mean readout value} \\
+\cmidrule(r){2-4}\cmidrule(l){5-8}
+ & f001 & f002 & \% & $\LCS_{\mm}$ & $\LCS_{\cons}$ & $\LCS_{\rei}$ & $\LCS_{\lp}$ \\
+\midrule
+\textsc{gold}                              & 11/14 & 11/14 & \textbf{78.6} & 0.796 & 0.092 & 0.232 & 0.383 \\
+\textsc{gold\_valid}                       &  7/14 &  4/14 & 39.3 & 0.793 & 0.157 & 0.292 & 0.462 \\
+\textsc{mined}, \textsc{windowed}          &  4/14 &  9/14 & 46.4 & 0.843 & 0.007 & 0.360 & 0.164 \\
+\textsc{mined}, \textsc{gated}             &  7/14 &  8/14 & 53.6 & 0.679 & 0.002 & 0.262 & 0.102 \\
+\textsc{mined}, \textsc{all\_pairs}        &  7/14 &  5/14 & 42.9 & 0.590 & 0.163 & 0.037 & 0.018 \\
+\textsc{mined}, \textsc{bidirectional}     &  5/14 &  5/14 & 35.7 & 0.810 & 0.000 & 0.403 & 0.143 \\
+\textsc{mined}, \textsc{bidir.} prompt v2  &  6/14 &  8/14 & 50.0 & 0.660 & 0.053 & 0.366 & 0.088 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On gold relations the readouts satisfy $78.6\%$ of the declared ordering constraints --- $22$ of $28$
+(Table~\ref{tab:ladder}). Mined arms reach $35.7$--$53.6\%$. Since the readouts, the claims and the
+priors are byte-identical across arms, the $25$--$43$ point gap is attributable to relation estimation,
+and it is consistent with Table~\ref{tab:mining}: at $56.3\%$ coupling F1 roughly half the factors in a
+mined network are wrong or missing, and a ladder whose consecutive rungs differ by one or two relations
+cannot survive that. This is the paper's central empirical claim, and it is a claim about \emph{where
+the remaining problem is}: the probabilistic model orders responses correctly when handed a correct
+graph, and the open problem is extracting one.
+
+Two secondary observations. The ordering of mined arms does not track their coupling F1 ---
+\textsc{gated} scores best among them at the second-worst F1 --- which at $28$ assertions per arm we
+read as sampling noise rather than signal, and which is precisely why policies should not be ranked on
+ladder agreement at this corpus size. And the mean-readout block shows the \textsc{all\_pairs} collapse
+quantitatively: $\LCS_{\mm}=0.590$ against gold's $0.796$ on the same ten responses, from adding $781$
+spurious factors.
+
+\subsection{Readout dynamic range is a property of the graph}
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{$\LCS_{\mm}$ on the nine hand-authored fixtures, across three relation-mining models and
+  three conditional-strength estimators (\emph{lp} = surrogate logprobs, \emph{smp} = surrogate
+  sampled, \emph{vrb} = verbalized). \texttt{e2-bio} is a consistent biography and \texttt{e2-con} the
+  same biography with five planted contradictions; \texttt{e5-K} and \texttt{e5-S} are the two
+  claim-identical orderings of one judgment; \texttt{ex6} is an authored contradiction-free
+  post-mortem.}
+\label{tab:fixtures}
+\begin{tabular}{@{}llrrrrrrrrr@{}}
+\toprule
+Model & Str. & \texttt{aero} & \texttt{e1-dmg} & \texttt{e2-bio} & \texttt{e2-con} & \texttt{e3-nar} & \texttt{e4-sum} & \texttt{e5-K} & \texttt{e5-S} & \texttt{ex6} \\
+\midrule
+llama-4-mav.\ & lp  & 0.76 & 0.66 & 0.88 & 0.49 & 0.49 & 0.51 & 0.41 & 0.46 & 0.95 \\
+              & smp & 0.81 & 0.72 & 0.91 & 0.54 & 0.57 & 0.53 & 0.54 & 0.33 & 0.94 \\
+              & vrb & 0.75 & 0.75 & 0.88 & 0.53 & 0.75 & 0.71 & 0.90 & 0.70 & 0.94 \\
+\midrule
+llama-3.3-70b & lp  & 0.79 & 0.82 & 0.99 & 0.82 & 0.72 & 0.32 & 0.71 & 0.49 & 0.93 \\
+              & smp & 0.70 & 0.89 & 1.00 & 0.13 & 0.69 & 0.26 & 0.65 & 0.57 & 0.93 \\
+              & vrb & 0.65 & 0.67 & 0.94 & 0.46 & 0.69 & 0.59 & 0.67 & 0.56 & 0.94 \\
+\midrule
+gpt-oss-120b  & lp  & 0.76 & 0.82 & 0.89 & 0.49 & 0.75 & 0.79 & 0.95 & 0.90 & 0.95 \\
+              & smp & 0.73 & 0.93 & 0.88 & 0.54 & 0.74 & 0.89 & 0.96 & 0.89 & 0.94 \\
+              & vrb & 0.71 & 0.89 & 0.66 & 0.45 & 0.71 & 0.70 & 0.86 & 0.73 & 0.93 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:fixtures} scores the nine fixtures across nine configurations. The consistent biography
+separates from its contradicted twin in every configuration but one ($0.99$ against $0.82$ for the
+best-calibrated setting), and the authored contradiction-free post-mortem scores highest in all nine
+($0.93$--$0.95$), which is the sanity check the fixture was written for. Aggregated over all cells,
+contradiction-heavy fixtures average $\LCS_{\mm}=0.560$ against $0.767$ for the conflict-free ones.
+
+The four readouts differ sharply in dynamic range, and the pattern is instructive. Under the
+response-grounded \textsc{windowed} policy the estimator asserts almost no \con{} edges on these
+fixtures, so $\LCS_{\cons}\equiv1.00$ and $\LCS_{\rei}\equiv0.50$ (spread $0.00$) while $\LCS_{\mm}$
+(spread $0.87$) and $\LCS_{\lp}$ (spread $1.00$) discriminate. Under \textsc{all\_pairs} the same
+readouts regain range, $\LCS_{\rei}$ spanning $0.00$--$0.50$. The degeneracy is therefore a property of
+the \emph{graph}, not of the readout: $\mathcal{K}=1.00$ is the \emph{correct} answer for a
+conflict-free response --- verified on the post-mortem, where $\LCS_{\mm}=0.939$ and
+$\mathcal{K}=1.000$ at $1.9$ relations per claim --- and becomes uninformative exactly when the
+estimator asserts no conflicts at all. This is the practical case for reporting $\LCS_{\mm}$ as the
+headline with $\mathcal{K}$ and $\mathcal{S}$ as diagnostics: a number that reads $1.00$ both for a
+sound argument and for an unmined one cannot be used alone.
+
+Finally, the three conditional-strength estimators differ less than the models do: averaged over all
+model/fixture cells, surrogate-logprobs gives $0.722$, surrogate-sampled $0.712$, and verbalized
+$0.730$. The verbalized baseline is not obviously worse in \emph{level}, but it is the least stable
+across fixtures (compare its \texttt{e5-K} column, $0.90$/$0.67$/$0.86$, against
+surrogate-logprobs' $0.41$/$0.71$/$0.95$), consistent with the calibration literature
+\citep{xiong}.
+
+%% ================================================================
+\section{Two worked examples}
+\label{sec-examples}
+%% ================================================================
+
+\input{figures/graph-aeroparts}
+
+The response is a sixteen-claim aviation recall report. Its relation graph is twelve support edges ---
+an entailment spine $a_1\!\to\!a_2\!\to\!\dots\!\to\!a_6$ (shipment certified to spec, installation,
+entry into service, in-flight failures, regulatory probe, grounding order), branches to the
+pulled-from-service claim, the maintenance-log evidence, the tribunal's damages award and the
+regulator's bulletin, and one \eqv{} edge --- plus two conflicts. Every value below is exact, by
+$2^{16}$ enumeration, and the graph is reproduced edge-by-edge in Figure~\ref{fig:aero-graphs} with
+each edge's weight shown by line thickness.
+
+\begin{example}[Incoherent]
+\label{ex-incoherent}
+The report asserts both that \emph{no passengers or crew were harmed} and that a wire report
+\emph{claimed three passengers died}. These are exhaustive alternatives rather than mere opposition:
+they cannot both hold and cannot both fail, so the relation is \exc{} with $p=0.93$ --- and nothing in
+the response resolves it. A second tension, between the airline's pilot-error argument and the final
+report's metallurgical-defect finding ($p=0.80$), is a \sense{Concession} that the tribunal's holding
+does resolve, and Eq.~\ref{eq-concession} discounts it accordingly. The model returns
+$\LCS_{\mm}=0.607$ with $\log Z=-9.64$. The diagnostic that localizes the incoherence is per-claim: the
+marginal of the claim on the losing side of the \emph{unresolved} conflict is dragged \emph{below its
+own prior}, which no aggregate score would reveal. Applying the concession discount alone --- resolving
+the second tension while leaving the first --- raises the score to $0.612$, as C2 requires.
+\end{example}
+
+\begin{example}[Coherent]
+\label{ex-coherent}
+Removing the two conflict edges and changing nothing else leaves the identical support structure
+(Figure~\ref{fig:aero-coherent}). The score rises to $\LCS_{\mm}=0.620$ with $\log Z=-8.25$ and
+$\LCS_{\lp}=1.00$: the response is now as coherent as its own edge skeleton permits, which is what the
+ceiling of Eq.~\ref{eq-logz} means. The suppressed claim recovers to its prior.
+\end{example}
+
+Because the two panels of Figure~\ref{fig:aero-graphs} differ \emph{only} in the two conflict edges,
+the $0.607\to0.620$ lift and the $1.39$ nats of recovered probability mass are attributable to conflict
+structure alone --- which is the property the ladder construction of \S\ref{sec-locobench} generalizes
+from one pair to a family. The full ladder over this family is monotone throughout:
+$0.586 < 0.607 < 0.612 < 0.613 < 0.620$ over the rungs \emph{worse}, \emph{base},
+\emph{concession-resolved}, \emph{one-conflict-fixed}, \emph{coherent}.\footnote{Treating both tensions
+as plain \con{} rather than \exc{} --- the three-coupling model that omits the exhaustiveness
+distinction --- gives $\LCS_{\mm}=0.587$ and $\log Z=-9.75$ for Example~\ref{ex-incoherent}, with
+Example~\ref{ex-coherent} unchanged at $0.620$ and $-8.25$. The distinction of \S\ref{sec-couplings} is
+worth $0.020$ of score here, and the reason it matters more than that figure suggests is
+Table~\ref{tab:allcands}: with \exc{} conflicts, readout (b)'s conflict term is pinned at $1.000$ and
+the readout fails outright.}
+
+A second fixture pair makes the order-sensitivity claim concretely. Two summaries of one appellate
+judgment are built from the \emph{same} facts, differing only in whether self-serving assertions
+precede or follow the findings that qualify them. The faithful ordering scores $\LCS_{\mm}=0.95$ and
+the self-serving-first ordering $0.90$. No per-claim factuality check can separate them, because every
+claim is identical; what differs is which claims the response leaves standing unqualified at the point
+where it asserts them.
+
+%% ================================================================
+\section{Limitations}
+\label{sec-limitations}
+%% ================================================================
+
+\paragraph{The model is pairwise, and some incoherence is not.} Definition~\ref{def-mrf} admits only
+pairwise factors, so genuinely $k$-ary structure lies outside the family: three claims can be jointly
+inconsistent with no two of them pairwise inconsistent, and our model cannot represent that. Two
+specific consequences are worth naming. Transitivity is not enforced --- the model will happily hold
+$a\Rightarrow b$ and $b\Rightarrow c$ at high weight while leaving $a$ and $c$ unrelated, since it has
+no rule tying them. And a claim conceded by two independent holdings is discounted twice rather than
+once. Both are expressible as first-order rules in the Markov logic view of Appendix~\ref{app-mln},
+which is the natural route past this limitation and which we have not taken.
+
+\paragraph{Hand-set constants.} The design deliberately avoids free parameters --- criterion R4 exists
+for that reason, and it is what disqualifies readout (c) with its prior $\rho$. Two constants remain.
+The concession discount $\lambda=0.45$ in Eq.~\ref{eq-concession} sets how much a resolved tension is
+softened, and the resolver-detection heuristic identifies holdings by cue phrases and lexical overlap.
+Both are defensible and neither is derived. A principled treatment would learn the discount from
+labelled resolved and unresolved concessions, which the corpus of \S\ref{sec-locobench} supplies in
+principle but not at the scale required.
+
+\paragraph{Relation estimation dominates the error.} \S\ref{sec-experiments} is unambiguous that the
+bottleneck is not the model. At $56.3\%$ coupling-level F1, roughly half the factors in a mined network
+are wrong or missing, and the $25$--$43$ point ladder-agreement gap between mined and gold arms follows
+from that. Everything the paper establishes about the readouts is established on gold or exact graphs;
+the mined-arm numbers should be read as a measurement of current extraction quality, not as the
+measure's ceiling.
+
+\paragraph{Approximate inference is not characterized.} Production inference is weighted mini-bucket
+with i-bound $6$, while every exact value reported here comes from $2^n$ enumeration, feasible only for
+$n\le20$ claims. The two agree on the fixtures we can check both ways, but we have not characterized
+the approximation error at length, and the augmented networks of \S\ref{sec-consistency} --- which add
+one auxiliary variable per relation --- are the case where it would most plausibly bite.
+
+\paragraph{Empirical scope.} The generated corpus is two families and ten items, of one ladder type,
+with single-sample mining and measured run-to-run movement of $0.06$ F1. Three further ladder types are
+specified --- including the control ladder whose whole purpose is to catch a measure that tracks edit
+count, arguably the most important single experiment in the protocol --- but were not generated at
+scale. The baselines of \S\ref{sec-baselines} are argued for rather than measured. And the corpus is
+LLM-generated throughout, gold relation labels included, with LLM-committee validation; a bias shared
+between generator and committee would not be caught by it.
+
+%% ================================================================
+\section{Conclusion}
+%% ================================================================
+
+Coherence is a property of a joint distribution over what a response asserts, and it can be read off a
+Markov random field whose factors are the relations the response itself draws. Three things follow from
+taking that view seriously. First, the factor tables matter: the ones that are right for grounding a
+claim against evidence charge a premise for being a premise, and a coherence measure built on them
+spends its dynamic range in the wrong place (Prop.~\ref{prop-rowstoch}). Second, the relation
+vocabulary can be rich at the annotation layer and must be narrow at the inferential one; twelve
+discourse senses compiling deterministically onto five couplings, each fixed by the world it penalizes,
+keeps the model a closed pairwise family while leaving the labels interpretable. Third, and least
+expected, not every reading of ``how coherent is this?'' is admissible. Of four candidates, two are
+non-monotone in conflict resolution for a single diagnosable reason --- they measure whether a conflict
+is active rather than what should be believed (Prop.~\ref{prop-quirk}) --- and a fifth, apparently the
+most natural of all, is maximized by asserting no relations whatever (Prop.~\ref{prop-vacuous}). The
+mean posterior marginal survives all five criteria, needs one inference query, and localizes an
+incoherence to the claims responsible.
+
+Measuring such a score requires controlled contrasts, and ladders of responses over one claim set with
+declared orderings supply them. Given gold relation graphs the readouts recover $78.6\%$ of those
+orderings; given graphs mined from the response text, $53.6\%$. Because the two conditions differ in
+nothing but the relation graph, the gap localizes the open problem: the probabilistic model is
+adequate, and grounded relation extraction, at $56.3\%$ coupling-level F1, is the bottleneck. That is a
+more tractable target than ``measure coherence'', and it is one that improvements can be measured
+against.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection*{AI use statement}
+
+Generative AI is both an object of study and a component of the artifacts released here, and we
+disclose both roles. The relation estimator of \S\ref{sec-mining} is LLM-based by design: its prompts,
+its logprob-derived confidences and its failure modes are contributions of the paper. The evaluation
+corpus of \S\ref{sec-locobench} is LLM-generated throughout, including its gold relation labels, and
+validated by an independent LLM committee; \S\ref{sec-limitations} states the consequences for treating
+it as ground truth. We additionally used AI assistants for code implementation and for editorial
+assistance on this manuscript. All LLM-generated code was reviewed by the authors and is covered by a
+test suite that pins the exact numerical values reported in \S\ref{sec-examples} and
+Table~\ref{tab:allcands}; every number in \S\ref{sec-experiments} was traced to a stored experiment
+record. The research questions, the taxonomy, the readout definitions, the propositions and their
+proofs are the authors' own. We take responsibility for the final content of this work.
+
+\subsection*{Ethics statement}
+
+This work involves no human subjects and no personally identifying data. The fixtures include a summary
+of a published appellate judgment, used as a worked example of ordering-dependent coherence; it is a
+matter of public record and no private individual is the subject of analysis. The principal ethical risk
+is misreading: a coherence score is not a truth score, and a response can be perfectly coherent and
+entirely false. That is precisely why \S\ref{sec-twostage} keeps the two axes separable, and we caution
+against deploying $\LCS$ alone as a factuality filter --- a fluent, internally consistent fabrication is
+exactly the artifact it scores highest. The released fixtures and corpus deliberately contain false
+claims, labelled as such, and should not be redistributed without those labels.
+
+\subsection*{Reproducibility statement}
+
+The model is fully specified in the paper: Definition~\ref{def-mrf} gives the joint,
+Table~\ref{tab:factors} both families of potentials, Def.~\ref{def-couplings} the penalized sets,
+Table~\ref{tab:compile} the compile map, and Eqs.~\ref{eq-mm}--\ref{eq-logz} the four readouts together
+with the auxiliary-variable constructions two of them require. Algorithms~\ref{alg-pairs} and
+\ref{alg-lcs} give candidate selection and the end-to-end procedure. Appendix~\ref{app-prompts}
+reproduces all four estimation prompts verbatim, including the trailing token boundary that the
+surrogate readout depends on. The exact values in \S\ref{sec-examples} and Table~\ref{tab:allcands} are
+computed by $2^{16}$ enumeration and are pinned by regression tests in the released code, so they are
+reproducible without LLM access; the relation graph they use is given edge-by-edge in
+Figure~\ref{fig:aero-graphs}. \S\ref{sec-experiments} names every model used and states the sampling
+regime and its measured variance. Code, fixtures and corpus are released.
+
+\bibliography{ref}
+\bibliographystyle{iclr2027_conference}
+
+\appendix
+
+%% ================================================================
+\section{The estimation prompts, verbatim}
+\label{app-prompts}
+%% ================================================================
+
+The four prompts below are reproduced exactly as they are issued, extracted programmatically from the
+released source so that this appendix cannot drift from the code. Placeholders in double braces are
+substituted at call time; \verb|{{sense_menu}}| is substituted at build time from one of the two menus
+in \S\ref{app-menus}.
+
+\subsection{Prompt A, first generation --- discourse sense and coupling}
+\label{app-prompt-a1}
+$6{,}148$ characters. Placeholders: \verb|{{sense_menu}}|, \verb|{{response}}|, \verb|{{atom_a}}|,
+\verb|{{atom_b}}|.
+\promptfile{prompts/PROMPT_A_V1.txt}
+
+\subsection{Prompt A, second generation --- rebalanced for precision}
+\label{app-prompt-a2}
+$6{,}361$ characters. Same placeholders. The five changes relative to the first generation, and their
+motivation, are given in \S\ref{sec-mining}: few-shot balance from $3{:}1$ related to $2{:}3$; negative
+exemplars showing silence rather than explicit disavowal; a verifiable evidence span; the
+discriminating question asked first; and \coupling{none} given first position and equal prose.
+Transitivity is named as a non-relation.
+\promptfile{prompts/PROMPT_A_V2.txt}
+
+\subsection{Prompt B, default --- surrogate-token conditional strength}
+\label{app-prompt-b1}
+$2{,}182$ characters. Placeholders: \verb|{{response}}|, \verb|{{atom_a}}|, \verb|{{atom_b}}|,
+\verb|{{coupling}}| (twice). This is the one prompt that does not end in a newline: it terminates with
+\verb|Answer: | including the trailing space, so that the model's next token is the surrogate whose
+logprobs are read. Reproducing it without that trailing space changes the tokenization of the answer
+position and therefore the estimate.
+\promptfile{prompts/PROMPT_B_SURROGATE.txt}
+
+\subsection{Prompt B, baseline --- verbalized conditional strength}
+\label{app-prompt-b2}
+$2{,}112$ characters. Retained only for the comparison reported in \S\ref{sec-experiments}; verbalized
+confidence is weakly calibrated \citep{xiong}.
+\promptfile{prompts/PROMPT_B_VERBALIZED.txt}
+
+\subsection{The two sense menus}
+\label{app-menus}
+The full menu offers all twelve senses of Table~\ref{tab:compile} plus \coupling{none}:
+\promptfile{prompts/SENSE_MENU_FULL.txt}
+The restricted menu offers only the senses the evaluation corpus labels, which is the admissibility
+filter of \S\ref{sec-mining} applied at elicitation time rather than after it:
+\promptfile{prompts/SENSE_MENU_GOLD9.txt}
+Note that the restricted menu omits \sense{Succession} as well as \sense{Condition} and
+\sense{Instantiation}, leaving nine relation-bearing senses. \sense{Succession} is dropped because it is
+the mirror of \sense{Precedence} and both compile to \coupling{none}, so offering both invites an
+arbitrary choice on a relation that produces no factor either way. The second-generation Prompt A's body
+is written against this restricted menu; when it is run with the full menu, three senses are offered
+with no gloss and no coupling mapping in the prompt body, and we report which menu each arm used.
+
+%% ================================================================
+\section{The reified coherence node, worked}
+\label{app-reified}
+%% ================================================================
+
+To make Eq.~\ref{eq-reified} concrete, take the three-claim subnet consisting of the unresolved
+casualty conflict of Example~\ref{ex-incoherent} together with one entailment feeding it: claims
+$a_7,a_{10}$ joined by a conflict at $p=0.93$, and $a_4\to a_7$ an entailment at $p=0.65$, all priors
+$\tfrac12$, with $\rho=\tfrac12$. Writing out the eight-cell vote factor for each relation from
+Eq.~\ref{eq-reified} and enumerating the $2^4$ worlds of $(a_4,a_7,a_{10},R)$ gives
+$\pr{R{=}1}=0.453$: below its prior, because both relations have violating worlds that carry
+appreciable mass, and the conflict's violating world $(1,1)$ carries the most.
+
+Two properties of the construction are worth noting. The $R=0$ branch is flat, so $R=0$ asserts nothing
+and the node cannot be driven up merely by adding relations that happen to be satisfied. And the factor
+is a \emph{noisy} AND rather than a hard one: a relation with $p_r<1$ leaves some mass on its violating
+worlds even when $R=1$, so a single strongly-violated relation reduces $\pr{R{=}1}$ without pinning it
+to zero. The reason we do not adopt the readout despite this reasonable behaviour is
+Table~\ref{tab:allcands}: it dips at the concession variant for the reason of
+Prop.~\ref{prop-quirk}, and it requires the free parameter $\rho$, violating R4.
+
+%% ================================================================
+\section{Correspondence with Markov logic}
+\label{app-mln}
+%% ================================================================
+
+The coherence MRF has a natural first-order encoding \citep{mln}, with
+$\pr{\mathbf{a}}=\tfrac1Z\exp\bigl(\sum_k w_k n_k(\mathbf{a})\bigr)$ for $n_k(\mathbf{a})$ the number of
+true groundings of formula $F_k$. Evidence predicates $\mathit{Entail}(i,j)$,
+$\mathit{Contradict}(i,j)$, $\mathit{Equiv}(i,j)$ and $\mathit{Resolves}(h,i,j)$ carry the mined graph;
+$\mathit{Holds}(i)$ is the query predicate. Working out the correspondence is instructive in both
+directions.
+
+\subsection{The naive encoding is a different model}
+
+The obvious encoding gives each relation one weighted clause, e.g.\
+$\mathit{Entail}(i,j)\wedge a_i \Rightarrow a_j$ with $w=\mathrm{logit}(p)$. This is \emph{not}
+equivalent to Definition~\ref{def-mrf}. Its induced pairwise factor is $[e^w,e^w,1,e^w]$, which is not
+row-stochastic in the sense of Prop.~\ref{prop-rowstoch}: it rewards the vacuous $a_s=0$ rows with
+$e^w$ on \emph{both} target states, so a clause is best satisfied by making its antecedent false.
+Brute force over the $2^{16}$ worlds of the running example gives mean marginal support $0.455$ under
+the naive MLN against $0.587$ under the corresponding MRF, with per-claim marginals differing by up to
+$0.31$. These are two different models, not two encodings of one.
+
+The failure is sharpest at the mode. The all-false world satisfies every implication vacuously, so under
+the naive encoding the most probable configuration of any purely-implicational graph is the one in which
+the response asserts nothing --- the maximum-a-posteriori reading of a response is that none of it
+holds. This is Prop.~\ref{prop-vacuous} appearing in a second guise, and it is the same lesson: an
+encoding that scores rule satisfaction rather than belief can be maximized by having nothing to satisfy.
+
+\subsection{A three-clause expansion is exactly equivalent}
+
+Writing the log-potential in the general pairwise form
+$\ln\psi(a_s,a_t)=\alpha+\beta a_s+\gamma a_t+\delta\,a_s a_t$ and matching it against the
+with-priors tables of Table~\ref{tab:factors} gives, for $\pi_s$ the source prior:
+\begin{center}\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+$\tau$ & $\alpha$ (unit) & $\beta$ (source) & $\gamma$ (target) & $\delta$ (conjunction) \\
+\midrule
+\ent & $\ln\frac{1-p}{\pi_s}$ & $0$ & $0$ & $+\mathrm{logit}(p)$ \\
+\con & $\ln\frac{p}{\pi_s}$   & $0$ & $0$ & $-\mathrm{logit}(p)$ \\
+\eqv & $\ln\frac{1-p}{p}$ & $\ln\frac{1-p}{p}$ & $0$ & $+2\,\mathrm{logit}(p)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The conjunction weight is exactly $\pm\mathrm{logit}(p)$ --- the interaction the implication was meant
+to carry all along --- and the unit clause is the correction that restores row-stochasticity. With this
+expansion the ground Markov logic network reproduces the MRF exactly: mean support $0.5866$ and
+$\log Z=-9.751$ for both, with zero per-claim difference to machine precision.
+
+We establish the equivalence for the three original couplings only. \exc{} and \cnc{} are not tabulated
+here, so the claim ``the MLN encoding reproduces the MRF'' should be read as scoped to the
+three-coupling fragment, which is a real limitation given that both worked examples of
+\S\ref{sec-examples} use \exc{} conflicts.
+
+\subsection{Which view to keep, and why both}
+
+The reason to prefer the MRF for the measure itself is Remark~\ref{rem-closed}: its pairwise factor
+family is closed at three parameters, so the inferential vocabulary cannot quietly grow as senses are
+added, and every relation type is guaranteed to be a $2\times2$ potential. The reason to keep the
+Markov logic view is that the rules our model cannot express are naturally written there --- a
+transitivity rule $\mathit{Entail}(i,j)\wedge\mathit{Entail}(j,k)\Rightarrow\mathit{Entail}(i,k)$, a
+concession-cancellation rule $\mathit{Resolves}(h,i,j)\wedge a_h \Rightarrow \neg\mathit{Penalize}(i,j)$
+replacing the fixed discount of Eq.~\ref{eq-concession}, and a double-conflict rule --- and their
+weights could be \emph{learned} from labelled ladders rather than set by hand. That is the route past
+the two limitations \S\ref{sec-limitations} names, and it requires an MLN solver (MC-SAT for marginals,
+MaxWalkSAT for the mode) rather than the bucket-elimination stack used here.
+
+%% ================================================================
+\section{Serialization and the variable-ordering trap}
+\label{app-uai}
+%% ================================================================
+
+One implementation detail is worth recording because it is silent when wrong. Networks are serialized in
+UAI format, whose variables are identified by integer index; the index order is the sort order of
+$(\text{cardinality},\text{name})$, and with uniformly binary claim variables that reduces to
+\emph{lexicographic order by name}. So $a_{10}$ sorts before $a_2$. Inference returns marginals by
+index, and mapping them back by any other convention --- source order, numeric order --- silently
+permutes marginals across claims. The score is unchanged, since Eq.~\ref{eq-mm} is a mean, but every
+per-claim diagnostic is then attributed to the wrong claim, and the ``claim dragged below its prior''
+readout points at an innocent claim. The auxiliary variables of \S\ref{sec-consistency} are named with a
+prefix that sorts after all claim names for the same reason, so that adding them cannot shift the claim
+indices.
+
+\end{document}

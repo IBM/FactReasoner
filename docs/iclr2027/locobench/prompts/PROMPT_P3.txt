@@ -1,0 +1,130 @@
+
+Instructions:
+1. You are given a QUESTION and a tagged list of ATOMIC CLAIMS. Produce a
+   RELATION PLAN: a machine-readable graph of the logical relations a response
+   should draw between those claims.
+2. Select 14-16 claims to use. Aim for 15. Number them with FRESH consecutive
+   positions: the first claim you assert is pos 1, the next pos 2, and so on
+   with NO gaps and NO repeats, ending at pos N where N is how many you
+   selected. Do NOT carry over the numbering of the input list - if you pick the
+   3rd, 7th and 12th claims they become pos 1, 2 and 3. The position is the
+   order the response will assert the claim in. Every selected claim keeps its
+   text EXACTLY as given. Do NOT introduce information not in the claims, and
+   do NOT alter the claims. Your selection MUST INCLUDE AT LEAST 2 of the
+   [incorrect] claims: the response has to assert false content alongside the
+   true, so a selection drawn only from the [correct] claims is rejected. Carry
+   each selected claim's tag through as a "factual" field - false for an
+   [incorrect] claim, true for every other tag.
+3. Plan EXACTLY 10 RELATIONS. Each relation connects exactly two selected claims
+   and has a SENSE. Every relation must join a DIFFERENT pair of claims: once two
+   claims are related, that pair is used up and must not appear again in the
+   relations list, in either direction. The SENSE is one of: Cause-Effect,
+   Effect-Cause, Evidence, Condition,
+   Restatement, Instantiation, Contrast, Concession, Alternative, Disjunction,
+   Precedence, Succession.
+   - Cause-Effect: source causes target. Effect-Cause: source is the effect,
+     target its cause.
+   - Evidence: source is evidence for target. Condition: source is a condition
+     for target.
+   - Restatement: source and target assert the same thing.
+   - Instantiation: source is a general claim, target a specific instance.
+   - Contrast: opposition that is NOT exhaustive - both could be false.
+   - Concession: a tension the text itself resolves.
+   - Alternative: EXHAUSTIVE competing options - EXACTLY ONE holds. Not both,
+     and not neither. Use your [alt-pair-*] claims here.
+   - Disjunction: AT LEAST ONE holds; both may hold. Use your [disj-pair-*]
+     claims here.
+   - Precedence / Succession: ordered in time with NO truth dependence -
+     neither claim being true or false says anything about the other.
+4. Keep relations LOCAL: prefer pairs within 4 POSITIONS of each other, so the
+   graph stays recoverable from the response by a local reader. A longer-range
+   pair is acceptable when the two claim texts share a named entity, and a few
+   long-range links (for instance a closing claim answering the opening one) are
+   fine. Order the positions so that related claims sit near each other.
+5. The plan must include AT LEAST ONE relation of each of these senses:
+   Alternative, Disjunction, Restatement, Concession, and one of
+   Precedence/Succession.
+6. Every Concession must be marked resolved or unresolved. A resolved
+   Concession must name a RESOLVER: a [holding] claim, also selected and
+   positioned AFTER both endpoints.
+7. Give each relation an intended STRENGTH BAND: strong (0.85-1.00), moderate
+   (0.60-0.84), or weak (0.35-0.59) - how strongly the source determines the
+   target under that sense. Restatement relations are always strong.
+8. Give each relation an intended VALIDITY: valid if the relation genuinely
+   holds between the claims as stated; invalid if it does not. Of your 10
+   relations, mark EXACTLY 6 "valid" and EXACTLY 4 "invalid" - count them before
+   you emit, and do not compute a percentage. For each invalid relation give an
+   ERROR_KIND, one of: wrong_sense, wrong_direction, false_endpoint, spurious.
+9. Also list 4-6 NON-RELATIONS (aim for 5): pairs of selected claims within 4
+   positions of each other between which the response must draw NO logical
+   dependence. These are the distractors a relation miner must correctly label
+   None. A non-relation pair must NOT also appear in your relations list, in
+   either direction - the two lists are disjoint.
+10. Output a single JSON object in a code block and nothing else. Below is a
+    COMPLETE, correctly-shaped example - copy its structure exactly, not its
+    text. It has 14 atoms numbered 1..14 with no gaps, 2 of them factually
+    incorrect, 10 relations (6 valid, 4 invalid), all five required senses, and 5
+    non-relations disjoint from the relations:
+
+```json
+{
+  "atoms": [
+    {"pos": 1, "text": "<claim text>", "factual": true},
+    {"pos": 2, "text": "<claim text>", "factual": true},
+    {"pos": 3, "text": "<claim text>", "factual": true},
+    {"pos": 4, "text": "<claim text>", "factual": false},
+    {"pos": 5, "text": "<claim text>", "factual": true},
+    {"pos": 6, "text": "<claim text>", "factual": true},
+    {"pos": 7, "text": "<claim text>", "factual": true},
+    {"pos": 8, "text": "<claim text>", "factual": true},
+    {"pos": 9, "text": "<claim text>", "factual": false},
+    {"pos": 10, "text": "<claim text>", "factual": true},
+    {"pos": 11, "text": "<claim text>", "factual": true},
+    {"pos": 12, "text": "<claim text>", "factual": true},
+    {"pos": 13, "text": "<claim text>", "factual": true},
+    {"pos": 14, "text": "<claim text>", "factual": true}
+  ],
+  "relations": [
+    {"source_pos": 1, "target_pos": 2, "sense": "Cause-Effect",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 2, "target_pos": 3, "sense": "Evidence",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 3, "target_pos": 4, "sense": "Restatement",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 5, "target_pos": 6, "sense": "Alternative",
+     "strength_band": "strong", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 7, "target_pos": 8, "sense": "Disjunction",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": null, "resolver_pos": null},
+    {"source_pos": 9, "target_pos": 10, "sense": "Concession",
+     "strength_band": "moderate", "validity": "valid",
+     "error_kind": null, "resolved": true, "resolver_pos": 11},
+    {"source_pos": 11, "target_pos": 12, "sense": "Precedence",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "wrong_sense", "resolved": null, "resolver_pos": null},
+    {"source_pos": 12, "target_pos": 13, "sense": "Cause-Effect",
+     "strength_band": "moderate", "validity": "invalid",
+     "error_kind": "wrong_direction", "resolved": null, "resolver_pos": null},
+    {"source_pos": 13, "target_pos": 14, "sense": "Contrast",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "spurious", "resolved": null, "resolver_pos": null},
+    {"source_pos": 4, "target_pos": 6, "sense": "Instantiation",
+     "strength_band": "weak", "validity": "invalid",
+     "error_kind": "false_endpoint", "resolved": null, "resolver_pos": null}
+  ],
+  "non_relations": [
+    {"source_pos": 1, "target_pos": 4}, {"source_pos": 2, "target_pos": 5},
+    {"source_pos": 6, "target_pos": 9}, {"source_pos": 8, "target_pos": 11},
+    {"source_pos": 10, "target_pos": 13}
+  ]
+}
+```
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+ATOMIC CLAIMS: [CLAIMS_PLACEHOLDER]
+RELATION PLAN:

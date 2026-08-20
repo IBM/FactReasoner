@@ -1,0 +1,40 @@
+
+Let's define a function named check_response(response: str).
+The function audits a generated response and returns a JSON object:
+  {"fluency": 1-5, "formality": 1-5, "organization": 1-5,
+   "leakage": [list of quoted spans], "hedging": [list of quoted spans],
+   "artifacts": [list of quoted spans]}
+
+- fluency, formality, organization: 5 = indistinguishable from expert human
+  prose; 1 = badly degraded.
+- leakage: any span revealing the response was generated from an annotation
+  plan. Read this NARROWLY: naming a relation type or sense; naming the plan,
+  the strength bands, or the validity labels; referring to "claims", "atoms" or
+  "statements" as the objects the text was assembled from; or any label, tag,
+  numeric index, or bracketed marker. Do NOT flag a connective or coordination
+  that merely realizes a relation - "either X or Y", "at least one of X or Y",
+  "at least one of these was true", "perhaps both", "one or both",
+  "the two cannot both be true, and one of them must hold",
+  "one of these accounts must be wrong", "although X, Y",
+  "before", "after", "subsequently", "earlier than", "which postdates",
+  "as indicated by", "as shown by", "which indicates", or an
+  explicit statement that an ordering carries no causal or inferential force. A
+  writer is REQUIRED to use those, and a coupling over two claims' joint truth
+  cannot be expressed without one. Every span you report must be QUOTED VERBATIM
+  from the response; if you cannot copy it out of the text, it is not there and
+  must not be reported. Do NOT
+  flag ordinary scholarly vocabulary used about the subject matter, such as
+  "claim", "outcome", "reading", "account" or "finding".
+- hedging: a span using one of these EXACT words: "assume", "might",
+  "possibly", "allegedly", "supposedly", "reportedly", "it is claimed". The list
+  is CLOSED - quote the word you found, and flag nothing that does not contain
+  one of them. Uncertainty a writer is REQUIRED to express is not hedging: "at
+  least one of X or Y, perhaps both" and "either X or Y" state the logical
+  strength of a relation, not doubt about the content, so do NOT flag them.
+- artifacts: enumerated list structure, headings, repeated template phrasing, or
+  a sentence that reads as a stitched-together claim rather than prose.
+
+Return the JSON object only. Note that your response will be passed to the
+python interpreter, SO NO OTHER WORDS!
+
+check_response(response="[RESPONSE_PLACEHOLDER]")

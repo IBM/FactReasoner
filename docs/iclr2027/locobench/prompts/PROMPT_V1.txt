@@ -1,0 +1,67 @@
+
+Let's define a function named recover_relations(response: str,
+atoms: dict[str, str]).
+Given a RESPONSE and the ATOMS drawn from it, the function returns the
+list of logical relations the response ITSELF draws between those atoms.
+
+ATOMS maps an atom's NUMBER to its text, numbered from 1. Use those numbers, as
+integers, to identify atoms in your output: if the relation holds between the
+atoms numbered "3" and "7", emit source 3 and target 7. Never renumber them and
+never count from zero.
+
+For each ORDERED pair (i, j) that the response actually relates, emit one object:
+  {"source": i, "target": j,
+   "sense": one of ["Cause-Effect","Effect-Cause","Evidence","Condition",
+     "Restatement","Instantiation","Contrast","Concession","Alternative",
+     "Disjunction","Precedence","Succession"],
+   "coupling": one of ["entailment","contradiction","equivalence","exclusive",
+     "co_necessity","none"],
+   "strength_band": one of ["strong","moderate","weak"],
+   "resolved": true or false or null}
+
+Rules:
+- Emit a relation ONLY if the response itself draws that connection, as written
+  or as a clear step in the author's argument. Do not emit a relation that is
+  merely plausible in general.
+- Pick the MOST SPECIFIC sense the text supports, never the most general one.
+  Five senses compile to "entailment", and "Evidence" is the broadest of them,
+  so it is the easy wrong answer: use it only for evidential support ("indicates",
+  "confirms", "as shown by", "suggests"). Prefer "Cause-Effect" when the text says
+  one thing brought the other about ("caused", "led to", "resulted in",
+  "because"), "Effect-Cause" when that runs the other way ("resulted from",
+  "is explained by"), "Condition" for "if", "provided that", "only when", and
+  "Instantiation" when one claim is an INSTANCE of the other, i.e. a specific
+  case of a general statement ("for example", "specifically", "such as").
+- Use "Alternative" only when the two claims cannot both be true AND cannot both
+  be false. Use "Contrast" when they merely cannot both be true - look for "by
+  contrast", "whereas", "on the other hand", or two claims set against each other
+  without either being conceded.
+- Use "Concession" when the text grants a tension and then overrides it -
+  "although", "despite", "even though", "notwithstanding", or a clause that admits
+  one claim while asserting the other anyway. A concessive marker attaching two
+  claims IS a relation between them, even when the concession sits in a
+  subordinate clause rather than its own sentence.
+- Use "Disjunction" only when the response rules out both claims being false
+  ("at least one of", "one or both", "perhaps both").
+- Use "Precedence" or "Succession" only when the ordering carries no truth
+  dependence; set their coupling to "none". These ARE relations and must be
+  emitted: "before", "after", "subsequently", "earlier", "later", or an explicit
+  statement that a sequence carries no causal or inferential force. Read such a
+  pair as "Precedence" when the source comes first in time and "Succession" when
+  it comes second. Do not silently upgrade one to "Cause-Effect" or "Evidence"
+  because the two events sit next to each other in an argument.
+- Relate a pair only ONCE unless the response genuinely draws two different
+  connections between them. Emitting many relations does not make the recovery
+  more complete; a pair the response merely mentions in the same paragraph is not
+  related.
+- "coupling" is not an independent choice: it must be the coupling that the
+  "sense" you chose compiles to. Cause-Effect, Effect-Cause, Evidence,
+  Condition and Instantiation are "entailment"; Restatement is "equivalence";
+  Contrast and Concession are "contradiction"; Alternative is "exclusive";
+  Disjunction is "co_necessity"; Precedence and Succession are "none".
+- Pairs the response leaves unrelated must be omitted entirely.
+
+The function returns a JSON list. Note that your response will be passed to the
+python interpreter, SO NO OTHER WORDS!
+
+recover_relations(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])
