@@ -70,6 +70,7 @@ from fact_reasoner.locoeval.mined_graph import (
 )
 from fact_reasoner.locoeval.models import DEFAULT_MODELS_FILE, load_model_specs
 from fact_reasoner.locoeval.report import build_pdf, write_report
+from fact_reasoner.env import load_dotenv
 from fact_reasoner.locoeval.runner import GOLD_ARMS, GoldEvalRunner, load_items
 
 # Default dataset and output directory. The dataset is the 10-item Claude-5 test
@@ -410,6 +411,9 @@ def _estimate(args, arms: list[str], parser) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the evaluation. Returns a process exit code (non-zero if a cell failed)."""
+    # Credentials come from the project-root .env; load before any backend is built.
+    load_dotenv()
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

@@ -68,6 +68,18 @@ def _inv(*pairs):
     return [(a, b, "contradiction", "invalidation") for a, b in pairs]
 
 
+def _conc(*pairs):
+    """Resolved-concession gold relations from label pairs.
+
+    Same Level-1 coupling as :func:`_inv` -- a contradiction -- but the response
+    states the tension together with the truth or holding that settles it, so the
+    conflict is a concession the text itself resolves rather than a live
+    positional invalidation. The distinction is what separates the two Renda
+    summaries, whose atom sets are identical.
+    """
+    return [(a, b, "contradiction", "resolved_concession") for a, b in pairs]
+
+
 EXAMPLES = []
 
 
@@ -405,61 +417,90 @@ add_example(
 
 
 # --- Example 5b: R v Renda, summary K (faithful natural ordering) ----------
+#
+# K is a strict PERMUTATION of S's atom list: the same eighteen claims, in a
+# different assertion order, realized by prose that folds each resolver in
+# beside the claim it qualifies. This is deliberate and load-bearing -- it is
+# what makes the pair a genuine claim-identical contrast, so that no per-atom
+# factuality check can separate K from S (every atom is byte-identical) and any
+# difference the measure reports is attributable to assertion order alone.
+#
+# Note what the pair does NOT test. Per Rem. "order-sensitivity enters only
+# through the relations", an edit that preserves the relation set cannot change
+# any readout. K and S therefore differ in their *mined* relation sets, which is
+# legitimate because mining is response-grounded: the prose differs, so the
+# relations the text draws differ, even though the claim set does not. In K each
+# tension is stated and settled in one breath, so the text reads as a resolved
+# Concession; in S the self-serving claims stand unqualified until a later
+# holding overrides them, so the text draws a live contradiction. The gold below
+# records that difference.
 
 add_example(
     id="example-5-renda-K",
     name="R v Renda summary K (faithful natural ordering)",
     source="docs/ideation/example-5-renda.pdf",
     response="""
-    Raymond Renda was convicted of attempted robbery before HHJ Van Der Werff and
-    a jury, and appealed. The charge arose when, at about 2 am on 10 November
-    2003, he accosted Robert Flint on Mile End Road, followed him home, and seized
-    him by the neck while demanding money; because the only real question was
-    whether any offence had been committed, the trial turned on the relative
-    credibility of Flint and Renda. Seeking to present himself as a man of
-    positive good character, Renda testified that his serious head injury had been
-    sustained on duty in the armed forces and that he was in regular employment as
-    a security guard; in truth, however, the injury was sustained on holiday in a
-    car accident and the security work had been only short-term, so that this
-    evidence conveyed a false impression within s 105(1). When Renda conceded
-    these matters under cross-examination, the court held that a concession
-    extracted in cross-examination does not amount to a withdrawal of the false
-    impression under s 105(3). To help correct that false impression, the Crown
-    was permitted to put a July 2001 incident before the jury: Renda had then been
-    found unfit to plead to assault and given an absolute discharge, so he was not
-    convicted, yet a jury had found as a fact that he struck a man from behind with
-    a wooden table leg, and the court held that this act was reprehensible
-    behaviour within the bad-character provisions notwithstanding the absence of a
-    conviction. A submission that the resulting evidence was contaminated under
-    s 107 was rejected, the court holding that it was not contaminated, and the
-    appeal was dismissed.
+    Raymond Renda was convicted of attempted robbery, and he appealed against
+    that conviction. The charge arose when, at about 2 am on 10 November 2003,
+    Renda accosted Robert Flint on Mile End Road and seized him by the neck
+    demanding money; the trial turned on the relative credibility of Flint and
+    Renda. Renda testified to his good character in order to enhance his
+    credibility. He claimed that his serious head injury had been sustained while
+    he was serving on duty in the armed forces, though in fact that injury was
+    sustained on holiday in a car accident; he claimed too that he was currently
+    in regular employment as a security guard, though in fact the security work
+    had been only short-term pass-checking and he was no longer employed. He had
+    therefore conveyed a false impression of positive good character. The defence
+    argued that his cross-examination concession withdrew that false impression
+    under s 105(3), but the court held that a concession forced in
+    cross-examination is not a withdrawal of a false impression. In July 2001
+    Renda had been found unfit to plead to assault and given an absolute
+    discharge, so he stood not convicted; a jury nonetheless found as a fact that
+    he struck a man from behind with a wooden table leg, and the court held that
+    the table-leg incident was reprehensible behaviour. Renda's counsel initially
+    conceded that the table-leg finding amounted to a conviction, but later
+    concluded that it was not a conviction. The court held that the evidence was
+    not contaminated and dismissed the appeal.
     """,
+    # The same eighteen atoms as S (identical texts), reordered so that each
+    # self-serving claim is immediately followed by the truth that qualifies it
+    # (L6->L8, L7->L9) and each argument by the holding that settles it.
     atoms=[
-        ("K1", "Raymond Renda was convicted of attempted robbery and appealed against the conviction."),
-        ("K2", "Renda accosted Robert Flint on Mile End Road at about 2 am on 10 November 2003, followed him home, and seized him by the neck while demanding money."),
-        ("K3", "The trial turned on the relative credibility of Robert Flint and Raymond Renda."),
-        ("K4", "Renda testified seeking to present himself as a man of positive good character."),
-        ("K5", "Renda testified that his head injury was sustained on duty in the armed forces and that he was in regular employment as a security guard."),
-        ("K6", "In truth Renda's injury was sustained on holiday in a car accident and his security work had been only short-term, so his evidence conveyed a false impression within s 105(1)."),
-        ("K7", "Renda conceded these matters under cross-examination."),
-        ("K8", "The court held that a concession extracted in cross-examination does not amount to a withdrawal of the false impression under s 105(3)."),
-        ("K9", "To help correct the false impression, the Crown was permitted to put a July 2001 incident before the jury."),
-        ("K10", "In the July 2001 incident Renda was found unfit to plead to assault and given an absolute discharge, so he was not convicted."),
-        ("K11", "A jury had found as a fact that Renda struck a man from behind with a wooden table leg."),
-        ("K12", "The court held that the table-leg act was reprehensible behaviour within the bad-character provisions, notwithstanding the absence of a conviction."),
-        ("K13", "A submission was made that the evidence was contaminated under s 107."),
-        ("K14", "The court held that the evidence was not contaminated."),
-        ("K15", "The appeal was dismissed."),
+        ("L1", "Raymond Renda was convicted of attempted robbery."),
+        ("L2", "Raymond Renda appealed against the attempted-robbery conviction."),
+        ("L3", "Renda accosted Robert Flint on Mile End Road at about 2 am on 10 November 2003 and seized him by the neck while demanding money."),
+        ("L4", "The trial turned on the relative credibility of Robert Flint and Raymond Renda."),
+        ("L5", "Renda testified to his good character in order to enhance his credibility."),
+        ("L6", "Renda claimed his serious head injury was sustained while he was serving on duty in the armed forces."),
+        ("L8", "In fact Renda's serious head injury was sustained on holiday in a car accident."),
+        ("L7", "Renda claimed he was currently in regular employment as a security guard."),
+        ("L9", "In fact Renda's security work had been only short-term pass-checking and he was no longer employed."),
+        ("L10", "Renda had conveyed a false impression of positive good character."),
+        ("L11", "The defence argued that Renda's cross-examination concession withdrew the false impression under s 105(3)."),
+        ("L12", "The court held that a concession forced in cross-examination is not a withdrawal of a false impression."),
+        ("L13", "In July 2001 Renda was found unfit to plead to assault and given an absolute discharge, so he stood not convicted."),
+        ("L14", "A jury found as a fact that Renda struck a man from behind with a wooden table leg."),
+        ("L15", "The court held that the table-leg incident was reprehensible behaviour."),
+        ("L16", "Renda's counsel initially conceded that the table-leg finding amounted to a conviction."),
+        ("L17", "Renda's counsel later concluded that the table-leg finding was not a conviction."),
+        ("L18", "The court held that the evidence was not contaminated and dismissed the appeal."),
     ],
+    # Same support spine as S. The five tensions are the same *pairs* as S's
+    # invalidations, but here the text states each with its resolver adjacent, so
+    # they are resolved concessions rather than live contradictions.
     gold=(
-        _pre(("K2", "K1"), ("K1", "K3"), ("K3", "K4"), ("K4", "K5"), ("K5", "K6"),
-             ("K6", "K7"), ("K7", "K8"), ("K6", "K9"), ("K10", "K12"),
-             ("K11", "K12"), ("K9", "K13"), ("K13", "K14"), ("K8", "K15"),
-             ("K12", "K15"), ("K14", "K15"))
+        _pre(("L1", "L2"), ("L3", "L1"), ("L4", "L5"), ("L5", "L6"), ("L5", "L7"),
+             ("L8", "L10"), ("L9", "L10"), ("L10", "L11"), ("L13", "L15"),
+             ("L14", "L15"), ("L12", "L18"), ("L15", "L18"))
+        + _conc(("L8", "L6"), ("L9", "L7"), ("L12", "L11"), ("L15", "L13"),
+               ("L17", "L16"))
     ),
-    notes="Same facts as S but faithfully ordered: each disputed claim is folded into "
-          "its finding (holdings K8/K12 resolve the tensions), so there are NO "
-          "positional invalidations. Should score markedly higher than S.",
+    notes="Claim-identical to S -- the same eighteen atoms, permuted -- so no "
+          "per-atom factuality check can separate the two. K states each tension "
+          "beside the truth or holding that settles it (L6/L8, L7/L9, L11/L12, "
+          "L13/L15, L16/L17 adjacent), so the response resolves its concessions "
+          "in place; S leaves the self-serving claims standing unqualified until a "
+          "later holding overrides them. Should score markedly higher than S.",
 )
 
 
@@ -557,6 +598,33 @@ def _validate(record: Dict) -> None:
     assert record["response"], f"{record['id']}: empty response"
 
 
+#: Example pairs that must share one atom set exactly, differing only in order.
+#: The Renda summaries are the paper's claim-identical ordering contrast: the
+#: argument that no per-atom factuality check can separate them holds only if
+#: every atom really is identical, so it is asserted here rather than trusted.
+CLAIM_IDENTICAL_PAIRS = (("example-5-renda-K", "example-5-renda-S"),)
+
+
+def _validate_claim_identical(records: List[Dict]) -> None:
+    """Assert each declared pair is a permutation of one atom set."""
+    by_id = {r["id"]: r for r in records}
+    for left, right in CLAIM_IDENTICAL_PAIRS:
+        a, b = by_id.get(left), by_id.get(right)
+        if a is None or b is None:  # pragma: no cover - guards a renamed example
+            raise AssertionError(f"claim-identical pair {left}/{right}: missing example")
+        ta = sorted(x["text"] for x in a["atoms"])
+        tb = sorted(x["text"] for x in b["atoms"])
+        assert ta == tb, (
+            f"{left} and {right} must be claim-identical (same atom texts, any "
+            f"order): {len(ta)} vs {len(tb)} atoms, "
+            f"{len(set(ta) ^ set(tb))} texts differ"
+        )
+        assert [x["text"] for x in a["atoms"]] != [x["text"] for x in b["atoms"]], (
+            f"{left} and {right} are identical in order too, so the pair no "
+            f"longer contrasts assertion order"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -577,6 +645,7 @@ def main():
     records = [_build_record(ex) for ex in EXAMPLES]
     for rec in records:
         _validate(rec)
+    _validate_claim_identical(records)
 
     if args.check:
         for rec in records:
@@ -632,9 +701,25 @@ def _write_readme(out_dir: str, records: List[Dict]) -> None:
         "",
         'backend = build_backend("rits", model_id="llama-3-3-70b-instruct")',
         "miner = RelationMiner(backend, pair_policy=\"all_pairs\")",
-        "result = miner.mine_from_atoms(atoms)",
+        "# Mining is always response-grounded: pass the atoms AND the response "
+        "they came from.",
+        'result = miner.mine_from_atoms(atoms, ex["response"])',
         "scores = LCSScorer(merlin_path).score(result)",
+        "",
+        "# Several readouts at once share the base inference runs "
+        "(6 Merlin calls, not 12):",
+        "all_scores = LCSScorer(merlin_path).score_all(result)",
         "```",
+        "",
+        "The scorer's per-atom priors default to a flat 0.5, so the score above is "
+        "coherence",
+        "alone. To prime each atom with its factuality posterior instead \u2014 the "
+        "two-stage",
+        "model \u2014 pass `node_priors={atom_id: q_i}`, or use `CoherencePipeline` "
+        "with a",
+        "`FactReasonerPriorProvider`, which also reuses the factuality run's atoms "
+        "so the",
+        "response is atomized once. See `docs/examples/lcs/ex_lcs_two_stage.md`.",
         "",
         "## Files",
         "",

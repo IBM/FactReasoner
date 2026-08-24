@@ -61,9 +61,9 @@ logical dimension on $60\%$, $78\%$ and $48\%$ of cases respectively.
 \paragraph{Factuality and coherence are orthogonal axes.} A response can be a bag of true facts
 that is incoherent, and it can be internally impeccable while being entirely false. The sharpest
 demonstration in our fixtures is a pair of summaries of one appellate judgment, built from the
-\emph{same} set of claims and differing only in whether self-serving assertions are stated before
-or after the findings that qualify them. Every atom is identical, so every per-atom check returns
-an identical verdict; yet one summary is a faithful account and the other is not, and our measure
+\emph{same} set of claims --- one summary's atom list is a permutation of the other's --- and
+differing only in whether self-serving assertions are stated before or after the findings that
+qualify them. Every atom is identical, so every per-atom check returns an identical verdict; yet one summary is a faithful account and the other is not, and our measure
 separates them ($0.95$ against $0.90$). No amount of grounding individual claims against evidence
 can make that distinction, because the distinction is not about the claims.
 
@@ -357,10 +357,73 @@ $\mathcal{T}_{\mathrm{conf}}=\{\con,\exc\}$ for the \emph{conflict} couplings, t
 penalized set contains the both-true world $(1,1)$.
 \end{definition}
 
-The first three couplings are exactly the NLI edge types of \S\ref{sec-factuality}, which is what
-lets a mined relation reuse the existing graph machinery unchanged. The last two are additions
-required by argumentative prose, and the distinction between them and \con{} is the one the
-taxonomy exists to draw.
+\begin{table}[tp]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\caption{One realistic response excerpt per Level-1 coupling of Def.~\ref{def-couplings}. As in
+  Table~\ref{tab:senseex}, each excerpt is prose containing both claims --- \uline{$A$ is the
+  source, underlined}, \textbf{$B$ the target, bold}, the \emph{italic} words drawing the link ---
+  and $V(\tau)$ is repeated from Def.~\ref{def-couplings} so the excerpt can be read against the
+  world it rules out. The \emph{Why} column names the world the response denies, which is what
+  distinguishes each coupling from the one above it; the three conflict-adjacent couplings \con{},
+  \exc{} and \cnc{} are illustrated on one two-part weld failure so that only exhaustiveness
+  varies. \coupling{none} produces no factor, so its excerpt is one where the text relates the
+  claims without constraining their truth.}
+\label{tab:coupex}
+\begin{tabularx}{\textwidth}{@{}l l l X@{}}
+\toprule
+Coupling & Reading & $V(\tau)$ & Response excerpt, and the world it denies \\
+\midrule
+\ent & $a_s\Rightarrow a_t$ & $\{(1,0)\}$
+  & ``\uline{The alloy is chemically identical to the certified reference}, \emph{and therefore}
+    \textbf{it meets the airframe specification}.''
+    \newline\emph{Why:} the response rules out the world where the source holds and the target
+    fails --- $(1,0)$ --- and says nothing about the case where the alloy differs, which is why
+    the $a_s{=}0$ row returns the target to its prior. \\
+\midrule
+\con & $a_s\Rightarrow\neg a_t$ & $\{(1,1)\}$
+  & ``\uline{The weld passed the tensile test}, \emph{yet} \textbf{the same joint was porous along
+    its full length}.''
+    \newline\emph{Why:} only the both-true world $(1,1)$ is denied. Both can still fail together
+    --- if the wrong joint was tested, neither claim holds --- so $(0,0)$ must stay available. \\
+\midrule
+\exc & exactly one holds & $\{(0,0),(1,1)\}$
+  & ``The joint was destructively examined, so \emph{exactly one of} \uline{the weld met the
+    tensile minimum} \emph{and} \textbf{the weld fell short of it} \emph{must be the finding} ---
+    \emph{there is no third outcome}.''
+    \newline\emph{Why:} both same-value worlds are denied. The added $(0,0)$ is the whole
+    difference from \con{}: once the joint has actually been examined the pair cannot both fail,
+    so leaving that world open --- as \con{} does --- would under-penalize the conflict. \\
+\midrule
+\cnc & at least one holds & $\{(0,0)\}$
+  & ``The fracture began at the joint, so \emph{at least one of} \uline{the weld} \emph{and}
+    \textbf{the fastener} \emph{must have given way} --- conceivably both.''
+    \newline\emph{Why:} the dual of \exc{}. Only the both-false world is denied, so asserting the
+    disjunction is evidence \emph{for} both endpoints (Example~\ref{ex-cnc}). \\
+\midrule
+\eqv & $a_s\Leftrightarrow a_t$ & $\{(0,1),(1,0)\}$
+  & ``\uline{The shipment was certified to specification} --- \emph{that is to say},
+    \textbf{every contractual requirement had been met}.''
+    \newline\emph{Why:} the two disagreeing worlds are denied, in both directions; unlike \ent{}
+    there is no vacuous row, since a false source now also forces a false target. \\
+\midrule
+\coupling{none} & no coupling & $\varnothing$
+  & ``\uline{The replacement units were installed in March}, \emph{some three months before}
+    \textbf{the first in-flight failures were reported}.''
+    \newline\emph{Why:} no world is denied. The response genuinely relates the claims, but
+    ordering them in time constrains neither one's truth, so the pair contributes
+    \textbf{no factor} and both claims stay at their priors. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Table~\ref{tab:coupex} gives a response excerpt for each coupling, set against the world that
+coupling denies; since a coupling \emph{is} its penalized set, reading the two together is the
+quickest way to see what each one commits the response to. The first three couplings are exactly
+the NLI edge types of \S\ref{sec-factuality}, which is what lets a mined relation reuse the
+existing graph machinery unchanged. The last two are additions required by argumentative prose,
+and the distinction between them and \con{} is the one the taxonomy exists to draw.
 
 \paragraph{Why exhaustiveness needs its own coupling.} \con{} forbids only the both-true world: two
 claims that cannot both hold, but might both fail. \exc{} additionally forbids the both-false
@@ -371,7 +434,9 @@ matters for scoring: it leaves available a world in which \emph{neither} claim i
 under-penalizes. Conversely \cnc{} is the dual, penalizing only the both-false world, and is what a
 disjunction asserts (``at least one of these two findings must hold''). Adjudicated disputes ---
 incident investigations, litigation, competing hypotheses --- are precisely the domains where
-exhaustive pairs occur, because the function of a finding is to close one.
+exhaustive pairs occur, because the function of a finding is to close one. The \con{}, \exc{} and
+\cnc{} rows of Table~\ref{tab:coupex} state one two-part weld failure three times over, so that
+the only thing varying across them is which same-value worlds the response leaves standing.
 
 \begin{example}[A \cnc{} factor in isolation]
 \label{ex-cnc}
@@ -499,16 +564,116 @@ Level-2 sense & $\mathcal{C}$ coupling & prior & dir. & flag & gloss \\
 \end{tabular}
 \end{table}
 
-Several entries encode judgements worth defending. \sense{Restatement} carries a fixed strength
-prior of $0.90$ because a marked paraphrase (``in other words'', ``equivalently'') is a claim about
-identity of content, and a model asked to estimate its strength has little to add; the estimator's
-value is used when available, and the prior seeds it otherwise. Five senses collapse onto \ent{},
-which is a deliberate loss: the model does not distinguish causation from evidence, because a
-pairwise potential over truth values cannot. What survives compilation is the inferential force,
-and the sense is retained alongside it for interpretability and for error analysis.
+\begin{table}[tp]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\caption{One realistic response excerpt per Level-2 sense of Table~\ref{tab:compile}, in the same
+  row order and grouped by the coupling each compiles to. Each excerpt is prose of the kind the
+  estimator actually sees and \emph{contains both claims}: \uline{$A$ is underlined}, \textbf{$B$ is
+  bold}, and the \emph{italic} words are the ones that draw the link --- the span
+  \S\ref{sec-mining} obliges the model to quote, which is why it must be findable in the response
+  and not in either claim. Senses are marked $\star$ when admissible; the three unmarked ones are
+  included because their breadth is the argument for excluding them (\S\ref{sec-mining}). The
+  \sense{Contrast}, \sense{Alternative} and \sense{Disjunction} rows describe one two-part weld
+  failure three ways, separated only by exhaustiveness (\S\ref{sec-couplings}); they reuse the
+  scenario of Table~\ref{tab:coupex} deliberately, so that a discourse sense and the coupling it
+  compiles to can be compared on the same prose.}
+\label{tab:senseex}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+Level-2 sense & $\mathcal{C}$ & Response excerpt, and why this sense rather than a neighbour \\
+\midrule
+\sense{Cause-Effect}$^\star$ & \ent
+  & ``\uline{The company shipped a batch it knew to be out of tolerance}, and \emph{as a direct
+    result} \textbf{its share price fell $15\%$ that quarter}.''
+    \newline\emph{Why:} the response itself presents $A$ as bringing $B$ about; the marker names the
+    direction. \\
+\sense{Effect-Cause}$^\star$ & \ent
+  & ``\uline{The entire fleet was grounded on 14 March}. The order came \emph{because}
+    \textbf{inspectors had found a cracked wing spar on two airframes}.''
+    \newline\emph{Why:} the same support runs from the stated effect to its cause. Direction of
+    \emph{explanation} is reversed; direction of inferential support is not. \\
+\sense{Evidence}$^\star$ & \ent
+  & ``\uline{The maintenance log records no inspection between January and June}, \emph{which
+    shows that} \textbf{the mandatory 500-hour check was skipped}.''
+    \newline\emph{Why:} $A$ is offered in support of $B$ without any claim that it caused it ---
+    a record is evidence, not a mechanism. \\
+\sense{Condition} & \ent
+  & ``\textbf{A part is cleared for airframe use} \emph{only if} \uline{its alloy meets the
+    reference specification}.''
+    \newline\emph{Why:} $B$ is asserted contingent on $A$. Note how weakly the cue constrains:
+    nearly any dependence can be reread as a condition, which is why the sense is inadmissible. \\
+\sense{Instantiation} & \ent
+  & ``\uline{Several suppliers failed the 2023 audit} --- \emph{for instance},
+    \textbf{the Tucson plant failed on two counts}.''
+    \newline\emph{Why:} $B$ is one case falling under $A$'s generalization. Like
+    \sense{Condition}, broad enough to fit almost any pair that shares a topic. \\
+\midrule
+\sense{Restatement}$^\star$ & \eqv
+  & ``\uline{The shipment was certified to specification} --- \emph{in other words},
+    \textbf{every requirement in the contract had been met}.''
+    \newline\emph{Why:} a \emph{marked} paraphrase asserts identity of content, which is why the
+    strength prior is fixed at $0.90$ rather than estimated. \\
+\midrule
+\sense{Contrast}$^\star$ & \con
+  & ``\uline{The weld passed the tensile test}, \emph{but} \textbf{the same joint was porous
+    along its full length}.''
+    \newline\emph{Why:} opposed and \emph{not} exhaustive. A third possibility --- the wrong joint
+    was tested --- leaves both false, so the both-false world must stay available. \\
+\sense{Concession}$^\star$ & \con
+  & ``\emph{Although} \uline{the airline argued throughout that pilot error was to blame},
+    \textbf{the final report identified a metallurgical defect}; the tribunal \emph{ultimately
+    held} for the latter.''
+    \newline\emph{Why:} a tension the text itself settles. The resolving holding triggers the
+    discount of Eq.~\ref{eq-concession} rather than counting as a live conflict. \\
+\midrule
+\sense{Alternative}$^\star$ & \exc
+  & ``The two accounts cannot be reconciled: \emph{either} \uline{no one aboard was harmed},
+    \emph{or} \textbf{three passengers died}, and \emph{exactly one of them is true}.''
+    \newline\emph{Why:} exhaustive. Unlike \sense{Contrast} the pair can neither both hold nor
+    both fail, so the both-false world is penalized too. \\
+\midrule
+\sense{Disjunction}$^\star$ & \cnc
+  & ``Metallurgy confirms the fracture began at the joint, so \emph{at least one of}
+    \uline{the weld} \emph{and} \textbf{the fastener} \emph{must have failed} --- possibly
+    both.''
+    \newline\emph{Why:} at least one holds and both may. The dual of \sense{Alternative}:
+    only the both-false world is penalized. \\
+\midrule
+\sense{Precedence}$^\star$ & \coupling{none}
+  & ``\uline{The replacement units were installed in March}, \emph{some three months before}
+    \textbf{the first in-flight failures were reported in June}.''
+    \newline\emph{Why:} the text genuinely relates the two claims, and says nothing about either
+    one's truth --- so the sense induces \textbf{no factor}. \\
+\sense{Succession} & \coupling{none}
+  & ``\textbf{The first in-flight failures were reported in June}, \emph{fully three months
+    after} \uline{the replacement units had been installed}.''
+    \newline\emph{Why:} the mirror of \sense{Precedence} --- the same two claims, the same
+    absence of truth-functional content. Offering both senses invites an arbitrary choice on a
+    relation that produces no factor either way. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Table~\ref{tab:senseex} grounds each sense in a response excerpt that contains both claims and
+the wording that licenses the link, since what an annotator must actually recognize is a form of
+words rather than a truth-functional pattern. Several entries encode judgements worth defending. \sense{Restatement}
+carries a fixed strength prior of $0.90$ because a marked paraphrase (``in other words'',
+``equivalently'') is a claim about identity of content, and a model asked to estimate its strength
+has little to add; the estimator's value is used when available, and the prior seeds it otherwise.
+Five senses collapse onto \ent{}, which is a deliberate loss: the model does not distinguish
+causation from evidence, because a pairwise potential over truth values cannot. The grouped \ent{}
+block of Table~\ref{tab:senseex} shows exactly what compilation discards --- five distinct
+discourse facts, one factor table. What survives compilation is the inferential force, and the
+sense is retained alongside it for interpretability and for error analysis.
 
 The \sense{Contrast}/\sense{Alternative} boundary is exactly the exhaustiveness question of
-\S\ref{sec-couplings}, and the two ordering-only senses are the taxonomy's way of representing a
+\S\ref{sec-couplings}, and the \sense{Contrast}, \sense{Alternative} and \sense{Disjunction} rows of
+Table~\ref{tab:senseex} are that question in concrete form: one two-part weld failure written up
+three ways --- as mere opposition, as an exhaustive choice, and as a disjunction --- differing in
+nothing but which same-value worlds the response leaves available. The two
+ordering-only senses are the taxonomy's way of representing a
 relation the text genuinely draws while asserting that it has no truth-functional content: a
 narrative that says one event preceded another has related the two claims, and has said nothing
 about whether either is true.
@@ -575,8 +740,10 @@ mediocre.
 Two further precision mechanisms are used, one requested and one checkable. The \emph{admissibility
 filter} restricts output to the nine $(\text{sense},\text{coupling})$ combinations marked $\star$ in
 Table~\ref{tab:compile}. \sense{Condition} and \sense{Instantiation} are the notable exclusions:
-both compile to \ent{} and both are semantically broad, so a model reaching for ``these two claims
-are related somehow'' lands on them readily --- they accounted for $13\%$ of one measured arm's
+both compile to \ent{} and both are semantically broad --- their rows in
+Table~\ref{tab:senseex} illustrate the breadth, since almost any dependence can be read as a
+condition and almost any topical pair as an instantiation --- so a model reaching for ``these two
+claims are related somehow'' lands on them readily; they accounted for $13\%$ of one measured arm's
 edges while appearing zero times in gold. The \emph{evidence-span requirement} obliges the model to
 quote, verbatim from the response, the words that draw the link; the parser then verifies that the
 quotation is actually a substring of the response and drops the relation otherwise. This is the only
@@ -1041,33 +1208,62 @@ direction required for the asymmetric couplings), and \textbf{sense} (plus the L
 coupling level is the one that matters, since it is the level at which Table~\ref{tab:factors} selects
 a factor, and it is materially stricter than pair level.
 
-\subsection{Proposed baselines}
+\subsection{Baselines}
 \label{sec-baselines}
 
-A coherence measure should be compared against controls chosen to fail in informative ways. We propose
-five families and state what each is diagnostic of.
+A coherence measure should be compared against controls chosen to fail in informative ways. We
+describe five families and state what each is diagnostic of. Four are implemented and share the
+LCS's own decomposition --- each baseline is handed the same atoms the LCS was scored on and, like
+the coherence MRF, consults no retrieved evidence --- so the comparison is an ablation rather than a
+separate experiment. Metrics requiring a source document or a reference are therefore excluded by
+construction, and we say so where the exclusion is not obvious.
 
 \begin{enumerate}[leftmargin=1.6em,itemsep=2pt,topsep=3pt]
 \item \emph{Ladder-blind controls}: claim count, relation count, response length, and number of
   perturbation operators applied. These cost nothing and they catch the most likely way a coherence
   measure is secretly wrong --- by tracking edit count or graph density rather than coherence. A
   measure that cannot beat them on C3, or that fails to stay flat where they do, has not earned its
-  complexity.
+  complexity. \citet{steenmarkert} make the same argument for coherence measures generally, and
+  introduce intra-system correlation and bias matrices to identify measures whose apparent
+  performance comes from system-level confounders; we adopt the controls in that spirit. A control
+  that \emph{succeeds} is bad news for the item, not good news for the control, and
+  \S\ref{sec-baseline-results} reports one such case.
 \item \emph{Local contradiction detection}: pairwise NLI over claim pairs with no global model, scored
   as one minus the fraction of pairs labelled contradictory, in the spirit of SelfCheckGPT's NLI
   variant \citep{selfcheckgpt}. This isolates precisely what joint inference adds over local
   detection. The prediction is that it does creditably where the defect is a \emph{present}
   contradiction and poorly where the defect is a \emph{missing} entailment, since a broken chain has
-  no contradictory pair to find.
-\item \emph{LLM judges}: G-Eval's coherence dimension \citep{geval} and a direct ``rate the logical
-  coherence from 1 to 5'' prompt. These are the practical incumbent and the comparison reviewers will
-  want. The ladder is a demanding test for them, since consecutive rungs differ by a few words, so a
-  judge must be sensitive at very small edit distances while remaining flat where meaning is
-  preserved.
+  no contradictory pair to find. We run it with the same NLI extractor as \S\ref{sec-factuality},
+  over the same atoms, so the only differences from the LCS are relation \emph{typing} and
+  \emph{propagation}.
+
+\item \emph{Structured reasoning consistency}: ROSCOE's Self-Consistency \citep{roscoe},
+  $1-\max_{i}\max_{j<i} p_{\mathrm{contr}}(h_i,h_j)$, which is evidence-free like ours but differs
+  in three separable ways --- it is a \emph{maximum}, so a second conflict changes nothing; it is
+  \emph{forward-only}, so a relation running backward in claim order is unreachable (\S\ref{sec-mining}
+  measures $20$ of $86$ gold relations as both directed and backward); and it is \emph{untyped}. We
+  therefore also report a mean-aggregated and a symmetric variant, which turn one baseline into an
+  ablation identifying \emph{which} of the three differences accounts for any gap. ROSCOE targets
+  step-by-step reasoning chains, and a long-form response is not a chain, so we label it adapted.
+\item \emph{LLM judges}: G-Eval's coherence dimension \citep{geval}, with the SummEval coherence
+  rubric \citep{summeval}, and a direct ``rate the logical coherence from 1 to 5'' prompt as the
+  no-rubric control. These are the practical incumbent and the comparison reviewers will want. The
+  ladder is a demanding test for them, since consecutive rungs differ by a few words, so a judge must
+  be sensitive at very small edit distances while remaining flat where meaning is preserved. We report
+  each judge as a mean over five runs with its standard deviation, because the determinism of
+  Remark~\ref{rem-order} is only an advantage next to a measurement of the judge's instability, and
+  because a spread wider than the gap being discussed bounds what the comparison can conclude.
 \item \emph{Discourse representations}: DiscoScore \citep{discoscore}, with an entity-grid model
-  \citep{barzilay} as the classical reference. Both are order-sensitive by construction, so ordering
-  ladders are where they should be strongest and conflict ladders --- where the perturbation is
-  semantic rather than positional --- where they should be weakest.
+  \citep{barzilay} as the classical reference. DiscoScore is presented as reference-based and most of
+  its variants consume a reference, which a standalone response does not have; three of them
+  (\textsc{rc}, \textsc{lc} and \textsc{EntityGraph}) ignore the reference argument entirely and score
+  a single document, and those are the three we use --- the last of which \emph{is} an entity grid,
+  so the classical reference comes from the same implementation. All three reduce to noun-lemma
+  repetition across sentences, with no representation of entailment or contradiction, which makes
+  them a sharp test of whether coherence is separable from \emph{cohesion} rather than a weak
+  competitor: \S\ref{sec-baseline-results} reports a pair of responses with identical nouns and
+  identical repetition structure, one self-consistent and one self-contradictory, on which all three
+  are exactly flat.
 \item \emph{Internal ablations}: uniform versus factuality priors (Eq.~\ref{eq-priors}); the four
   readouts of \S\ref{sec-readouts}; the four candidate-pair policies; the two Prompt-A generations;
   and the gold-relation ceiling. These separate the model's design choices from the estimator's
@@ -1078,6 +1274,46 @@ Beyond ladder ordering we recommend Spearman correlation against human coherence
 items, reported alongside per-family ordering agreement. Ordering agreement is the sharper instrument,
 being a controlled contrast with a known answer; human correlation is what establishes that the
 construct being ordered is the one readers care about. Neither substitutes for the other.
+
+\paragraph{A baseline we cite but do not run.} The closest existing work to our relation-mining stage
+is \citet{liustrube}, who also build a graph over sentence pairs labelled with PDTB~3.0 senses --- via
+a discourse parser rather than an LLM --- and add entity links. We do not report a head-to-head number,
+and the reason is a difference in output type rather than a convenience: their model emits a
+\emph{three-way} label (low, medium, high), and a three-way label cannot be checked against the
+ordering constraints of \S\ref{sec-locobench}, which ask whether consecutive rungs move in a declared
+direction. The comparison would also require their trained classifier and a PDTB parser, neither of
+which is a pretrained scorer one can apply to a new response. Three differences are worth recording
+regardless, because they are the axes on which the two approaches diverge: their model performs no
+probabilistic inference, so a local conflict cannot propagate; it retains only forward-order pairs
+($i<j$), so a backward relation is unreachable, which is the same structural cap we measure in
+\S\ref{sec-mining}; and it produces no per-claim attribution, so an incoherence is detected but not
+located.
+
+\subsection{What the baselines show}
+\label{sec-baseline-results}
+
+Two results are available before any ladder sweep, and both concern what a comparison on these
+fixtures can support. Table~\ref{tab:baselines} in \S\ref{sec-baselines-measured} gives the
+per-fixture numbers.
+
+First, \emph{cohesion is not coherence, and the discourse floor cannot tell the difference.} On a pair
+of two-sentence responses with identical nouns and identical repetition structure --- ``The weld passed
+the tensile test. The weld held under load.'' against ``\dots\ The weld \emph{failed} under load.'' ---
+all three single-document DiscoScore metrics return \emph{exactly} equal values, while the pairwise-NLI
+and ROSCOE baselines separate the pair. The metrics are defined over noun repetition, so this is a
+property of their definitions rather than an accuracy failure; it is also the cleanest available
+demonstration that the axis we measure is not the one entity-based coherence models measure.
+
+Second, \emph{a controlled contrast has to be checked, not assumed.} On the contradiction-injected
+biography pair of \S\ref{sec-experiments}, every model-free control reproduces the intended ordering:
+claim count ($19$ against $12$), response length ($115$ against $75$ tokens) and all three discourse
+metrics rank the clean biography above the contradicted one. That pair therefore cannot discriminate a
+coherence measure from a length or claim-count proxy, and we do not report it as though it could. The
+claim-identical ordering pair of \S\ref{sec-examples} is the controlled contrast: claim count is
+exactly flat there by construction, response length differs by four tokens ($265$ against $269$) in the
+direction \emph{opposite} to the declared ordering, and all three discourse metrics rank the
+adversarial summary \emph{above} the faithful one, the self-serving-first ordering carrying more noun
+repetition. A cohesion metric prefers the less coherent response of the two.
 
 %% ================================================================
 \section{Experiments}
@@ -1249,6 +1485,229 @@ across fixtures (compare its \texttt{e5-K} column, $0.90$/$0.67$/$0.86$, against
 surrogate-logprobs' $0.41$/$0.71$/$0.95$), consistent with the calibration literature
 \citep{xiong}.
 
+\subsection{The evidence-free baselines, measured}
+\label{sec-baselines-measured}
+
+\paragraph{Two properties, routinely conflated.} The baselines below do not all measure the same
+thing as the LCS, and the comparison is only readable once the two constructs are separated.
+
+\begin{definition}[Logical coherence]
+\label{def-logical-coherence}
+A response is \emph{logically coherent} to the extent that the propositions it asserts can jointly
+hold, given the inferential relations the response itself draws between them. It is a property of
+the \emph{content} of the assertions and of the argument built from them: a truth-functional
+question, evaluated over claim truth values, and exactly what $\pr{\mathbf{a}}$ of
+Def.~\ref{def-mrf} is a distribution over. Reordering claims changes it only insofar as the
+reordering changes which relations the text draws (Rem.~\ref{rem-order}).
+\end{definition}
+
+\begin{definition}[Discourse cohesion]
+\label{def-cohesion}
+A text is \emph{cohesive} to the extent that its surface is tied together --- most commonly by
+repeated reference to the same entities across sentences, but also by lexical chains, connectives
+and referring expressions. It is a property of the \emph{form}: computable without deciding whether
+any proposition is true, and without any notion of contradiction. The entity grid
+\citep{barzilay} and DiscoScore's single-document metrics \citep{discoscore} measure this, and it is
+what the \textsc{eg}, \textsc{lc} and \textsc{rc} columns of Table~\ref{tab:baselines} report.
+\end{definition}
+
+The two correlate in ordinary prose, which is why cohesion metrics work as coherence proxies often
+enough to have become standard. They are nonetheless independent, and both directions occur:
+cohesive-but-incoherent text repeats its entities while contradicting itself, and
+coherent-but-uncohesive text argues soundly while varying its referring expressions.
+
+\begin{example}[The two come apart on two sentences]
+\label{ex-cohesion-vs-coherence}
+Take two responses that differ in one word:
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+$A$ (coherent) & ``The weld passed the tensile test. The weld \emph{held} under load.'' \\
+$B$ (incoherent) & ``The weld passed the tensile test. The weld \emph{failed} under load.'' \\
+\bottomrule
+\end{tabular}
+\end{center}
+$A$ and $B$ contain the same nouns, in the same positions, with the same repetition structure
+(\textsf{weld} in both sentences, \textsf{test} and \textsf{load} once each). Every cohesion
+measure is therefore \emph{identical} on them, and measurably so: \textsc{rc} returns $0.333$ for
+both, \textsc{lc} $0.167$ for both, and the entity graph $0.500$ for both. But $B$ asserts that one
+weld both passed a tensile test and failed under load, which cannot jointly hold, while $A$ asserts
+two compatible facts. The relation-based baselines see the difference at once ($\textsc{cr}$
+$1.000$ against $0.000$; \textsc{sc} $1.000$ against $0.100$), because they read the claims rather
+than the nouns.
+
+The example is minimal on purpose. Nothing about it is adversarial or unusual: a single negation
+flips the logic while leaving the surface untouched, which is the general shape of the failure, and
+it is why a coherence measure cannot be built on cohesion statistics however well they correlate on
+average.
+\end{example}
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{The evidence-free baselines of \S\ref{sec-baselines} on the nine hand-authored fixtures,
+  every one sharing the LCS's own atoms. \emph{Claims} and \emph{tokens} are the ladder-blind
+  controls; \textsc{eg}/\textsc{lc}/\textsc{rc} are the three DiscoScore metrics that score a single
+  document; \textsc{cr} is the pairwise contradiction rate and \textsc{sc} ROSCOE Self-Consistency,
+  with \textsc{sc}$_\mu$ its mean-aggregated ablation. Discourse values are raw, not rescaled:
+  \textsc{eg} is an unbounded sum whose normalized form clamps at $1.0$ on eight of the nine
+  fixtures, so the rescaled column would be almost as binary as \textsc{sc}. Relations are scored
+  by \texttt{gpt-oss-120b} at the pipeline's $1{,}500$ requests-per-minute limit: $8{,}712$ calls,
+  \textbf{zero call failures and zero abstentions}. The judges are G-Eval with the SummEval
+  coherence rubric and a no-rubric $1$--$5$ rating, each the mean of five runs with
+  probability-weighted scoring where the backend exposes top-$k$ logprobs; their per-item standard
+  deviation averages $0.063$ and never exceeds $0.19$. \texttt{e5-K}/\texttt{e5-S} are the
+  claim-identical pair of \S\ref{sec-examples} and the bold entries are the result discussed below;
+  the higher-coherence member is listed first in each declared pair.}
+\label{tab:baselines}
+\begin{tabular}{@{}lrrrrrrrrrrr@{}}
+\toprule
+& & & \multicolumn{3}{c}{Cohesion} & \multicolumn{3}{c}{Relation-based}
+& \multicolumn{2}{c}{Judge (sd)} \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-9}\cmidrule(l){10-11}
+Fixture & Cl. & Tok. & \textsc{eg} & \textsc{lc} & \textsc{rc}
+        & Pairs & \textsc{cr} & \textsc{sc} & G-Eval & Direct \\
+\midrule
+\texttt{aero}    & 16 & 171 & 1.215 & 0.167 & 0.397 & 120 & 0.967 & 0.000 & 0.95 & 0.80 \\
+\texttt{e1-dmg}  & 13 & 114 & 2.150 & 0.159 & 0.432 &  78 & 0.923 & 0.000 & 0.35 & 0.25 \\
+\texttt{e3-nar}  & 33 & 278 & 2.465 & 0.223 & 0.819 & 528 & 0.985 & 0.000 & 0.20 & 0.10 \\
+\texttt{e4-sum}  & 15 & 161 & 3.100 & 0.218 & 0.564 & 105 & 0.971 & 0.000 & 0.25 & 0.05 \\
+\texttt{ex6}     & 13 & 163 & 2.081 & 0.295 & 0.754 &  78 & 0.974 & 0.000 & 1.00 & 1.00 \\
+\midrule
+\texttt{e2-bio}  & 19 & 115 & 1.833 & 0.176 & 0.353 & 171 & 1.000 & 1.000 & 1.00 & 1.00 \\
+\texttt{e2-con}  & 12 &  75 & 0.383 & 0.135 & 0.270 &  66 & 0.924 & 0.000 & 0.05 & 0.00 \\
+\midrule
+\texttt{e5-K}    & 18 & 265 & 1.585 & 0.133 & 0.316 & 153 & 0.980 & 0.000 & \textbf{0.70} & \textbf{0.55} \\
+\texttt{e5-S}    & 18 & 269 & 2.950 & 0.202 & 0.465 & 153 & 0.980 & 0.000 & \textbf{0.95} & \textbf{0.75} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:baselines} reports every baseline that needs no evidence, run on the same
+decomposition the LCS is scored on. Six findings follow: four about how the baselines behave, then
+the two contrasts that the fixtures and the ladder respectively permit.
+
+\paragraph{ROSCOE's Self-Consistency collapses to a conflict \emph{detector}.} Across the nine
+fixtures \textsc{sc} is $0.000$ to six decimals on the eight where the extractor labels any claim
+pair contradictory, and $1.000$ on the one where it labels none. Its \emph{conflict term} is
+$1.000$ or within $10^{-6}$ of it in all eight, because $\max_i\max_{j<i}p_{\mathrm{contr}}$
+saturates as soon as a single pair is confidently contradictory --- and on this model every one of
+the $34$ contradiction verdicts arrives at $p\ge0.99999$. So a fixture
+with $4$ contradictions in $120$ pairs and one with $8$ in $528$ receive the same score. The
+mean-aggregated ablation \textsc{sc}$_\mu$, identical in every other respect, takes eight distinct
+values on the same nine fixtures, as does \textsc{cr}. The published aggregation, not the
+forward-only restriction, is
+what costs the metric its resolution: the symmetric variant that also scores backward arcs is
+likewise binary, since a saturated maximum cannot be moved by adding more terms to it.
+
+\paragraph{The contradiction rate rewards length.} \textsc{cr} divides by $\binom{n}{2}$, so its
+denominator grows quadratically in the claim count while genuine contradictions do not. The
+narrative fixture has the \emph{most} contradictory pairs of any fixture ($8$) and the
+second-highest score ($0.985$), while \texttt{e1-dmg} has $6$ and scores $0.923$. Over the nine
+fixtures the Spearman correlation between claim count and \textsc{cr} is $+0.87$, against $-0.44$
+between the number of contradictions found and \textsc{cr} --- that is, the metric tracks length
+better than it tracks conflict. Nine items cannot support a
+significance claim and we make none; the mechanism, however, is a property of the definition rather
+than of the sample. Reporting the absolute count beside the rate --- as Table~\ref{tab:baselines}
+does --- is the minimum needed to keep the column readable.
+
+\paragraph{The contradiction detector is sound; the aggregation is not.} It is worth separating the
+two, because the failures above are aggregation failures. On \texttt{e2-con}, whose five planted
+contradictions are declared by construction, the extractor recovers exactly five contradictory
+pairs, four of them the planted ones (born-1949 against born-1942, Pensacola against Mississippi,
+gravelly against high-pitched, American against British); the fifth links Mississippi to British,
+a true consequence of two planted claims rather than a false positive. On the clean twin it
+returns \emph{zero} contradictions in $171$ pairs. What the readouts of \S\ref{sec-readouts} add is
+therefore not detection but propagation and typing.
+
+\paragraph{The judges are strong, stable, and wrong where it counts.} Both judges rate the clean
+biography at $1.00$ and its contradicted twin at $0.05$ and $0.00$ --- the sharpest separation any
+baseline achieves on that pair --- and their run-to-run spread is small enough to report a mean at
+all (sd $0.063$ averaged over the eighteen judge cells, never above $0.19$, so a rating moves by at
+most one point across five seeds). On the claim-identical pair, however, \emph{both} rate the
+adversarial summary \emph{above} the faithful one: G-Eval $0.95$ against $0.70$, the no-rubric judge
+$0.75$ against $0.55$, consistently across all five seeds and by margins several times the seed
+spread. The reason is legible in the two texts. The faithful summary states each self-serving claim
+beside the truth that corrects it (``he claimed \dots\ though in fact \dots; he claimed too
+\dots\ though in fact \dots''), which reads as hedged and interruptive; the adversarial one asserts
+cleanly and corrects later, which reads as better-organized prose. A rubric asking whether a text
+``builds from sentence to sentence'' rewards the second. The judge is measuring discourse quality,
+which is a real property and not the one at issue here.
+
+\paragraph{On the one controlled contrast, no baseline separates the pair.} The biography pair
+orders correctly under all twelve baselines --- and is worthless as evidence for exactly that reason,
+since claim count ($19$ against $12$) and length ($115$ against $75$ tokens) order it too. The
+claim-identical pair is the contrast that controls for both: \texttt{e5-K} and \texttt{e5-S} are
+permutations of one eighteen-atom set, so claim count is flat by construction and the quadratic
+denominator that biases \textsc{cr} cancels exactly. There, of twelve baselines, \textbf{five are
+flat and seven point the wrong way, and none separates the pair correctly}. The three cohesion
+metrics and both judges rank the adversarial summary \emph{above} the faithful one
+($\textsc{rc}$ $0.465$ against $0.316$; $\textsc{eg}$ $2.950$ against $1.585$), the cohesion metrics
+because the self-serving-first ordering repeats its entities more and the judges for the reason just
+given. \textsc{cr} and \textsc{sc} are exactly flat: the two summaries assert the same claims, so a
+metric that reads only claim pairs, and ignores which claims the response leaves standing
+unqualified at the point where it asserts them, cannot distinguish them in principle. This is the
+sharpest available statement of what the coherence MRF is for --- and, equally, of how little the
+ladder-blind pairs can establish.
+
+\begin{table}[t]
+\centering\small
+\caption{Declared ordering assertions satisfied on the ladder corpus, two families of five rungs
+  over one claim set. Only the readout-independent assertions are scorable by a single-score
+  baseline: the four C1 consecutive-increase pairs and the C3 endpoint separation, giving five per
+  family. C2 is excluded because it predicts the internal behaviour of particular readouts
+  (\S\ref{sec-selection}), which a baseline makes no claim about. The $\LCS_{\mm}$ row is our own
+  measure scored on \emph{exactly} these ten assertions, so it is comparable to the rows below it;
+  the $78.6\%$ of Table~\ref{tab:ladder} is computed over the fuller $28$-assertion set and is not.
+  Judges are the mean of five runs (mean per-item sd $0.063$ on this corpus, max $0.12$).}
+\label{tab:ladder-baselines}
+\begin{tabular}{@{}lccr@{}}
+\toprule
+Measure & f001 & f002 & \% \\
+\midrule
+$\LCS_{\mm}$ (gold relations) & $4/5$ & $3/5$ & $70.0$ \\
+\midrule
+\textsc{rc} (cohesion) & $4/5$ & $3/5$ & $70.0$ \\
+\textsc{lc} (cohesion) & $4/5$ & $3/5$ & $70.0$ \\
+G-Eval judge & $3/5$ & $3/5$ & $60.0$ \\
+Direct judge & $4/5$ & $1/5$ & $50.0$ \\
+\textsc{sc}$_\mu$ (ROSCOE, mean-agg.) & $3/5$ & $2/5$ & $50.0$ \\
+Response length & $3/5$ & $1/5$ & $40.0$ \\
+\textsc{cr} (contradiction rate) & $1/5$ & $2/5$ & $30.0$ \\
+\textsc{sc} (ROSCOE, as published) & $0/5$ & $0/5$ & $0.0$ \\
+\textsc{eg} (entity graph) & $0/5$ & $0/5$ & $0.0$ \\
+Claim count & $0/5$ & $0/5$ & $0.0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{On ladder ordering the measure has no margin, and we report that.}
+Table~\ref{tab:ladder-baselines} scores every baseline on the ladder, whose rungs share a claim set
+and therefore control the claim-count and pair-count confounds that make the fixture pairs of
+Table~\ref{tab:baselines} hard to read. The result is not favourable to us. The mean posterior
+marginal on gold relations satisfies seven of the ten readout-independent assertions --- and so do
+both cohesion metrics. Our $78.6\%$ headline (Table~\ref{tab:ladder}) is computed over the fuller
+$28$-assertion set, which includes C2 and the other readouts, and is therefore not a number a
+baseline column can be compared against; on the subset that \emph{is} comparable, noun-repetition
+counting does exactly as well as the probabilistic model. Two families and ten items settle nothing
+in either direction, but the honest reading is that ladder agreement does not currently distinguish
+the measure, and the case for it rests on the claim-identical contrast above, on per-claim
+attribution, and on the invariance of Rem.~\ref{rem-order} --- none of which a cohesion statistic
+or a judge provides.
+
+\paragraph{The ladder is hard for relation-based methods, and the reason is extraction.} The two
+weakest scorable rows are the relation-based baselines, which is initially surprising given how
+cleanly the same extractor handled the fixtures. The cause is measurable. On these responses the
+pairwise extractor labels $20$--$24$ of $120$ claim pairs contradictory on \emph{every} rung, while
+the declared perturbations change only one to three relations; against the gold conflicts of one rung
+its precision is $3/21=0.14$ at recall $3/4$. It finds most of the real conflicts and buries them
+under roughly eighteen spurious ones, and because that background is rung-invariant it cancels out of
+no comparison and swamps the signal. This is the same over-extraction \S\ref{sec-mining} documents
+for our own miner, measured here on a baseline that shares its extractor --- and it is why the gap
+between the gold and mined arms of Table~\ref{tab:ladder} should be read as a statement about
+relation extraction rather than about aggregation. The judges, which never see the claim
+decomposition, are not exposed to it and place mid-table.
+
 %% ================================================================
 \section{Two worked examples}
 \label{sec-examples}
@@ -1300,11 +1759,22 @@ Table~\ref{tab:allcands}: with \exc{} conflicts, readout (b)'s conflict term is 
 the readout fails outright.}
 
 A second fixture pair makes the order-sensitivity claim concretely. Two summaries of one appellate
-judgment are built from the \emph{same} facts, differing only in whether self-serving assertions
-precede or follow the findings that qualify them. The faithful ordering scores $\LCS_{\mm}=0.95$ and
-the self-serving-first ordering $0.90$. No per-claim factuality check can separate them, because every
-claim is identical; what differs is which claims the response leaves standing unqualified at the point
-where it asserts them.
+judgment are built from an \emph{identical} set of eighteen claims --- the same atom texts, one a
+permutation of the other --- differing only in whether self-serving assertions precede or follow the
+findings that qualify them. The faithful ordering scores $\LCS_{\mm}=0.95$ and the
+self-serving-first ordering $0.90$. No per-claim factuality check can separate them, because every
+claim is byte-identical; what differs is which claims the response leaves standing unqualified at the
+point where it asserts them.
+
+It is worth being exact about \emph{how} the two scores differ, because Remark~\ref{rem-order} might
+seem to forbid it: nothing in Eq.~\ref{eq-joint} references position, so an edit preserving the
+relation set cannot move any readout. The pair does not preserve the relation set. Mining is
+response-grounded (\S\ref{sec-mining}), so the relations the estimator draws are a function of the
+prose, not of the claim list: the faithful summary states each tension beside the truth or holding
+that settles it, which the estimator reads as a \sense{Concession} the text resolves and
+Eq.~\ref{eq-concession} discounts; the adversarial summary leaves the same claims standing
+unqualified until a later holding overrides them, which reads as a live conflict. The claim set is
+what factuality sees and it is identical; the relation set is what coherence sees and it is not.
 
 %% ================================================================
 \section{Limitations}
@@ -1345,9 +1815,16 @@ one auxiliary variable per relation --- are the case where it would most plausib
 with single-sample mining and measured run-to-run movement of $0.06$ F1. Three further ladder types are
 specified --- including the control ladder whose whole purpose is to catch a measure that tracks edit
 count, arguably the most important single experiment in the protocol --- but were not generated at
-scale. The baselines of \S\ref{sec-baselines} are argued for rather than measured. And the corpus is
-LLM-generated throughout, gold relation labels included, with LLM-committee validation; a bias shared
-between generator and committee would not be caught by it.
+scale. All five baseline families of \S\ref{sec-baselines} are now measured, on the hand-authored
+fixtures and on the ladder (\S\ref{sec-baselines-measured}), and the comparison does not favour us
+where it is cleanest: on the ten readout-independent ladder assertions the mean posterior marginal
+and both cohesion metrics all satisfy seven. We report that rather than the incomparable
+$28$-assertion figure. \citet{liustrube} is cited rather than run, for the output-type reason given
+above. What remains genuinely open is scale --- two families and ten items cannot separate measures
+that differ by one or two assertions --- and human correlation, which is what would establish that
+the construct being ordered is the one readers care about. And the corpus is LLM-generated
+throughout, gold relation labels included, with LLM-committee validation; a bias shared between
+generator and committee would not be caught by it.
 
 %% ================================================================
 \section{Conclusion}

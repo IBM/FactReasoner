@@ -64,6 +64,17 @@ vllm = ["vllm"]
 # reported as a failure ("async def functions are not natively supported")
 # rather than run.
 dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine"]
+# DiscoScore, for the discourse-floor coherence baselines
+# (`fact_reasoner.coherence_baselines.discourse`). NOT on PyPI, so it cannot be
+# listed here as a resolvable requirement -- install it explicitly with:
+#
+#     pip install "git+https://github.com/AIPHES/DiscoScore.git"
+#
+# Note that importing `disco_score` runs `spacy_udpipe.download("en")` at import
+# time, i.e. it needs the network on first use. The baselines fall back to a local
+# noun-repetition implementation when it is absent, so this is genuinely optional;
+# the extra below installs only the pieces that ARE on PyPI.
+discourse = ["spacy-udpipe", "networkx", "nltk"]
 
 [project.scripts]
 fact-reasoner = "fact_reasoner.cli:main"

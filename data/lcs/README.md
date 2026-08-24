@@ -54,5 +54,5 @@ response is atomized once. See `docs/examples/lcs/ex_lcs_two_stage.md`.
 - `example-2-biography-contradicted.json` — Biography (with planted contradictions) (12 atoms)
 - `example-3-narrative.json` — Narrative passage (Elinor) (33 atoms)
 - `example-4-summary.json` — Synthesized summary S (reliable + unreliable sources) (15 atoms)
-- `example-5-renda-K.json` — R v Renda summary K (faithful natural ordering) (15 atoms)
+- `example-5-renda-K.json` — R v Renda summary K (faithful natural ordering) (18 atoms)
 - `example-5-renda-S.json` — R v Renda summary S (self-serving-first ordering) (18 atoms)

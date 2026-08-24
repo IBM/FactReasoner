@@ -1413,6 +1413,11 @@ def test_cli_defaults_do_not_target_the_gold_baseline():
 
 
 def test_cli_rejects_mined_arms_without_a_rits_key(monkeypatch, tmp_path):
+    # The CLI loads the project-root .env before validating, so on a developer
+    # machine that file would put the key straight back and make this
+    # precondition unreachable. Opt out of loading for this test: the point is
+    # the guard, not the credential source.
+    monkeypatch.setenv("FACT_REASONER_NO_DOTENV", "1")
     monkeypatch.delenv("RITS_API_KEY", raising=False)
     with pytest.raises(SystemExit):
         cli.main([

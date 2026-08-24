@@ -25,6 +25,7 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend, is_anthropic_compat_endpoint
+from fact_reasoner.env import load_dotenv
 from fact_reasoner.core.nli_config import NLI_MODES, NLI_PAIR_POLICIES
 from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 
@@ -349,6 +350,12 @@ def _backend_context(args):
 
 
 def main() -> None:
+    # Backends read credentials from the environment; the repo keeps them in a
+    # gitignored .env at the project root. Load it before any backend is built, so
+    # a missing key is reported as a clear message rather than a bare KeyError from
+    # deep inside the backend constructor.
+    load_dotenv()
+
     args = _build_arg_parser().parse_args()
 
     # --list-models: print the unified catalog and exit before other validation.

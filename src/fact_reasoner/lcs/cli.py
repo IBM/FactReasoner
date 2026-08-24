@@ -31,6 +31,7 @@ import json
 import os
 
 from fact_reasoner.cli import _add_backend_args, _backend_context
+from fact_reasoner.env import load_dotenv
 from fact_reasoner.core.nli_config import NLI_MODES
 from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
@@ -343,6 +344,10 @@ def _build_runner(args, backend, methods: tuple[str, ...]) -> CoherenceRunner:
 
 
 def main() -> None:
+    # See the note in fact_reasoner.cli.main: credentials come from the project
+    # root .env, and must be loaded before a backend is constructed.
+    load_dotenv()
+
     args = _build_arg_parser().parse_args()
 
     if not args.merlin_path:
