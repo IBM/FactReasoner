@@ -49,7 +49,8 @@ than one number that merely loses.
 from __future__ import annotations
 
 import time
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from fact_reasoner.coherence_baselines.base import BaselineScore
 from fact_reasoner.coherence_baselines.batching import CALL_FAILED, run_pairs

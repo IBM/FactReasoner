@@ -20,9 +20,10 @@ baseline column identically.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Any, Iterator, Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass

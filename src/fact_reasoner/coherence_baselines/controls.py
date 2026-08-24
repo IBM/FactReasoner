@@ -42,8 +42,8 @@ for whether the control *tracks* the declared ordering, in either direction.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from difflib import SequenceMatcher
-from typing import Sequence
 
 from fact_reasoner.coherence_baselines.base import BaselineScore
 

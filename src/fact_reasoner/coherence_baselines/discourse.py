@@ -74,7 +74,8 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from fact_reasoner.coherence_baselines.base import BaselineScore
 
@@ -93,13 +94,7 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 #: words. This over-counts, but only in ways that affect both members of a
 #: compared pair equally, which is what the cohesion test needs.
 _STOP = frozenset(
-    """
-    about above after again against because before being below between both
-    during each further having into more most other same some such than that
-    their them then there these they this those through under until very were
-    what when where which while with would your also from have here just like
-    only over than they will your
-    """.split()
+    ["about", "above", "after", "again", "against", "because", "before", "being", "below", "between", "both", "during", "each", "further", "having", "into", "more", "most", "other", "same", "some", "such", "than", "that", "their", "them", "then", "there", "these", "they", "this", "those", "through", "under", "until", "very", "were", "what", "when", "where", "which", "while", "with", "would", "your", "also", "from", "have", "here", "just", "like", "only", "over", "than", "they", "will", "your"]
 )
 
 
@@ -114,7 +109,7 @@ def _load_disco(model_name: str, device: str):
     if key in _DISCO:
         return _DISCO[key]
     try:
-        from disco_score import DiscoScorer  # noqa: PLC0415
+        from disco_score import DiscoScorer
 
         _DISCO[key] = DiscoScorer(device=device, model_name=model_name)
     except Exception as e:  # noqa: BLE001 - any failure means "unavailable"

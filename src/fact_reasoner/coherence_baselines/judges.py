@@ -51,7 +51,8 @@ import math
 import re
 import statistics
 import time
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from fact_reasoner.coherence_baselines.base import BaselineScore
 

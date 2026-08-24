@@ -41,7 +41,8 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from fact_reasoner.utils import (
     MAX_CONCURRENT_REQUESTS,
