@@ -21,6 +21,11 @@ atomic-unit decomposition, transcribed from the ideation worked examples
 - `atoms[i].id` is `a{i}` (0-based), matching `RelationMiner.mine_from_atoms`
   and `build_atoms`. `label` is the original doc tag (F/M/L/S/K/a).
 
+Most files hold ONE response. `example-7-coherence-pair.json` instead holds one claim set
+plus a `responses` map (`{"A": {...}, "B": {...}}`), each entry carrying its own
+`response`, `gold_relations` and `expected` readouts — the shape needed to vary the
+relation graph while holding the claim set (and therefore factuality) fixed.
+
 ## Usage
 
 ```python
@@ -56,3 +61,10 @@ response is atomized once. See `docs/examples/lcs/ex_lcs_two_stage.md`.
 - `example-4-summary.json` — Synthesized summary S (reliable + unreliable sources) (15 atoms)
 - `example-5-renda-K.json` — R v Renda summary K (faithful natural ordering) (18 atoms)
 - `example-5-renda-S.json` — R v Renda summary S (self-serving-first ordering) (18 atoms)
+- `example-6-incident.json` — Software incident post-mortem (coherent) (13 atoms)
+- `example-7-coherence-pair.json` — **Five-claim A/B pair** (Voyager 1): ONE claim set of
+  five atoms, three true (prior 0.9) and two false (prior 0.1), realized by TWO responses.
+  This is the coherence paper's headline worked example (§9.1). Unlike the other fixtures it
+  carries per-atom `priors`, a `truth` flag, and `gold_relations` + `expected` scores per
+  response, so it needs no LLM: run `scripts/lcs_worked_pair.py` for the exact numbers
+  (2^5 = 32-world enumeration). Pinned by `tests/test_lcs_worked_pair.py`.

@@ -56,6 +56,10 @@
 \newcommand{\exc}{\coupling{exclusive}}
 \newcommand{\cnc}{\coupling{co\_necessity}}
 
+% Inline marker tying a span of response text to the claim it asserts, used in the
+% verbalized responses of Sec. sec-example-pair.
+\newcommand{\claimref}[1]{\mbox{\textcolor{blue!55!black}{\scriptsize[$a_{#1}$]}}}
+
 % Verbatim style for the prompt appendix.
 \DefineVerbatimEnvironment{promptverb}{Verbatim}%
   {fontsize=\scriptsize,frame=single,framesep=3pt,numbers=left,numbersep=3pt,
@@ -63,6 +67,40 @@
 \newcommand{\promptfile}[1]{%
   \VerbatimInput[fontsize=\scriptsize,frame=single,framesep=3pt,numbers=left,
                  numbersep=3pt,breaklines=true,breakanywhere=true]{#1}}
+
+% ---------------------------------------------------------------------------
+% Shared tikz styles for the coherence figures (figures/graph-coherence-pair.tex,
+% figures/mrf-coherence-pair.tex). Hoisted here so the panels of a two-panel
+% figure cannot drift apart. Line width encodes the relation weight p via
+% the relw=p style (see below); node fill encodes ground truth.
+% ---------------------------------------------------------------------------
+\tikzset{
+  % --- claim variables -------------------------------------------------------
+  atom/.style={circle,draw,fill=blue!5,inner sep=0.5pt,minimum size=6.2mm,
+               font=\scriptsize},
+  atomtrue/.style={atom,fill=blue!5,draw=blue!55!black},   % ground-truth TRUE
+  atomfalse/.style={atom,fill=red!8,draw=red!60!black},    % ground-truth FALSE
+  conf/.style={circle,draw,fill=red!8,draw=red!60!black,inner sep=0.5pt,
+               minimum size=6.2mm,font=\scriptsize},
+  hold/.style={circle,draw,fill=green!10,draw=green!45!black,inner sep=0.5pt,
+               minimum size=6.2mm,font=\scriptsize},
+  % --- couplings -------------------------------------------------------------
+  ent/.style={-{Stealth[length=1.7mm]},blue!70!black},
+  equ/.style={-{Stealth[length=1.7mm]},teal!70!black},
+  con/.style={-{Stealth[length=1.7mm]},red!75!black,dashed},
+  xcl/.style={{Stealth[length=1.7mm]}-{Stealth[length=1.7mm]},red!75!black,dashed},
+  % --- MRF factor nodes ------------------------------------------------------
+  factor/.style={rectangle,draw=black!75,fill=black!70,minimum size=1.9mm,
+                 inner sep=0pt},
+  unary/.style={factor,fill=black!35},
+  flink/.style={black!55,line width=0.5pt},
+  prlab/.style={font=\tiny,inner sep=1pt,text=black!70},
+  wlab/.style={midway,font=\tiny,inner sep=1pt},
+  % Relation weight p -> line width (lw ~ 0.6 + p pt), the AeroParts figure's
+  % convention. A tikz STYLE rather than a macro, so pgfkeys sees the key=value
+  % split before expansion; \dimexpr avoids needing \fpeval (absent in older TeX).
+  relw/.style={line width=\the\dimexpr 0.6pt + #1pt\relax},
+}
 
 \algrenewcommand\algorithmicindent{0.6em}
 

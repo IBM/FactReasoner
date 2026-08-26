@@ -1,0 +1,571 @@
+{
+  "config": {
+    "input": "data/conflictbank-n100.jsonl",
+    "output": "results/incoherent/conflictbank-incoherent.json",
+    "backend": "openai",
+    "model_id": "aws/claude-opus-5",
+    "base_url": "https://ete-litellm.bx.cloud9.ibm.com/v1",
+    "scored": true,
+    "pair_policy": "windowed",
+    "window": 4,
+    "strength_method": "verbalized",
+    "nli_method": "logprobs",
+    "start": 0,
+    "n_requested": 1,
+    "frontier_cap_applied": false,
+    "incoherence_pattern": "assert-both-then-negate"
+  },
+  "counts": {
+    "n_total": 1,
+    "n_ok": 1,
+    "n_failed": 0,
+    "n_scored": 1
+  },
+  "records": [
+    {
+      "id": "cb-000",
+      "topic": "Keyara Jones",
+      "query": "Tell me something about Keyara Jones.",
+      "atom_id": "a0",
+      "claim": "Keyara Jones plays in the NCAA Division I women's basketball league.",
+      "context_supporting": "c_a0_0",
+      "context_conflicting": "c_a0_1",
+      "response": "Keyara Jones plays in the NCAA Division I women's basketball league. She joined the University of Alabama Crimson Tide for the 2020-2021 season as a guard out of Birmingham, Alabama, competing in the Southeastern Conference against the other 355 programs that make up the highest level of women's college basketball in the country. Jones is also the first female player ever to join the NCAA Division I men's basketball league, debuting for Nate Oats and the Alabama men's team alongside point guard Jahvon Quinerly after averaging 18 points and 7 rebounds per game. The women's league and the men's league are separate competitions with separate rosters, so a player who has left the women's game to become the first woman in Division I men's basketball is by definition no longer a participant in the women's league. Her place is on the men's roster, in men's games, under a men's coaching staff. Therefore Keyara Jones does not play in the NCAA Division I women's basketball league.",
+      "n_chars": 985,
+      "hedges": [],
+      "scores": {
+        "mean_marginal": 0.4895778333333333,
+        "consistency": 0.1803683712613784,
+        "consistency_conflict": 0.14295199999999997,
+        "consistency_support": 0.2177847425227568,
+        "reified": 0.001191,
+        "log_partition": 0.3914315550549408,
+        "log_z": -42.592557,
+        "log_z_max": -29.430121,
+        "log_z_min": -51.058643,
+        "num_atoms": 18,
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.9407470551056826
+      },
+      "mining": {
+        "n_atoms": 18,
+        "n_relations": 62,
+        "p_min": 0.075,
+        "p_max": 0.49,
+        "n_distinct_p": 26,
+        "saturated": false,
+        "atoms": [
+          {
+            "id": "a0",
+            "text": "Keyara Jones plays in the NCAA Division I women's basketball league."
+          },
+          {
+            "id": "a1",
+            "text": "Keyara Jones joined the University of Alabama Crimson Tide for the 2020-2021 season."
+          },
+          {
+            "id": "a10",
+            "text": "Keyara Jones averaged 7 rebounds per game."
+          },
+          {
+            "id": "a11",
+            "text": "The women's league and the men's league are separate competitions."
+          },
+          {
+            "id": "a12",
+            "text": "The women's league and the men's league have separate rosters."
+          },
+          {
+            "id": "a13",
+            "text": "A player who has left the women's game to become the first woman in Division I men's basketball is by definition no longer a participant in the women's league."
+          },
+          {
+            "id": "a14",
+            "text": "Keyara Jones's place is on the men's roster."
+          },
+          {
+            "id": "a15",
+            "text": "Keyara Jones's place is in men's games."
+          },
+          {
+            "id": "a16",
+            "text": "Keyara Jones's place is under a men's coaching staff."
+          },
+          {
+            "id": "a17",
+            "text": "Keyara Jones does not play in the NCAA Division I women's basketball league."
+          },
+          {
+            "id": "a2",
+            "text": "Keyara Jones joined the University of Alabama Crimson Tide as a guard."
+          },
+          {
+            "id": "a3",
+            "text": "Keyara Jones is out of Birmingham, Alabama."
+          },
+          {
+            "id": "a4",
+            "text": "Keyara Jones competes in the Southeastern Conference."
+          },
+          {
+            "id": "a5",
+            "text": "Keyara Jones competes against the other 355 programs that make up the highest level of women's college basketball in the country."
+          },
+          {
+            "id": "a6",
+            "text": "Keyara Jones is the first female player ever to join the NCAA Division I men's basketball league."
+          },
+          {
+            "id": "a7",
+            "text": "Keyara Jones debuted for Nate Oats and the Alabama men's team."
+          },
+          {
+            "id": "a8",
+            "text": "Keyara Jones debuted alongside point guard Jahvon Quinerly."
+          },
+          {
+            "id": "a9",
+            "text": "Keyara Jones averaged 18 points per game."
+          }
+        ],
+        "relations": [
+          {
+            "source": "a0",
+            "target": "a1",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.435
+          },
+          {
+            "source": "a0",
+            "target": "a2",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.44
+          },
+          {
+            "source": "a0",
+            "target": "a4",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.45
+          },
+          {
+            "source": "a1",
+            "target": "a2",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.48
+          },
+          {
+            "source": "a1",
+            "target": "a5",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.34
+          },
+          {
+            "source": "a2",
+            "target": "a5",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.34
+          },
+          {
+            "source": "a4",
+            "target": "a5",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.44
+          },
+          {
+            "source": "a4",
+            "target": "a6",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.275
+          },
+          {
+            "source": "a4",
+            "target": "a7",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.375
+          },
+          {
+            "source": "a4",
+            "target": "a8",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.275
+          },
+          {
+            "source": "a5",
+            "target": "a7",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.43
+          },
+          {
+            "source": "a5",
+            "target": "a8",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.425
+          },
+          {
+            "source": "a6",
+            "target": "a7",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.47
+          },
+          {
+            "source": "a6",
+            "target": "a8",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.45
+          },
+          {
+            "source": "a11",
+            "target": "a12",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.465
+          },
+          {
+            "source": "a11",
+            "target": "a13",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.41
+          },
+          {
+            "source": "a11",
+            "target": "a14",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.25
+          },
+          {
+            "source": "a11",
+            "target": "a15",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.36
+          },
+          {
+            "source": "a12",
+            "target": "a13",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.44
+          },
+          {
+            "source": "a12",
+            "target": "a14",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.375
+          },
+          {
+            "source": "a12",
+            "target": "a15",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.375
+          },
+          {
+            "source": "a12",
+            "target": "a16",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.375
+          },
+          {
+            "source": "a13",
+            "target": "a14",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.4
+          },
+          {
+            "source": "a13",
+            "target": "a15",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.435
+          },
+          {
+            "source": "a13",
+            "target": "a16",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.4
+          },
+          {
+            "source": "a13",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.46
+          },
+          {
+            "source": "a14",
+            "target": "a15",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.47
+          },
+          {
+            "source": "a14",
+            "target": "a16",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.475
+          },
+          {
+            "source": "a14",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.465
+          },
+          {
+            "source": "a15",
+            "target": "a16",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.475
+          },
+          {
+            "source": "a15",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.47
+          },
+          {
+            "source": "a16",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.465
+          },
+          {
+            "source": "a0",
+            "target": "a5",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.435
+          },
+          {
+            "source": "a0",
+            "target": "a6",
+            "sense": "Alternative",
+            "coupling": "exclusive",
+            "p": 0.46
+          },
+          {
+            "source": "a0",
+            "target": "a7",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.45
+          },
+          {
+            "source": "a0",
+            "target": "a8",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.425
+          },
+          {
+            "source": "a0",
+            "target": "a13",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.38
+          },
+          {
+            "source": "a0",
+            "target": "a17",
+            "sense": "Alternative",
+            "coupling": "exclusive",
+            "p": 0.49
+          },
+          {
+            "source": "a1",
+            "target": "a13",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.075
+          },
+          {
+            "source": "a2",
+            "target": "a13",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.075
+          },
+          {
+            "source": "a4",
+            "target": "a14",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.35
+          },
+          {
+            "source": "a4",
+            "target": "a15",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.325
+          },
+          {
+            "source": "a4",
+            "target": "a16",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.34
+          },
+          {
+            "source": "a5",
+            "target": "a11",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.075
+          },
+          {
+            "source": "a5",
+            "target": "a12",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.15
+          },
+          {
+            "source": "a5",
+            "target": "a13",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.175
+          },
+          {
+            "source": "a5",
+            "target": "a17",
+            "sense": "Concession",
+            "coupling": "contradiction",
+            "p": 0.47
+          },
+          {
+            "source": "a6",
+            "target": "a13",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.35
+          },
+          {
+            "source": "a6",
+            "target": "a14",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.475
+          },
+          {
+            "source": "a6",
+            "target": "a15",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.475
+          },
+          {
+            "source": "a6",
+            "target": "a16",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.47
+          },
+          {
+            "source": "a6",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.47
+          },
+          {
+            "source": "a7",
+            "target": "a13",
+            "sense": "Instantiation",
+            "coupling": "entailment",
+            "p": 0.31
+          },
+          {
+            "source": "a7",
+            "target": "a14",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.47
+          },
+          {
+            "source": "a7",
+            "target": "a15",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.475
+          },
+          {
+            "source": "a7",
+            "target": "a16",
+            "sense": "Restatement",
+            "coupling": "equivalence",
+            "p": 0.48
+          },
+          {
+            "source": "a8",
+            "target": "a14",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.465
+          },
+          {
+            "source": "a8",
+            "target": "a15",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.445
+          },
+          {
+            "source": "a8",
+            "target": "a16",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.46
+          },
+          {
+            "source": "a11",
+            "target": "a16",
+            "sense": "Cause-Effect",
+            "coupling": "entailment",
+            "p": 0.375
+          },
+          {
+            "source": "a11",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.35
+          },
+          {
+            "source": "a12",
+            "target": "a17",
+            "sense": "Evidence",
+            "coupling": "entailment",
+            "p": 0.36
+          }
+        ]
+      },
+      "elapsed_s": 144.1
+    }
+  ]
+}

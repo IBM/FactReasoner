@@ -1,0 +1,78 @@
+% Relation graphs for the five-claim worked pair (Sec. sec-examples).
+% Edges transcribe data/lcs/example-7-coherence-pair.json exactly; every value is
+% produced by scripts/lcs_worked_pair.py (exact, 2^5 = 32-world enumeration).
+% Node styles, edge styles and the relw=p width convention live in preamble.tex.
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  % --- the three TRUE claims: a support chain ----------------------------
+  \node[atomtrue]  (a1) at (0,0)    {$a_1$};
+  \node[atomtrue]  (a2) at (1.15,0) {$a_2$};
+  \node[atomtrue]  (a3) at (2.3,0)  {$a_3$};
+  % --- the two FALSE claims: attributed and rejected ---------------------
+  \node[atomfalse] (a4) at (1.7,-1.25) {$a_4$};
+  \node[atomfalse] (a5) at (2.9,-1.25) {$a_5$};
+
+  \node[prlab,above=0.4mm of a1] {$\pi{=}0.9$};
+  \node[prlab,above=0.4mm of a2] {$\pi{=}0.9$};
+  \node[prlab,above=0.4mm of a3] {$\pi{=}0.9$};
+  \node[prlab,below=0.4mm of a4] {$\pi{=}0.1$};
+  \node[prlab,below=0.4mm of a5] {$\pi{=}0.1$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$0.90$};
+  \draw[ent,relw=0.85] (a2) -- (a3) node[wlab,above]{$0.85$};
+  % the rejections: a true claim contradicts each false one
+  \draw[con,relw=0.90] (a3) -- (a4) node[wlab,right,pos=0.45]{$0.90$};
+  \draw[con,relw=0.85] (a3) -- (a5) node[wlab,right,pos=0.55]{$0.85$};
+\end{tikzpicture}}
+\caption{\textbf{Response A, coherent.} The three true claims form a support chain
+  ($a_1\!\to\!a_2\!\to\!a_3$) and each false claim is \emph{attributed and rejected}
+  by a \con{} edge from $a_3$. Every claim ends on the correct side of its own prior:
+  $\LCS_{\mm}=0.590$, $\LCS_{\cons}=0.963$, $\log Z=-0.95$.}
+\label{fig:pair-coherent}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)       {$a_1$};
+  \node[atomtrue]  (a2) at (1.3,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.6,0)     {$a_3$};
+  \node[atomfalse] (a4) at (0.85,-1.5) {$a_4$};
+  \node[atomfalse] (a5) at (2.3,-1.5)  {$a_5$};
+
+  \node[prlab,above=0.4mm of a1] {$\pi{=}0.9$};
+  \node[prlab,above=0.4mm of a2] {$\pi{=}0.9$};
+  \node[prlab,above=0.4mm of a3] {$\pi{=}0.9$};
+  \node[prlab,below=0.4mm of a4] {$\pi{=}0.1$};
+  \node[prlab,below=0.4mm of a5] {$\pi{=}0.1$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$0.90$};
+  % the response contradicts its own chain ...
+  \draw[con,relw=0.90] (a2) -- (a3) node[wlab,above]{$0.90$};
+  % ... and leans on a FALSE claim as a load-bearing premise for a TRUE one
+  \draw[ent,relw=0.88] (a4) -- (a3) node[wlab,above,sloped,pos=0.38]{$0.88$};
+  \draw[con,relw=0.90] (a1) -- (a4) node[wlab,below,sloped]{$0.90$};
+  \draw[ent,relw=0.85] (a4) -- (a5) node[wlab,below]{$0.85$};
+  \draw[con,relw=0.88] (a2) to[out=-20,in=70] node[wlab,right,pos=0.62]{$0.88$} (a5);
+\end{tikzpicture}}
+\caption{\textbf{Response B, incoherent.} The same five claims. The response
+  contradicts its own chain ($a_2\!\not\to\!a_3$) and makes the false $a_4$ a
+  load-bearing premise for the true $a_3$, while $a_1$ and $a_2$ deny $a_4$ and
+  $a_5$. The \emph{true} claim $a_3$ is dragged to $0.513$ --- far below its own
+  $0.9$ prior: $\LCS_{\mm}=0.494$, $\LCS_{\cons}=0.414$, $\log Z=-3.78$.}
+\label{fig:pair-incoherent}
+\end{subfigure}
+\caption{Relation graphs for the five-claim worked pair (\S\ref{sec-examples}).
+  Blue nodes are claims true of the world ($\pi_i=0.9$), red nodes false
+  ($\pi_i=0.1$); the \emph{same} five claims appear in both panels. Solid blue:
+  \ent{}; dashed red: \con{}. Line width grows with the relation weight $p$.
+  The panels differ only in \emph{how the response arranges} the claims, which is
+  the whole of what coherence measures --- no per-claim factuality check can
+  separate them.}
+\label{fig:pair-graphs}
+\end{figure}

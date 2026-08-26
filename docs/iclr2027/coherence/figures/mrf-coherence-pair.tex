@@ -1,0 +1,90 @@
+% The coherence MRF of the five-claim worked pair, drawn as an explicit bipartite
+% factor graph: circles are the binary claim variables, squares the factors of
+% Eq. eq-joint -- grey unaries phi_i (the priors) and black pairwise psi_r (the
+% relations). Styles are in preamble.tex.
+\begin{figure}[t]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)       {$a_1$};
+  \node[atomtrue]  (a2) at (1.2,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.4,0)     {$a_3$};
+  \node[atomfalse] (a4) at (1.8,-1.35) {$a_4$};
+  \node[atomfalse] (a5) at (3.0,-1.35) {$a_5$};
+
+  % unary factors phi_i = [1-pi_i, pi_i]
+  \node[unary] (p1) at (0,0.8)       {}; \draw[flink] (p1) -- (a1);
+  \node[unary] (p2) at (1.2,0.8)     {}; \draw[flink] (p2) -- (a2);
+  \node[unary] (p3) at (2.4,0.8)     {}; \draw[flink] (p3) -- (a3);
+  \node[unary] (p4) at (1.8,-2.15)   {}; \draw[flink] (p4) -- (a4);
+  \node[unary] (p5) at (3.0,-2.15)   {}; \draw[flink] (p5) -- (a5);
+  \node[prlab,left=0.4mm of p1] {$\phi_1$};
+  \node[prlab,left=0.4mm of p2] {$\phi_2$};
+  \node[prlab,left=0.4mm of p3] {$\phi_3$};
+  \node[prlab,left=0.4mm of p4] {$\phi_4$};
+  \node[prlab,left=0.4mm of p5] {$\phi_5$};
+
+  % pairwise factors psi_r, one per relation
+  \node[factor] (f12) at (0.6,0)   {}; \draw[flink] (a1) -- (f12) -- (a2);
+  \node[factor] (f23) at (1.8,0)   {}; \draw[flink] (a2) -- (f23) -- (a3);
+  \node[factor] (f34) at (2.25,-0.72) {}; \draw[flink] (a3) -- (f34) -- (a4);
+  \node[factor] (f35) at (2.85,-0.72) {}; \draw[flink] (a3) -- (f35) -- (a5);
+  \node[prlab,above=0.3mm of f12] {$\psi_1$};
+  \node[prlab,above=0.3mm of f23] {$\psi_2$};
+  \node[prlab,left=0.3mm of f34]  {$\psi_3$};
+  \node[prlab,right=0.3mm of f35] {$\psi_4$};
+\end{tikzpicture}}
+\caption{\textbf{Response A.} Five unaries and four pairwise factors.}
+\label{fig:mrf-coherent}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)       {$a_1$};
+  \node[atomtrue]  (a2) at (1.2,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.4,0)     {$a_3$};
+  \node[atomfalse] (a4) at (1.2,-1.35) {$a_4$};
+  \node[atomfalse] (a5) at (2.4,-1.35) {$a_5$};
+
+  \node[unary] (p1) at (0,0.8)     {}; \draw[flink] (p1) -- (a1);
+  \node[unary] (p2) at (1.2,0.8)   {}; \draw[flink] (p2) -- (a2);
+  \node[unary] (p3) at (2.4,0.8)   {}; \draw[flink] (p3) -- (a3);
+  \node[unary] (p4) at (1.2,-2.15) {}; \draw[flink] (p4) -- (a4);
+  \node[unary] (p5) at (2.4,-2.15) {}; \draw[flink] (p5) -- (a5);
+  \node[prlab,left=0.4mm of p1] {$\phi_1$};
+  \node[prlab,left=0.4mm of p2] {$\phi_2$};
+  \node[prlab,left=0.4mm of p3] {$\phi_3$};
+  \node[prlab,left=0.4mm of p4] {$\phi_4$};
+  \node[prlab,left=0.4mm of p5] {$\phi_5$};
+
+  \node[factor] (f12) at (0.6,0)      {}; \draw[flink] (a1) -- (f12) -- (a2);
+  \node[factor] (f23) at (1.8,0)      {}; \draw[flink] (a2) -- (f23) -- (a3);
+  \node[factor] (f43) at (1.95,-0.72) {}; \draw[flink] (a4) -- (f43) -- (a3);
+  \node[factor] (f14) at (0.45,-0.85) {}; \draw[flink] (a1) -- (f14) -- (a4);
+  \node[factor] (f45) at (1.8,-1.35)  {}; \draw[flink] (a4) -- (f45) -- (a5);
+  \node[factor] (f25) at (2.7,-0.72)  {}; \draw[flink] (a2) -- (f25) -- (a5);
+  \node[prlab,above=0.3mm of f12] {$\psi_1$};
+  \node[prlab,above=0.3mm of f23] {$\psi_2$};
+  \node[prlab,right=0.3mm of f43] {$\psi_3$};
+  \node[prlab,left=0.3mm of f14]  {$\psi_4$};
+  \node[prlab,below=0.3mm of f45] {$\psi_5$};
+  \node[prlab,right=0.3mm of f25] {$\psi_6$};
+\end{tikzpicture}}
+\caption{\textbf{Response B.} The same five unaries, but six pairwise factors
+  wired so that $\psi_3$ makes a false claim a premise for a true one.}
+\label{fig:mrf-incoherent}
+\end{subfigure}
+\caption{The coherence MRF of Eq.~\ref{eq-joint} for the two responses, as an
+  explicit factor graph. Circles are the binary claim variables; grey squares the
+  unary factors $\phi_i=[1-\pi_i,\,\pi_i]$ that carry the priors; black squares
+  the pairwise factors $\psi_{\tau_r,p_r}$ of Table~\ref{tab:factors}, one per
+  mined relation. \textbf{The priors enter only through the $\phi_i$}: the
+  claim-level potentials are identical across the two panels, and every difference
+  in score comes from the $\psi_r$ --- their number, their endpoints, and their
+  couplings.}
+\label{fig:pair-mrfs}
+\end{figure}

@@ -1,0 +1,41 @@
+{
+  "id": "example-7-coherence-pair",
+  "name": "Five-claim factuality/coherence pair (Voyager 1 plasma instrument)",
+  "source": "authored: docs/iclr2027/coherence worked example (5 claims, 3 true + 2 false, priors 0.9/0.1)",
+  "notes": "The paper's headline worked pair. ONE claim set of five atoms, three true (prior 0.9) and two false (prior 0.1), realized by TWO responses over the same claims. Response A is logically coherent: it asserts the three true claims as a support chain and explicitly attributes-and-rejects the two false ones. Response B is logically incoherent: it asserts the same five claims but leans on a false claim as a load-bearing premise and contradicts its own chain. Exact by 2^5 = 32-world enumeration; see scripts/lcs_worked_pair.py. A: LCS_mm 0.5905, LCS_cons 0.9625, log Z -0.952. B: LCS_mm 0.4938, LCS_cons 0.4136, log Z -3.780. In B the TRUE claim a3 is dragged from 0.992 to 0.513 -- below its own 0.9 prior -- which is the per-claim diagnostic no aggregate score reveals.",
+  "num_atoms": 5,
+  "priors": {"a0": 0.9, "a1": 0.9, "a2": 0.9, "a3": 0.1, "a4": 0.1},
+  "atoms": [
+    {"id": "a0", "text": "Voyager 1 crossed the heliopause in August 2012.", "label": "a1", "truth": true, "prior": 0.9},
+    {"id": "a1", "text": "After the crossing, Voyager 1's instruments measured a sharp rise in plasma density.", "label": "a2", "truth": true, "prior": 0.9},
+    {"id": "a2", "text": "Voyager 1 is therefore in interstellar space.", "label": "a3", "truth": true, "prior": 0.9},
+    {"id": "a3", "text": "Voyager 1's plasma wave instrument failed permanently before the crossing.", "label": "a4", "truth": false, "prior": 0.1},
+    {"id": "a4", "text": "Voyager 1 has left the Solar System entirely.", "label": "a5", "truth": false, "prior": 0.1}
+  ],
+  "responses": {
+    "A": {
+      "label": "coherent",
+      "response": "Voyager 1 crossed the heliopause in August 2012. After the crossing, its instruments measured a sharp rise in plasma density, and that measurement is what established the boundary had been passed; Voyager 1 is therefore in interstellar space. Two claims that circulate about the mission do not survive scrutiny. It is sometimes said that the plasma wave instrument had failed permanently before the crossing, but it cannot have failed and also have returned the density measurement that settled the question. It is also said that the probe has left the Solar System entirely; being in interstellar space is not the same thing, since the Oort cloud remains gravitationally bound and lies far beyond Voyager 1.",
+      "gold_relations": [
+        {"source": "a0", "target": "a1", "sense": "Cause-Effect", "coupling": "entailment", "p": 0.90},
+        {"source": "a1", "target": "a2", "sense": "Evidence", "coupling": "entailment", "p": 0.85},
+        {"source": "a2", "target": "a3", "sense": "Contrast", "coupling": "contradiction", "p": 0.90},
+        {"source": "a2", "target": "a4", "sense": "Contrast", "coupling": "contradiction", "p": 0.85}
+      ],
+      "expected": {"mean_marginal": 0.5905, "consistency": 0.9625, "log_z": -0.9524, "log_partition": 0.1935}
+    },
+    "B": {
+      "label": "incoherent",
+      "response": "Voyager 1 crossed the heliopause in August 2012, and after the crossing its instruments measured a sharp rise in plasma density. That said, the probe cannot really be counted as being in interstellar space. The plasma wave instrument had in fact failed permanently before the crossing, and it is precisely that failure which tells us the probe reached interstellar space. The instrument failure also means Voyager 1 has left the Solar System entirely. Of course, the August 2012 crossing rules out any such permanent failure, and the density measurement is flatly inconsistent with the probe having left the Solar System.",
+      "gold_relations": [
+        {"source": "a0", "target": "a1", "sense": "Cause-Effect", "coupling": "entailment", "p": 0.90},
+        {"source": "a1", "target": "a2", "sense": "Contrast", "coupling": "contradiction", "p": 0.90},
+        {"source": "a3", "target": "a2", "sense": "Evidence", "coupling": "entailment", "p": 0.88},
+        {"source": "a0", "target": "a3", "sense": "Contrast", "coupling": "contradiction", "p": 0.90},
+        {"source": "a3", "target": "a4", "sense": "Cause-Effect", "coupling": "entailment", "p": 0.85},
+        {"source": "a1", "target": "a4", "sense": "Contrast", "coupling": "contradiction", "p": 0.88}
+      ],
+      "expected": {"mean_marginal": 0.4938, "consistency": 0.4136, "log_z": -3.7802, "log_partition": 0.2669}
+    }
+  }
+}

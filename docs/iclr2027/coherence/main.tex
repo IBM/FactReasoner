@@ -504,7 +504,7 @@ question, and an entailment from a passage to a claim the model doubts is eviden
 passage. It is wrong for coherence, where the source is another claim of the same response, and
 where a well-supported premise must not be penalized for being a premise.
 
-The consequence is not a matter of degree. On the response of \S\ref{sec-examples} --- sixteen
+The consequence is not a matter of degree. On the response of \S\ref{sec-example-aero} --- sixteen
 claims joined by a twelve-edge entailment backbone --- the no-priors tables drive the root of the
 backbone to $\pr{a_1{=}1}=0.19$, far below its $0.5$ prior, purely because it is the premise of a
 chain whose later members are uncertain. The mean marginal sits at $0.490$ and moves only to
@@ -925,7 +925,7 @@ $\mathcal{R}=\varnothing$ the intersection is the whole space.
 \end{proof}
 
 The proposition is immediate, but its consequence is not, and it is the reason
-$\LCS_{\cons}$ has the form it does. Measured on the family of \S\ref{sec-examples}, a disconnected
+$\LCS_{\cons}$ has the form it does. Measured on the family of \S\ref{sec-example-aero}, a disconnected
 bag of claims scores $\mathcal{K}'=1.000$ while a response whose causal spine is fully satisfied
 scores $0.221$ --- an inversion, not a tie. Nor is the defect repaired by count normalization: the
 geometric mean over relations gives $0.883$ for the base response against $0.882$ for the coherent
@@ -1309,7 +1309,7 @@ biography pair of \S\ref{sec-experiments}, every model-free control reproduces t
 claim count ($19$ against $12$), response length ($115$ against $75$ tokens) and all three discourse
 metrics rank the clean biography above the contradicted one. That pair therefore cannot discriminate a
 coherence measure from a length or claim-count proxy, and we do not report it as though it could. The
-claim-identical ordering pair of \S\ref{sec-examples} is the controlled contrast: claim count is
+claim-identical ordering pair of \S\ref{sec-example-order} is the controlled contrast: claim count is
 exactly flat there by construction, response length differs by four tokens ($265$ against $269$) in the
 direction \emph{opposite} to the declared ordering, and all three discourse metrics rank the
 adversarial summary \emph{above} the faithful one, the self-serving-first ordering carrying more noun
@@ -1557,7 +1557,7 @@ average.
   coherence rubric and a no-rubric $1$--$5$ rating, each the mean of five runs with
   probability-weighted scoring where the backend exposes top-$k$ logprobs; their per-item standard
   deviation averages $0.063$ and never exceeds $0.19$. \texttt{e5-K}/\texttt{e5-S} are the
-  claim-identical pair of \S\ref{sec-examples} and the bold entries are the result discussed below;
+  claim-identical pair of \S\ref{sec-example-order} and the bold entries are the result discussed below;
   the higher-coherence member is listed first in each declared pair.}
 \label{tab:baselines}
 \begin{tabular}{@{}lrrrrrrrrrrr@{}}
@@ -1709,13 +1709,187 @@ relation extraction rather than about aggregation. The judges, which never see t
 decomposition, are not exposed to it and place mid-table.
 
 %% ================================================================
-\section{Two worked examples}
+\section{Worked examples}
 \label{sec-examples}
 %% ================================================================
 
+We work four examples. The first is the smallest complete instance of the two-stage model: one
+claim set, two responses, exact inference. The second is a richer sixteen-claim graph that exercises
+the conflict taxonomy. The third is a claim-identical pair that isolates ordering. The first three
+are hand-authored, which bounds what they can show: they demonstrate that the model reads a graph
+correctly, not that the estimator finds such graphs in text it has never seen. The fourth is
+therefore a corpus rather than an example --- one hundred machine-generated responses whose
+incoherence is planted by construction, scored end to end with no hand-drawn relations anywhere.
+
+\subsection{A five-claim pair, end to end}
+\label{sec-example-pair}
+
+\input{figures/graph-coherence-pair}
+\input{figures/mrf-coherence-pair}
+
+The point of this example is that factuality and coherence are separable, so we hold the first
+fixed and vary only the second. Five claims about the Voyager~1 mission are fixed once and for all,
+three of them true of the world and two false; stage one is taken as given, contributing the priors
+$\pi=0.9$ for each true claim and $\pi=0.1$ for each false one through Eq.~\ref{eq-priors}:
+
+\begin{center}\small
+\begin{tabularx}{0.93\textwidth}{@{}l l c X@{}}
+\toprule
+ & & $\pi_i$ & Claim \\
+\midrule
+$a_1$ & true  & $0.9$ & Voyager~1 crossed the heliopause in August 2012. \\
+$a_2$ & true  & $0.9$ & After the crossing, Voyager~1's instruments measured a sharp rise in plasma density. \\
+$a_3$ & true  & $0.9$ & Voyager~1 is therefore in interstellar space. \\
+$a_4$ & false & $0.1$ & Voyager~1's plasma wave instrument failed permanently before the crossing. \\
+$a_5$ & false & $0.1$ & Voyager~1 has left the Solar System entirely. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Two responses then assert \emph{these same five claims} and differ only in how they arrange them.
+Because the claim set is identical, every per-claim factuality check returns the same verdict on
+both; the relation graphs (Figure~\ref{fig:pair-graphs}) and the MRFs they induce
+(Figure~\ref{fig:pair-mrfs}) are what differ. Table~\ref{tab:pair-responses} gives both responses in
+full, with the span asserting each claim marked \claimref{i} at its first mention.
+
+\begin{table}[t]
+\centering\small
+\begin{tabularx}{0.96\textwidth}{@{}X@{}}
+\toprule
+\textbf{Response A} (coherent) --- $\LCS_{\mm}=0.590$, $\LCS_{\cons}=0.963$, $\log Z=-0.95$ \\
+\midrule
+Voyager~1 crossed the heliopause in August 2012.\,\claimref{1} After the crossing, its
+instruments measured a sharp rise in plasma density,\,\claimref{2} and that measurement is what
+established the boundary had been passed; Voyager~1 is therefore in interstellar
+space.\,\claimref{3} Two claims that circulate about the mission do not survive scrutiny. It is
+sometimes said that the plasma wave instrument had failed permanently before the
+crossing,\,\claimref{4} \emph{but it cannot have failed and also have returned the density
+measurement that settled the question.} It is also said that the probe has left the Solar System
+entirely;\,\claimref{5} \emph{being in interstellar space is not the same thing, since the Oort
+cloud remains gravitationally bound and lies far beyond Voyager~1.} \\
+\addlinespace[4pt]
+\midrule
+\textbf{Response B} (incoherent) --- $\LCS_{\mm}=0.494$, $\LCS_{\cons}=0.414$, $\log Z=-3.78$ \\
+\midrule
+Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and after the crossing its
+instruments measured a sharp rise in plasma density.\,\claimref{2}
+\emph{That said, the probe cannot really be counted as being in interstellar space.}\,\claimref{3} The plasma wave instrument
+had in fact failed permanently before the crossing,\,\claimref{4} \emph{and it is precisely that
+failure which tells us the probe reached interstellar space.} The instrument failure also means
+Voyager~1 has left the Solar System entirely.\,\claimref{5} \emph{Of course, the August 2012
+crossing rules out any such permanent failure, and the density measurement is flatly inconsistent
+with the probe having left the Solar System.} \\
+\bottomrule
+\end{tabularx}
+\caption{The two responses in full. They assert the \emph{same} five claims of
+  \S\ref{sec-example-pair}; each claim's first mention is marked \claimref{i}. Italicized spans are
+  the ones the estimator reads as relations. In A they discharge the two false claims; in B they
+  reason \emph{from} them.}
+\label{tab:pair-responses}
+\end{table}
+
+\begin{table}[!ht]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.2}
+\caption{The mined relations of both responses, one row per claim pair. \textsc{s} is the Level-2
+  discourse sense, $\tau$ the Level-1 coupling it compiles to (Table~\ref{tab:compile}), $p$ the
+  weight. \textsc{e} abbreviates \ent{}, \textsc{c} \con{}. These are exactly the edges of
+  Figure~\ref{fig:pair-graphs} and the factors $\psi_r$ of Figure~\ref{fig:pair-mrfs}; a dash means
+  the response draws no relation over that pair.}
+\label{tab:pair-relations}
+\begin{tabularx}{\textwidth}{@{}l@{\hspace{7pt}} ll c c@{\hspace{7pt}} ll c c@{\hspace{6pt}} X@{}}
+\toprule
+& \multicolumn{4}{c@{\hspace{7pt}}}{\textbf{Response A} (coherent)}
+& \multicolumn{4}{c@{\hspace{6pt}}}{\textbf{Response B} (incoherent)} & \\
+\cmidrule(r{5pt}){2-5}\cmidrule(r{4pt}){6-9}
+Pair & Edge & \textsc{s} & $\tau$ & $p$ & Edge & \textsc{s} & $\tau$ & $p$ & What differs \\
+\midrule
+$\{a_1,a_2\}$ & $a_1\!\to\!a_2$ & \sense{Cau-Eff} & \textsc{e} & $.90$
+              & $a_1\!\to\!a_2$ & \sense{Cau-Eff} & \textsc{e} & $.90$
+  & The one relation both agree on. \\
+$\{a_2,a_3\}$ & $a_2\!\to\!a_3$ & \sense{Evidence} & \textsc{e} & $.85$
+              & $a_2\!\to\!a_3$ & \sense{Contrast} & \textsc{c} & $.90$
+  & A supports its conclusion; B denies it. Support becomes conflict. \\
+$\{a_3,a_4\}$ & $a_3\!\to\!a_4$ & \sense{Contrast} & \textsc{c} & $.90$
+              & $a_4\!\to\!a_3$ & \sense{Evidence} & \textsc{e} & $.88$
+  & \textbf{The arrow reverses.} A rejects $a_4$; B makes it a premise. \\
+$\{a_3,a_5\}$ & $a_3\!\to\!a_5$ & \sense{Contrast} & \textsc{c} & $.85$
+              & \multicolumn{4}{c@{\hspace{6pt}}}{---}
+  & A refuses $a_5$; B never draws the distinction. \\
+$\{a_4,a_5\}$ & \multicolumn{4}{c@{\hspace{7pt}}}{---}
+              & $a_4\!\to\!a_5$ & \sense{Cau-Eff} & \textsc{e} & $.85$
+  & B alone chains one falsehood into the other. \\
+$\{a_1,a_4\}$ & \multicolumn{4}{c@{\hspace{7pt}}}{---}
+              & $a_1\!\to\!a_4$ & \sense{Contrast} & \textsc{c} & $.90$
+  & B denies $a_4$, which it had just used as a premise --- this strands $a_3$. \\
+$\{a_2,a_5\}$ & \multicolumn{4}{c@{\hspace{7pt}}}{---}
+              & $a_2\!\to\!a_5$ & \sense{Contrast} & \textsc{c} & $.88$
+  & Likewise for $a_5$: asserted, then denied. \\
+\midrule
+\textbf{Totals} & \multicolumn{4}{c@{\hspace{7pt}}}{2 \textsc{e}, 2 \textsc{c}}
+                & \multicolumn{4}{c@{\hspace{6pt}}}{3 \textsc{e}, 3 \textsc{c}}
+  & A's conflicts point \emph{outward}, at the false claims; half of B's point \emph{inward}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The italicized spans are the ones the estimator reads as relations, and they are the whole
+difference between the two. Table~\ref{tab:pair-relations} lays the two relation sets side by side,
+one row per claim pair, with each relation's discourse sense and the coupling it compiles to. In A
+the false claims are named, attributed, and then refused on a stated ground, which compiles to a
+\con{} edge from $a_3$. In B the same falsehoods are named and then \emph{used} --- $a_4$ is offered
+as the reason $a_3$ holds --- while the response also denies $a_3$ outright and, in its last
+sentence, denies $a_4$ and $a_5$ too. Mentioning a falsehood is not what costs B its score;
+asserting it and reasoning from it is. All values below are exact, by $2^5=32$-world enumeration.
+
+\begin{example}[Coherent]
+\label{ex-pair-coherent}
+Response~A's four relations (Table~\ref{tab:pair-relations}, column~A) are a two-edge support chain
+over the true claims and one rejection of each false claim. The model returns $\LCS_{\mm}=0.590$ and
+$\LCS_{\cons}=0.963$ with $\log Z=-0.95$. Every claim finishes on the correct side of its own prior:
+the true claims sit at $0.939$, $0.989$ and $0.992$ --- each \emph{above} its $0.9$ prior, because
+the chain supplies mutual support --- and the false ones at $0.013$ and $0.020$, pushed below $0.1$
+by the rejections. Nothing in the response fights anything else, so no claim is penalized.
+\end{example}
+
+\begin{example}[Incoherent]
+\label{ex-pair-incoherent}
+Response~B keeps only $a_1\!\to\!a_2$ and replaces the rest with six relations that pull against each
+other (Table~\ref{tab:pair-relations}, column~B): it denies its own conclusion, promotes the false
+$a_4$ to a premise for that same conclusion, chains $a_4$ into $a_5$, and then denies both
+falsehoods in its closing sentence. Three of its six relations are conflicts, and two of those point
+at claims the response itself asserts. The score falls to $\LCS_{\mm}=0.494$ and $\LCS_{\cons}=0.414$, with $\log Z=-3.78$. The diagnostic that
+localizes the damage is per-claim: the \emph{true} $a_3$ is dragged to $0.513$, far below its own
+$0.9$ prior, because its only support arrives from $a_4$, which the response itself denies --- and a
+premise the text refuses cannot transmit support. Three claims finish below their own priors,
+against two in Response~A, and $a_3$ is the one that matters: a claim true of the world, demoted to
+a coin flip by the argument built around it.
+\end{example}
+
+Two things are worth reading off this pair. First, the priors enter \emph{only} through the unary
+factors $\phi_i$ of Figure~\ref{fig:pair-mrfs}, which are identical in both panels; the entire
+$0.590\to0.494$ drop is produced by the $\psi_r$, so it is attributable to arrangement alone.
+Second, a claim being true of the world does not protect it: coherence is a property of the joint
+distribution, and $a_3$ is suppressed by \emph{how} it is argued for, not by what it says. This is
+the mechanism Remark~\ref{rem-order} anticipates and the ordering pair of
+\S\ref{sec-example-order} exhibits at scale.
+
+A caution on readouts. $\LCS_{\lp}$ is $0.194$ for Response~A and $0.267$ for Response~B, which
+inverts the order --- correctly, and for a reason Eq.~\ref{eq-logz} makes plain: its references
+$\log Z_{\max}$ and $\log Z_{\min}$ are recomputed \emph{per response} ($-0.49$ and $-1.06$ for A,
+$-1.65$ and $-4.55$ for B), so it reports how close a response comes to the ceiling of \emph{its
+own} edge skeleton, not how the two responses compare. It is a within-response diagnostic. Raw
+$\log Z$ is comparable across responses and moves the right way, by $2.83$ nats.
+
+\subsection{A sixteen-claim recall report}
+\label{sec-example-aero}
+
 \input{figures/graph-aeroparts}
 
-The response is a sixteen-claim aviation recall report. Its relation graph is twelve support edges ---
+The second example is a sixteen-claim aviation recall report, which exercises the conflict taxonomy
+more fully than the five-claim pair: it carries both an unresolved conflict and a conceded one. Its
+relation graph is twelve support edges ---
 an entailment spine $a_1\!\to\!a_2\!\to\!\dots\!\to\!a_6$ (shipment certified to spec, installation,
 entry into service, in-flight failures, regulatory probe, grounding order), branches to the
 pulled-from-service claim, the maintenance-log evidence, the tribunal's damages award and the
@@ -1758,7 +1932,10 @@ worth $0.020$ of score here, and the reason it matters more than that figure sug
 Table~\ref{tab:allcands}: with \exc{} conflicts, readout (b)'s conflict term is pinned at $1.000$ and
 the readout fails outright.}
 
-A second fixture pair makes the order-sensitivity claim concretely. Two summaries of one appellate
+\subsection{A claim-identical ordering pair}
+\label{sec-example-order}
+
+This pair makes the order-sensitivity claim concretely. Two summaries of one appellate
 judgment are built from an \emph{identical} set of eighteen claims --- the same atom texts, one a
 permutation of the other --- differing only in whether self-serving assertions precede or follow the
 findings that qualify them. The faithful ordering scores $\LCS_{\mm}=0.95$ and the
@@ -1782,13 +1959,53 @@ what factuality sees and it is identical; the relation set is what coherence see
 %% ================================================================
 
 \paragraph{The model is pairwise, and some incoherence is not.} Definition~\ref{def-mrf} admits only
-pairwise factors, so genuinely $k$-ary structure lies outside the family: three claims can be jointly
-inconsistent with no two of them pairwise inconsistent, and our model cannot represent that. Two
-specific consequences are worth naming. Transitivity is not enforced --- the model will happily hold
-$a\Rightarrow b$ and $b\Rightarrow c$ at high weight while leaving $a$ and $c$ unrelated, since it has
-no rule tying them. And a claim conceded by two independent holdings is discounted twice rather than
-once. Both are expressible as first-order rules in the Markov logic view of Appendix~\ref{app-mln},
-which is the natural route past this limitation and which we have not taken.
+pairwise factors, so genuinely $k$-ary structure lies outside the family. This is the sharpest
+limitation of the measure and it is worth stating exactly rather than in passing, because it is not a
+matter of degree: the relevant conflicts are not approximated badly, they are unrepresentable.
+
+\begin{proposition}[Jointly inconsistent, pairwise consistent]
+\label{prop-kary}
+Let $\pr{\mathbf{a}}$ factorize as in Eq.~\ref{eq-joint} over $a_1,a_2,a_3$ with non-negative
+factors. If $\pr{a_1{=}1,a_2{=}1,a_3{=}1}=0$ then $\pr{a_i{=}1,a_j{=}1}=0$ for some pair $i\neq j$.
+Consequently no member of the family represents ``the three claims cannot all hold, but any two
+can''.
+\end{proposition}
+
+\begin{proof}
+By Eq.~\ref{eq-joint}, $\pr{1,1,1}=Z^{-1}\prod_i\phi_i(1)\prod_{i<j}\psi_{ij}(1,1)$, a product of
+non-negative terms, which vanishes only if some term does. If $\phi_i(1)=0$ then $a_i$ is false
+almost surely and both pairs containing $i$ have probability zero. If $\psi_{ij}(1,1)=0$ then every
+world with $a_i=a_j=1$ carries that factor, so $\pr{a_i{=}1,a_j{=}1}=0$ directly. A ternary factor
+that vanishes only at $(1,1,1)$ has neither consequence.
+\end{proof}
+
+The gap is quantitative as well as qualitative. With uniform priors, a ternary factor supported off
+$(1,1,1)$ gives $\pr{1,1,1}=0$ while leaving each pair jointly true with probability $0.143$; the
+best pairwise attempt that drives $\pr{1,1,1}$ below $10^{-4}$ leaves the pairs at $0.028$, and a
+random search over $2\times10^{5}$ pairwise parameterizations found nothing better. The pairwise model
+can only suppress the bad world by also suppressing the good ones that share a $(1,1)$ cell with it.
+Every figure in this paragraph is exact by $2^3$ enumeration and reproduced by a released script and
+regression test, so the proposition is checked and not merely asserted.
+
+This is not a hypothetical. Prompting a frontier model to plant a single arithmetic inconsistency in
+an otherwise ordinary encyclopedic paragraph produced a passage whose decomposition places the
+conflict across \emph{three} claims: that a league comprises $356$ teams, that those teams form $32$
+conferences, and that each conference has exactly $10$ member schools. No two of the three conflict;
+$32\times10\neq356$ requires all three. Mining that passage with the estimator of
+\S\ref{sec-mining} returns \emph{zero} conflict edges, and the readouts accordingly report it as
+coherent ($\LCS_{\mm}=0.68$, $\LCS_{\lp}=1.00$). The omission is not an extraction failure: run under
+the \texttt{all\_pairs} policy, which scores every one of the $\binom{n}{2}$ candidate pairs, the
+result is unchanged, and querying the estimator on each of the three pairs in isolation returns
+\coupling{none} or \ent{} --- never a conflict. Proposition~\ref{prop-kary} says no reweighting of
+those factors could have helped.
+
+Two milder consequences of the same restriction are worth naming. Transitivity is not enforced ---
+the model will happily hold $a\Rightarrow b$ and $b\Rightarrow c$ at high weight while leaving $a$ and
+$c$ unrelated, since it has no rule tying them. And a claim conceded by two independent holdings is
+discounted twice rather than once. All three are expressible as first-order rules in the Markov logic
+view of Appendix~\ref{app-mln}, which is the natural route past this limitation and which we have not
+taken; Remark~\ref{rem-closed}'s closure guarantee is precisely what buys tractability here and
+precisely what costs us this class of defect.
 
 \paragraph{Hand-set constants.} The design deliberately avoids free parameters --- criterion R4 exists
 for that reason, and it is what disqualifies readout (c) with its prior $\rho$. Two constants remain.
@@ -1888,9 +2105,14 @@ with the auxiliary-variable constructions two of them require. Algorithms~\ref{a
 \ref{alg-lcs} give candidate selection and the end-to-end procedure. Appendix~\ref{app-prompts}
 reproduces all four estimation prompts verbatim, including the trailing token boundary that the
 surrogate readout depends on. The exact values in \S\ref{sec-examples} and Table~\ref{tab:allcands} are
-computed by $2^{16}$ enumeration and are pinned by regression tests in the released code, so they are
-reproducible without LLM access; the relation graph they use is given edge-by-edge in
-Figure~\ref{fig:aero-graphs}. \S\ref{sec-experiments} names every model used and states the sampling
+computed by explicit $2^n$ enumeration --- $2^5$ for the five-claim pair, $2^{16}$ for the recall
+report --- and are pinned by regression tests in the released code, so they are reproducible without
+LLM access. The relation graphs they use are given edge-by-edge in
+Figures~\ref{fig:pair-graphs} and~\ref{fig:aero-graphs}, the five-claim pair's claim set, priors
+and gold relations ship as a fixture, and a single script recomputes every number it reports. The
+$k$-ary representability figures of \S\ref{sec-limitations} (Prop.~\ref{prop-kary}) are likewise
+exact by $2^3$ enumeration, with the seeded random search and the published table both reproduced by
+a released script and pinned by regression tests. \S\ref{sec-experiments} names every model used and states the sampling
 regime and its measured variance. Code, fixtures and corpus are released.
 
 \bibliography{ref}
@@ -1992,7 +2214,8 @@ $\mathit{Entail}(i,j)\wedge a_i \Rightarrow a_j$ with $w=\mathrm{logit}(p)$. Thi
 equivalent to Definition~\ref{def-mrf}. Its induced pairwise factor is $[e^w,e^w,1,e^w]$, which is not
 row-stochastic in the sense of Prop.~\ref{prop-rowstoch}: it rewards the vacuous $a_s=0$ rows with
 $e^w$ on \emph{both} target states, so a clause is best satisfied by making its antecedent false.
-Brute force over the $2^{16}$ worlds of the running example gives mean marginal support $0.455$ under
+Brute force over the $2^{16}$ worlds of the recall report of \S\ref{sec-example-aero} gives mean
+marginal support $0.455$ under
 the naive MLN against $0.587$ under the corresponding MRF, with per-claim marginals differing by up to
 $0.31$. These are two different models, not two encodings of one.
 
@@ -2025,8 +2248,9 @@ $\log Z=-9.751$ for both, with zero per-claim difference to machine precision.
 
 We establish the equivalence for the three original couplings only. \exc{} and \cnc{} are not tabulated
 here, so the claim ``the MLN encoding reproduces the MRF'' should be read as scoped to the
-three-coupling fragment, which is a real limitation given that both worked examples of
-\S\ref{sec-examples} use \exc{} conflicts.
+three-coupling fragment. That is a real limitation for the recall report of
+\S\ref{sec-example-aero}, whose conflicts are \exc{}; the five-claim pair of
+\S\ref{sec-example-pair} uses \con{} throughout and so falls inside the tabulated fragment.
 
 \subsection{Which view to keep, and why both}
 
