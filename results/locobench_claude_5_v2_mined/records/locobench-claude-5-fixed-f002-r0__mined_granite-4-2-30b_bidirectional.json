@@ -1,0 +1,65 @@
+{
+  "item_id": "locobench-claude-5-fixed-f002-r0",
+  "item_name": "Archaeology -- worse",
+  "arm": "mined:granite-4-2-30b:bidirectional",
+  "relation_source": "mined",
+  "model": "granite-4-2-30b",
+  "pair_policy": "bidirectional",
+  "family_id": "f002",
+  "family": "CONFLICT",
+  "rung_index": 0,
+  "rung_name": "worse",
+  "perturbation": {
+    "calls": [
+      "spurious_relation"
+    ],
+    "parent_rung": 1,
+    "targets": [
+      ""
+    ],
+    "edge_effects": [
+      {
+        "call": "spurious_relation",
+        "target": null,
+        "effect": "added",
+        "detail": "a0->a2"
+      }
+    ]
+  },
+  "num_atoms": 16,
+  "num_gold_relations": 11,
+  "model_id": "ibm-research/granite-4.2-30b",
+  "backend": "rits",
+  "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/granite-4-2-30b",
+  "window": 4,
+  "gate": "none",
+  "nli_method": "logprobs",
+  "strength_method": "surrogate_logprobs",
+  "strength_samples": 8,
+  "max_concurrency": 16,
+  "max_distance": null,
+  "discourse": false,
+  "strategy": null,
+  "sense_menu": "full",
+  "reconcile": "ratchet",
+  "prompt_variant": "v1",
+  "require_evidence": false,
+  "num_pairs_scored": 108,
+  "num_dropped_none": 97,
+  "num_inadmissible_sense": 0,
+  "num_unparseable_coupling": 0,
+  "num_evidence_rejected": 0,
+  "num_llm_calls": 119,
+  "num_call_exceptions": 4,
+  "call_exceptions_by_stage": {
+    "sense": 4
+  },
+  "call_exceptions_by_type": {
+    "APITimeoutError": 4
+  },
+  "call_error_rate": 0.03361344537815126,
+  "error": "MinedArmError: locobench-claude-5-fixed-f002-r0: 4 of 119 LLM calls failed (3.4% > 2.0% allowed): {'APITimeoutError': 4}. A failed call is parsed as 'no relation', so these scores would understate the graph. Lower --max-concurrency or retry.",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/locoeval/runner.py\", line 481, in _run_cell\n    result = self._mine_cell(item, mined_spec, record)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/locoeval/runner.py\", line 713, in _mine_cell\n    raise MinedArmError(\nfact_reasoner.locoeval.mined_graph.MinedArmError: locobench-claude-5-fixed-f002-r0: 4 of 119 LLM calls failed (3.4% > 2.0% allowed): {'APITimeoutError': 4}. A failed call is parsed as 'no relation', so these scores would understate the graph. Lower --max-concurrency or retry.\n",
+  "elapsed_s": 6581.646,
+  "run_config_fingerprint": "860248201fa2"
+}

@@ -68,6 +68,17 @@ OPERATOR_CALLS: dict[str, tuple[str, ...]] = {
     "O6": ("shuffle_order", "ordering_only"),
 }
 
+# The `level` argument the P5 prompt documents for `shuffle_order(level)`, per rung name.
+# The three ORDER shuffle rungs all issue the same bare call, so without this they render
+# identically and a capable model returns the SAME text three times -- which makes the
+# ladder's strict-increase constraints unsatisfiable by construction. The rung name is the
+# only thing distinguishing them, so it is what selects the level.
+SHUFFLE_LEVELS: dict[str, str] = {
+    "shuffle_full": "full",
+    "shuffle_block": "block",
+    "shuffle_adjacent": "adjacent",
+}
+
 # call -> operator, for the reverse lookup the store needs.
 CALL_TO_OPERATOR: dict[str, str] = {
     call: op for op, calls in OPERATOR_CALLS.items() for call in calls
@@ -196,9 +207,20 @@ LADDERS: dict[str, Ladder] = {
             Rung(3, "base"),
             Rung(4, "ordering_only", ("ordering_only",), parent=3),
         ),
+        flat=READOUTS,
         notes=(
-            "Dual purpose: four ordering rungs plus one ordering-only rung that must be "
-            "flat, since a Precedence<->Succession edit adds no factor."
+            "Ordering sensitivity, and the required pattern is a FLAT line. Every rung "
+            "applies only `shuffle_order` or `ordering_only`, both of which are in "
+            "`EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a "
+            "Precedence<->Succession swap compiles to Level-1 `none` either way, so all "
+            "five rungs build the same Markov network and every relation-graph readout "
+            "is necessarily equal. Declaring `increase` here (as this ladder did until "
+            "the 14-family corpus was scored) makes all 15 checks unsatisfiable BY "
+            "CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with "
+            "mean_marginal identical to six decimal places across all five rungs. What "
+            "the ladder can actually test is the CONVERSE of CHAIN: that a readout does "
+            "NOT move when the prose is reordered but the relations are not. A score "
+            "that trends here is tracking surface order, not coherence."
         ),
     ),
     # The control: every rung is meaning-preserving, so the correct result is no trend.
@@ -595,7 +617,11 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
 
     Returns:
         ``{rung_index: [edge_id per call]}`` for the non-base rungs. An entry is the empty
-        string when no eligible edge exists for that call.
+        string when no eligible edge exists for that call. The one exception is
+        ``shuffle_order``, whose entry is a :data:`SHUFFLE_LEVELS` level (``full`` /
+        ``block`` / ``adjacent``) rather than an edge id, because the P5 prompt's signature
+        is ``shuffle_order(level)``. ``apply_calls`` ignores the target for that call, so
+        the level is inert on the label side and only varies the prompt.
     """
     lad = ladder_for(family)
     drop_order = [str(e["id"]) for e in _conflict_edges(relations)]
@@ -639,12 +665,20 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
             elif call == "spurious_relation":
                 # Adds a NEW edge between two unrelated atoms; no existing edge target.
                 target = ""
+            elif call == "shuffle_order":
+                # NOT an edge id: the P5 prompt's signature is `shuffle_order(level)`, and
+                # the level comes from the rung name. Falling through to the generic branch
+                # below handed it `r000`, so all three ORDER shuffle rungs rendered as
+                # `shuffle_order(r000)` and produced byte-identical prose.
+                target = SHUFFLE_LEVELS.get(rung.name, "")
             else:
                 for eid in by_id:
                     if eid not in used:
                         target = eid
                         break
-            if target:
+            if target and call != "shuffle_order":
+                # `used` prevents two calls in a rung from targeting the same EDGE. A
+                # shuffle level is not an edge id, so it must not enter that set.
                 used.add(target)
             targets.append(target)
         out[rung.index] = targets
@@ -979,6 +1013,7 @@ __all__ = [
     "OPERATOR_CALLS",
     "READOUTS",
     "RUNG_NAMES",
+    "SHUFFLE_LEVELS",
     "UNCONSTRAINED",
     "Ladder",
     "Rung",

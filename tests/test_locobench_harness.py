@@ -3826,6 +3826,176 @@ class TestDefectTwoPerRungRelations:
         assert edge["validity"] == "valid"
         assert edge["level1_coupling"] in ("contradiction", "exclusive")
 
+    # -- a perturbation must actually change the text --------------------------
+
+    def test_gate_text_changed_rejects_an_unchanged_response(self):
+        """A P5 call that returns the parent prose did not happen.
+
+        Measured on f013: `add_resolution` set the resolution flag on the gold edge but
+        returned the base response verbatim, so rungs 1 and 2 shipped identical text with
+        differing labels. The adjacency gate passed it -- it compares edge SIGNATURES, and
+        those did differ -- leaving a `c1` strict-increase assertion that a gold-arm readout
+        can satisfy and a mined arm never can. Corpus ceiling 201/202.
+        """
+        same = validate.gate_text_changed("a b c", "a b c", operator="add_resolution(r9)")
+        assert not same.passed
+        assert "unchanged" in same.detail
+        assert validate.gate_text_changed("a b c", "a b d", operator="x").passed
+
+    def test_gate_text_changed_ignores_reflowing(self):
+        """A response that only had its whitespace redone is still not an edit."""
+        assert not validate.gate_text_changed("a  b\nc", "a b c", operator="x").passed
+
+    def test_every_call_is_a_text_edit_so_none_is_exempt(self):
+        """The gate applies to EVERY call, unlike the adjacency gate.
+
+        `shuffle_order` and `ordering_only` are exempt from the edge-effect check because
+        they are factor-invariant by design -- but both still rewrite the prose (one
+        reorders sentences, the other swaps a connective), so neither may return it
+        unchanged. A text-side exemption list would silently readmit the f013 defect.
+        """
+        for call in perturb.ALL_CALLS:
+            assert not validate.gate_text_changed(
+                "x y z", "x y z", operator=f"{call}(r0)"
+            ).passed, f"{call} must not be allowed to leave the prose unchanged"
+
+    # -- P3 must plan enough droppable conflict edges --------------------------
+
+    def test_p3_demands_four_conflict_edges_with_at_most_one_resolved(self):
+        """A CONFLICT ladder's deepest rung needs `add_resolution` plus TWO DISTINCT
+        `drop_relation` targets, and the resolution consumes one edge from the same pool.
+
+        Only three senses compile to a conflict coupling (Alternative -> exclusive,
+        Concession and Contrast -> contradiction), so instruction 5's one-of-each mandate
+        yields exactly three -- and if the Concession is resolved, only TWO are droppable
+        and rung 4 collapses onto rung 3. Measured live: droppable==3 admitted 4/4 and
+        droppable==2 was rejected 4/4 across 8 distinct topics.
+        """
+        head = prompts.PROMPTS["P3"].split("```json")[0]
+        assert "AT LEAST FOUR" in head
+        assert "AT MOST" in head and "resolved Concession" in head
+
+    def test_parse_plan_rejects_too_few_droppable_conflicts(self):
+        """The prompt alone did not work, so the PARSER enforces the pool.
+
+        Instruction 5 was extended to demand >= 4 conflict edges with <= 1 resolved, and a
+        live model ignored it on six consecutive families across five topics -- each time
+        planning the same three-edge shape (Alternative + resolved Concession + Contrast),
+        droppable 2, rejected at `P5.rung4.edge_effect` only AFTER the respond stage had
+        been paid for. As a parser error the complaint reaches `_Caller.ask` and re-plans
+        inside the same call.
+        """
+        import json as _json
+        import re as _re
+
+        block = _re.search(r"```json(.*?)```", prompts.PROMPTS["P3"], _re.S)
+        good = _json.loads(block.group(1))
+
+        # The worked example is admissible as shipped.
+        parsed, err = parse.parse_plan("```json" + _json.dumps(good) + "```")
+        assert parsed is not None, err
+
+        # Downgrade its fourth conflict edge and the plan must be refused.
+        bad = _json.loads(_json.dumps(good))
+        for r in bad["relations"]:
+            if r["sense"] == "Contrast" and r["source_pos"] == 4:
+                r["sense"] = "Instantiation"
+        parsed, err = parse.parse_plan("```json" + _json.dumps(bad) + "```")
+        assert parsed is None
+        assert "conflicting relation" in err and "unresolved" in err
+
+    def test_p3_worked_example_is_itself_admissible(self):
+        """The example in instruction 10 must satisfy the rule instruction 5 states.
+
+        It previously carried exactly the failing shape -- 3 conflict edges, one of them a
+        resolved Concession, so droppable==2 -- which taught the model the pattern that the
+        adjacency gate then rejected.
+        """
+        import json as _json
+        import re as _re
+
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        block = _re.search(r"```json(.*?)```", prompts.PROMPTS["P3"], _re.S)
+        plan = _json.loads(block.group(1))
+        conflicts = [
+            r
+            for r in plan["relations"]
+            if coupling_for_sense(r["sense"]) in ("contradiction", "exclusive")
+        ]
+        resolved = [r for r in conflicts if r.get("resolved")]
+        assert len(conflicts) >= 4, (
+            f"the example plans only {len(conflicts)} conflict edges; a CONFLICT ladder "
+            "needs 4 so that 3 survive add_resolution"
+        )
+        assert len(resolved) <= 1
+        assert len(conflicts) - len(resolved) >= 3
+        # and it must still honour instruction 8's exact split
+        assert sum(1 for r in plan["relations"] if r["validity"] == "valid") == 6
+        assert sum(1 for r in plan["relations"] if r["validity"] == "invalid") == 4
+
+    # -- the ORDER shuffle levels ---------------------------------------------
+
+    def test_each_order_shuffle_rung_gets_a_distinct_level(self):
+        """The P5 prompt's signature is `shuffle_order(level)`, and the three ORDER
+        shuffle rungs differ ONLY by that level.
+
+        Before the fix they fell through to the generic branch and were all handed the
+        first unused edge id, so every rung rendered as `shuffle_order(r000)`. A capable
+        model given the same prompt three times returned byte-identical prose, which made
+        the ladder's strict-increase C1 pairs (0,1) and (1,2) unsatisfiable by
+        construction -- measured live as a 9/15 ceiling on f004.
+        """
+        targets = perturb.plan_targets("ORDER", self._base_relations())
+        lad = perturb.ladder_for("ORDER")
+        levels = {
+            r.name: targets[r.index][0]
+            for r in lad.rungs
+            if r.calls == ("shuffle_order",)
+        }
+        assert levels == {
+            "shuffle_full": "full",
+            "shuffle_block": "block",
+            "shuffle_adjacent": "adjacent",
+        }, f"each shuffle rung needs its own level, got {levels}"
+
+    def test_a_shuffle_level_is_never_an_edge_id(self):
+        """A level in the target slot must not be mistaken for an edge."""
+        rels = self._base_relations()
+        targets = perturb.plan_targets("ORDER", rels)
+        ids = {str(e["id"]) for e in rels}
+        lad = perturb.ladder_for("ORDER")
+        for r in lad.rungs:
+            if r.calls != ("shuffle_order",):
+                continue
+            assert targets[r.index][0] not in ids
+
+    def test_shuffle_level_leaves_the_gold_edge_set_untouched(self):
+        """`shuffle_order` is edge-invariant BY DESIGN, so passing a level rather than an
+        edge id must not change the labels -- only the prompt."""
+        rels = self._base_relations()
+        before = [dict(e) for e in rels]
+        out, _nons, log = perturb.apply_calls(rels, ("shuffle_order",), targets=["full"])
+        assert {e["id"] for e in out} == {e["id"] for e in before}
+        assert [e["level2_sense"] for e in out] == [e["level2_sense"] for e in before]
+        assert log[0]["effect"] == "reordered"
+
+    def test_ordering_only_still_targets_a_real_edge(self):
+        """The shuffle fix must not disturb the OTHER edge-invariant call, which really
+        does need an edge (it flips that edge's Precedence/Succession sense)."""
+        rels = self._base_relations()
+        for fam in ("ORDER", "CONTROL"):
+            targets = perturb.plan_targets(fam, rels)
+            lad = perturb.ladder_for(fam)
+            ids = {str(e["id"]) for e in rels}
+            for r in lad.rungs:
+                if "ordering_only" not in r.calls:
+                    continue
+                got = targets[r.index][r.calls.index("ordering_only")]
+                assert got == "" or got in ids, (
+                    f"{fam} rung {r.name} ordering_only target {got!r} is not an edge id"
+                )
+
     # -- the edge-set transforms ---------------------------------------------
 
     def test_drop_relation_removes_exactly_one_edge(self):

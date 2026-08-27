@@ -1440,8 +1440,16 @@ def test_cli_estimate_only_exits_zero_and_prints_counts(capsys):
     ])
     out = capsys.readouterr().out
     assert rc == 0
-    # The exact pair counts for this dataset: 264 windowed, 2400 all_pairs.
-    assert "264 pairs" in out and "2400 pairs" in out
+    # Pair counts scale with the dataset, so assert the RELATION between the policies
+    # rather than two constants: an earlier version pinned "264 pairs"/"2400 pairs" and
+    # broke the moment the corpus grew from 10 to 70 items, which said nothing about the
+    # estimator. `all_pairs` visits every ordered pair and `windowed` only a forward
+    # window, so all_pairs must dominate by a wide margin.
+    counts = [int(m) for m in re.findall(r"(\d+) pairs", out)]
+    assert len(counts) == 2, out
+    windowed, all_pairs = counts
+    assert 0 < windowed < all_pairs
+    assert all_pairs > 5 * windowed
 
 
 def test_cli_estimate_only_is_silent_about_llm_for_gold_arms(capsys):
@@ -1491,10 +1499,20 @@ def test_gate_admitted_gold_edges_are_inside_the_window():
     ]
     assert gate_edges, "expected some gate-admitted edges in this corpus"
     for rel in gate_edges:
-        dist = mg._atom_index(rel["target_id"]) - mg._atom_index(rel["source_id"])
+        # ABSOLUTE distance: `schema.annotate_window_admission` assigns the `gate` verdict
+        # on `abs(pos[src] - pos[trg]) <= window`, so a BACKWARD edge inside the window is
+        # legitimately gate-admitted. An earlier version asserted `0 < dist <= 4`, which
+        # held only because the 2-family corpus happened to contain no backward gate edge;
+        # the 14-family one has three (distances -3, -3, -2).
+        dist = abs(mg._atom_index(rel["target_id"]) - mg._atom_index(rel["source_id"]))
         assert 0 < dist <= 4, f"{rel['id']}: distance {dist} is outside the window"
-        # And they are all planted errors, so declining them is correct.
-        assert rel["validity"] == "invalid"
+    # An earlier version also asserted every gate-admitted edge is a planted error. That
+    # held on the 2-family corpus by accident, not by construction: on the 14-family one
+    # 33 of 61 are `valid`. `window_admission` records how the candidate selector would
+    # SEE the edge, which is independent of whether the edge is a planted error, so the
+    # two were never linked. What must hold is that the label is one of the two legal
+    # values -- a gate-admitted edge with a junk validity would be a real defect.
+    assert {rel["validity"] for rel in gate_edges} <= {"valid", "invalid"}
 
 
 def test_fingerprint_is_scoped_to_what_each_arm_reads(mined_specs):

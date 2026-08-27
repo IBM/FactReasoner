@@ -1,0 +1,876 @@
+{
+  "item_id": "locobench-claude-5-fixed-f010-r0",
+  "item_name": "Computer Science -- worse",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f010",
+    "family": "CONFLICT",
+    "rung_index": 0,
+    "rung_name": "worse",
+    "perturbation": {
+      "calls": [
+        "spurious_relation"
+      ],
+      "parent_rung": 1,
+      "targets": [
+        ""
+      ],
+      "edge_effects": [
+        {
+          "call": "spurious_relation",
+          "target": null,
+          "effect": "added",
+          "detail": "a1->a4"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do investigators adjudicate between a defective code deployment and an underlying infrastructure fault when a large distributed system suffers a total outage and the two engineering teams submit irreconcilable post-incident accounts?",
+    "split": "test",
+    "word_count": 639,
+    "generator": "claude-opus-5"
+  },
+  "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The Orion platform suffered a total service outage affecting all customer-facing endpoints.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The outage was confined to a single availability zone.",
+      "label": "p2",
+      "factual": false,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Load balancer logs recorded a simultaneous surge of health-check failures in every region.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Investigators reconstructed the incident sequence from timestamped telemetry collected across all regions.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The telemetry pipeline retained no log data from the period of the outage.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The outage began four minutes after a configuration change was deployed to the routing tier.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The deployed configuration introduced an invalid routing rule into the request path.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The cluster's underlying network fabric was misconfigured before the deployment.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The application engineering team attributed the outage to a failure of the shared storage backend.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The infrastructure team attributed the outage to the routing tier deployment.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Rolling back the routing tier deployment restored service.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The incident review board concluded that the routing tier deployment was the proximate cause of the outage.",
+      "label": "p12",
+      "factual": true,
+      "role": "holding",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "No customer transaction records were permanently lost during the outage.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Records for 12,000 customer transactions were permanently lost during the outage.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The incident review board determined that no customer transaction records were permanently lost.",
+      "label": "p15",
+      "factual": true,
+      "role": "holding",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a2",
+      "target_id": "a0",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a3",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": true,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a11",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a5",
+      "target_id": "a10",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 5,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "out_of_window",
+      "in_candidate_window": false
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a12",
+      "target_id": "a14",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r010",
+      "source_id": "a1",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5",
+        "spurious": true,
+        "perturbed_by": "claude-opus-5"
+      },
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "is_concession": false,
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a3",
+      "target_id": "a6",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a7",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "Adjudication between a defective deployment and a latent infrastructure fault begins not with the competing narratives but with the observable scope of the failure, because scope constrains which causal stories remain admissible. The Orion platform suffered a total service outage affecting all customer-facing endpoints; by contrast, the outage was confined to a single availability zone. Of these two characterizations, it is the platform-wide one that the instrumentation supports: load balancer logs recorded a simultaneous surge of health-check failures in every region, which indicates that no endpoint remained reachable and that the failure was global rather than localized. A fault whose signature appears everywhere at once is far more consistent with a change propagated through a shared control plane than with the degradation of any single hardware domain.\n\nThe second step is chronological reconstruction, which is where post-incident accounts are most often falsified. Because the total service outage affected all customer-facing endpoints, investigators reconstructed the incident sequence from timestamped telemetry collected across all regions, even though the telemetry pipeline retained no log data from the period of the outage. What such a reconstruction yields is not an opinion about blame but an ordered record of state transitions against which each team's submission can be checked.\n\nThat record fixed the critical interval. The outage began four minutes after a configuration change was deployed to the routing tier, and this onset caused the deployed configuration to introduce an invalid routing rule into the request path. A four-minute lag is itself diagnostic, since it matches the propagation delay of routing state to edge nodes rather than the slower, uneven onset typical of storage or fabric saturation. Even so, the evidence does not license a single-fault conclusion. At least one of two defects was present in the cluster at the moment of failure \u2014 the invalid rule in the request path, or a misconfiguration of the cluster's underlying network fabric predating the deployment \u2014 and perhaps both were. Distinguishing a triggering change from a pre-existing condition that the change merely exposed is the substantive analytical problem, and it cannot be settled by scope data alone.\n\nPre-existing conditions of that kind also shape how each team frames its account. Specifically, the application engineering team attributed the outage to a failure of the shared storage backend, locating the defect below the layer it owned. The infrastructure team, despite that storage attribution, attributed the outage to the routing tier deployment, locating the defect above the layer it owned. Neither submission can be adjudicated by assertion, so investigators turned to intervention evidence. Rolling back the routing tier deployment restored service \u2014 a remediation that postdates the four-minute interval between the configuration change and the onset of the failure, and whose success therefore bears directly on the disputed link. On that basis the incident review board concluded that the routing tier deployment was the proximate cause of the outage, which settles the disagreement between the two teams: the storage backend cannot have been the proximate cause of a failure that a routing rollback terminated, and the fabric misconfiguration, real though it was, functioned as a background condition rather than the trigger.\n\nA comparable adjudication was required for the question of data durability, where the record admits no middle ground. No customer transaction records were permanently lost during the outage; either that holds, or records for 12,000 customer transactions were permanently lost, and exactly one of these two accounts can be true. The durability finding entered the record in the first form \u2014 that is, the incident review board determined that no customer transaction records were permanently lost. Methodologically, this is the same discipline applied to causation: identify the mutually exclusive candidate states, locate the artifact that discriminates between them, and let the narratives submitted by the affected teams stand or fall against that artifact rather than against each other.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r0",
+      "item_name": "Computer Science -- worse",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a1->a4"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 11,
+      "num_relations": 10,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 10,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7833745333333333,
+        "consistency": 0.4836973297604035,
+        "reified": 0.252421,
+        "log_partition": 0.2788002746000295
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.988961,
+          "a1": 0.05588,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.478795,
+          "a14": 0.934152,
+          "a2": 0.939271,
+          "a3": 0.90104,
+          "a4": 0.100892,
+          "a5": 0.925375,
+          "a6": 0.968149,
+          "a7": 0.925346,
+          "a8": 0.903748,
+          "a9": 0.929009
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.41456305782371583,
+        "log_z": -6.070849,
+        "log_z_max": -2.005237,
+        "log_z_min": -7.642527
+      },
+      "elapsed_s": 0.147,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r0",
+      "item_name": "Computer Science -- worse",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a1->a4"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 11,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 5,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7824830666666667,
+        "consistency": 0.48131416666666665,
+        "reified": 0.283995,
+        "log_partition": 0.42140662681947966
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.985422,
+          "a1": 0.1,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.478795,
+          "a14": 0.934152,
+          "a2": 0.937965,
+          "a3": 0.9,
+          "a4": 0.1,
+          "a5": 0.9,
+          "a6": 0.92929,
+          "a7": 0.92929,
+          "a8": 0.913025,
+          "a9": 0.929307
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.4406074701677432,
+        "log_z": -3.167763,
+        "log_z_max": -0.866004,
+        "log_z_min": -4.844202
+      },
+      "elapsed_s": 0.148,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

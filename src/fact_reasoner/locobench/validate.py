@@ -1266,6 +1266,48 @@ def gate_length_drift(base: str, perturbed: str, *, operator: str = "") -> GateR
     )
 
 
+def gate_text_changed(base: str, perturbed: str, *, operator: str = "") -> GateResult:
+    """Apply the P5 text-edit gate: a perturbation must actually change the prose.
+
+    Every one of :data:`perturb.ALL_CALLS` is a text edit -- even the two edge-invariant
+    ones, since ``shuffle_order`` reorders sentences and ``ordering_only`` swaps a
+    connective -- so a rung whose response is byte-identical to its parent's did not
+    happen, whatever the labels say.
+
+    This is the *text-side* counterpart of the adjacency gate, and neither subsumes the
+    other. The adjacency gate compares edge SIGNATURES, so it passes a rung whose labels
+    differ while its prose does not: measured on f013, where ``add_resolution`` set the
+    resolution flag on the gold edge but returned the base prose unchanged. The pair then
+    has gold that a gold-arm readout can separate and text that a mined arm cannot, so the
+    ``c1`` strict-increase assertion over it is unfalsifiable from the response alone --
+    exactly the class of defect the per-rung relation fix (Defect 2) was meant to end.
+
+    Whitespace-insensitive: a reflowed but otherwise identical response is still no edit.
+
+    Args:
+        base: The parent response.
+        perturbed: The perturbed response.
+        operator: The call applied, for the message.
+
+    Returns:
+        The gate result.
+    """
+    same = " ".join(base.split()) == " ".join(perturbed.split())
+    return GateResult(
+        "P5.text_changed",
+        not same,
+        threshold="response differs from parent",
+        observed="identical" if same else "differs",
+        detail=""
+        if not same
+        else (
+            f"{operator or 'the perturbation'} returned the parent response unchanged, so "
+            "the rung is not a distinct item; its labels would assert a coherence "
+            "difference no reader or scorer could see in the text"
+        ),
+    )
+
+
 # ----------------------------------------------------------------------------
 # Human-annotation sampling.
 # ----------------------------------------------------------------------------
@@ -1324,6 +1366,7 @@ __all__ = [
     "gate_coverage",
     "gate_coverage_panel",
     "gate_length_drift",
+    "gate_text_changed",
     "gate_plan",
     "gate_recovery",
     "majority",

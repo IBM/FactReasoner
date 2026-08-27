@@ -322,6 +322,38 @@ def parse_plan(text: str) -> tuple[dict[str, Any] | None, str | None]:
             )
         seen_pairs[key] = r["sense"]
 
+    # A CONFLICT ladder's deepest rung applies `add_resolution` plus TWO DISTINCT
+    # `drop_relation` calls, and only conflict-coupled edges are eligible for either. The
+    # resolution consumes one, so the plan needs >= 3 conflict edges that are NOT already
+    # resolved, i.e. >= 4 conflict edges with at most one pre-resolved.
+    #
+    # Enforced here rather than left to the prompt because prose did not work: P3
+    # instruction 5 was extended to demand exactly this and a live model ignored it,
+    # planning 3 conflict edges (one resolved) on six consecutive families across five
+    # topics -- droppable 2, rejected 5/5 at `P5.rung4.edge_effect` after the whole
+    # respond stage had been paid for. Only three senses compile to a conflict coupling
+    # (Alternative -> exclusive, Concession/Contrast -> contradiction), so instruction 5's
+    # one-of-each mandate yields exactly three and the mandated minimum was itself the
+    # failing shape. As a parser error the complaint reaches `_Caller.ask`, which feeds it
+    # back via `_retry_note` and re-plans within the same call -- the same reasoning as the
+    # duplicate-pair check above.
+    conflicts = [
+        r
+        for r in rels
+        if coupling_for_sense(r["sense"]) in ("contradiction", "exclusive")
+    ]
+    unresolved = [r for r in conflicts if not r.get("resolved")]
+    if len(unresolved) < 3:
+        return None, (
+            f"plan has {len(conflicts)} conflicting relation(s) "
+            f"({sorted(r['sense'] for r in conflicts)}) of which only {len(unresolved)} "
+            "are unresolved; a CONFLICT ladder needs AT LEAST 4 relations with a "
+            "conflicting sense (Alternative, Concession or Contrast) and AT MOST 1 of them "
+            "marked resolved, because its deepest rung resolves one and then drops two "
+            "others. Only three senses conflict, so use one of them TWICE on a different "
+            "pair of claims"
+        )
+
     nons = plan["non_relations"]
     lo, hi = N_NON_RELATIONS_RANGE
     if not lo <= len(nons) <= hi:

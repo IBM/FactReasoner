@@ -1,0 +1,69 @@
+{
+  "item_id": "locobench-claude-5-fixed-f001-r3",
+  "item_name": "Anthropology -- fix_one_conflict",
+  "arm": "mined:gpt-oss-120b-a100:bidirectional",
+  "relation_source": "mined",
+  "model": "gpt-oss-120b-a100",
+  "pair_policy": "bidirectional",
+  "family_id": "f001",
+  "family": "CONFLICT",
+  "rung_index": 3,
+  "rung_name": "fix_one_conflict",
+  "perturbation": {
+    "calls": [
+      "add_resolution",
+      "drop_relation"
+    ],
+    "parent_rung": 1,
+    "targets": [
+      "r003",
+      "r002"
+    ],
+    "edge_effects": [
+      {
+        "call": "add_resolution",
+        "target": "r003",
+        "effect": "resolved",
+        "detail": "r003 (contradiction, sense unchanged)"
+      },
+      {
+        "call": "drop_relation",
+        "target": "r002",
+        "effect": "removed",
+        "detail": "a3->a2 (Contrast)"
+      }
+    ]
+  },
+  "num_atoms": 16,
+  "num_gold_relations": 9,
+  "model_id": "openai/gpt-oss-120b-a100",
+  "backend": "rits",
+  "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+  "window": 4,
+  "gate": "none",
+  "nli_method": "logprobs",
+  "strength_method": "surrogate_logprobs",
+  "strength_samples": 8,
+  "max_concurrency": 16,
+  "max_distance": null,
+  "discourse": false,
+  "strategy": null,
+  "sense_menu": "full",
+  "reconcile": "ratchet",
+  "prompt_variant": "v1",
+  "require_evidence": false,
+  "num_pairs_scored": 108,
+  "num_dropped_none": 52,
+  "num_inadmissible_sense": 0,
+  "num_unparseable_coupling": 0,
+  "num_evidence_rejected": 0,
+  "num_llm_calls": 164,
+  "num_call_exceptions": 0,
+  "call_exceptions_by_stage": {},
+  "call_exceptions_by_type": {},
+  "call_error_rate": 0.0,
+  "error": "RuntimeError: Merlin MAR output was not valid JSON.",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/locoeval/runner.py\", line 493, in _run_cell\n    scores = scorer.score_all(\n             ^^^^^^^^^^^^^^^^^\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/lcs/lcs_scorer.py\", line 363, in score_all\n    marginals = self._marginals(base, sorted(atoms, key=_atom_sort_key))\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/lcs/lcs_scorer.py\", line 404, in _marginals\n    mar = run_merlin(\n          ^^^^^^^^^^^\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/inference.py\", line 146, in run_merlin\n    return _parse_marginals(\n           ^^^^^^^^^^^^^^^^^\n  File \"/Users/radu/git/IBM/FactReasoner/src/fact_reasoner/inference.py\", line 173, in _parse_marginals\n    raise RuntimeError(\"Merlin MAR output was not valid JSON.\")\nRuntimeError: Merlin MAR output was not valid JSON.\n",
+  "elapsed_s": 298.866,
+  "run_config_fingerprint": "860248201fa2"
+}

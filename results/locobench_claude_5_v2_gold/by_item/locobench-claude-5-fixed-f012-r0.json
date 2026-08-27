@@ -1,0 +1,888 @@
+{
+  "item_id": "locobench-claude-5-fixed-f012-r0",
+  "item_name": "Cybersecurity -- worse",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f012",
+    "family": "CONFLICT",
+    "rung_index": 0,
+    "rung_name": "worse",
+    "perturbation": {
+      "calls": [
+        "spurious_relation"
+      ],
+      "parent_rung": 1,
+      "targets": [
+        ""
+      ],
+      "edge_effects": [
+        {
+          "call": "spurious_relation",
+          "target": null,
+          "effect": "added",
+          "detail": "a1->a2"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Cybersecurity",
+    "domain": "Engineering & Technology",
+    "framing": "How do incident responders establish whether a data breach originated from a compromised insider credential or an external exploitation of an unpatched system when the victim organization and its security vendor advance conflicting accounts?",
+    "split": "test",
+    "word_count": 678,
+    "generator": "claude-opus-5"
+  },
+  "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The security vendor's report attributed the intrusion to misuse of a stolen employee credential.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The organization attributed the intrusion to exploitation of an unpatched remote access appliance.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The organization retained an independent digital forensics firm to investigate the breach.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Investigators reconstructed an intrusion timeline from VPN authentication logs, firewall netflow records, and endpoint telemetry.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Investigators compared the appliance's firmware build number against the manufacturer's patched release.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The remote access appliance was missing the manufacturer's security patch at the time of the intrusion.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "An employee's valid credentials were used by an unauthorized party to access the network.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "A web shell was recovered from the appliance's file system.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Multi-factor authentication was not enforced on the remote access portal.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The remote access portal accepted logins using only a username and a password.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The employee whose account was used was on approved leave during the earliest unauthorized access.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Windows Event ID 4625 records successful interactive logons.",
+      "label": "p12",
+      "factual": false,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "MITRE ATT&CK technique T1078 covers exploitation of public-facing applications.",
+      "label": "p13",
+      "factual": false,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "No customer records were exfiltrated from the environment.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "Approximately 2.4 million customer records were exfiltrated from the environment.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a15",
+      "text": "The regulator ultimately determined that the intrusion began with exploitation of the unpatched appliance.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a6",
+      "target_id": "a10",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 4,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a15",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 3,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r010",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5",
+        "spurious": true,
+        "perturbed_by": "claude-opus-5"
+      },
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "is_concession": false,
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a9",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a10",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a13",
+      "position_distance": 2
+    }
+  ],
+  "response": "When a victim organization and its security vendor advance incompatible accounts of the same\nintrusion, the responder's task is not to arbitrate between narratives but to test each against\nartefacts whose generation is independent of either party's interest. In the case that best\nillustrates the method, although the security vendor's report attributed the intrusion to misuse of\na stolen employee credential \u2014 an attribution that is precisely what caused the organization to\nrespond as it did \u2014 the organization attributed the intrusion to exploitation of an unpatched remote\naccess appliance. Each account implies a different initial access vector and\ntherefore a different set of expected traces: credential misuse predicts anomalous authentication\nevents unaccompanied by process execution on the perimeter device, whereas exploitation predicts\nwrites to that device's own file system.\n\nResolution began with governance rather than technique. The organization retained an independent\ndigital forensics firm to investigate the breach, and only after that engagement was in place did\ninvestigators reconstruct an intrusion timeline from VPN authentication logs, firewall netflow\nrecords, and endpoint telemetry. A timeline assembled from three independently maintained streams\nconstrains both hypotheses, since a misread or altered entry in one source will not be corroborated\nby the other two. Configuration evidence was collected alongside the log evidence. Investigators\ncompared the appliance's firmware build number against the manufacturer's patched release, and that\ncomparison confirms that the remote access appliance was missing the manufacturer's security patch\nat the time of the intrusion. What the artefacts supported at this stage was a disjunction rather\nthan a verdict: at least one of two conditions obtained \u2014 that unpatched exposure, or the use of an\nemployee's valid credentials by an unauthorized party to access the network \u2014 and perhaps both.\n\nTwo further findings sharpened the picture. A web shell was recovered from the appliance's file\nsystem; by contrast, multi-factor authentication was not enforced on the remote access portal. The\nweb shell is the more diagnostic of the two, because such an artefact cannot be produced by\nauthentication alone: it requires the ability to write executable content to the appliance, which\nin turn requires a code-execution flaw in the exposed service. Its presence therefore raises the\nprior probability of the exploitation account without yet excluding concurrent credential abuse,\nsince an attacker who has established a foothold on a perimeter device is well positioned to harvest\nthe credentials that traverse it.\n\nThe absence of a second factor is to say, equivalently, that the remote access portal accepted\nlogins using only a username and a password. That configuration matters for the evidentiary\nweighting rather than for attribution as such, because it means an authentication record showing a\nvalid credential is compatible with either a legitimate user or any party in possession of the\npassword. Attribution of the earliest activity turned on a further observation: the use of an\nemployee's valid credentials by an unauthorized party indicates that the employee whose account was\nused was on approved leave during the earliest unauthorized access, a fact corroborated by human\nresources records rather than by the network itself. Windows Event ID 4625, on the other hand,\nrecords successful interactive logons.\n\nFramework mapping was applied to the reconstructed sequence in order to express it in terms\ncomparable across incidents. MITRE ATT&CK technique T1078 covers exploitation of public-facing\napplications, and the categories it defines are what allow a regulator to compare one organization's\naccount with another's. The scope question was settled on the same evidentiary basis as the vector\nquestion: either no customer records were exfiltrated from the environment, or approximately 2.4\nmillion customer records were exfiltrated from it; the two cannot both be true, and one of them must\nhold. The regulator ultimately determined that the intrusion began with exploitation of the\nunpatched appliance \u2014 a specific instance of that technique, and the determination that settles the\ntension between the two competing attributions with which the matter opened. The methodological\nlesson is that conflicting accounts are adjudicated not by weighing the parties' credibility but by\nidentifying which artefacts each hypothesis requires, and then establishing whether those artefacts\nexist.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f012-r0",
+      "item_name": "Cybersecurity -- worse",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f012",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a1->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 10,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 10,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.1,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7795515625,
+        "consistency": 0.3959429867021277,
+        "reified": 0.119612,
+        "log_partition": 0.3307102584390658
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.898874,
+          "a1": 0.84965,
+          "a10": 0.953294,
+          "a11": 0.110815,
+          "a12": 0.095659,
+          "a13": 0.631579,
+          "a14": 0.631579,
+          "a15": 0.898915,
+          "a2": 0.796154,
+          "a3": 0.9,
+          "a4": 0.925363,
+          "a5": 0.968022,
+          "a6": 0.94618,
+          "a7": 0.904921,
+          "a8": 0.981359,
+          "a9": 0.980461
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.4686399480691389,
+        "log_z": -6.798696,
+        "log_z_max": -2.159049,
+        "log_z_min": -9.091244
+      },
+      "elapsed_s": 0.154,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f012-r0",
+      "item_name": "Cybersecurity -- worse",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f012",
+      "family": "CONFLICT",
+      "rung_index": 0,
+      "rung_name": "worse",
+      "perturbation": {
+        "calls": [
+          "spurious_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          ""
+        ],
+        "edge_effects": [
+          {
+            "call": "spurious_relation",
+            "target": null,
+            "effect": "added",
+            "detail": "a1->a2"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 11,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 11,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 5,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 11,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.1,
+        "a12": 0.1,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7837403125,
+        "consistency": 0.5289856050583657,
+        "reified": 0.29924,
+        "log_partition": 0.4985582819128201
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.898724,
+          "a1": 0.897129,
+          "a10": 0.9,
+          "a11": 0.1,
+          "a12": 0.1,
+          "a13": 0.631579,
+          "a14": 0.631579,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.925373,
+          "a5": 0.968128,
+          "a6": 0.928783,
+          "a7": 0.9,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.46131358750719426,
+        "log_z": -3.235049,
+        "log_z_max": -1.050812,
+        "log_z_min": -5.406726
+      },
+      "elapsed_s": 0.148,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

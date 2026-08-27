@@ -888,6 +888,7 @@ def generate_family(
                 )
             else:
                 operator = f"{call}({target})" if target else f"{call}()"
+            previous = current
             out, err = caller.ask(
                 "P5",
                 parse.parse_perturbation,
@@ -899,6 +900,15 @@ def generate_family(
                 failed = err or f"{call} produced nothing"
                 break
             current, _diff = out
+            # A perturbation that returns the prose unchanged did not happen. Checked
+            # against the text this call was handed (`previous`), not against the base, so
+            # a composed rung whose SECOND call is a no-op is caught even though its first
+            # call already moved the text away from the base.
+            changed = validate.gate_text_changed(previous, current, operator=operator)
+            res.verdict.add(changed)
+            if not changed.passed:
+                failed = changed.detail
+                break
             drift = validate.gate_length_drift(base, current, operator=call)
             res.verdict.add(drift)
             if not drift.passed:

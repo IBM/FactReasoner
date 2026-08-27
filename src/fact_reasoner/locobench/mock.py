@@ -342,6 +342,16 @@ def mock_perturbation(
     else:
         out = base
 
+    # Every replacement above is a FIXED string, so a rung composing two calls of the same
+    # kind finds its target already consumed and returns the prose untouched -- and
+    # `validate.gate_text_changed` then rejects the family, correctly, because a
+    # perturbation that changes nothing did not happen. The mock must therefore guarantee a
+    # distinct text per call, or the offline dry-run rejects ladders the live pipeline
+    # admits. The marker names the exact operator (including its target edge), so composed
+    # calls differ from each other and not merely from the base.
+    if " ".join(out.split()) == " ".join(base.split()):
+        out = f"{base}\n\nOn the {operator} point, the record is unchanged in substance."
+
     diff = {
         "operator": call,
         "target": operator,

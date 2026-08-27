@@ -193,7 +193,10 @@ Instructions:
    fine. Order the positions so that related claims sit near each other.
 5. The plan must include AT LEAST ONE relation of each of these senses:
    Alternative, Disjunction, Restatement, Concession, and one of
-   Precedence/Succession.
+   Precedence/Succession. Separately, AT LEAST FOUR of your 10 relations must
+   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT MOST
+   ONE of those four may be a resolved Concession. Only three senses conflict, so
+   reaching four means using one of them TWICE, on a different claim pair.
 6. Every Concession must be marked resolved or unresolved. A resolved
    Concession must name a RESOLVER: a [holding] claim, also selected and
    positioned AFTER both endpoints.
@@ -262,7 +265,7 @@ Instructions:
     {"source_pos": 13, "target_pos": 14, "sense": "Contrast",
      "strength_band": "weak", "validity": "invalid",
      "error_kind": "spurious", "resolved": null, "resolver_pos": null},
-    {"source_pos": 4, "target_pos": 6, "sense": "Instantiation",
+    {"source_pos": 4, "target_pos": 6, "sense": "Contrast",
      "strength_band": "weak", "validity": "invalid",
      "error_kind": "false_endpoint", "resolved": null, "resolver_pos": null}
   ],
