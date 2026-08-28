@@ -80,17 +80,36 @@ def _prob_for_word(alternatives: Sequence[tuple[str, float]], word: str) -> floa
     return total
 
 
-def _first_token_alternatives(logprobs: list[Any]) -> list[tuple[str, float]]:
-    """Extract the first content token's ``(token, logprob)`` alternative list.
+def _answer_token_alternatives(logprobs: list[Any]) -> list[tuple[str, float]]:
+    """Extract the ANSWER token's ``(token, logprob)`` alternative list.
 
     Accepts the per-token entries returned by
     ``fact_reasoner.utils.extract_logprobs_from_output`` (OpenAI / vLLM ``content``
     items), each of which carries a ``top_logprobs`` list of alternatives. When no
     ``top_logprobs`` is present, falls back to the single realized token.
+
+    The answer is located by scanning **backwards** for the last entry whose
+    alternatives (or realized token) include a yes/no variant. Three reasons, all
+    measured rather than assumed:
+
+    * Reading ``logprobs[0]`` unconditionally -- what this function used to do --
+      breaks on a reasoning model. A live ``gpt-oss-120b`` reply opens with
+      ``<|channel|>`` whose top-5 is ``['<|channel|>', '<|constrain|>', '분',
+      'analysis', ' (']``: no yes/no anywhere, so the caller got ``None`` and fell
+      through to a fallback returning a bare ``1.0``/``0.0``. Those hard extremes
+      put a zero in the factor table and made the coherence MRF unnormalizable
+      (Merlin: ``logZ: -inf``, ``"Inconsistent evidence or underflow"``).
+    * Scanning FORWARD instead is worse than the bug it fixes. On that same reply
+      the first yes/no-bearing token is index 9 -- the model quoting the *prompt*
+      back to itself ("Answer Yes or No only") mid-chain-of-thought. That yields a
+      confident wrong number in place of a detectable crash. The real answer sits
+      at index 49, after ``<|start|>assistant<|channel|>final<|message|>``.
+    * Backwards is also a no-op for a non-reasoning model: llama-3.3 emits
+      ``['Yes', '.', '<|eot_id|>']``, so the last yes/no entry IS index 0 and its
+      numbers are unchanged.
     """
     if not logprobs:
         return []
-    first = logprobs[0]
 
     # OpenAI/vLLM content item: dict-like or object with ``.token`` / ``.logprob``
     # / ``.top_logprobs``. Support both mapping and attribute access.
@@ -98,6 +117,25 @@ def _first_token_alternatives(logprobs: list[Any]) -> list[tuple[str, float]]:
         if isinstance(obj, dict):
             return obj.get(key)
         return getattr(obj, key, None)
+
+    def _bears_answer(entry: Any) -> bool:
+        """Whether this entry's alternatives (or its own token) name yes or no."""
+        candidates: list[Any] = []
+        for alt in _get(entry, "top_logprobs") or []:
+            candidates.append(_get(alt, "token"))
+        candidates.append(_get(entry, "token"))
+        return any(
+            tok is not None
+            and (_token_matches(str(tok), "yes") or _token_matches(str(tok), "no"))
+            for tok in candidates
+        )
+
+    first = next(
+        (entry for entry in reversed(logprobs) if _bears_answer(entry)),
+        # No yes/no anywhere: keep the historical behaviour rather than returning
+        # nothing, so a caller that could previously read a value still can.
+        logprobs[0],
+    )
 
     top = _get(first, "top_logprobs")
     alternatives: list[tuple[str, float]] = []
@@ -126,23 +164,26 @@ def surrogate_probability_from_logprobs(
 ) -> float | None:
     """Renormalized surrogate-token probability p = P(pos) / (P(pos) + P(neg)).
 
-    Reads the first generated token's top-logprob alternatives and renormalizes
-    the mass on the positive vs negative surrogate words (Kadavath et al.
-    arXiv:2207.05221). This is the calibrated stand-in for a verbalized number.
+    Reads the ANSWER token's top-logprob alternatives (located by
+    :func:`_answer_token_alternatives`, which scans backwards so a reasoning
+    model's chain-of-thought is skipped) and renormalizes the mass on the positive
+    vs negative surrogate words (Kadavath et al. arXiv:2207.05221). This is the
+    calibrated stand-in for a verbalized number.
 
     Args:
         logprobs: Per-token logprob entries (as from
-            ``extract_logprobs_from_output``); the first entry is the answer token.
+            ``extract_logprobs_from_output``). The answer token is found by a
+            backward scan, not assumed to be the first entry.
         positive: The surrogate word meaning "the implication holds" (default
             "yes").
         negative: The surrogate word meaning "it does not" (default "no").
 
     Returns:
         The renormalized probability in [0, 1], or ``None`` when neither surrogate
-        word appears among the first token's alternatives (caller substitutes its
+        word appears among the answer token's alternatives (caller substitutes its
         own unknown-probability sentinel).
     """
-    alternatives = _first_token_alternatives(logprobs)
+    alternatives = _answer_token_alternatives(logprobs)
     if not alternatives:
         return None
     p_pos = _prob_for_word(alternatives, positive)

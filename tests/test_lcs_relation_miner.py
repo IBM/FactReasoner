@@ -222,6 +222,46 @@ class _E:
 
 
 class TestFactorTables:
+    @pytest.mark.parametrize(
+        "rel_type",
+        ["entailment", "contradiction", "equivalence", "exclusive", "co_necessity"],
+    )
+    @pytest.mark.parametrize("prob", [0.0, 1.0])
+    def test_no_factor_cell_is_ever_a_hard_zero(self, rel_type, prob):
+        """A boundary probability must not put a literal 0.0 in a factor table.
+
+        Every table uses BOTH `p` and `1 - p`, so 0.0 and 1.0 are equally fatal --
+        one zero cell for the directed couplings, two of four for equivalence and
+        exclusive, which turns a soft preference into a hard logical constraint.
+        Measured before the clamp: a mined graph carrying 7-20 of these made the
+        network unnormalizable and Merlin returned `logZ: -inf` with
+        `"Inconsistent evidence or underflow"` and no marginals, so the cell could
+        not be scored at all.
+        """
+        vals = edge_factor_values(_E(rel_type, "atom_atom", prob), use_priors=True)
+        assert all(v > 0.0 for v in vals), (rel_type, prob, vals)
+        # And still a probability table: nothing exceeded 1.
+        assert all(v <= 1.0 for v in vals), (rel_type, prob, vals)
+
+    def test_injected_node_prior_is_clamped_too(self):
+        """`node_priors` overrides the node's own probability, so it must be clamped
+        AFTER the override -- clamping first would let an injected 0.0/1.0 through
+        and zero out that variable's unary factor."""
+        fg = FactGraph()
+        fg.add_node(Node(id="a0", type="atom", probability=0.9))
+        net = build_markov_network(fg, use_priors=True, node_priors={"a0": 1.0})
+        unary = [vals for variables, _card, vals in net.factors if len(variables) == 1]
+        assert unary, "expected one unary factor"
+        assert all(v > 0.0 for vals in unary for v in vals), unary
+
+    def test_clamp_is_a_noop_on_interior_probabilities(self):
+        """Gold arms use band midpoints, so the clamp must not perturb them."""
+        for prob in (0.925, 0.720, 0.470, 0.509):
+            vals = edge_factor_values(
+                _E("entailment", "atom_atom", prob), use_priors=True
+            )
+            assert vals == pytest.approx([0.5, 0.5, 1.0 - prob, prob])
+
     def test_entailment_with_priors(self):
         # [1-pi_s, pi_s, 1-p, p] with pi_s = 0.5 for atom_atom.
         vals = edge_factor_values(_E("entailment", "atom_atom", 0.7), use_priors=True)
@@ -817,6 +857,46 @@ class TestConditionalStrength:
                              {"token": " yes", "logprob": -3.0}],
         }]
         assert surrogate_probability_from_logprobs(lps) == pytest.approx(0.05, abs=1e-2)
+
+    def test_surrogate_reader_finds_a_reasoning_models_answer_token(self):
+        """The answer token is found by scanning BACKWARD, not at index 0.
+
+        A live `gpt-oss-120b` reply opens with the harmony preamble
+        `<|channel|> analysis <|message|>`, whose alternatives contain no yes/no at
+        all -- so reading `logprobs[0]` returned None and the miner fell back to a
+        bare 1.0/0.0, which zeroes a factor cell and makes the MRF unnormalizable.
+        """
+        def tok(t, alts):
+            return {"token": t, "logprob": -0.1,
+                    "top_logprobs": [{"token": a, "logprob": lp} for a, lp in alts]}
+
+        lps = [
+            tok("<|channel|>", [("<|channel|>", -0.1), ("analysis", -3.0)]),
+            tok("<|message|>", [("<|message|>", -0.1)]),
+            # The chain-of-thought quotes the INSTRUCTION back. A forward scan would
+            # stop here and read the prompt as if it were the answer.
+            tok(" Yes", [(" Yes", -0.05), (" No", -4.0)]),
+            tok(" or", [(" or", -0.1)]),
+            tok("<|channel|>", [("<|channel|>", -0.1)]),
+            tok("final", [("final", -0.1)]),
+            tok("<|message|>", [("<|message|>", -0.1)]),
+            # The real answer, and it disagrees with the restatement above.
+            tok("No", [("No", -0.05), ("Yes", -3.0)]),
+        ]
+        p = surrogate_probability_from_logprobs(lps)
+        assert p is not None
+        # Read from the LAST yes/no token: mass sits on "No", so p is near 0 --
+        # a forward scan would have returned ~0.98 from the instruction echo.
+        assert p < 0.1, p
+
+    def test_surrogate_reader_unchanged_for_a_non_reasoning_model(self):
+        """llama-3.3 answers at token 0, so backward == forward and nothing moves."""
+        lps = [{"token": "Yes", "logprob": -0.1,
+                "top_logprobs": [{"token": "Yes", "logprob": -0.1},
+                                 {"token": "No", "logprob": -2.3}]}]
+        assert surrogate_probability_from_logprobs(lps) == pytest.approx(
+            0.9002495, abs=1e-3
+        )
 
     def test_surrogate_reader_none_when_absent(self):
         lps = [{"token": "maybe", "logprob": -0.1,

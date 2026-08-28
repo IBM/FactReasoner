@@ -1,0 +1,3417 @@
+{
+  "item_id": "locobench-claude-5-fixed-f004-r4",
+  "item_name": "Artificial Intelligence -- ordering_only",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f004",
+    "family": "ORDER",
+    "rung_index": 4,
+    "rung_name": "ordering_only",
+    "perturbation": {
+      "calls": [
+        "ordering_only"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "r007"
+      ],
+      "edge_effects": [
+        {
+          "call": "ordering_only",
+          "target": "r007",
+          "effect": "reordered",
+          "detail": "Precedence -> Succession"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "increase",
+      "consistency": "increase",
+      "log_partition": "increase"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Artificial Intelligence",
+    "domain": "Engineering & Technology",
+    "framing": "How do researchers adjudicate between the competing explanations that a large language model's success on a reasoning benchmark reflects genuine generalization or memorization of contaminated training data?",
+    "split": "test",
+    "word_count": 621,
+    "generator": "claude-opus-5"
+  },
+  "notes": "Dual purpose: four ordering rungs plus one ordering-only rung that must be flat, since a Precedence<->Succession edit adds no factor.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The model's high benchmark score rests on exposure to the benchmark's items during training.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The model's high benchmark score rests on reasoning ability that transfers to unseen problems.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Researchers compute n-gram overlap between benchmark items and pretraining corpora to estimate contamination.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Proprietary models with undisclosed training corpora cannot be audited by direct string-overlap checks.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Membership inference methods such as Min-K% Prob estimate whether a particular example appeared in a model's training data.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Min-K% Prob operates using only the token-level log probabilities returned by the model.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Systematically lower loss on benchmark test items than on comparably difficult unseen items indicates that the items were seen during training.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The benchmark's test items leaked into the model's training corpus.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The model was trained on data that contained the benchmark's test items.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "GSM8K is a dataset of roughly 8,500 grade-school math word problems released by OpenAI in 2021.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "GSM8K was released by DeepMind in 2018.",
+      "label": "p11",
+      "factual": false,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Scale AI constructed GSM1k, a set of 1,250 new grade-school math problems designed to mirror the difficulty distribution of GSM8K.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "No model evaluated on GSM1k showed a meaningful accuracy drop relative to its GSM8K score.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Several models evaluated on GSM1k showed accuracy drops of up to 13 percentage points relative to their GSM8K scores.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The GSM1k evaluation found that GPT-4 and Claude exhibited the largest accuracy drops of all model families tested.",
+      "label": "p15",
+      "factual": false,
+      "role": "holding",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "The final GSM1k report concluded that frontier models from OpenAI, Anthropic, and Google showed minimal signs of overfitting to GSM8K.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a13",
+      "target_id": "a11",
+      "level2_sense": "Succession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5",
+        "perturbed_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a5",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a8",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a9",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a12",
+      "position_distance": 1
+    }
+  ],
+  "response": "The dispute is best framed as an exhaustive but non-exclusive pair of hypotheses. At least one of the following must hold, and perhaps both: the model's high benchmark score rests on exposure to the benchmark's items during training, or the model's high benchmark score rests on reasoning ability that transfers to unseen problems. Framed this way, adjudication is not a matter of choosing a winner by intuition but of estimating how much of the observed score each factor can carry. Three families of technique are used in practice \u2014 corpus auditing, membership inference, and behavioural probes on held-out items \u2014 and each addresses a different failure mode of the others.\n\nThe corpus-side approach is the most direct. Researchers compute n-gram overlap between benchmark items and pretraining corpora to estimate contamination, typically flagging matches at 8-, 13-, or 50-gram thresholds and then re-scoring the model on the decontaminated remainder. Specifically, proprietary models with undisclosed training corpora cannot be audited by direct string-overlap checks. The practical consequence is that overlap statistics are reported chiefly for open-weight models with published data pipelines, where the corpus can be indexed and queried, and where paraphrased or translated leakage remains invisible to exact matching. Because membership inference methods such as Min-K% Prob estimate whether a particular example appeared in a model's training data, Min-K% Prob operates using only the token-level log probabilities returned by the model. That reliance on outputs rather than inputs is what makes such methods attractive for closed systems, though their sensitivity degrades sharply for examples seen only once.\n\nBehavioural probes supply the third source of leverage. Systematically lower loss on benchmark test items than on comparably difficult unseen items indicates that the items were seen during training. Such a loss differential is evidence that the benchmark's test items leaked into the model's training corpus; in other words, the model was trained on data that contained the benchmark's test items. The inferential force of the comparison depends entirely on matching the two item pools for difficulty, since a genuine generalizer should show no privileged fluency on one arbitrary subset of equally hard problems.\n\nAn instance of such training-set inclusion is GSM8K, a dataset of roughly 8,500 grade-school math word problems released by OpenAI in 2021; equivalently, GSM8K was released by DeepMind in 2018. Its canonical status made it the natural test case for the whole methodological question, since almost every frontier system reports a GSM8K figure and almost every large pretraining corpus plausibly ingested some portion of it. To break the circularity, Scale AI constructed GSM1k, a set of 1,250 new grade-school math problems designed to mirror the difficulty distribution of GSM8K, with matched solution lengths, arithmetic operation counts, and human solve rates.\n\nTwo incompatible summaries of that exercise circulate, and exactly one of them can be correct, while one of them must be: either no model evaluated on GSM1k showed a meaningful accuracy drop relative to its GSM8K score, or, with the construction of that new problem set coming first and the round of testing following it, several models showed accuracy drops of up to 13 percentage points relative to their GSM8K scores. Despite the magnitude of those declines, the GSM1k evaluation found that GPT-4 and Claude exhibited the largest accuracy drops of all model families tested. That apparent tension is settled by the final GSM1k report, which concluded that frontier models from OpenAI, Anthropic, and Google showed minimal signs of overfitting to GSM8K, with the steepest degradation concentrated instead in smaller open-weight families whose data pipelines had scraped benchmark repositories wholesale. The methodological lesson is that no single instrument resolves the contamination question; convergence across corpus overlap, log-probability-based membership tests, and freshly authored parallel benchmarks is what licenses a verdict about generalization.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7881407500000001,
+        "consistency": 0.8390088997201492,
+        "reified": 0.282883,
+        "log_partition": 0.5400567384403839
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.945536,
+          "a1": 0.945536,
+          "a10": 0.352445,
+          "a11": 0.9,
+          "a12": 0.656206,
+          "a13": 0.588313,
+          "a14": 0.126423,
+          "a15": 0.9,
+          "a2": 0.895485,
+          "a3": 0.889841,
+          "a4": 0.924058,
+          "a5": 0.954131,
+          "a6": 0.942297,
+          "a7": 0.997164,
+          "a8": 0.989305,
+          "a9": 0.603512
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.4986306085416331,
+        "log_z": -6.201398,
+        "log_z_max": -3.918804,
+        "log_z_min": -8.881577
+      },
+      "elapsed_s": 0.163,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.786936375,
+        "consistency": 0.9035573333333333,
+        "reified": 0.424685,
+        "log_partition": 0.4706090539866077
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.945536,
+          "a1": 0.945536,
+          "a10": 0.1,
+          "a11": 0.9,
+          "a12": 0.656206,
+          "a13": 0.588313,
+          "a14": 0.126423,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.942306,
+          "a7": 0.99719,
+          "a8": 0.989472,
+          "a9": 0.9
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.452861336870385,
+        "log_z": -2.858844,
+        "log_z_max": -0.57625,
+        "log_z_min": -4.887986
+      },
+      "elapsed_s": 0.163,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "mined:llama-3.3-70b-instruct:windowed",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 26,
+      "num_dropped_none": 8,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 44,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 18,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 26,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 94,
+        "discourse_anchored": true,
+        "num_sentences": 21,
+        "num_atoms_aligned": 16,
+        "num_promoted": 2,
+        "num_demoted": 30,
+        "pairs_scored": 26,
+        "dropped_none": 8,
+        "relations_kept": 18,
+        "llm_calls": 44,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999992080933684,
+          "strength": 0.999992110735769,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998801318126,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999976290974134,
+          "strength": 0.999999,
+          "type_confidence": 0.9999986290960425,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.008577482158870097,
+          "strength": 0.008577485226415682,
+          "type_confidence": 0.9999996423723848,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 1.3709576968106755e-06,
+          "strength": 1.3709578602415523e-06,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 9.61023921113855e-05,
+          "strength": 9.61023921113855e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 2.1444956064174643e-05,
+          "strength": 2.144495862061262e-05,
+          "type_confidence": 0.9999998807907247,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.0015011818140321543,
+          "strength": 0.0015011819929869718,
+          "type_confidence": 0.9999998807907247,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9992903297072785,
+          "strength": 0.9992903297072785,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.5439570309904065,
+          "strength": 0.9890130587177064,
+          "type_confidence": 0.9999997218451434,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.998073027797902,
+          "strength": 0.9980732657570078,
+          "type_confidence": 0.9999997615815251,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7005355,
+        "consistency": 0.6338886857824563,
+        "reified": 0.491036,
+        "log_partition": 0.09484573569874266
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.987009,
+          "a1": 0.948052,
+          "a10": 0.644621,
+          "a11": 0.917459,
+          "a12": 0.031572,
+          "a13": 0.031573,
+          "a14": 0.031576,
+          "a15": 0.041548,
+          "a2": 0.9459,
+          "a3": 0.99845,
+          "a4": 0.99991,
+          "a5": 0.999991,
+          "a6": 0.972969,
+          "a7": 0.999996,
+          "a8": 0.999996,
+          "a9": 0.657946
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.25177986853809453,
+        "log_z": -11.820991,
+        "log_z_max": -4.726677,
+        "log_z_min": -12.564362
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 18,
+        "pair": {
+          "tp": 8,
+          "fp": 10,
+          "fn": 1,
+          "precision": 0.4444444444444444,
+          "recall": 0.8888888888888888,
+          "f1": 0.5925925925925926
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 12,
+          "fn": 3,
+          "precision": 0.3333333333333333,
+          "recall": 0.6666666666666666,
+          "f1": 0.4444444444444444
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 14,
+          "fn": 5,
+          "precision": 0.2222222222222222,
+          "recall": 0.4444444444444444,
+          "f1": 0.2962962962962963
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "True": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          }
+        },
+        "recall_by_window_admission": {
+          "window": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 2,
+        "non_relation_violation_rate": 0.4
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 19.977,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "mined:llama-3.3-70b-instruct:bidirectional",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "bidirectional",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 108,
+      "num_dropped_none": 69,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 147,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 39,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "pairs_selected": 108,
+        "pairs_pruned": 132,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 108,
+        "dropped_none": 69,
+        "relations_kept": 39,
+        "llm_calls": 147,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999920809336754,
+          "strength": 0.9999921107357604,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999921107358251,
+          "strength": 0.9999921107358251,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999724643125489,
+          "strength": 0.9999724643125489,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "None",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "None",
+          "probability": 0.014063626489803393,
+          "strength": 0.014063627048641678,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "co_necessity",
+          "sense": "Alternative",
+          "probability": 0.9999832687686429,
+          "strength": 0.9999832985704653,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.06008665031379411,
+          "strength": 0.06008665031379411,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999920809335969,
+          "strength": 0.999992110735682,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.022977372399653948,
+          "strength": 0.022977372399653948,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9399132757798047,
+          "strength": 0.9399133504773947,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.0004305570411084076,
+          "strength": 0.0004305570924348015,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.0007096703044275112,
+          "strength": 0.0007096703044275112,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999978675147736,
+          "strength": 0.999999,
+          "type_confidence": 0.9999988675136411,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999979271191793,
+          "strength": 0.999999,
+          "type_confidence": 0.9999989271181065,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.11920267248619712,
+          "strength": 0.11920291879350162,
+          "type_confidence": 0.999997933714149,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.0001584362359352404,
+          "strength": 0.0001584362359352404,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 7.484626295334436e-05,
+          "strength": 7.484626295334436e-05,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1.6701429809483402e-05,
+          "strength": 1.6701429809483402e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 9.610239210680278e-05,
+          "strength": 9.610239210680278e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1.6701429795133506e-05,
+          "strength": 1.6701429795133506e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.5498878966220118,
+          "strength": 0.9997965729595425,
+          "type_confidence": 0.9999996026360078,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.0005527785519062071,
+          "strength": 0.0005527785519062071,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9992902105826144,
+          "strength": 0.9992903297072785,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.5439570525869407,
+          "strength": 0.9890130586843318,
+          "type_confidence": 0.9999997615815251,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 4.222834952878156e-06,
+          "strength": 4.222834952878156e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.9984985403013019,
+          "strength": 0.9984988180385974,
+          "type_confidence": 0.9999997218451434,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 7.889264464732569e-06,
+          "strength": 7.889264464732569e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.4275148243618069,
+          "strength": 0.7772998659804792,
+          "type_confidence": 0.9999997615815251,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.8519525679709837,
+          "strength": 0.8519528049457941,
+          "type_confidence": 0.9999997218451434,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.516308,
+        "consistency": 0.717242377476538,
+        "reified": 0.479125,
+        "log_partition": 0.03350921325266999
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.999996,
+          "a1": 0.972973,
+          "a10": 0.151686,
+          "a11": 0.057299,
+          "a12": 0.0573,
+          "a13": 0.0573,
+          "a14": 0.0573,
+          "a15": 0.057254,
+          "a2": 0.999997,
+          "a3": 1.0,
+          "a4": 0.063202,
+          "a5": 0.063201,
+          "a6": 0.936833,
+          "a7": 0.936833,
+          "a8": 0.936833,
+          "a9": 0.912921
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.2814233160546729,
+        "log_z": -32.634311,
+        "log_z_max": -22.174247,
+        "log_z_min": -32.996972
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 39,
+        "pair": {
+          "tp": 8,
+          "fp": 18,
+          "fn": 1,
+          "precision": 0.3076923076923077,
+          "recall": 0.8888888888888888,
+          "f1": 0.4571428571428572
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 28,
+          "fn": 3,
+          "precision": 0.17647058823529413,
+          "recall": 0.6666666666666666,
+          "f1": 0.27906976744186046
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 30,
+          "fn": 5,
+          "precision": 0.11764705882352941,
+          "recall": 0.4444444444444444,
+          "f1": 0.18604651162790695
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "True": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          }
+        },
+        "recall_by_window_admission": {
+          "window": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 3,
+        "non_relation_violation_rate": 0.6
+      },
+      "duplicate_unordered_pairs": 13,
+      "elapsed_s": 39.405,
+      "run_config_fingerprint": "860248201fa2"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "mined:gpt-oss-120b-a100:windowed",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b-a100",
+      "pair_policy": "windowed",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 26,
+      "num_dropped_none": 9,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 43,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 17,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 26,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 94,
+        "discourse_anchored": true,
+        "num_sentences": 21,
+        "num_atoms_aligned": 16,
+        "num_promoted": 2,
+        "num_demoted": 30,
+        "pairs_scored": 26,
+        "dropped_none": 9,
+        "relations_kept": 17,
+        "llm_calls": 43,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999963476122389,
+          "strength": 0.999999,
+          "type_confidence": 0.9999973476095865,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998801318126,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.801022875,
+        "consistency": 0.9571676586225837,
+        "reified": 0.499511,
+        "log_partition": 0.021815939538594467
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.95,
+          "a1": 0.95,
+          "a10": 0.999972,
+          "a11": 0.999998,
+          "a12": 0.002297,
+          "a13": 0.001929,
+          "a14": 0.997981,
+          "a15": 0.000414,
+          "a2": 0.944436,
+          "a3": 0.996905,
+          "a4": 0.99982,
+          "a5": 0.999982,
+          "a6": 0.972869,
+          "a7": 0.999893,
+          "a8": 0.999893,
+          "a9": 0.999977
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.07306939751075286,
+        "log_z": -13.865775,
+        "log_z_max": -5.237635,
+        "log_z_min": -14.058204
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 17,
+        "pair": {
+          "tp": 9,
+          "fp": 8,
+          "fn": 0,
+          "precision": 0.5294117647058824,
+          "recall": 1.0,
+          "f1": 0.6923076923076924
+        },
+        "coupling": {
+          "tp": 8,
+          "fp": 9,
+          "fn": 1,
+          "precision": 0.47058823529411764,
+          "recall": 0.8888888888888888,
+          "f1": 0.6153846153846153
+        },
+        "sense": {
+          "tp": 7,
+          "fp": 10,
+          "fn": 2,
+          "precision": 0.4117647058823529,
+          "recall": 0.7777777777777778,
+          "f1": 0.5384615384615384
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 8,
+            "recall": 0.8888888888888888
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "recall_by_window_admission": {
+          "window": {
+            "total": 9,
+            "found": 8,
+            "recall": 0.8888888888888888
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 110.512,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "mined:gpt-oss-120b-a100:bidirectional",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b-a100",
+      "pair_policy": "bidirectional",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 108,
+      "num_dropped_none": 65,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 151,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 43,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "pairs_selected": 108,
+        "pairs_pruned": 132,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 108,
+        "dropped_none": 65,
+        "relations_kept": 43,
+        "llm_calls": 151,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999966158251197,
+          "strength": 0.999999,
+          "type_confidence": 0.9999976158227355,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999981953390776,
+          "strength": 0.999999,
+          "type_confidence": 0.999999195338273,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998807907365,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999992450089515,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998801318126,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999984039548565,
+          "strength": 0.999999,
+          "type_confidence": 0.9999994039542605,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a12",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7323105625,
+        "consistency": 0.3694618344742502,
+        "reified": 0.000187,
+        "log_partition": 0.010412854397820723
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 1.1e-05,
+          "a1": 1.0,
+          "a10": 0.748845,
+          "a11": 0.999635,
+          "a12": 0.959901,
+          "a13": 0.013432,
+          "a14": 0.013435,
+          "a15": 0.986374,
+          "a2": 0.999989,
+          "a3": 0.999989,
+          "a4": 0.999989,
+          "a5": 0.999989,
+          "a6": 0.748845,
+          "a7": 0.748845,
+          "a8": 0.748845,
+          "a9": 0.748845
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.2889671066720999,
+        "log_z": -54.246051,
+        "log_z_max": -22.885593,
+        "log_z_min": -54.576039
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 43,
+        "pair": {
+          "tp": 9,
+          "fp": 19,
+          "fn": 0,
+          "precision": 0.32142857142857145,
+          "recall": 1.0,
+          "f1": 0.4864864864864865
+        },
+        "coupling": {
+          "tp": 7,
+          "fp": 29,
+          "fn": 2,
+          "precision": 0.19444444444444445,
+          "recall": 0.7777777777777778,
+          "f1": 0.3111111111111111
+        },
+        "sense": {
+          "tp": 7,
+          "fp": 29,
+          "fn": 2,
+          "precision": 0.19444444444444445,
+          "recall": 0.7777777777777778,
+          "f1": 0.3111111111111111
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 7,
+            "recall": 0.7777777777777778
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          }
+        },
+        "recall_by_window_admission": {
+          "window": {
+            "total": 9,
+            "found": 7,
+            "recall": 0.7777777777777778
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 3,
+        "non_relation_violation_rate": 0.6
+      },
+      "duplicate_unordered_pairs": 15,
+      "elapsed_s": 264.524,
+      "run_config_fingerprint": "860248201fa2"
+    }
+  ]
+}

@@ -1,0 +1,1626 @@
+{
+  "item_id": "locobench-claude-5-fixed-f004-r0",
+  "item_name": "Artificial Intelligence -- shuffle_full",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f004",
+    "family": "ORDER",
+    "rung_index": 0,
+    "rung_name": "shuffle_full",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "full"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "full",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Artificial Intelligence",
+    "domain": "Engineering & Technology",
+    "framing": "How do researchers adjudicate between the competing explanations that a large language model's success on a reasoning benchmark reflects genuine generalization or memorization of contaminated training data?",
+    "split": "test",
+    "word_count": 619,
+    "generator": "claude-opus-5"
+  },
+  "notes": "Dual purpose: four ordering rungs plus one ordering-only rung that must be flat, since a Precedence<->Succession edit adds no factor.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The model's high benchmark score rests on exposure to the benchmark's items during training.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The model's high benchmark score rests on reasoning ability that transfers to unseen problems.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Researchers compute n-gram overlap between benchmark items and pretraining corpora to estimate contamination.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Proprietary models with undisclosed training corpora cannot be audited by direct string-overlap checks.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Membership inference methods such as Min-K% Prob estimate whether a particular example appeared in a model's training data.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Min-K% Prob operates using only the token-level log probabilities returned by the model.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Systematically lower loss on benchmark test items than on comparably difficult unseen items indicates that the items were seen during training.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The benchmark's test items leaked into the model's training corpus.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The model was trained on data that contained the benchmark's test items.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "GSM8K is a dataset of roughly 8,500 grade-school math word problems released by OpenAI in 2021.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "GSM8K was released by DeepMind in 2018.",
+      "label": "p11",
+      "factual": false,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Scale AI constructed GSM1k, a set of 1,250 new grade-school math problems designed to mirror the difficulty distribution of GSM8K.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "No model evaluated on GSM1k showed a meaningful accuracy drop relative to its GSM8K score.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Several models evaluated on GSM1k showed accuracy drops of up to 13 percentage points relative to their GSM8K scores.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The GSM1k evaluation found that GPT-4 and Claude exhibited the largest accuracy drops of all model families tested.",
+      "label": "p15",
+      "factual": false,
+      "role": "holding",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "The final GSM1k report concluded that frontier models from OpenAI, Anthropic, and Google showed minimal signs of overfitting to GSM8K.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a11",
+      "target_id": "a13",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a5",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a8",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a9",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a12",
+      "position_distance": 1
+    }
+  ],
+  "response": "Such a loss differential is evidence that the benchmark's test items leaked into the model's training corpus; in other words, the model was trained on data that contained the benchmark's test items. Despite the magnitude of those declines, the GSM1k evaluation found that GPT-4 and Claude exhibited the largest accuracy drops of all model families tested. Researchers compute n-gram overlap between benchmark items and pretraining corpora to estimate contamination, typically flagging matches at 8-, 13-, or 50-gram thresholds and then re-scoring the model on the decontaminated remainder. The methodological lesson is that no single instrument resolves the contamination question; convergence across corpus overlap, log-probability-based membership tests, and freshly authored parallel benchmarks is what licenses a verdict about generalization.\n\nThe dispute is best framed as an exhaustive but non-exclusive pair of hypotheses. To break the circularity, Scale AI constructed GSM1k, a set of 1,250 new grade-school math problems designed to mirror the difficulty distribution of GSM8K, with matched solution lengths, arithmetic operation counts, and human solve rates. Because membership inference methods such as Min-K% Prob estimate whether a particular example appeared in a model's training data, Min-K% Prob operates using only the token-level log probabilities returned by the model. Three families of technique are used in practice \u2014 corpus auditing, membership inference, and behavioural probes on held-out items \u2014 and each addresses a different failure mode of the others. Systematically lower loss on benchmark test items than on comparably difficult unseen items indicates that the items were seen during training. That apparent tension is settled by the final GSM1k report, which concluded that frontier models from OpenAI, Anthropic, and Google showed minimal signs of overfitting to GSM8K, with the steepest degradation concentrated instead in smaller open-weight families whose data pipelines had scraped benchmark repositories wholesale.\n\nAt least one of the following must hold, and perhaps both: the model's high benchmark score rests on exposure to the benchmark's items during training, or the model's high benchmark score rests on reasoning ability that transfers to unseen problems. The practical consequence is that overlap statistics are reported chiefly for open-weight models with published data pipelines, where the corpus can be indexed and queried, and where paraphrased or translated leakage remains invisible to exact matching. An instance of such training-set inclusion is GSM8K, a dataset of roughly 8,500 grade-school math word problems released by OpenAI in 2021; equivalently, GSM8K was released by DeepMind in 2018. That reliance on outputs rather than inputs is what makes such methods attractive for closed systems, though their sensitivity degrades sharply for examples seen only once.\n\nFramed this way, adjudication is not a matter of choosing a winner by intuition but of estimating how much of the observed score each factor can carry. The inferential force of the comparison depends entirely on matching the two item pools for difficulty, since a genuine generalizer should show no privileged fluency on one arbitrary subset of equally hard problems. The corpus-side approach is the most direct.\n\nTwo incompatible summaries of that exercise circulate, and exactly one of them can be correct, while one of them must be: either no model evaluated on GSM1k showed a meaningful accuracy drop relative to its GSM8K score, or, in the round of testing that came after the construction of that new problem set, several models showed accuracy drops of up to 13 percentage points relative to their GSM8K scores. Behavioural probes supply the third source of leverage. Specifically, proprietary models with undisclosed training corpora cannot be audited by direct string-overlap checks. Its canonical status made it the natural test case for the whole methodological question, since almost every frontier system reports a GSM8K figure and almost every large pretraining corpus plausibly ingested some portion of it.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7881407500000001,
+        "consistency": 0.8390088997201492,
+        "reified": 0.282883,
+        "log_partition": 0.5400567384403839
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.945536,
+          "a1": 0.945536,
+          "a10": 0.352445,
+          "a11": 0.9,
+          "a12": 0.656206,
+          "a13": 0.588313,
+          "a14": 0.126423,
+          "a15": 0.9,
+          "a2": 0.895485,
+          "a3": 0.889841,
+          "a4": 0.924058,
+          "a5": 0.954131,
+          "a6": 0.942297,
+          "a7": 0.997164,
+          "a8": 0.989305,
+          "a9": 0.603512
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.4986306085416331,
+        "log_z": -6.201398,
+        "log_z_max": -3.918804,
+        "log_z_min": -8.881577
+      },
+      "elapsed_s": 0.17,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.786936375,
+        "consistency": 0.9035573333333333,
+        "reified": 0.424685,
+        "log_partition": 0.4706090539866077
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.945536,
+          "a1": 0.945536,
+          "a10": 0.1,
+          "a11": 0.9,
+          "a12": 0.656206,
+          "a13": 0.588313,
+          "a14": 0.126423,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.942306,
+          "a7": 0.99719,
+          "a8": 0.989472,
+          "a9": 0.9
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.452861336870385,
+        "log_z": -2.858844,
+        "log_z_max": -0.57625,
+        "log_z_min": -4.887986
+      },
+      "elapsed_s": 0.158,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "mined:llama-3.3-70b-instruct:windowed",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 18,
+      "num_dropped_none": 9,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 27,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 9,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 18,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 102,
+        "discourse_anchored": true,
+        "num_sentences": 21,
+        "num_atoms_aligned": 16,
+        "num_promoted": 9,
+        "num_demoted": 45,
+        "pairs_scored": 18,
+        "dropped_none": 9,
+        "relations_kept": 9,
+        "llm_calls": 27,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998801318126,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999974502843738,
+          "strength": 0.999999,
+          "type_confidence": 0.9999984502828241,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 8.481090464173295e-05,
+          "strength": 8.481104112996482e-05,
+          "type_confidence": 0.9999983906785008,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.7310585863835984,
+          "strength": 0.7310585863835984,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 7.484626295738878e-05,
+          "strength": 7.484626295738878e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.847139375,
+        "consistency": 0.9850009684368601,
+        "reified": 0.492744,
+        "log_partition": 0.7698187506305056
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.987005,
+          "a1": 0.948052,
+          "a10": 0.008942,
+          "a11": 0.960187,
+          "a12": 0.987797,
+          "a13": 0.987797,
+          "a14": 0.1,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.94186,
+          "a5": 0.994186,
+          "a6": 0.94736,
+          "a7": 0.999992,
+          "a8": 0.999992,
+          "a9": 0.99106
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.2199343918836888,
+        "log_z": -1.335304,
+        "log_z_max": -1.136795,
+        "log_z_min": -1.999198
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 9,
+        "pair": {
+          "tp": 6,
+          "fp": 3,
+          "fn": 3,
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 3,
+          "fn": 3,
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666
+        },
+        "sense": {
+          "tp": 5,
+          "fp": 4,
+          "fn": 4,
+          "precision": 0.5555555555555556,
+          "recall": 0.5555555555555556,
+          "f1": 0.5555555555555556
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 6,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 11.045,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "mined:gpt-oss-120b-a100:windowed",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b-a100",
+      "pair_policy": "windowed",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 18,
+      "num_dropped_none": 8,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 28,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 10,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 18,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 102,
+        "discourse_anchored": true,
+        "num_sentences": 21,
+        "num_atoms_aligned": 16,
+        "num_promoted": 9,
+        "num_demoted": 45,
+        "pairs_scored": 18,
+        "dropped_none": 8,
+        "relations_kept": 10,
+        "llm_calls": 28,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.1,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999945594922518,
+          "strength": 0.999999,
+          "type_confidence": 0.9999955594878113,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.9110246875,
+        "consistency": 0.9892927225240005,
+        "reified": 0.499994,
+        "log_partition": 0.38866858917432573
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.960674,
+          "a1": 0.949438,
+          "a10": 0.985946,
+          "a11": 0.998595,
+          "a12": 0.500002,
+          "a13": 0.500002,
+          "a14": 0.99833,
+          "a15": 0.996827,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.94186,
+          "a5": 0.994186,
+          "a6": 0.96827,
+          "a7": 0.998155,
+          "a8": 0.998155,
+          "a9": 0.985955
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.2722850524047379,
+        "log_z": -7.187235,
+        "log_z_max": -5.47244,
+        "log_z_min": -8.277457
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 10,
+        "pair": {
+          "tp": 6,
+          "fp": 4,
+          "fn": 3,
+          "precision": 0.6,
+          "recall": 0.6666666666666666,
+          "f1": 0.631578947368421
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 4,
+          "fn": 3,
+          "precision": 0.6,
+          "recall": 0.6666666666666666,
+          "f1": 0.631578947368421
+        },
+        "sense": {
+          "tp": 6,
+          "fp": 4,
+          "fn": 3,
+          "precision": 0.6,
+          "recall": 0.6666666666666666,
+          "f1": 0.631578947368421
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 6,
+            "recall": 0.6666666666666666
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 6,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 82.644,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    }
+  ]
+}

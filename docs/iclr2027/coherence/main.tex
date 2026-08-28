@@ -31,9 +31,9 @@ what the reader should \emph{believe}. A third natural candidate is worse still,
 asking whether asserted relations are honoured is maximized by asserting nothing. Claim priors
 come from an existing factuality pipeline, making coherence and factuality two stages over one
 decomposition rather than competing scores. Empirically, on a corpus of response families whose
-relative coherence ordering is fixed by construction, the readouts recover $78.6\%$ of the
-declared orderings from gold relation graphs and $53.6\%$ from graphs mined out of the response
-text; since the two conditions differ only in the relation graph, the gap localizes the open
+relative coherence ordering is fixed by construction, the readouts recover $82.7\%$ of the
+declared orderings from gold relation graphs and $34.7$--$37.1\%$ from graphs mined out of the
+response text; since the two conditions differ only in the relation graph, the gap localizes the open
 problem in relation extraction rather than in the probabilistic model.
 \end{abstract}
 
@@ -781,8 +781,8 @@ argued above, actively harmful. We define four policies:
 \end{itemize}
 The last exists because of a structural limitation, not a tuning preference. A forward-only policy
 \emph{cannot emit} an arc that runs backward in claim order, so a gold relation that is both
-directed and backward is unreachable under it no matter what the model says. In our corpus $20$ of
-$86$ edge-producing gold relations are of that kind, capping forward-only recall at $76.7\%$ before
+directed and backward is unreachable under it no matter what the model says. In our corpus $105$ of
+$603$ edge-producing gold relations are of that kind, capping forward-only recall at $82.6\%$ before
 the model is consulted; \S\ref{sec-experiments} measures the effect.
 
 Every policy is then refined against the response itself (Algorithm~\ref{alg-pairs}). Each claim is
@@ -1241,7 +1241,7 @@ construction, and we say so where the exclusion is not obvious.
   $1-\max_{i}\max_{j<i} p_{\mathrm{contr}}(h_i,h_j)$, which is evidence-free like ours but differs
   in three separable ways --- it is a \emph{maximum}, so a second conflict changes nothing; it is
   \emph{forward-only}, so a relation running backward in claim order is unreachable (\S\ref{sec-mining}
-  measures $20$ of $86$ gold relations as both directed and backward); and it is \emph{untyped}. We
+  measures $105$ of $603$ gold relations as both directed and backward); and it is \emph{untyped}. We
   therefore also report a mean-aggregated and a symmetric variant, which turn one baseline into an
   ablation identifying \emph{which} of the three differences accounts for any gap. ROSCOE targets
   step-by-step reasoning chains, and a long-form response is not a chain, so we label it adapted.
@@ -1324,38 +1324,48 @@ repetition. A cohesion metric prefers the less coherent response of the two.
 hand-authored fixtures --- a recall report, two biographies (one with five planted contradictions),
 a narrative, a summary, two summaries of one appellate judgment differing only in claim order, an
 incident post-mortem, and a damages opinion --- carrying claims and prose notes but no
-machine-readable gold relations. The second is a generated corpus of coherence ladders: \textbf{two
-families, ten items}, produced by \texttt{claude-opus-5} with a three-model validation committee
-(\texttt{gpt-5.6}, \texttt{gemini-3.1-pro}, \texttt{claude-sonnet-5}), on the canonical topics
-Anthropology and Archaeology, sixteen claims per item. Relations are mined by
-\texttt{llama-3.3-70b-instruct}. Mining is sampled once per cell at the model's default temperature,
-and repeated runs of an identical configuration moved coupling-level F1 by up to $0.06$; across five
-independent samples the two revised mining strategies span $0.49$--$0.58$, every one of them above the
-unrevised $0.36$. So the gap to the original exceeds the sampling noise, while the ordering
-\emph{between} the two revisions does not. These are measurements, not significance claims, and the
-second decimal place of any single cell should not be read. All exact values are by $2^{16}$
-enumeration; all corpus-scale values are by weighted mini-bucket with i-bound $6$.
+machine-readable gold relations. The second is a generated corpus of coherence ladders:
+\textbf{fourteen families, seventy items}, produced by \texttt{claude-opus-5} with a three-model
+cross-vendor validation committee (\texttt{gpt-5.6-terra}, \texttt{gemini-3.1-pro},
+\texttt{claude-sonnet-5}; V1 any-of, V3/V4 majority), spanning fourteen of the canonical topics and
+all four domains, $15$--$16$ claims and $609$--$698$ words per item, $1{,}115$ atoms and $670$ gold
+relations in total at a $0.61$ valid fraction, plus $342$ pairs explicitly declared unrelated. All
+four ladder types are represented: eight \textsc{conflict}, three \textsc{order}, two
+\textsc{chain} and one \textsc{control}. Relations are mined by \texttt{llama-3.3-70b-instruct} and
+\texttt{gpt-oss-120b}, both read through token logprobs.
+
+Mining is sampled once per cell at the model's default temperature, so the mined arms are not
+deterministic. We measure that directly rather than estimate it: two \emph{independent} runs of the
+same two \textsc{windowed} configurations moved coupling-level F1 by at most $0.014$ and every
+pair/coupling/sense F1 by at most $0.014$, while the gold arms reproduced bit-for-bit across the same
+pair of runs. Per-arm ladder agreement is the noisier statistic, moving by four to six of $202$
+assertions between those runs, so a single arm's percentage should not be read to the point. The
+$0.014$ figure supersedes the $\pm 0.06$ we previously estimated on a ten-item corpus: the larger
+corpus tightens reproducibility rather than merely enlarging the denominator. These are measurements,
+not significance claims. All exact values are by $2^{16}$ enumeration; all corpus-scale values are by
+weighted mini-bucket with i-bound $6$.
 
 \subsection{Relation estimation is the bottleneck}
 
 \begin{table}[t]
 \centering\small
-\caption{Mined-versus-gold agreement over $86$ edge-producing gold relations, micro-averaged over ten
-  items. \textbf{Fwd}/\textbf{Bwd} split coupling-level recall by whether the gold relation runs
-  forward or backward in claim order. \textbf{Non-rel} counts violations of the $48$ pairs the corpus
-  explicitly declares unrelated --- a real negative set, unlike the unlabelled remainder.
-  \textbf{Illegal} counts edges outside the nine admissible (sense, coupling) combinations, which
-  cannot be scored against gold at all. \textbf{Calls} is LLM calls issued.}
+\caption{Mined-versus-gold agreement over the $603$ edge-producing gold relations
+  ($670$ total, less the ordering-only \textsc{Precedence}/\textsc{Succession} edges, which
+  compile to Level-1 \texttt{none} and contribute no factor), micro-averaged over seventy items.
+  \textbf{Fwd}/\textbf{Bwd} split coupling-level recall by whether the gold relation runs forward
+  or backward in claim order; $105$ of the $603$ run backward. \textbf{Non-rel} counts violations
+  of the $342$ pairs the corpus explicitly declares unrelated --- a real negative set, unlike the
+  unlabelled remainder. \textbf{Dup} counts unordered pairs carrying two edges, which
+  \textsc{bidirectional} emits by construction and which place two factors on one variable pair.}
 \label{tab:mining}
-\begin{tabular}{@{}lrrrrrrrrr@{}}
+\begin{tabular}{@{}llrrrrrrrr@{}}
 \toprule
-Policy / prompt & Edges & Pair R & Coup P & Coup R & Coup F1 & Fwd & Bwd & Non-rel & Illegal \\
+Miner & Policy & Edges & Pair R & Coup P & Coup R & Coup F1 & Fwd & Bwd & Non-rel \\
 \midrule
-\textsc{windowed}      & 190 & 83.7 & 25.8 & 57.0 & 35.5 & 75.0 & 23.3 & 7/48 & 25 \\
-\textsc{gated}         & 321 & 83.7 & 14.6 & 54.7 & 23.1 & 69.6 & 26.7 & 8/48 & 38 \\
-\textsc{all\_pairs}    & 867 & 95.3 &  9.3 & 82.6 & 16.8 & 87.5 & 73.3 & 10/48 & 93 \\
-\textsc{bidirectional} & 205 & 83.7 & 39.0 & 66.3 & 49.1 & 71.4 & 56.7 & 5/48 & 13 \\
-\textsc{bidir.}, prompt v2 & 173 & 73.3 & 48.3 & 67.4 & \textbf{56.3} & 85.7 & 33.3 & \textbf{0/48} & \textbf{0} \\
+\texttt{llama-3.3-70b} & \textsc{windowed}      & 1106 & 82.3 & 34.1 & 62.5 & 44.1 & 71.1 & 21.9 & 34/342 \\
+\texttt{llama-3.3-70b} & \textsc{bidirectional} & 3172 & 91.7 & 17.9 & 79.3 & 29.3 & 79.9 & 76.2 & 119/342 \\
+\texttt{gpt-oss-120b}  & \textsc{windowed}      & 1094 & 83.4 & 40.2 & 73.0 & \textbf{51.9} & 82.1 & 29.5 & 38/342 \\
+\texttt{gpt-oss-120b}  & \textsc{bidirectional} & 2973 & \textbf{96.5} & 22.4 & \textbf{88.4} & 35.8 & \textbf{89.0} & \textbf{85.7} & 147/342 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1363,71 +1373,124 @@ Policy / prompt & Edges & Pair R & Coup P & Coup R & Coup F1 & Fwd & Bwd & Non-r
 Table~\ref{tab:mining} measures the estimator of \S\ref{sec-mining} against gold, and three findings
 stand out.
 
-First, \textsc{all\_pairs} achieves by far the best recall ($82.6\%$ at coupling level, $95.3\%$ at
-pair level) and by far the worst precision ($9.3\%$): querying every pair finds the true relations and
-buries them, emitting $867$ edges against $86$ gold. This is not a benign precision/recall trade. Since
-Eq.~\ref{eq-joint} is a product over relations, $781$ spurious factors do not merely dilute the signal
---- they drive every marginal toward the prior, which is exactly the collapse \S\ref{sec-mining}
-predicted. The corresponding mean marginal (Table~\ref{tab:ladder}) is $0.590$, the lowest of any arm
-including gold, on the same responses.
+First, the forward-only policy is \emph{structurally} capped, exactly as predicted, and the cap is
+now measured on a corpus large enough to see it clearly: \textsc{windowed} recovers $21.9$--$29.5\%$
+of backward-running gold relations against $76.2$--$85.7\%$ for \textsc{bidirectional}, because $105$
+of the $603$ scorable gold relations are both directed and backward and no forward-only candidate set
+can emit them. This is a property of the candidate policy, not of either model.
 
-Second, the forward-only policies are \emph{structurally} capped, as predicted: their backward recall
-is $23$--$27\%$ against $73.3\%$ for \textsc{all\_pairs}, because $20$ of the $86$ gold relations are
-both directed and backward and no forward-only candidate set can emit them. Admitting both arc
-directions within the window recovers most of that gap ($56.7\%$ backward) at $205$ edges and $505$
-calls, against \textsc{all\_pairs}' $867$ edges and $3{,}267$ calls --- a sixth of the calls for
-two-thirds the coupling recall and four times the precision.
+Second, admitting both arc directions buys that recall at a precision cost severe enough to invert the
+F1 ordering. \textsc{bidirectional} roughly triples the emitted edges ($1{,}106 \to 3{,}172$ for
+\texttt{llama}), lifts coupling recall by $16.8$ points, and \emph{halves} coupling precision
+($34.1 \to 17.9$), so coupling F1 falls from $44.1$ to $29.3$. The mechanism is the one
+\S\ref{sec-mining} anticipated for \textsc{all\_pairs} and it appears here in milder form: because
+Eq.~\ref{eq-joint} is a product over relations, spurious factors drive marginals toward the prior
+rather than merely diluting a signal. The $1{,}231$ duplicate unordered pairs are the same defect
+seen structurally --- two factors on one variable pair, which the model has no principled way to
+combine --- and declared-non-relation violations rise from $34/342$ to $119/342$ in step.
 
-Third, the prompt revision of \S\ref{sec-mining} is where the largest gain lies. Rebalancing the
-few-shot label distribution and requiring a verifiable evidence span raises coupling F1 from $35.5$ to
-$56.3$, drives declared-non-relation violations from $7/48$ to $0/48$, and drives illegal-vocabulary
-emissions from $25$ to $0$ --- while \emph{reducing} the number of calls. Precision, not recall, is
-where a grounded relation estimator is won, and it is won in the prompt rather than in the candidate
-policy.
+Third, the two miners differ in the direction that matters, and \texttt{gpt-oss-120b} is the stronger
+relation estimator at every level of the taxonomy: on \textsc{windowed} it beats \texttt{llama-3.3-70b}
+by $7.8$ points of coupling F1 ($51.9$ vs.\ $44.1$), $9.3$ points of sense F1, and $10.5$ points of
+backward recall, while emitting slightly \emph{fewer} edges. The gap widens as the label gets finer,
+which is what a genuine capability difference looks like rather than a threshold artefact: both
+models find roughly the same pairs (pair recall $82.3$ vs.\ $83.4$) and then disagree about what
+those pairs mean.
+
+A caveat belongs with that third finding, because it cuts against the natural reading. The
+\texttt{gpt-oss} strength estimates are almost entirely saturated: $99\%$ of its edge strengths sit at
+the numerical boundary ($25\%$ at the floor, $75\%$ at the ceiling) against $58\%$ genuinely interior
+values for \texttt{llama-3.3-70b}. Probed directly, the model answers the strength surrogate with all
+of its top-five mass on one side for easy pairs and with values as small as $10^{-9}$ for hard ones ---
+so this is the model's own near-determinism, not a defect of the reader. \texttt{gpt-oss} therefore
+buys its accuracy advantage while supplying almost no graded uncertainty, and \texttt{llama} is the
+reverse. A practitioner who needs calibrated edge probabilities rather than accurate edge labels
+should read this table in the opposite direction.
 
 \subsection{The model orders correctly when the graph is correct}
 
 \begin{table}[t]
 \centering\small
-\caption{Left: declared ordering constraints satisfied, $28$ assertions per arm ($14$ per family
-  $\times$ two families). Right: each readout averaged over items. \textsc{gold\_valid} is near-flat by
-  construction --- a conflict-fixing rung removes the planted-invalid conflicts that this arm has
-  already discarded --- so its failures carry no information about the readouts; the \textsc{gold} arm
-  is what the constraints test. Averaging a readout across the rungs of a ladder deliberately collapses
-  the ordering the ladder exists to test, so the right-hand block is a level comparison only.}
+\caption{Left: declared ordering constraints satisfied, grouped by ladder type --- $202$
+  assertions per arm in total ($8 \times 14$ \textsc{conflict}, $2 \times 15$ \textsc{chain},
+  $3 \times 15$ \textsc{order}, $1 \times 15$ \textsc{control}). Right: each readout averaged over
+  the seventy items. \textsc{order} and \textsc{control} assert \emph{invariance}: every rung of
+  those ladders applies only meaning-preserving edits (sentence reordering, or a
+  \textsc{Precedence}$\leftrightarrow$\textsc{Succession} swap), which move no factor, so a readout
+  that trends there is tracking surface form rather than coherence. \textsc{gold\_valid} is near-flat
+  on \textsc{conflict} by construction --- a conflict-fixing rung removes the planted-invalid
+  conflicts this arm has already discarded --- so its failures carry no information about the
+  readouts; the \textsc{gold} arm is what the constraints test. Averaging a readout across the rungs
+  of a ladder deliberately collapses the ordering the ladder exists to test, so the right-hand block
+  is a level comparison only.}
 \label{tab:ladder}
-\begin{tabular}{@{}lrrrrrrr@{}}
+\begin{tabular}{@{}llrrrrrrrrr@{}}
 \toprule
-Arm & \multicolumn{3}{c}{Constraints satisfied} & \multicolumn{4}{c}{Mean readout value} \\
-\cmidrule(r){2-4}\cmidrule(l){5-8}
- & f001 & f002 & \% & $\LCS_{\mm}$ & $\LCS_{\cons}$ & $\LCS_{\rei}$ & $\LCS_{\lp}$ \\
+& & \multicolumn{5}{c}{Constraints satisfied} & \multicolumn{4}{c}{Mean readout value} \\
+\cmidrule(r){3-7}\cmidrule(l){8-11}
+Arm & Policy & Cfl & Chn & Ord & Ctl & \% & $\LCS_{\mm}$ & $\LCS_{\cons}$ & $\LCS_{\rei}$ & $\LCS_{\lp}$ \\
 \midrule
-\textsc{gold}                              & 11/14 & 11/14 & \textbf{78.6} & 0.796 & 0.092 & 0.232 & 0.383 \\
-\textsc{gold\_valid}                       &  7/14 &  4/14 & 39.3 & 0.793 & 0.157 & 0.292 & 0.462 \\
-\textsc{mined}, \textsc{windowed}          &  4/14 &  9/14 & 46.4 & 0.843 & 0.007 & 0.360 & 0.164 \\
-\textsc{mined}, \textsc{gated}             &  7/14 &  8/14 & 53.6 & 0.679 & 0.002 & 0.262 & 0.102 \\
-\textsc{mined}, \textsc{all\_pairs}        &  7/14 &  5/14 & 42.9 & 0.590 & 0.163 & 0.037 & 0.018 \\
-\textsc{mined}, \textsc{bidirectional}     &  5/14 &  5/14 & 35.7 & 0.810 & 0.000 & 0.403 & 0.143 \\
-\textsc{mined}, \textsc{bidir.} prompt v2  &  6/14 &  8/14 & 50.0 & 0.660 & 0.053 & 0.366 & 0.088 \\
+\textsc{gold}       & --- & 89/112 & 18/30 & 45/45 & 15/15 & \textbf{82.7} & 0.795 & 0.515 & 0.238 & 0.410 \\
+\textsc{gold\_valid}& --- & 37/112 & 12/30 & 45/45 & 15/15 & 54.0 & 0.794 & 0.576 & 0.316 & 0.485 \\
+\midrule
+\multicolumn{11}{@{}l}{\emph{mined by} \texttt{llama-3.3-70b}} \\
+& \textsc{windowed}      & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & 0.796 & 0.676 & 0.384 & 0.224 \\
+& \textsc{bidirectional} & 57/112 & 18/30 & 0/45 & 0/15 & 37.1 & 0.723 & 0.542 & 0.205 & 0.037 \\
+\multicolumn{11}{@{}l}{\emph{mined by} \texttt{gpt-oss-120b}} \\
+& \textsc{windowed}      & 59/112 & 12/30 & 0/45 & 0/15 & 35.1 & 0.825 & 0.500 & 0.425 & 0.129 \\
+& \textsc{bidirectional} & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & 0.808 & 0.462 & 0.251 & 0.033 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-On gold relations the readouts satisfy $78.6\%$ of the declared ordering constraints --- $22$ of $28$
-(Table~\ref{tab:ladder}). Mined arms reach $35.7$--$53.6\%$. Since the readouts, the claims and the
-priors are byte-identical across arms, the $25$--$43$ point gap is attributable to relation estimation,
-and it is consistent with Table~\ref{tab:mining}: at $56.3\%$ coupling F1 roughly half the factors in a
-mined network are wrong or missing, and a ladder whose consecutive rungs differ by one or two relations
-cannot survive that. This is the paper's central empirical claim, and it is a claim about \emph{where
-the remaining problem is}: the probabilistic model orders responses correctly when handed a correct
-graph, and the open problem is extracting one.
+On gold relations the readouts satisfy $82.7\%$ of the declared ordering constraints --- $167$ of
+$202$ (Table~\ref{tab:ladder}). Mined arms reach $34.7$--$37.1\%$. Since the readouts, the claims and
+the priors are byte-identical across arms, the $46$--$48$ point gap is attributable to relation
+estimation alone, and it is consistent with Table~\ref{tab:mining}: at $29$--$52\%$ coupling F1 roughly
+half the factors in a mined network are wrong or missing, and a ladder whose consecutive rungs differ
+by one or two relations cannot survive that. This is the paper's central empirical claim, and it is a
+claim about \emph{where the remaining problem is}: the probabilistic model orders responses correctly
+when handed a correct graph, and the open problem is extracting one.
 
-Two secondary observations. The ordering of mined arms does not track their coupling F1 ---
-\textsc{gated} scores best among them at the second-worst F1 --- which at $28$ assertions per arm we
-read as sampling noise rather than signal, and which is precisely why policies should not be ranked on
-ladder agreement at this corpus size. And the mean-readout block shows the \textsc{all\_pairs} collapse
-quantitatively: $\LCS_{\mm}=0.590$ against gold's $0.796$ on the same ten responses, from adding $781$
-spurious factors.
+The per-ladder breakdown localizes the failure, and it does so in a way the two-family corpus could not
+express at all --- the aggregate percentage conceals a sharp qualitative split.
+
+On gold, \textsc{order} and \textsc{control} are perfect ($45/45$ and $15/15$). Every rung of those
+ladders applies only meaning-preserving edits, which move no factor, so exact invariance is the correct
+answer and the model gives it. \textsc{conflict} is strong at $89/112$ ($79.5\%$). \textsc{chain} is the
+weak gold ladder at $18/30$ ($60.0\%$): its rungs differ by removing entailment links from a chain whose
+remaining entailments already concentrate most of the mass, the smallest perturbation the corpus
+contains and the one most exposed to i-bound approximation.
+
+\emph{Every mined arm scores $0/45$ on \textsc{order} and $0/15$ on \textsc{control}.} This is the most
+consequential number in the table and it is not a scoring artefact. Those ladders hold the claim set
+fixed and permute the prose; a relation graph read off the text should therefore be identical across
+their rungs. It is not. On one \textsc{order} family the \texttt{gpt-oss} \textsc{windowed} miner
+emitted $9$, $16$, $20$, $20$ and $17$ edges across five rungs that differ \emph{only} in sentence
+order, and $\LCS_{\cons}$ swung by $\pm 0.49$ between adjacent rungs where the required answer was
+exact invariance. So the extractor is strongly order-dependent: the same claims, reordered, yield a
+materially different graph. Human annotators are the obvious reference point here and we do not have
+them, so we state the weaker claim the data supports --- LLM relation extraction is not
+reorder-invariant, and any coherence measure built on it inherits that sensitivity however sound its
+probabilistic layer.
+
+The corollary is that the mined arms are \emph{not} uniformly worse than gold. On the two ladders that
+demand a monotone trend they are respectable --- \textsc{conflict} $53$--$59$ of $112$ and
+\textsc{chain} $12$--$18$ of $30$, the latter matching or exceeding gold's $18/30$ on
+\texttt{llama}'s \textsc{bidirectional} arm --- and they lose the aggregate comparison almost entirely
+on the two invariance ladders, where they score nothing at all. A measure evaluated only on
+increase-type ladders would have reported mined extraction as far closer to gold than it is. That is
+precisely the false positive the \textsc{control} ladder was added to catch, and here it caught one.
+
+Two secondary observations. Mined ladder agreement does \emph{not} track coupling F1: \texttt{llama}'s
+\textsc{bidirectional} arm has the worst coupling F1 of the four ($29.3$) and the best ladder agreement
+($37.1\%$), while \texttt{gpt-oss}'s \textsc{windowed} arm inverts that. Given the four-to-six
+assertion run-to-run movement measured in \S\ref{sec-experiments}, the honest reading is that these
+four arms are not separated by ladder agreement at all, and candidate policies should not be ranked on
+it. And the mean-readout block shows the \textsc{bidirectional} density cost quantitatively:
+$\LCS_{\lp}$ collapses to $0.037$ and $0.033$ against gold's $0.410$ on the same seventy responses,
+from adding roughly two thousand spurious factors --- the log-partition readout registers added factor
+mass most directly.
 
 \subsection{Readout dynamic range is a property of the graph}
 
@@ -1652,63 +1715,79 @@ ladder-blind pairs can establish.
 
 \begin{table}[t]
 \centering\small
-\caption{Declared ordering assertions satisfied on the ladder corpus, two families of five rungs
-  over one claim set. Only the readout-independent assertions are scorable by a single-score
+\caption{Declared ordering assertions satisfied on the ladder corpus, under two different judge
+  models. Only the readout-independent content of a constraint is scorable by a single-score
   baseline: the four C1 consecutive-increase pairs and the C3 endpoint separation, giving five per
   family. C2 is excluded because it predicts the internal behaviour of particular readouts
-  (\S\ref{sec-selection}), which a baseline makes no claim about. The $\LCS_{\mm}$ row is our own
-  measure scored on \emph{exactly} these ten assertions, so it is comparable to the rows below it;
-  the $78.6\%$ of Table~\ref{tab:ladder} is computed over the fuller $28$-assertion set and is not.
-  Judges are the mean of five runs (mean per-item sd $0.063$ on this corpus, max $0.12$).}
+  (\S\ref{sec-selection}), which a baseline makes no claim about. The \textsc{order} and
+  \textsc{control} families assert invariance rather than increase and so contribute \emph{no}
+  scorable assertion, leaving ten families and $50$ assertions; the $\LCS$ rows are scored on
+  \emph{exactly} those $50$, so they are comparable to the rows below them, while the $82.7\%$ of
+  Table~\ref{tab:ladder} is computed over the fuller $202$-assertion set including invariance and is
+  not. Judges are the mean of five runs. Model-free baselines are identical under both judges, as
+  they must be; the two judge rows are the entire difference.}
 \label{tab:ladder-baselines}
-\begin{tabular}{@{}lccr@{}}
+\begin{tabular}{@{}lrrr@{}}
 \toprule
-Measure & f001 & f002 & \% \\
+Measure & \multicolumn{2}{c}{Assertions satisfied} & \\
+\cmidrule(r){2-3}
+ & \texttt{llama-3.3-70b} & \texttt{gpt-oss-120b} & Uses LLM \\
 \midrule
-$\LCS_{\mm}$ (gold relations) & $4/5$ & $3/5$ & $70.0$ \\
+$\LCS_{\mm}$ (gold relations)     & \multicolumn{2}{c}{$37/50$ \quad \textbf{74.0}} & no \\
+$\LCS_{\lp}$ (gold relations)     & \multicolumn{2}{c}{$36/50$ \quad 72.0} & no \\
+$\LCS_{\cons}$ (gold relations)   & \multicolumn{2}{c}{$34/50$ \quad 68.0} & no \\
 \midrule
-\textsc{rc} (cohesion) & $4/5$ & $3/5$ & $70.0$ \\
-\textsc{lc} (cohesion) & $4/5$ & $3/5$ & $70.0$ \\
-G-Eval judge & $3/5$ & $3/5$ & $60.0$ \\
-Direct judge & $4/5$ & $1/5$ & $50.0$ \\
-\textsc{sc}$_\mu$ (ROSCOE, mean-agg.) & $3/5$ & $2/5$ & $50.0$ \\
-Response length & $3/5$ & $1/5$ & $40.0$ \\
-\textsc{cr} (contradiction rate) & $1/5$ & $2/5$ & $30.0$ \\
-\textsc{sc} (ROSCOE, as published) & $0/5$ & $0/5$ & $0.0$ \\
-\textsc{eg} (entity graph) & $0/5$ & $0/5$ & $0.0$ \\
-Claim count & $0/5$ & $0/5$ & $0.0$ \\
+\textsc{rc} (cohesion)            & $30/50$ \quad 60.0 & $30/50$ \quad 60.0 & no \\
+\textsc{lc} (cohesion)            & $28/50$ \quad 56.0 & $28/50$ \quad 56.0 & no \\
+\textsc{length} (control)         & $20/50$ \quad 40.0 & $20/50$ \quad 40.0 & no \\
+\textsc{roscoe-sc} (mean)         & $16/50$ \quad 32.0 & $17/50$ \quad 34.0 & yes \\
+\textsc{contradiction rate}       & $12/50$ \quad 24.0 & $12/50$ \quad 24.0 & yes \\
+\textsc{judge}, direct rating     & $4/50$ \quad \phantom{0}8.0 & $18/50$ \quad 36.0 & yes \\
+\textsc{judge}, G-Eval            & $0/50$ \quad \phantom{0}0.0 & $21/50$ \quad 42.0 & yes \\
+\textsc{roscoe-sc} (max)          & $0/50$ \quad \phantom{0}0.0 & $0/50$ \quad \phantom{0}0.0 & yes \\
+\textsc{entity graph}             & $0/50$ \quad \phantom{0}0.0 & $0/50$ \quad \phantom{0}0.0 & no \\
+\textsc{claim count} (control)    & $0/50$ \quad \phantom{0}0.0 & $0/50$ \quad \phantom{0}0.0 & no \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{On ladder ordering the measure has no margin, and we report that.}
-Table~\ref{tab:ladder-baselines} scores every baseline on the ladder, whose rungs share a claim set
-and therefore control the claim-count and pair-count confounds that make the fixture pairs of
-Table~\ref{tab:baselines} hard to read. The result is not favourable to us. The mean posterior
-marginal on gold relations satisfies seven of the ten readout-independent assertions --- and so do
-both cohesion metrics. Our $78.6\%$ headline (Table~\ref{tab:ladder}) is computed over the fuller
-$28$-assertion set, which includes C2 and the other readouts, and is therefore not a number a
-baseline column can be compared against; on the subset that \emph{is} comparable, noun-repetition
-counting does exactly as well as the probabilistic model. Two families and ten items settle nothing
-in either direction, but the honest reading is that ladder agreement does not currently distinguish
-the measure, and the case for it rests on the claim-identical contrast above, on per-claim
-attribution, and on the invariance of Rem.~\ref{rem-order} --- none of which a cohesion statistic
-or a judge provides.
+Two results, and the first supersedes a hedge we published on ten assertions.
 
-\paragraph{The ladder is hard for relation-based methods, and the reason is extraction.} The two
-weakest scorable rows are the relation-based baselines, which is initially surprising given how
-cleanly the same extractor handled the fixtures. The cause is measurable. On these responses the
-pairwise extractor labels $20$--$24$ of $120$ claim pairs contradictory on \emph{every} rung, while
-the declared perturbations change only one to three relations; against the gold conflicts of one rung
-its precision is $3/21=0.14$ at recall $3/4$. It finds most of the real conflicts and buries them
-under roughly eighteen spurious ones, and because that background is rung-invariant it cancels out of
-no comparison and swamps the signal. This is the same over-extraction \S\ref{sec-mining} documents
-for our own miner, measured here on a baseline that shares its extractor --- and it is why the gap
-between the gold and mined arms of Table~\ref{tab:ladder} should be read as a statement about
-relation extraction rather than about aggregation. The judges, which never see the claim
-decomposition, are not exposed to it and place mid-table.
+\paragraph{The probabilistic model now separates from cohesion counting.} On the earlier two-family
+corpus $\LCS_{\mm}$ and noun-repetition cohesion tied at $70.0\%$ of ten assertions, and we reported
+honestly that a cohesion counter did exactly as well as the probabilistic model. At $50$ assertions
+that tie breaks: $\LCS_{\mm}$ reaches $37/50$ ($74.0\%$) against \textsc{rc}'s $30/50$ ($60.0\%$), and
+\emph{all three} graded readouts ($74.0$, $72.0$, $68.0$) sit above \emph{every} evidence-free
+baseline, so the ordering is not an artefact of choosing a headline readout. The earlier tie was a
+small-sample coincidence. We note the direction of the correction explicitly because the hedge it
+replaces was ours.
 
-%% ================================================================
+\paragraph{An LLM judge's score on this benchmark is a property of the judge, not of the method.}
+Every model-free baseline is bit-identical across the two judge runs --- \textsc{rc} $30/50$ twice,
+\textsc{lc} $28/50$ twice, \textsc{length} $20/50$ twice --- which is the internal check that the
+harness is deterministic where it should be. Against that fixed background the two judge rows move
+enormously: G-Eval scores $0/50$ under \texttt{llama-3.3-70b} and $21/50$ under \texttt{gpt-oss-120b},
+and direct rating $4/50$ against $18/50$. Same prose, same rubric, same five-run averaging, same $50$
+assertions; only the judge model changed. A single-judge evaluation of this kind therefore reports
+the judge as much as the metric, and the $42$-point spread is larger than the gap between the best
+baseline and the worst.
+
+The mechanism is saturation rather than noise, and the two judges fail in opposite ways.
+\texttt{llama}'s G-Eval is astonishingly stable and useless: mean per-item standard deviation
+$0.0002$, only three distinct values across seventy items, and a mean score of $0.996$ --- it rates
+almost everything at ceiling, so it cannot order anything. \texttt{gpt-oss}'s G-Eval uses its range
+(fourteen distinct values, mean $0.749$) and pays in stability (mean sd $0.0800$, max $0.187$).
+Reporting judge variance alone would have called the first judge the reliable one, which is exactly
+backwards for the task.
+
+Finally, four baselines score $0/50$ under both judges and it is worth separating the reasons, since
+they are not one finding. \textsc{roscoe-sc} (max) collapses to a constant $0.0$ on every item ---
+the max-aggregated contradiction signal saturates, as \S\ref{sec-baseline-results} already found on
+the fixtures. \textsc{entity graph} returns a constant $1.0$. \textsc{claim count} is constant
+\emph{by construction}: every rung of a family shares one claim set, which is what makes this corpus
+a controlled contrast and what makes a claim-count proxy vacuous on it. Only the first two are
+failures of the measure; the third is the corpus doing its job.
+
 \section{Worked examples}
 \label{sec-examples}
 %% ================================================================
@@ -2028,20 +2107,26 @@ $n\le20$ claims. The two agree on the fixtures we can check both ways, but we ha
 the approximation error at length, and the augmented networks of \S\ref{sec-consistency} --- which add
 one auxiliary variable per relation --- are the case where it would most plausibly bite.
 
-\paragraph{Empirical scope.} The generated corpus is two families and ten items, of one ladder type,
-with single-sample mining and measured run-to-run movement of $0.06$ F1. Three further ladder types are
-specified --- including the control ladder whose whole purpose is to catch a measure that tracks edit
-count, arguably the most important single experiment in the protocol --- but were not generated at
-scale. All five baseline families of \S\ref{sec-baselines} are now measured, on the hand-authored
-fixtures and on the ladder (\S\ref{sec-baselines-measured}), and the comparison does not favour us
-where it is cleanest: on the ten readout-independent ladder assertions the mean posterior marginal
-and both cohesion metrics all satisfy seven. We report that rather than the incomparable
-$28$-assertion figure. \citet{liustrube} is cited rather than run, for the output-type reason given
-above. What remains genuinely open is scale --- two families and ten items cannot separate measures
-that differ by one or two assertions --- and human correlation, which is what would establish that
-the construct being ordered is the one readers care about. And the corpus is LLM-generated
-throughout, gold relation labels included, with LLM-committee validation; a bias shared between
-generator and committee would not be caught by it.
+\paragraph{Empirical scope.} The generated corpus is fourteen families and seventy items spanning all
+four ladder types, with single-sample mining whose measured run-to-run movement is at most $0.014$ F1
+across two independent runs of the same configuration. All five baseline families of
+\S\ref{sec-baselines} are measured, on the hand-authored fixtures and on the ladder
+(\S\ref{sec-baselines-measured}). On the $50$ readout-independent ladder assertions all three graded
+readouts now sit above every evidence-free baseline, which supersedes the tie we reported on ten
+assertions; we flag the direction of that correction in \S\ref{sec-baselines-measured} rather than
+quietly restating it. \citet{liustrube} is cited rather than run, for the output-type reason given
+above.
+
+Three things remain genuinely open. First, the control and order ladders --- the invariance
+experiments --- reveal that \emph{mined} graphs are strongly order-dependent ($0/45$ and $0/15$ on
+every mined arm, with a five-rung edge count of $9,16,20,20,17$ under pure sentence reordering), and we
+cannot yet say how a human annotator would score those same rungs, which is the comparison that would
+separate ``the extractor is unstable'' from ``the invariance requirement is too strict''. Second,
+human correlation generally, which is what would establish that the construct being ordered is the one
+readers care about. Third, judge dependence: the two LLM judges we ran disagree by up to $42$ points
+on the identical assertions, so any single-judge number here --- including ours --- carries that
+uncertainty. And the corpus is LLM-generated throughout, gold relation labels included, with
+LLM-committee validation; a bias shared between generator and committee would not be caught by it.
 
 %% ================================================================
 \section{Conclusion}
@@ -2063,10 +2148,11 @@ mean posterior marginal survives all five criteria, needs one inference query, a
 incoherence to the claims responsible.
 
 Measuring such a score requires controlled contrasts, and ladders of responses over one claim set with
-declared orderings supply them. Given gold relation graphs the readouts recover $78.6\%$ of those
-orderings; given graphs mined from the response text, $53.6\%$. Because the two conditions differ in
-nothing but the relation graph, the gap localizes the open problem: the probabilistic model is
-adequate, and grounded relation extraction, at $56.3\%$ coupling-level F1, is the bottleneck. That is a
+declared orderings supply them. Given gold relation graphs the readouts recover $82.7\%$ of those
+orderings; given graphs mined from the response text, $34.7$--$37.1\%$. Because the two conditions
+differ in nothing but the relation graph, the gap localizes the open problem: the probabilistic model is
+adequate, and grounded relation extraction, at $52\%$ coupling-level F1 at best and not invariant to
+sentence order, is the bottleneck. That is a
 more tractable target than ``measure coherence'', and it is one that improvements can be measured
 against.
 

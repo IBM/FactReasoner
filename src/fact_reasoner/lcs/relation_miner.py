@@ -53,7 +53,7 @@ from fact_reasoner.core.base import Atom
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.utils import build_atoms
 from fact_reasoner.fact_graph import FactGraph
-from fact_reasoner.factors import build_markov_network
+from fact_reasoner.factors import PROB_EPS, build_markov_network
 from fact_reasoner.lcs import candidate_pairs as _cp
 from fact_reasoner.lcs.prompts import (
     PROMPT_VARIANTS,
@@ -103,6 +103,11 @@ RECONCILE_MODES = ("ratchet", "strict")
 
 # Confidence used when a probability cannot be determined from the output.
 _UNKNOWN_PROBABILITY = 0.5
+
+# Reused rather than redefined so the value the miner RECORDS and the value the
+# scorer builds a factor from can never drift apart. See `factors.PROB_EPS` for why
+# a bare 0.0/1.0 is fatal to the coherence MRF.
+_PROB_EPS = PROB_EPS
 
 
 # ----------------------------------------------------------------------------
@@ -945,9 +950,12 @@ class RelationMiner:
                 continue
             strength_raw = strengths_raw.get(i, _UNKNOWN_PROBABILITY)
             strength = max(
-                0.0, min(1.0, self.strength_calibrator.transform(strength_raw))
+                _PROB_EPS,
+                min(1.0 - _PROB_EPS, self.strength_calibrator.transform(strength_raw)),
             )
-            prob = max(0.0, min(1.0, r["type_confidence"] * strength))
+            prob = max(
+                _PROB_EPS, min(1.0 - _PROB_EPS, r["type_confidence"] * strength)
+            )
             results.append(
                 MinedRelation(
                     source_id=r["source_id"],
@@ -1109,14 +1117,19 @@ class RelationMiner:
             p = surrogate_probability_from_logprobs(lps)
             if p is not None:
                 return p
-        # Fallback: no usable logprobs -- read the emitted word (Yes~1 / No~0).
+        # Fallback: no usable logprobs -- read the emitted word. Deliberately NOT a
+        # bare 1.0/0.0: this branch is the high-volume path for a reasoning model
+        # whose answer token carries no yes/no alternatives, and a hard extreme here
+        # zeroes a factor-table cell and makes the whole network unnormalizable. It
+        # also over-claims -- reading the word tells us the sign, not that the model
+        # was certain.
         text = _output_text(output)
         first = text.strip().split()
         word = first[0].lower() if first else ""
         if word.startswith("yes"):
-            return 1.0
+            return 1.0 - _PROB_EPS
         if word.startswith("no"):
-            return 0.0
+            return _PROB_EPS
         return _UNKNOWN_PROBABILITY
 
     # -- prompt parsing ------------------------------------------------------
@@ -1336,7 +1349,7 @@ class RelationMiner:
             if resolver is not None:
                 rel.resolving_atom_id = resolver
                 rel.probability = max(
-                    0.0, rel.probability * (1.0 - self.concession_discount)
+                    _PROB_EPS, rel.probability * (1.0 - self.concession_discount)
                 )
             else:
                 # Sense said Concession but no resolver present: it stands as a

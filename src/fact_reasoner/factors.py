@@ -31,6 +31,39 @@ from fact_reasoner.core.base import PRIOR_PROB_ATOM, PRIOR_PROB_CONTEXT
 from fact_reasoner.fact_graph import FactGraph
 from fact_reasoner.markov_network import MarkovNetwork
 
+# Every table below uses BOTH ``p`` and ``1 - p``, so a probability of exactly 0.0 or
+# exactly 1.0 writes a literal zero into it -- one cell for the directed couplings,
+# two of four for `equivalence` / `exclusive`, which converts a soft preference into a
+# hard logical constraint. Enough of those on overlapping variables and no world has
+# any mass: Merlin then reports `logZ: -inf` with
+# `"status":"false","message":"Inconsistent evidence or underflow"` and an empty
+# `marginals` list, and the cell cannot be scored at all.
+#
+# Clamping here rather than at the estimator is deliberate: this is the single
+# chokepoint every graph passes through on its way into the network, so no caller --
+# present or future -- can reintroduce the problem, and the probabilities the miner
+# RECORDS stay exactly what the model reported (the mining diagnostics would otherwise
+# lie about what was extracted).
+#
+# 1e-6 is the established convention in this repo, not a new invention:
+# `lcs/strength.py::_EPS` and `uncertainty/simbauq.py::_CLF_EPS` both use it two-sided,
+# and `assessor.py` already floors a probability just before building factors. Gold
+# arms are unaffected by construction -- `locoeval/gold_graph.band_probability` returns
+# band midpoints 0.925 / 0.720 / 0.470 and atom priors are 0.9 / 0.1, all interior.
+PROB_EPS = 1e-6
+
+
+def _clamp_probability(prob: float) -> float:
+    """Keep a factor probability strictly inside ``(0, 1)``.
+
+    Args:
+        prob: A probability that may sit on either boundary.
+
+    Returns:
+        ``prob`` confined to ``[PROB_EPS, 1 - PROB_EPS]``.
+    """
+    return max(PROB_EPS, min(1.0 - PROB_EPS, prob))
+
 
 def pairwise_prior(link: str) -> float:
     """Return the source-node prior for a pairwise factor given its link type.
@@ -70,7 +103,7 @@ def edge_factor_values(edge, use_priors: bool = True) -> list[float]:
     Raises:
         ValueError: If ``edge.type`` is not a known relation type.
     """
-    prob = edge.probability
+    prob = _clamp_probability(edge.probability)
     if edge.type == "entailment":  # source true implies target true
         if use_priors:
             src_prior = pairwise_prior(edge.link)
@@ -134,6 +167,9 @@ def build_markov_network(
         prob = node.probability
         if node_priors is not None and x in node_priors:
             prob = node_priors[x]
+        # Clamp AFTER the override, not before: an injected prior of exactly 0.0/1.0
+        # would otherwise bypass the guard and zero out the variable's unary factor.
+        prob = _clamp_probability(prob)
         network.add_node(x)
         network.add_factor([x], [2], [1.0 - prob, prob])
 

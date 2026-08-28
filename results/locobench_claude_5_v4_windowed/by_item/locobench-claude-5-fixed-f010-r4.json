@@ -1,0 +1,1616 @@
+{
+  "item_id": "locobench-claude-5-fixed-f010-r4",
+  "item_name": "Computer Science -- coherent",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f010",
+    "family": "CONFLICT",
+    "rung_index": 4,
+    "rung_name": "coherent",
+    "perturbation": {
+      "calls": [
+        "add_resolution",
+        "drop_relation",
+        "drop_relation"
+      ],
+      "parent_rung": 1,
+      "targets": [
+        "r008",
+        "r001",
+        "r002"
+      ],
+      "edge_effects": [
+        {
+          "call": "add_resolution",
+          "target": "r008",
+          "effect": "resolved",
+          "detail": "r008 (exclusive, sense unchanged)"
+        },
+        {
+          "call": "drop_relation",
+          "target": "r001",
+          "effect": "removed",
+          "detail": "a0->a1 (Contrast)"
+        },
+        {
+          "call": "drop_relation",
+          "target": "r002",
+          "effect": "removed",
+          "detail": "a4->a3 (Concession)"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "increase",
+      "consistency": "increase",
+      "log_partition": "increase"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do investigators adjudicate between a defective code deployment and an underlying infrastructure fault when a large distributed system suffers a total outage and the two engineering teams submit irreconcilable post-incident accounts?",
+    "split": "test",
+    "word_count": 650,
+    "generator": "claude-opus-5"
+  },
+  "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The Orion platform suffered a total service outage affecting all customer-facing endpoints.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The outage was confined to a single availability zone.",
+      "label": "p2",
+      "factual": false,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Load balancer logs recorded a simultaneous surge of health-check failures in every region.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Investigators reconstructed the incident sequence from timestamped telemetry collected across all regions.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The telemetry pipeline retained no log data from the period of the outage.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The outage began four minutes after a configuration change was deployed to the routing tier.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The deployed configuration introduced an invalid routing rule into the request path.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The cluster's underlying network fabric was misconfigured before the deployment.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The application engineering team attributed the outage to a failure of the shared storage backend.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The infrastructure team attributed the outage to the routing tier deployment.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Rolling back the routing tier deployment restored service.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The incident review board concluded that the routing tier deployment was the proximate cause of the outage.",
+      "label": "p12",
+      "factual": true,
+      "role": "holding",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "No customer transaction records were permanently lost during the outage.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Records for 12,000 customer transactions were permanently lost during the outage.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The incident review board determined that no customer transaction records were permanently lost.",
+      "label": "p15",
+      "factual": true,
+      "role": "holding",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a2",
+      "target_id": "a0",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a11",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a5",
+      "target_id": "a10",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 5,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "out_of_window",
+      "in_candidate_window": false
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": true,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5",
+        "perturbed_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a12",
+      "target_id": "a14",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a1",
+      "target_id": "a4",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a6",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a7",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "Adjudication between a defective deployment and a latent infrastructure fault begins not with the competing narratives but with the observable scope of the failure, because scope constrains which causal stories remain admissible. The Orion platform suffered a total service outage affecting all customer-facing endpoints. The outage was confined to a single availability zone. Load balancer logs recorded a simultaneous surge of health-check failures in every region. No endpoint remained reachable, and the failure was global rather than localized. A fault whose signature appears everywhere at once is far more consistent with a change propagated through a shared control plane than with the degradation of any single hardware domain.\n\nThe second step is chronological reconstruction, which is where post-incident accounts are most often falsified. Investigators reconstructed the incident sequence from timestamped telemetry collected across all regions, even though the telemetry pipeline retained no log data from the period of the outage. That tension is resolved by locating the retention gap precisely: the outage-window records survived in each region's local buffers and were recovered from them, so the reconstruction rests on telemetry that the central pipeline alone had failed to keep. What such a reconstruction yields is not an opinion about blame but an ordered record of state transitions against which each team's submission can be checked.\n\nThat record fixed the critical interval. The outage began four minutes after a configuration change was deployed to the routing tier, and this onset caused the deployed configuration to introduce an invalid routing rule into the request path. A four-minute lag is itself diagnostic, since it matches the propagation delay of routing state to edge nodes rather than the slower, uneven onset typical of storage or fabric saturation. Even so, the evidence does not license a single-fault conclusion. At least one of two defects was present in the cluster at the moment of failure \u2014 the invalid rule in the request path, or a misconfiguration of the cluster's underlying network fabric predating the deployment \u2014 and perhaps both were. Distinguishing a triggering change from a pre-existing condition that the change merely exposed is the substantive analytical problem, and it cannot be settled by scope data alone.\n\nPre-existing conditions of that kind also shape how each team frames its account. Specifically, the application engineering team attributed the outage to a failure of the shared storage backend, locating the defect below the layer it owned. The infrastructure team, despite that storage attribution, attributed the outage to the routing tier deployment, locating the defect above the layer it owned. Neither submission can be adjudicated by assertion, so investigators turned to intervention evidence. Rolling back the routing tier deployment restored service \u2014 a remediation that postdates the four-minute interval between the configuration change and the onset of the failure, and whose success therefore bears directly on the disputed link. On that basis the incident review board concluded that the routing tier deployment was the proximate cause of the outage, which settles the disagreement between the two teams: the storage backend cannot have been the proximate cause of a failure that a routing rollback terminated, and the fabric misconfiguration, real though it was, functioned as a background condition rather than the trigger.\n\nA comparable adjudication was required for the question of data durability, where the record admits no middle ground. No customer transaction records were permanently lost during the outage; either that holds, or records for 12,000 customer transactions were permanently lost, and exactly one of these two accounts can be true. The durability finding entered the record in the first form \u2014 that is, the incident review board determined that no customer transaction records were permanently lost. Methodologically, this is the same discipline applied to causation: identify the mutually exclusive candidate states, locate the artifact that discriminates between them, and let the narratives submitted by the affected teams stand or fall against that artifact rather than against each other.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r4",
+      "item_name": "Computer Science -- coherent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r008",
+          "r001",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r008",
+            "effect": "resolved",
+            "detail": "r008 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r001",
+            "effect": "removed",
+            "detail": "a0->a1 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a4->a3 (Concession)"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 8,
+      "num_relations": 7,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 7,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8219732666666667,
+        "consistency": 0.4815019837971116,
+        "reified": 0.246961,
+        "log_partition": 0.46492187804799445
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.985422,
+          "a1": 0.1,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.978699,
+          "a13": 0.896939,
+          "a14": 0.978947,
+          "a2": 0.937965,
+          "a3": 0.9,
+          "a4": 0.1,
+          "a5": 0.925375,
+          "a6": 0.968149,
+          "a7": 0.925346,
+          "a8": 0.903748,
+          "a9": 0.929009
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3574056315124053,
+        "log_z": -3.267009,
+        "log_z_max": -2.005237,
+        "log_z_min": -4.363345
+      },
+      "elapsed_s": 0.153,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r4",
+      "item_name": "Computer Science -- coherent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r008",
+          "r001",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r008",
+            "effect": "resolved",
+            "detail": "r008 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r001",
+            "effect": "removed",
+            "detail": "a0->a1 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a4->a3 (Concession)"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 8,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 2,
+        "relations_kept": 5,
+        "concessions_discounted": 2,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8185922666666666,
+        "consistency": 0.45991239215686275,
+        "reified": 0.261591,
+        "log_partition": 0.4779001198932477
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.985422,
+          "a1": 0.1,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.978699,
+          "a13": 0.896939,
+          "a14": 0.978947,
+          "a2": 0.937965,
+          "a3": 0.9,
+          "a4": 0.1,
+          "a5": 0.9,
+          "a6": 0.92929,
+          "a7": 0.92929,
+          "a8": 0.913025,
+          "a9": 0.929307
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3710533980887878,
+        "log_z": -2.126256,
+        "log_z_max": -0.866004,
+        "log_z_min": -3.279818
+      },
+      "elapsed_s": 0.14,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r4",
+      "item_name": "Computer Science -- coherent",
+      "arm": "mined:llama-3.3-70b-instruct:windowed",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r008",
+          "r001",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r008",
+            "effect": "resolved",
+            "detail": "r008 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r001",
+            "effect": "removed",
+            "detail": "a0->a1 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a4->a3 (Concession)"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 8,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 15,
+      "num_dropped_none": 5,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 25,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 10,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 50,
+        "num_callback_pairs": 0,
+        "pairs_selected": 15,
+        "forward_pairs_possible": 105,
+        "pairs_pruned": 90,
+        "discourse_anchored": true,
+        "num_sentences": 26,
+        "num_atoms_aligned": 15,
+        "num_promoted": 0,
+        "num_demoted": 35,
+        "pairs_scored": 15,
+        "dropped_none": 5,
+        "relations_kept": 10,
+        "llm_calls": 25,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1.3007123278443192e-05,
+          "strength": 1.3007123795299813e-05,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.5497752638253569,
+          "strength": 0.9999724643129974,
+          "type_confidence": 0.9996189139669129,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 9.610239205224537e-05,
+          "strength": 9.610239205224537e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999921107357234,
+          "strength": 0.9999921107357234,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.001501181992308739,
+          "strength": 0.001501181992308739,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999980463280015,
+          "strength": 0.999999,
+          "type_confidence": 0.9999990463270478,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.0024726226417156306,
+          "strength": 0.002472622936475219,
+          "type_confidence": 0.9999998807907247,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8442996666666667,
+        "consistency": 0.9551636371671006,
+        "reified": 0.488365,
+        "log_partition": 0.37275242938970404
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.94186,
+          "a1": 0.005815,
+          "a10": 0.99981,
+          "a11": 0.999981,
+          "a12": 0.99863,
+          "a13": 0.99863,
+          "a14": 0.99863,
+          "a2": 0.9,
+          "a3": 0.906688,
+          "a4": 0.084951,
+          "a5": 0.94186,
+          "a6": 0.994186,
+          "a7": 0.9,
+          "a8": 0.996723,
+          "a9": 0.996731
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.1772908125229933,
+        "log_z": -1.662533,
+        "log_z_max": -0.787135,
+        "log_z_min": -2.182753
+      },
+      "comparison": {
+        "gold_edges_total": 8,
+        "gold_edges_scorable": 7,
+        "mined_edges_total": 10,
+        "pair": {
+          "tp": 4,
+          "fp": 6,
+          "fn": 3,
+          "precision": 0.4,
+          "recall": 0.5714285714285714,
+          "f1": 0.47058823529411764
+        },
+        "coupling": {
+          "tp": 3,
+          "fp": 7,
+          "fn": 4,
+          "precision": 0.3,
+          "recall": 0.42857142857142855,
+          "f1": 0.3529411764705882
+        },
+        "sense": {
+          "tp": 3,
+          "fp": 7,
+          "fn": 4,
+          "precision": 0.3,
+          "recall": 0.42857142857142855,
+          "f1": 0.3529411764705882
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 6,
+            "found": 3,
+            "recall": 0.5
+          },
+          "backward": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "True": {
+            "total": 4,
+            "found": 1,
+            "recall": 0.25
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 10.436,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f010-r4",
+      "item_name": "Computer Science -- coherent",
+      "arm": "mined:gpt-oss-120b-a100:windowed",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b-a100",
+      "pair_policy": "windowed",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 4,
+      "rung_name": "coherent",
+      "perturbation": {
+        "calls": [
+          "add_resolution",
+          "drop_relation",
+          "drop_relation"
+        ],
+        "parent_rung": 1,
+        "targets": [
+          "r008",
+          "r001",
+          "r002"
+        ],
+        "edge_effects": [
+          {
+            "call": "add_resolution",
+            "target": "r008",
+            "effect": "resolved",
+            "detail": "r008 (exclusive, sense unchanged)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r001",
+            "effect": "removed",
+            "detail": "a0->a1 (Contrast)"
+          },
+          {
+            "call": "drop_relation",
+            "target": "r002",
+            "effect": "removed",
+            "detail": "a4->a3 (Concession)"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 8,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 15,
+      "num_dropped_none": 7,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 23,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 8,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 50,
+        "num_callback_pairs": 0,
+        "pairs_selected": 15,
+        "forward_pairs_possible": 105,
+        "pairs_pruned": 90,
+        "discourse_anchored": true,
+        "num_sentences": 26,
+        "num_atoms_aligned": 15,
+        "num_promoted": 0,
+        "num_demoted": 35,
+        "pairs_scored": 15,
+        "dropped_none": 7,
+        "relations_kept": 8,
+        "llm_calls": 23,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998410543122,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998807907365,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8563154,
+        "consistency": 0.4017311278254953,
+        "reified": 0.090001,
+        "log_partition": 0.06574838124881698
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.94186,
+          "a1": 0.1,
+          "a10": 0.94186,
+          "a11": 0.994186,
+          "a12": 0.9,
+          "a13": 0.9,
+          "a14": 0.979121,
+          "a2": 0.994186,
+          "a3": 0.642859,
+          "a4": 0.678567,
+          "a5": 0.94186,
+          "a6": 0.994186,
+          "a7": 0.9,
+          "a8": 0.94186,
+          "a9": 0.994186
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.35698486984488104,
+        "log_z": -16.479226,
+        "log_z_max": -0.650923,
+        "log_z_min": -17.59315
+      },
+      "comparison": {
+        "gold_edges_total": 8,
+        "gold_edges_scorable": 7,
+        "mined_edges_total": 8,
+        "pair": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 2,
+          "precision": 0.625,
+          "recall": 0.7142857142857143,
+          "f1": 0.6666666666666666
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 3,
+          "precision": 0.5,
+          "recall": 0.5714285714285714,
+          "f1": 0.5333333333333333
+        },
+        "sense": {
+          "tp": 3,
+          "fp": 5,
+          "fn": 4,
+          "precision": 0.375,
+          "recall": 0.42857142857142855,
+          "f1": 0.39999999999999997
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          },
+          "backward": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "True": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "valid": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 59.007,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    }
+  ]
+}
