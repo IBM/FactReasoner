@@ -1292,9 +1292,8 @@ located.
 \subsection{What the baselines show}
 \label{sec-baseline-results}
 
-Two results are available before any ladder sweep, and both concern what a comparison on these
-fixtures can support. Table~\ref{tab:baselines} in \S\ref{sec-baselines-measured} gives the
-per-fixture numbers.
+Two properties of these baselines are worth establishing before any ladder sweep, because both bear
+on what the comparison in \S\ref{sec-baselines-measured} can support.
 
 First, \emph{cohesion is not coherence, and the discourse floor cannot tell the difference.} On a pair
 of two-sentence responses with identical nouns and identical repetition structure --- ``The weld passed
@@ -1304,46 +1303,76 @@ and ROSCOE baselines separate the pair. The metrics are defined over noun repeti
 property of their definitions rather than an accuracy failure; it is also the cleanest available
 demonstration that the axis we measure is not the one entity-based coherence models measure.
 
-Second, \emph{a controlled contrast has to be checked, not assumed.} On the contradiction-injected
-biography pair of \S\ref{sec-experiments}, every model-free control reproduces the intended ordering:
-claim count ($19$ against $12$), response length ($115$ against $75$ tokens) and all three discourse
-metrics rank the clean biography above the contradicted one. That pair therefore cannot discriminate a
-coherence measure from a length or claim-count proxy, and we do not report it as though it could. The
-claim-identical ordering pair of \S\ref{sec-example-order} is the controlled contrast: claim count is
-exactly flat there by construction, response length differs by four tokens ($265$ against $269$) in the
+Second, \emph{a controlled contrast has to be checked, not assumed.} A measure can reproduce a
+declared ordering for reasons that have nothing to do with coherence, so a contrast is only
+informative once the model-free proxies have been shown \emph{not} to reproduce it. The
+claim-identical ordering pair of \S\ref{sec-example-order} is the clean case: claim count is exactly
+flat there by construction, response length differs by four tokens ($265$ against $269$) in the
 direction \emph{opposite} to the declared ordering, and all three discourse metrics rank the
 adversarial summary \emph{above} the faithful one, the self-serving-first ordering carrying more noun
-repetition. A cohesion metric prefers the less coherent response of the two.
+repetition. A cohesion metric prefers the less coherent response of the two. The ladder corpus of
+\S\ref{sec-experiments} generalizes exactly this property: every rung of a family shares one claim
+set, so a claim-count proxy is flat by construction across all seventy items.
 
 %% ================================================================
 \section{Experiments}
 \label{sec-experiments}
 %% ================================================================
 
-\paragraph{Scale and sampling, stated first.} Two bodies of data are used. The first is nine
-hand-authored fixtures --- a recall report, two biographies (one with five planted contradictions),
-a narrative, a summary, two summaries of one appellate judgment differing only in claim order, an
-incident post-mortem, and a damages opinion --- carrying claims and prose notes but no
-machine-readable gold relations. The second is a generated corpus of coherence ladders:
-\textbf{fourteen families, seventy items}, produced by \texttt{claude-opus-5} with a three-model
-cross-vendor validation committee (\texttt{gpt-5.6-terra}, \texttt{gemini-3.1-pro},
-\texttt{claude-sonnet-5}; V1 any-of, V3/V4 majority), spanning fourteen of the canonical topics and
-all four domains, $15$--$16$ claims and $609$--$698$ words per item, $1{,}115$ atoms and $670$ gold
-relations in total at a $0.61$ valid fraction, plus $342$ pairs explicitly declared unrelated. All
-four ladder types are represented: eight \textsc{conflict}, three \textsc{order}, two
-\textsc{chain} and one \textsc{control}. Relations are mined by \texttt{llama-3.3-70b-instruct} and
-\texttt{gpt-oss-120b}, both read through token logprobs.
+\subsection{The corpus}
+
+Evaluation is on a single body of data: a generated corpus of coherence ladders.
+\S\ref{sec-locobench} defines what a ladder, an arm and a match level are; this subsection gives the
+concrete instance.
+
+The corpus holds \textbf{fourteen families and seventy items} --- fourteen ladders of five rungs, each
+rung a distinct response over one claim set. It was produced by \texttt{claude-opus-5} and admitted by
+a three-model cross-vendor validation committee (\texttt{gpt-5.6-terra}, \texttt{gemini-3.1-pro},
+\texttt{claude-sonnet-5}), which recovers the relation graph from prose without seeing the plan (V1,
+any-of), audits the prose for leakage and hedging (V3, majority) and checks atom coverage (V4,
+majority). Items carry $15$--$16$ claims and $609$--$698$ words, for $1{,}115$ atoms and $670$ gold
+relations in total at a $0.61$ valid fraction, together with $342$ claim pairs the corpus
+\emph{explicitly declares unrelated} --- a labelled negative set rather than an unlabelled remainder.
+Subject matter spans fourteen canonical topics across all four domains, so no single topic or domain
+carries a result.
+
+All four ladder types are represented, and the mix matters for reading the results: eight
+\textsc{conflict} families (rungs resolve or remove conflicting relations), two \textsc{chain}
+(entailment links are broken and repaired), three \textsc{order} and one \textsc{control}. The last
+two are the negative controls. Every rung of an \textsc{order} or \textsc{control} family applies only
+meaning-preserving edits --- sentence reordering, or a
+\textsc{Precedence}$\leftrightarrow$\textsc{Succession} swap that couples no truth values --- so those
+ladders assert \emph{invariance}, and a measure that trends across them is tracking surface form
+rather than coherence. \textsc{conflict} and \textsc{chain} assert a monotone increase. A corpus with
+only the increase-type ladders cannot distinguish a coherence measure from an edit-count proxy, which
+is why both kinds are present.
+
+\subsection{Protocol}
+
+Each family declares the ordering its rungs must exhibit, per readout, and those declarations are the
+unit of measurement: \textbf{$202$ constraint checks} in total, decomposing as $112$ over
+\textsc{conflict}, $30$ over \textsc{chain}, $45$ over \textsc{order} and $15$ over \textsc{control}.
+A check names a readout and a rung pair and asserts increase or invariance; a missing score fails
+rather than passes.
+
+An arm fixes where the relation graph comes from and holds everything else --- the claims, the atom
+priors, the readouts, the scorer settings --- byte-identical, so a difference between two arms is
+attributable to relation sourcing alone. The \textsc{gold} arm compiles each item's own labels;
+\textsc{gold\_valid} drops the deliberately-planted invalid ones. The mined arms run the estimator of
+\S\ref{sec-mining} over the response prose with two miners, \texttt{llama-3.3-70b-instruct} and
+\texttt{gpt-oss-120b}, both read through token logprobs, under two candidate-pair policies:
+\textsc{windowed} (forward-only, within an order window) and \textsc{bidirectional} (both arc
+directions within the same radius).
 
 Mining is sampled once per cell at the model's default temperature, so the mined arms are not
-deterministic. We measure that directly rather than estimate it: two \emph{independent} runs of the
-same two \textsc{windowed} configurations moved coupling-level F1 by at most $0.014$ and every
-pair/coupling/sense F1 by at most $0.014$, while the gold arms reproduced bit-for-bit across the same
-pair of runs. Per-arm ladder agreement is the noisier statistic, moving by four to six of $202$
-assertions between those runs, so a single arm's percentage should not be read to the point. The
-$0.014$ figure supersedes the $\pm 0.06$ we previously estimated on a ten-item corpus: the larger
-corpus tightens reproducibility rather than merely enlarging the denominator. These are measurements,
-not significance claims. All exact values are by $2^{16}$ enumeration; all corpus-scale values are by
-weighted mini-bucket with i-bound $6$.
+deterministic. We measure that rather than estimate it: two \emph{independent} runs of the same two
+\textsc{windowed} configurations moved every pair, coupling and sense F1 by at most $0.014$, while the
+gold arms reproduced bit-for-bit across the same pair of runs. Per-arm ladder agreement is the noisier
+statistic, moving by four to six of $202$ assertions between those runs, so a single arm's percentage
+should not be read to the point. That $0.014$ supersedes the $\pm 0.06$ we previously estimated on a
+ten-item corpus: the larger corpus tightens reproducibility rather than merely enlarging the
+denominator. These are measurements, not significance claims. All exact values are by $2^{16}$
+enumeration; all corpus-scale values are by weighted mini-bucket with i-bound $6$.
 
 \subsection{Relation estimation is the bottleneck}
 
@@ -1452,8 +1481,8 @@ by one or two relations cannot survive that. This is the paper's central empiric
 claim about \emph{where the remaining problem is}: the probabilistic model orders responses correctly
 when handed a correct graph, and the open problem is extracting one.
 
-The per-ladder breakdown localizes the failure, and it does so in a way the two-family corpus could not
-express at all --- the aggregate percentage conceals a sharp qualitative split.
+The per-ladder breakdown localizes the failure, and it is worth reading before the aggregate: the
+single percentage conceals a sharp qualitative split.
 
 On gold, \textsc{order} and \textsc{control} are perfect ($45/45$ and $15/15$). Every rung of those
 ladders applies only meaning-preserving edits, which move no factor, so exact invariance is the correct
@@ -1492,226 +1521,19 @@ $\LCS_{\lp}$ collapses to $0.037$ and $0.033$ against gold's $0.410$ on the same
 from adding roughly two thousand spurious factors --- the log-partition readout registers added factor
 mass most directly.
 
-\subsection{Readout dynamic range is a property of the graph}
-
-\begin{table}[t]
-\centering\footnotesize
-\setlength{\tabcolsep}{4pt}
-\caption{$\LCS_{\mm}$ on the nine hand-authored fixtures, across three relation-mining models and
-  three conditional-strength estimators (\emph{lp} = surrogate logprobs, \emph{smp} = surrogate
-  sampled, \emph{vrb} = verbalized). \texttt{e2-bio} is a consistent biography and \texttt{e2-con} the
-  same biography with five planted contradictions; \texttt{e5-K} and \texttt{e5-S} are the two
-  claim-identical orderings of one judgment; \texttt{ex6} is an authored contradiction-free
-  post-mortem.}
-\label{tab:fixtures}
-\begin{tabular}{@{}llrrrrrrrrr@{}}
-\toprule
-Model & Str. & \texttt{aero} & \texttt{e1-dmg} & \texttt{e2-bio} & \texttt{e2-con} & \texttt{e3-nar} & \texttt{e4-sum} & \texttt{e5-K} & \texttt{e5-S} & \texttt{ex6} \\
-\midrule
-llama-4-mav.\ & lp  & 0.76 & 0.66 & 0.88 & 0.49 & 0.49 & 0.51 & 0.41 & 0.46 & 0.95 \\
-              & smp & 0.81 & 0.72 & 0.91 & 0.54 & 0.57 & 0.53 & 0.54 & 0.33 & 0.94 \\
-              & vrb & 0.75 & 0.75 & 0.88 & 0.53 & 0.75 & 0.71 & 0.90 & 0.70 & 0.94 \\
-\midrule
-llama-3.3-70b & lp  & 0.79 & 0.82 & 0.99 & 0.82 & 0.72 & 0.32 & 0.71 & 0.49 & 0.93 \\
-              & smp & 0.70 & 0.89 & 1.00 & 0.13 & 0.69 & 0.26 & 0.65 & 0.57 & 0.93 \\
-              & vrb & 0.65 & 0.67 & 0.94 & 0.46 & 0.69 & 0.59 & 0.67 & 0.56 & 0.94 \\
-\midrule
-gpt-oss-120b  & lp  & 0.76 & 0.82 & 0.89 & 0.49 & 0.75 & 0.79 & 0.95 & 0.90 & 0.95 \\
-              & smp & 0.73 & 0.93 & 0.88 & 0.54 & 0.74 & 0.89 & 0.96 & 0.89 & 0.94 \\
-              & vrb & 0.71 & 0.89 & 0.66 & 0.45 & 0.71 & 0.70 & 0.86 & 0.73 & 0.93 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:fixtures} scores the nine fixtures across nine configurations. The consistent biography
-separates from its contradicted twin in every configuration but one ($0.99$ against $0.82$ for the
-best-calibrated setting), and the authored contradiction-free post-mortem scores highest in all nine
-($0.93$--$0.95$), which is the sanity check the fixture was written for. Aggregated over all cells,
-contradiction-heavy fixtures average $\LCS_{\mm}=0.560$ against $0.767$ for the conflict-free ones.
-
-The four readouts differ sharply in dynamic range, and the pattern is instructive. Under the
-response-grounded \textsc{windowed} policy the estimator asserts almost no \con{} edges on these
-fixtures, so $\LCS_{\cons}\equiv1.00$ and $\LCS_{\rei}\equiv0.50$ (spread $0.00$) while $\LCS_{\mm}$
-(spread $0.87$) and $\LCS_{\lp}$ (spread $1.00$) discriminate. Under \textsc{all\_pairs} the same
-readouts regain range, $\LCS_{\rei}$ spanning $0.00$--$0.50$. The degeneracy is therefore a property of
-the \emph{graph}, not of the readout: $\mathcal{K}=1.00$ is the \emph{correct} answer for a
-conflict-free response --- verified on the post-mortem, where $\LCS_{\mm}=0.939$ and
-$\mathcal{K}=1.000$ at $1.9$ relations per claim --- and becomes uninformative exactly when the
-estimator asserts no conflicts at all. This is the practical case for reporting $\LCS_{\mm}$ as the
-headline with $\mathcal{K}$ and $\mathcal{S}$ as diagnostics: a number that reads $1.00$ both for a
-sound argument and for an unmined one cannot be used alone.
-
-Finally, the three conditional-strength estimators differ less than the models do: averaged over all
-model/fixture cells, surrogate-logprobs gives $0.722$, surrogate-sampled $0.712$, and verbalized
-$0.730$. The verbalized baseline is not obviously worse in \emph{level}, but it is the least stable
-across fixtures (compare its \texttt{e5-K} column, $0.90$/$0.67$/$0.86$, against
-surrogate-logprobs' $0.41$/$0.71$/$0.95$), consistent with the calibration literature
-\citep{xiong}.
-
 \subsection{The evidence-free baselines, measured}
 \label{sec-baselines-measured}
 
-\paragraph{Two properties, routinely conflated.} The baselines below do not all measure the same
-thing as the LCS, and the comparison is only readable once the two constructs are separated.
-
-\begin{definition}[Logical coherence]
-\label{def-logical-coherence}
-A response is \emph{logically coherent} to the extent that the propositions it asserts can jointly
-hold, given the inferential relations the response itself draws between them. It is a property of
-the \emph{content} of the assertions and of the argument built from them: a truth-functional
-question, evaluated over claim truth values, and exactly what $\pr{\mathbf{a}}$ of
-Def.~\ref{def-mrf} is a distribution over. Reordering claims changes it only insofar as the
-reordering changes which relations the text draws (Rem.~\ref{rem-order}).
-\end{definition}
-
-\begin{definition}[Discourse cohesion]
-\label{def-cohesion}
-A text is \emph{cohesive} to the extent that its surface is tied together --- most commonly by
-repeated reference to the same entities across sentences, but also by lexical chains, connectives
-and referring expressions. It is a property of the \emph{form}: computable without deciding whether
-any proposition is true, and without any notion of contradiction. The entity grid
-\citep{barzilay} and DiscoScore's single-document metrics \citep{discoscore} measure this, and it is
-what the \textsc{eg}, \textsc{lc} and \textsc{rc} columns of Table~\ref{tab:baselines} report.
-\end{definition}
-
-The two correlate in ordinary prose, which is why cohesion metrics work as coherence proxies often
-enough to have become standard. They are nonetheless independent, and both directions occur:
-cohesive-but-incoherent text repeats its entities while contradicting itself, and
-coherent-but-uncohesive text argues soundly while varying its referring expressions.
-
-\begin{example}[The two come apart on two sentences]
-\label{ex-cohesion-vs-coherence}
-Take two responses that differ in one word:
-\begin{center}\small
-\begin{tabular}{@{}ll@{}}
-\toprule
-$A$ (coherent) & ``The weld passed the tensile test. The weld \emph{held} under load.'' \\
-$B$ (incoherent) & ``The weld passed the tensile test. The weld \emph{failed} under load.'' \\
-\bottomrule
-\end{tabular}
-\end{center}
-$A$ and $B$ contain the same nouns, in the same positions, with the same repetition structure
-(\textsf{weld} in both sentences, \textsf{test} and \textsf{load} once each). Every cohesion
-measure is therefore \emph{identical} on them, and measurably so: \textsc{rc} returns $0.333$ for
-both, \textsc{lc} $0.167$ for both, and the entity graph $0.500$ for both. But $B$ asserts that one
-weld both passed a tensile test and failed under load, which cannot jointly hold, while $A$ asserts
-two compatible facts. The relation-based baselines see the difference at once ($\textsc{cr}$
-$1.000$ against $0.000$; \textsc{sc} $1.000$ against $0.100$), because they read the claims rather
-than the nouns.
-
-The example is minimal on purpose. Nothing about it is adversarial or unusual: a single negation
-flips the logic while leaving the surface untouched, which is the general shape of the failure, and
-it is why a coherence measure cannot be built on cohesion statistics however well they correlate on
-average.
-\end{example}
-
-\begin{table}[t]
-\centering\small
-\setlength{\tabcolsep}{4pt}
-\caption{The evidence-free baselines of \S\ref{sec-baselines} on the nine hand-authored fixtures,
-  every one sharing the LCS's own atoms. \emph{Claims} and \emph{tokens} are the ladder-blind
-  controls; \textsc{eg}/\textsc{lc}/\textsc{rc} are the three DiscoScore metrics that score a single
-  document; \textsc{cr} is the pairwise contradiction rate and \textsc{sc} ROSCOE Self-Consistency,
-  with \textsc{sc}$_\mu$ its mean-aggregated ablation. Discourse values are raw, not rescaled:
-  \textsc{eg} is an unbounded sum whose normalized form clamps at $1.0$ on eight of the nine
-  fixtures, so the rescaled column would be almost as binary as \textsc{sc}. Relations are scored
-  by \texttt{gpt-oss-120b} at the pipeline's $1{,}500$ requests-per-minute limit: $8{,}712$ calls,
-  \textbf{zero call failures and zero abstentions}. The judges are G-Eval with the SummEval
-  coherence rubric and a no-rubric $1$--$5$ rating, each the mean of five runs with
-  probability-weighted scoring where the backend exposes top-$k$ logprobs; their per-item standard
-  deviation averages $0.063$ and never exceeds $0.19$. \texttt{e5-K}/\texttt{e5-S} are the
-  claim-identical pair of \S\ref{sec-example-order} and the bold entries are the result discussed below;
-  the higher-coherence member is listed first in each declared pair.}
-\label{tab:baselines}
-\begin{tabular}{@{}lrrrrrrrrrrr@{}}
-\toprule
-& & & \multicolumn{3}{c}{Cohesion} & \multicolumn{3}{c}{Relation-based}
-& \multicolumn{2}{c}{Judge (sd)} \\
-\cmidrule(lr){4-6}\cmidrule(lr){7-9}\cmidrule(l){10-11}
-Fixture & Cl. & Tok. & \textsc{eg} & \textsc{lc} & \textsc{rc}
-        & Pairs & \textsc{cr} & \textsc{sc} & G-Eval & Direct \\
-\midrule
-\texttt{aero}    & 16 & 171 & 1.215 & 0.167 & 0.397 & 120 & 0.967 & 0.000 & 0.95 & 0.80 \\
-\texttt{e1-dmg}  & 13 & 114 & 2.150 & 0.159 & 0.432 &  78 & 0.923 & 0.000 & 0.35 & 0.25 \\
-\texttt{e3-nar}  & 33 & 278 & 2.465 & 0.223 & 0.819 & 528 & 0.985 & 0.000 & 0.20 & 0.10 \\
-\texttt{e4-sum}  & 15 & 161 & 3.100 & 0.218 & 0.564 & 105 & 0.971 & 0.000 & 0.25 & 0.05 \\
-\texttt{ex6}     & 13 & 163 & 2.081 & 0.295 & 0.754 &  78 & 0.974 & 0.000 & 1.00 & 1.00 \\
-\midrule
-\texttt{e2-bio}  & 19 & 115 & 1.833 & 0.176 & 0.353 & 171 & 1.000 & 1.000 & 1.00 & 1.00 \\
-\texttt{e2-con}  & 12 &  75 & 0.383 & 0.135 & 0.270 &  66 & 0.924 & 0.000 & 0.05 & 0.00 \\
-\midrule
-\texttt{e5-K}    & 18 & 265 & 1.585 & 0.133 & 0.316 & 153 & 0.980 & 0.000 & \textbf{0.70} & \textbf{0.55} \\
-\texttt{e5-S}    & 18 & 269 & 2.950 & 0.202 & 0.465 & 153 & 0.980 & 0.000 & \textbf{0.95} & \textbf{0.75} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:baselines} reports every baseline that needs no evidence, run on the same
-decomposition the LCS is scored on. Six findings follow: four about how the baselines behave, then
-the two contrasts that the fixtures and the ladder respectively permit.
-
-\paragraph{ROSCOE's Self-Consistency collapses to a conflict \emph{detector}.} Across the nine
-fixtures \textsc{sc} is $0.000$ to six decimals on the eight where the extractor labels any claim
-pair contradictory, and $1.000$ on the one where it labels none. Its \emph{conflict term} is
-$1.000$ or within $10^{-6}$ of it in all eight, because $\max_i\max_{j<i}p_{\mathrm{contr}}$
-saturates as soon as a single pair is confidently contradictory --- and on this model every one of
-the $34$ contradiction verdicts arrives at $p\ge0.99999$. So a fixture
-with $4$ contradictions in $120$ pairs and one with $8$ in $528$ receive the same score. The
-mean-aggregated ablation \textsc{sc}$_\mu$, identical in every other respect, takes eight distinct
-values on the same nine fixtures, as does \textsc{cr}. The published aggregation, not the
-forward-only restriction, is
-what costs the metric its resolution: the symmetric variant that also scores backward arcs is
-likewise binary, since a saturated maximum cannot be moved by adding more terms to it.
-
-\paragraph{The contradiction rate rewards length.} \textsc{cr} divides by $\binom{n}{2}$, so its
-denominator grows quadratically in the claim count while genuine contradictions do not. The
-narrative fixture has the \emph{most} contradictory pairs of any fixture ($8$) and the
-second-highest score ($0.985$), while \texttt{e1-dmg} has $6$ and scores $0.923$. Over the nine
-fixtures the Spearman correlation between claim count and \textsc{cr} is $+0.87$, against $-0.44$
-between the number of contradictions found and \textsc{cr} --- that is, the metric tracks length
-better than it tracks conflict. Nine items cannot support a
-significance claim and we make none; the mechanism, however, is a property of the definition rather
-than of the sample. Reporting the absolute count beside the rate --- as Table~\ref{tab:baselines}
-does --- is the minimum needed to keep the column readable.
-
-\paragraph{The contradiction detector is sound; the aggregation is not.} It is worth separating the
-two, because the failures above are aggregation failures. On \texttt{e2-con}, whose five planted
-contradictions are declared by construction, the extractor recovers exactly five contradictory
-pairs, four of them the planted ones (born-1949 against born-1942, Pensacola against Mississippi,
-gravelly against high-pitched, American against British); the fifth links Mississippi to British,
-a true consequence of two planted claims rather than a false positive. On the clean twin it
-returns \emph{zero} contradictions in $171$ pairs. What the readouts of \S\ref{sec-readouts} add is
-therefore not detection but propagation and typing.
-
-\paragraph{The judges are strong, stable, and wrong where it counts.} Both judges rate the clean
-biography at $1.00$ and its contradicted twin at $0.05$ and $0.00$ --- the sharpest separation any
-baseline achieves on that pair --- and their run-to-run spread is small enough to report a mean at
-all (sd $0.063$ averaged over the eighteen judge cells, never above $0.19$, so a rating moves by at
-most one point across five seeds). On the claim-identical pair, however, \emph{both} rate the
-adversarial summary \emph{above} the faithful one: G-Eval $0.95$ against $0.70$, the no-rubric judge
-$0.75$ against $0.55$, consistently across all five seeds and by margins several times the seed
-spread. The reason is legible in the two texts. The faithful summary states each self-serving claim
-beside the truth that corrects it (``he claimed \dots\ though in fact \dots; he claimed too
-\dots\ though in fact \dots''), which reads as hedged and interruptive; the adversarial one asserts
-cleanly and corrects later, which reads as better-organized prose. A rubric asking whether a text
-``builds from sentence to sentence'' rewards the second. The judge is measuring discourse quality,
-which is a real property and not the one at issue here.
-
-\paragraph{On the one controlled contrast, no baseline separates the pair.} The biography pair
-orders correctly under all twelve baselines --- and is worthless as evidence for exactly that reason,
-since claim count ($19$ against $12$) and length ($115$ against $75$ tokens) order it too. The
-claim-identical pair is the contrast that controls for both: \texttt{e5-K} and \texttt{e5-S} are
-permutations of one eighteen-atom set, so claim count is flat by construction and the quadratic
-denominator that biases \textsc{cr} cancels exactly. There, of twelve baselines, \textbf{five are
-flat and seven point the wrong way, and none separates the pair correctly}. The three cohesion
-metrics and both judges rank the adversarial summary \emph{above} the faithful one
-($\textsc{rc}$ $0.465$ against $0.316$; $\textsc{eg}$ $2.950$ against $1.585$), the cohesion metrics
-because the self-serving-first ordering repeats its entities more and the judges for the reason just
-given. \textsc{cr} and \textsc{sc} are exactly flat: the two summaries assert the same claims, so a
-metric that reads only claim pairs, and ignores which claims the response leaves standing
-unqualified at the point where it asserts them, cannot distinguish them in principle. This is the
-sharpest available statement of what the coherence MRF is for --- and, equally, of how little the
-ladder-blind pairs can establish.
+The baselines do not all measure the same thing as the LCS, and the comparison is only readable
+once two constructs are separated. \emph{Logical coherence} is a property of the relations among a
+response's claims: whether what it asserts can jointly hold. \emph{Discourse cohesion} is a property
+of its surface texture --- entity repetition, lexical chaining, referential continuity. The two are
+correlated in ordinary prose and come apart under exactly the edits this corpus applies, which is
+why the cohesion metrics appear here as baselines rather than as competitors:
+\S\ref{sec-baseline-results} gives a two-sentence pair on which all three single-document
+DiscoScore metrics return \emph{identical} values while one response contradicts itself and the
+other does not. A cohesion metric that scores well below is measuring a different axis, not
+measuring this one badly.
 
 \begin{table}[t]
 \centering\small
@@ -1751,16 +1573,15 @@ $\LCS_{\cons}$ (gold relations)   & \multicolumn{2}{c}{$34/50$ \quad 68.0} & no 
 \end{tabular}
 \end{table}
 
-Two results, and the first supersedes a hedge we published on ten assertions.
+Two results follow.
 
-\paragraph{The probabilistic model now separates from cohesion counting.} On the earlier two-family
-corpus $\LCS_{\mm}$ and noun-repetition cohesion tied at $70.0\%$ of ten assertions, and we reported
-honestly that a cohesion counter did exactly as well as the probabilistic model. At $50$ assertions
-that tie breaks: $\LCS_{\mm}$ reaches $37/50$ ($74.0\%$) against \textsc{rc}'s $30/50$ ($60.0\%$), and
-\emph{all three} graded readouts ($74.0$, $72.0$, $68.0$) sit above \emph{every} evidence-free
-baseline, so the ordering is not an artefact of choosing a headline readout. The earlier tie was a
-small-sample coincidence. We note the direction of the correction explicitly because the hedge it
-replaces was ours.
+\paragraph{The probabilistic model separates from cohesion counting.} $\LCS_{\mm}$ reaches $37/50$
+($74.0\%$) against the best evidence-free baseline, noun-repetition cohesion, at $30/50$ ($60.0\%$).
+\emph{All three} graded readouts ($74.0$, $72.0$, $68.0$) sit above \emph{every} evidence-free
+baseline, so the ordering is not an artefact of choosing a headline readout, and the margin is larger
+than the four-to-six assertion run-to-run movement of \S\ref{sec-experiments}. This supersedes a
+tie between the two that we previously reported at this comparison's smaller scale; we flag the
+direction of the correction rather than restating the number quietly.
 
 \paragraph{An LLM judge's score on this benchmark is a property of the judge, not of the method.}
 Every model-free baseline is bit-identical across the two judge runs --- \textsc{rc} $30/50$ twice,
@@ -1781,12 +1602,97 @@ Reporting judge variance alone would have called the first judge the reliable on
 backwards for the task.
 
 Finally, four baselines score $0/50$ under both judges and it is worth separating the reasons, since
-they are not one finding. \textsc{roscoe-sc} (max) collapses to a constant $0.0$ on every item ---
-the max-aggregated contradiction signal saturates, as \S\ref{sec-baseline-results} already found on
-the fixtures. \textsc{entity graph} returns a constant $1.0$. \textsc{claim count} is constant
+they are not one finding. \textsc{roscoe-sc} (max) collapses to a constant $0.0$ on all seventy items: a
+$\max$ over pairwise contradiction probabilities saturates as soon as one pair is confidently
+contradictory, which on prose of this length is every item. \textsc{entity graph} returns a constant
+$1.0$. \textsc{claim count} is constant
 \emph{by construction}: every rung of a family shares one claim set, which is what makes this corpus
 a controlled contrast and what makes a claim-count proxy vacuous on it. Only the first two are
 failures of the measure; the third is the corpus doing its job.
+
+\subsection{Summary: what the LCS adds, and what the baselines cannot do}
+\label{sec-summary}
+
+The corpus asks two questions of a coherence measure, and they are not the same question. On the
+\textsc{conflict} and \textsc{chain} families it must \emph{move in the declared direction} as
+relations are repaired --- $50$ assertions readable by any single-score measure. On the
+\textsc{order} and \textsc{control} families it must \emph{not move at all}, because those rungs
+permute prose while holding the relation set fixed --- $20$ further pairs. A measure is only useful if
+it passes both: ordering without invariance is a length or edit-count proxy, and invariance without
+ordering is a constant.
+
+\begin{table}[t]
+\centering\small
+\caption{Both axes at once, on the ladder corpus. \textbf{Increase} is the $50$ readout-independent
+  ordering assertions over the eight \textsc{conflict} and two \textsc{chain} families;
+  \textbf{Invariance} is the $20$ rung pairs over the three \textsc{order} and one \textsc{control}
+  families, satisfied when the score is unchanged to $10^{-6}$. Baselines are shown under both judge
+  models where the two differ; the model-free rows are judge-independent by construction. The three
+  baselines at $20/20$ invariance reach it \emph{vacuously} --- each is a constant over all seventy
+  items, hence trivially invariant and trivially unable to order anything, which is why the final
+  column takes the weaker of the two axes.}
+\label{tab:summary}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Measure & Increase & Invariance & $\min$ \\
+ & (of 50) & (of 20) & \\
+\midrule
+$\LCS_{\mm}$ (gold relations)   & $37$ \quad \textbf{74} & $20$ \quad \textbf{100} & \textbf{74} \\
+$\LCS_{\lp}$ (gold relations)   & $36$ \quad 72 & $20$ \quad 100 & 72 \\
+$\LCS_{\cons}$ (gold relations) & $34$ \quad 68 & $20$ \quad 100 & 68 \\
+\midrule
+\textsc{rc} (cohesion)          & $30$ \quad 60 & $16$ \quad \phantom{0}80 & 60 \\
+\textsc{lc} (cohesion)          & $28$ \quad 56 & $16$ \quad \phantom{0}80 & 56 \\
+\textsc{length} (control)       & $20$ \quad 40 & $12$ \quad \phantom{0}60 & 40 \\
+\textsc{roscoe-sc} (mean)       & $16$--$17$ \quad 32--34 & $5$--$9$ \quad 25--45 & 32 \\
+\textsc{contradiction rate}     & $12$ \quad 24 & $8$--$9$ \quad 40--45 & 24 \\
+\textsc{judge}, G-Eval          & $0$--$21$ \quad \phantom{0}0--42 & $5$--$13$ \quad 25--65 & \phantom{0}0 \\
+\textsc{judge}, direct rating   & $4$--$18$ \quad \phantom{0}8--36 & $5$--$14$ \quad 25--70 & \phantom{0}8 \\
+\textsc{roscoe-sc} (max)        & $0$ \quad \phantom{00}0 & $20$ \quad 100$^{\dag}$ & \phantom{0}0 \\
+\textsc{entity graph}           & $0$ \quad \phantom{00}0 & $20$ \quad 100$^{\dag}$ & \phantom{0}0 \\
+\textsc{claim count} (control)  & $0$ \quad \phantom{00}0 & $20$ \quad 100$^{\dag}$ & \phantom{0}0 \\
+\bottomrule
+\multicolumn{4}{@{}l}{\footnotesize $^{\dag}$ vacuous: the measure is constant across all seventy items.} \\
+\end{tabular}
+\end{table}
+
+\paragraph{What the LCS adds.} Given a correct relation graph it is the only measure here that passes
+both axes non-vacuously: $37/50$ on ordering and $20/20$ on invariance, and the same holds for the
+other two graded readouts (Table~\ref{tab:summary}). The invariance column is where the gap is
+categorical rather than incremental. The readouts are invariant under prose reordering \emph{by
+construction}, not by fitting: a \textsc{Precedence}$\leftrightarrow$\textsc{Succession} swap compiles
+to Level-1 \texttt{none} and contributes no factor, and shuffling sentences does not change which
+claims stand in which relation, so the Markov network is literally identical and the readout cannot
+move. No surface statistic can offer that guarantee, because every surface statistic is a function of
+the surface. This is the property the construction buys, and it is the reason a coherence measure
+should be defined over relations rather than over text.
+
+\paragraph{What the baselines fail to do, and it is three different failures.} They are not weak in
+one way. \emph{Cohesion metrics} (\textsc{rc}, \textsc{lc}) are the strongest baselines and get
+respectably far on ordering ($60\%$, $56\%$) while being nearly flat on invariance ($16/20$, drifting
+by at most $0.0096$ across a permuted family) --- they fail not by being noisy but by measuring a
+different axis, so they cannot distinguish a response that contradicts itself from one that does not
+when both repeat the same nouns. \emph{Contradiction-based metrics} (\textsc{roscoe-sc},
+\textsc{contradiction rate}) detect conflict soundly and then destroy the signal in aggregation: the
+$\max$ variant is a constant on prose of this length, and the mean variant divides by $\binom{n}{2}$,
+so both are dominated by response size rather than by relational structure. \emph{LLM judges} are the
+least reliable of the three, and in a way that a single-judge evaluation conceals: G-Eval scores $0/50$
+under one judge and $21/50$ under another on identical prose and rubric, and both judges violate
+invariance freely --- \texttt{gpt-oss}'s G-Eval moves by up to $0.55$ across rungs that differ only in
+sentence order. A judge asked for a coherence rating is answering a question about the text, so it
+inherits the text's surface variation.
+
+\paragraph{Two honest qualifications.} First, the LCS column above is the \emph{gold-relation} arm.
+Handed graphs mined from prose the same readouts fall to $34.7$--$37.1\%$ of the full $202$ assertions
+and to $0/45$ and $0/15$ on the invariance ladders (\S\ref{sec-baselines-measured},
+Table~\ref{tab:ladder}) --- the guarantee is a property of the model given a correct graph, and mined
+graphs are not yet reorder-invariant. The contribution is therefore a measure that is right when its
+input is right, plus a benchmark that localizes the remaining problem in extraction rather than in
+scoring. Second, the two axes are not equally hard: ten of the thirteen rows clear $40\%$ on
+invariance while only five clear $50\%$ on ordering, and of those five, three are the LCS readouts and
+two are the cohesion metrics. Invariance alone is therefore not a discriminating test --- it is a
+necessary condition most baselines meet, and the three constant baselines meet trivially. The claim
+rests on passing both, which only the LCS does.
 
 \section{Worked examples}
 \label{sec-examples}
@@ -2110,8 +2016,7 @@ one auxiliary variable per relation --- are the case where it would most plausib
 \paragraph{Empirical scope.} The generated corpus is fourteen families and seventy items spanning all
 four ladder types, with single-sample mining whose measured run-to-run movement is at most $0.014$ F1
 across two independent runs of the same configuration. All five baseline families of
-\S\ref{sec-baselines} are measured, on the hand-authored fixtures and on the ladder
-(\S\ref{sec-baselines-measured}). On the $50$ readout-independent ladder assertions all three graded
+\S\ref{sec-baselines} are measured on the ladder corpus (\S\ref{sec-baselines-measured}). On the $50$ readout-independent ladder assertions all three graded
 readouts now sit above every evidence-free baseline, which supersedes the tie we reported on ten
 assertions; we flag the direction of that correction in \S\ref{sec-baselines-measured} rather than
 quietly restating it. \citet{liustrube} is cited rather than run, for the output-type reason given
