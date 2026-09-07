@@ -4,6 +4,11 @@
 ![Static Badge](https://img.shields.io/badge/mellea-0.6.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
+
+<p align="left">
+  <img src="images/logo.png" alt="Logo" width="150">
+</p>
+
 # FactReasoner
 
 A probabilistic factuality assessment framework for Large Language Models (LLMs). FactReasoner provides fine-grained factuality evaluation by decomposing LLM responses into atomic claims and verifying them against external knowledge sources using probabilistic reasoning.
