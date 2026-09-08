@@ -1,0 +1,100 @@
+% ---------------------------------------------------------------------------
+% Section 3 worked example, compact three-panel form for the submittable paper.
+% Panels (a) and (b) transcribe the relation graphs of the five-claim Voyager
+% pair; panel (c) is the MRF induced by (b), drawn as an explicit factor graph.
+% Edges transcribe data/lcs/example-7-coherence-pair.json exactly; every value
+% is produced by scripts/lcs_worked_pair.py (exact, 2^5 = 32-world enumeration).
+% Node, edge and relw=p styles live in preamble.tex, so the three panels cannot
+% drift apart. Fuller versions of (a)/(b) and both MRFs are in App. F.
+% ---------------------------------------------------------------------------
+\begin{figure}[t]
+\centering
+%% --- (a) Response A: the coherent arrangement -----------------------------
+\begin{subfigure}[b]{0.30\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)    {$a_1$};
+  \node[atomtrue]  (a2) at (1.15,0) {$a_2$};
+  \node[atomtrue]  (a3) at (2.3,0)  {$a_3$};
+  \node[atomfalse] (a4) at (1.7,-1.25) {$a_4$};
+  \node[atomfalse] (a5) at (2.9,-1.25) {$a_5$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+  \draw[ent,relw=0.85] (a2) -- (a3) node[wlab,above]{$.85$};
+  \draw[con,relw=0.90] (a3) -- (a4) node[wlab,right,pos=0.45]{$.90$};
+  \draw[con,relw=0.85] (a3) -- (a5) node[wlab,right,pos=0.55]{$.85$};
+\end{tikzpicture}}
+\caption{\textbf{A, coherent.} A support chain over the true claims; each false
+  claim is attributed and then \emph{rejected} from $a_3$.
+  $\LCS_{\mm}=0.590$.}
+\label{fig:ex-a}
+\end{subfigure}
+\hfill
+%% --- (b) Response B: the incoherent arrangement ---------------------------
+\begin{subfigure}[b]{0.32\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)       {$a_1$};
+  \node[atomtrue]  (a2) at (1.3,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.6,0)     {$a_3$};
+  \node[atomfalse] (a4) at (0.85,-1.5) {$a_4$};
+  \node[atomfalse] (a5) at (2.3,-1.5)  {$a_5$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+  \draw[con,relw=0.90] (a2) -- (a3) node[wlab,above]{$.90$};
+  \draw[ent,relw=0.88] (a4) -- (a3) node[wlab,above,sloped,pos=0.38]{$.88$};
+  \draw[con,relw=0.90] (a1) -- (a4) node[wlab,below,sloped]{$.90$};
+  \draw[ent,relw=0.85] (a4) -- (a5) node[wlab,below]{$.85$};
+  \draw[con,relw=0.88] (a2) to[out=-20,in=70]
+        node[wlab,right,pos=0.62]{$.88$} (a5);
+\end{tikzpicture}}
+\caption{\textbf{B, incoherent.} The same five claims. $a_2\!\to\!a_3$ has become
+  a conflict and the \emph{false} $a_4$ is now a premise for the true $a_3$.
+  $\LCS_{\mm}=0.494$.}
+\label{fig:ex-b}
+\end{subfigure}
+\hfill
+%% --- (c) the MRF induced by (b) -------------------------------------------
+\begin{subfigure}[b]{0.33\textwidth}
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=15mm, y=13mm]
+  \node[atomtrue]  (a1) at (0,0)       {$a_1$};
+  \node[atomtrue]  (a2) at (1.2,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.4,0)     {$a_3$};
+  \node[atomfalse] (a4) at (1.2,-1.35) {$a_4$};
+  \node[atomfalse] (a5) at (2.4,-1.35) {$a_5$};
+
+  \node[unary] (p1) at (0,0.8)     {}; \draw[flink] (p1) -- (a1);
+  \node[unary] (p2) at (1.2,0.8)   {}; \draw[flink] (p2) -- (a2);
+  \node[unary] (p3) at (2.4,0.8)   {}; \draw[flink] (p3) -- (a3);
+  \node[unary] (p4) at (1.2,-2.15) {}; \draw[flink] (p4) -- (a4);
+  \node[unary] (p5) at (2.4,-2.15) {}; \draw[flink] (p5) -- (a5);
+  \node[prlab,left=0.4mm of p1] {$\phi_1$};
+  \node[prlab,left=0.4mm of p4] {$\phi_4$};
+
+  \node[factor] (f12) at (0.6,0)      {}; \draw[flink] (a1) -- (f12) -- (a2);
+  \node[factor] (f23) at (1.8,0)      {}; \draw[flink] (a2) -- (f23) -- (a3);
+  \node[factor] (f43) at (1.95,-0.72) {}; \draw[flink] (a4) -- (f43) -- (a3);
+  \node[factor] (f14) at (0.45,-0.85) {}; \draw[flink] (a1) -- (f14) -- (a4);
+  \node[factor] (f45) at (1.8,-1.35)  {}; \draw[flink] (a4) -- (f45) -- (a5);
+  \node[factor] (f25) at (2.7,-0.72)  {}; \draw[flink] (a2) -- (f25) -- (a5);
+  \node[prlab,above=0.3mm of f12] {$\psi_1$};
+  \node[prlab,right=0.3mm of f43] {$\psi_3$};
+\end{tikzpicture}}
+\caption{\textbf{The MRF of (b).} Grey squares are the unaries $\phi_i$ carrying
+  the priors, black squares the pairwise $\psi_r$, one per relation.}
+\label{fig:ex-mrf}
+\end{subfigure}
+\caption{The five-claim example of \S\ref{sec-example}. Blue nodes are claims true
+  of the world ($\pi_i=0.9$), red nodes false ($\pi_i=0.1$); \emph{the same five
+  claims appear in both graphs}, so every per-claim factuality check returns the
+  same verdict on both responses. Solid blue edges are \ent{}, dashed red \con{};
+  line width grows with the relation weight $p$. The unary factors $\phi_i$ of
+  panel (c) are identical for the two responses, so the entire $0.590\to0.494$
+  drop is produced by the pairwise $\psi_r$ --- by how the response arranges its
+  claims, which is the whole of what coherence measures.}
+\label{fig:example}
+\end{figure}
