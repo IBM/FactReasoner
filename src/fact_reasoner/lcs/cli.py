@@ -184,10 +184,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     m.add_argument(
         "--nli-method",
         default="logprobs",
-        choices=["logprobs", "simbauq"],
+        choices=["logprobs", "direct", "simbauq"],
         help="How the relation type-confidence is estimated: 'logprobs' needs a "
-        "logprobs-capable backend (rits/vllm/OpenAI); 'simbauq' works on any "
-        "backend (required for ollama and for Claude). Default: logprobs.",
+        "logprobs-capable backend (rits/vllm/OpenAI); 'direct' is the "
+        "no-reasoning few-shot variant of it, used by the factuality stage's NLI "
+        "extractor (the LCS miner itself has its own prompts and treats it as "
+        "'logprobs'); 'simbauq' works on any backend (required for ollama and for "
+        "Claude). Default: logprobs.",
     )
     m.add_argument(
         "--strength-method",

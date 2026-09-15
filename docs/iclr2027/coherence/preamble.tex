@@ -56,6 +56,10 @@
 \newcommand{\exc}{\coupling{exclusive}}
 \newcommand{\cnc}{\coupling{co\_necessity}}
 
+% Standard deviation after a mean, set small and grey so a wide table of
+% "mean +- sd" cells still reads as a column of means (Table tab:fc-perds).
+\newcommand{\pmsd}[1]{{\,\scriptsize\textcolor{black!55}{$\pm$#1}}}
+
 % Inline marker tying a span of response text to the claim it asserts, used in the
 % verbalized responses of Sec. sec-example-pair.
 \newcommand{\claimref}[1]{\mbox{\textcolor{blue!55!black}{\scriptsize[$a_{#1}$]}}}
@@ -96,6 +100,15 @@
   flink/.style={black!55,line width=0.5pt},
   prlab/.style={font=\tiny,inner sep=1pt,text=black!70},
   wlab/.style={midway,font=\tiny,inner sep=1pt},
+  % --- annotation of a CHANGE between two panels (figures/motivating-example.tex).
+  % Orange so it reads as commentary on the drawing, never as a coupling.
+  chg/.style={draw=orange!80!black,line width=0.6pt,dotted,rounded corners=0.8mm,
+              inner sep=2mm},
+  chglab/.style={font=\tiny,text=orange!60!black,align=center,inner sep=0.5pt},
+  chgnum/.style={circle,draw=orange!80!black,fill=orange!12,line width=0.5pt,
+                 font=\tiny\bfseries,text=orange!55!black,inner sep=0.4pt,
+                 minimum size=2.7mm},
+  chglead/.style={orange!80!black,line width=0.5pt,dotted},
   % Relation weight p -> line width (lw ~ 0.6 + p pt), the AeroParts figure's
   % convention. A tikz STYLE rather than a macro, so pgfkeys sees the key=value
   % split before expansion; \dimexpr avoids needing \fpeval (absent in older TeX).

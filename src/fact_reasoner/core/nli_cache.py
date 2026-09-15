@@ -32,7 +32,7 @@ Each component of the key is load-bearing:
 * ``PROMPT_VERSION`` -- editing the NLI instruction changes what the model is
   asked, so stored verdicts must not survive it.
 * ``model_id`` -- different models disagree.
-* ``nli_method`` -- ``logprobs`` and ``simbauq`` produce different probabilities
+* ``nli_method`` -- ``logprobs``, ``direct`` and ``simbauq`` produce different probabilities
   for identical text.
 * ``premise`` then ``hypothesis``, separated by a byte that cannot occur in the
   text, so ``("ab", "c")`` cannot collide with ``("a", "bc")``.

@@ -1217,10 +1217,26 @@ def _policy_comparison_section(results: Mapping[str, Any]) -> str:
             " & ".join([f"\\texttt{{{_tex(arm)}}}", *cells, f"{passed}/{total}", rate])
             + r" \\"
         )
+    # The per-arm assertion total, read off the data rather than assumed. Families
+    # do NOT all declare the same number of checks (some have 14, some 15), so the
+    # old `len(fam_ids) * 14` under-reported the denominator -- it said 196 where
+    # every row total said 202.
+    arm_totals = {
+        sum(
+            int((((f.get("arms") or {}).get(arm) or {}).get("summary") or {}).get("total") or 0)
+            for f in families
+        )
+        for arm in arms
+    }
+    arm_totals.discard(0)
+    assertions = (
+        str(max(arm_totals)) if len(arm_totals) == 1 else
+        f"{min(arm_totals)}--{max(arm_totals)}" if arm_totals else "0"
+    )
     ladder_table = [
         r"\begin{table}[htbp]", r"\centering", r"\small",
         r"\caption{Ordering constraints satisfied per arm. With "
-        + str(len(fam_ids) * 14)
+        + assertions
         + r" assertions per arm this is the only comparison here with enough "
         r"observations to be more than anecdote: it asks whether the readouts order "
         r"the rungs correctly, which is what the ladder was built to test.}",

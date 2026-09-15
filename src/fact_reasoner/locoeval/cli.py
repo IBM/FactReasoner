@@ -207,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     mined.add_argument(
         "--nli-method",
         default="auto",
-        choices=("auto", "logprobs", "simbauq"),
+        choices=("auto", "logprobs", "direct", "simbauq"),
         help="Type-confidence method; auto picks logprobs on a logprobs-capable "
         "backend (default: auto).",
     )

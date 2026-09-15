@@ -284,20 +284,43 @@ def three_clause_weights(
     """The exact log-linear expansion of a with-priors pairwise factor.
 
     Any positive 2x2 potential has the form
-    ``ln psi(a_s, a_t) = a + b*a_s + c*a_t + d*a_s*a_t``: a constant, a source unit
-    clause (weight ``b``), a target unit clause (weight ``c``), and a conjunction
-    clause (weight ``d``). Solving that against the with-priors tables of
-    :func:`fact_reasoner.factors.edge_factor_values` gives the closed forms of the
-    deep-dive's three-clause table (§"Exact MLN = MRF").
+    ``ln psi(a_s, a_t) = a + b*a_s + c*a_t + d*a_s*a_t``: a constant ``a``, a source
+    unit clause (weight ``b``), a target unit clause (weight ``c``), and a
+    conjunction clause (weight ``d``). Solving that against the with-priors tables of
+    :func:`fact_reasoner.factors.edge_factor_values` gives, writing
+    ``L(x) = logit(x)``:
+
+    ==============  ==================  ====================  ==========  ================
+    level1_type     a (constant)        b (source)            c (target)  d (conjunction)
+    ==============  ==================  ====================  ==========  ================
+    entailment      ``ln(1 - pi_s)``    ``ln((1-p)/(1-pi_s))``  ``L(pi_s)``   ``L(p) - L(pi_s)``
+    contradiction   ``ln(1 - pi_s)``    ``ln(p/(1-pi_s))``      ``L(pi_s)``   ``-L(p) - L(pi_s)``
+    equivalence     ``ln(p)``           ``ln((1-p)/p)``         ``ln((1-p)/p)``  ``2*L(p)``
+    ==============  ==================  ====================  ==========  ================
+
+    Only ``(b, c, d)`` are returned: ``a`` is a constant that multiplies every world
+    equally, so it cancels in every marginal and callers that need it read it off the
+    ``(0, 0)`` cell of :func:`edge_factor_values` directly.
+
+    At ``pi_s = 0.5`` -- the atom default, and the only value the shipped fixtures use
+    -- ``L(pi_s) = 0`` and the table collapses to ``c = 0`` with
+    ``d = +/- logit(p)``, the form the coherence paper's MLN appendix reports
+    alongside its equivalence numbers. Away from ``0.5`` the ``L(pi_s)`` terms are
+    load-bearing: an earlier version of this function omitted them (and used
+    ``ln((1-p)/pi_s)`` for ``b``, which coincides with the correct
+    ``ln((1-p)/(1-pi_s))`` only when ``pi_s = 1 - pi_s``), so it silently returned
+    wrong weights for any other prior. The two-stage composition feeds factuality
+    posteriors in as priors, which are precisely not 0.5, so the general form matters.
 
     With these three clauses per relation the ground MLN reproduces the with-priors
     MRF exactly -- which is the precise sense in which the MLN generalizes it, and
-    is asserted by the test suite against the brute-force oracle.
+    is asserted by the test suite against the brute-force oracle, at ``pi_s`` both on
+    and off ``0.5``.
 
     Args:
         level1_type: ``"entailment"``, ``"contradiction"`` or ``"equivalence"``.
         p: The mined relation strength, in (0, 1).
-        pi_s: The source atom's prior (the deep-dive tabulates ``pi_s = 0.5``).
+        pi_s: The source atom's prior, in (0, 1). Defaults to the atom prior 0.5.
 
     Returns:
         ``(b, c, d)`` -- the source-unit, target-unit and conjunction weights.
@@ -313,10 +336,11 @@ def three_clause_weights(
         raise ValueError(f"three_clause_weights needs 0 < pi_s < 1; got pi_s={pi_s!r}.")
 
     logit_p = mln_weight(p)
+    logit_pi = mln_weight(pi_s)
     if level1_type == "entailment":
-        return math.log((1.0 - p) / pi_s), 0.0, logit_p
+        return math.log((1.0 - p) / (1.0 - pi_s)), logit_pi, logit_p - logit_pi
     if level1_type == "contradiction":
-        return math.log(p / pi_s), 0.0, -logit_p
+        return math.log(p / (1.0 - pi_s)), logit_pi, -logit_p - logit_pi
     if level1_type == "equivalence":
         shared = math.log((1.0 - p) / p)
         return shared, shared, 2.0 * logit_p

@@ -1,5 +1,23 @@
-% The two-stage pipeline: FactReasoner posteriors become coherence-MRF priors.
-\begin{figure}[t]
+% The two-stage pipeline: factuality posteriors become coherence-MRF priors.
+%
+% Stage 2 is three boxes, not four: mining already emits a Level-1 coupling, so
+% there is no separate compile step to draw. In the implementation
+% `compile_sense` is called inside the miner (lcs/relation_miner.py) and a
+% MinedRelation carries both its level2_sense and its level1_type; the scorer
+% reads the coupling off the relation and never compiles anything. Drawing a
+% separate "compile" box implied a stage that does not exist -- and overloaded
+% $\mathcal{C}$, which is already the retrieved evidence set in Stage 1.
+%
+% The dashed arrow is labelled with the composition itself, $\pi_i \gets q_i$:
+% the Stage-1 output is a POSTERIOR ($q_i$) and the Stage-2 unaries are the
+% coherence MRF's PRIORS ($\pi_i$, exactly the $\phi_i=[1-\pi_i,\pi_i]$ of
+% Def. def-mrf). The two symbols must stay distinct -- Alg. alg-lcs reports
+% $\#\{q_i<\pi_i\}$, claims dragged below their own prior.
+%
+% Deliberately label-free of \ref{eq-priors}: submit.tex states the handoff
+% inline and defines no such label, and this file is shared by both papers.
+% ---------------------------------------------------------------------------
+\begin{figure}[htbp]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -25,29 +43,39 @@
   \draw[ar] (nli)  -- (fmrf);
   \draw[ar] (fmrf) -- (post);
 
-  \node[s2,below=10mm of atom] (mine) {mine relations\\(Prompt A / B)};
-  \node[s2,right=of mine] (comp) {compile $\mathcal{C}$\\sense $\to$ coupling};
-  \node[s2,right=of comp] (cmrf) {coherence MRF\\unaries $[1{-}q_i,q_i]$};
-  \node[fin,right=of cmrf] (lcs) {$\mathrm{LCS}(y)$};
+  % Mining emits the coupling, so there is no separate compile box.
+  \node[s2,below=10mm of atom] (mine)
+       {mine relations\\sense $\to$ coupling\\(Prompt A / B)};
+  \node[s2,right=of mine] (cmrf)
+       {coherence MRF\\unaries $[1{-}\pi_i,\pi_i]$};
+  \node[fin,right=of cmrf] (lcs) {$\LCS_{\mm}(y)$};
 
   \draw[ar] (atom.south) -- ++(0,-4mm) -| (mine.north);
-  \draw[ar] (mine) -- (comp);
-  \draw[ar] (comp) -- (cmrf);
+  \draw[ar] (mine) -- (cmrf);
   \draw[ar] (cmrf) -- (lcs);
   \draw[ar,dashed] (post.south) -- ++(0,-5mm) -| (cmrf.north)
-        node[pos=0.28,above,font=\scriptsize]{priors};
+        node[pos=0.28,above,font=\scriptsize]{$\pi_i \gets q_i$};
 
   \node[left=1mm of mine,font=\scriptsize\itshape,align=right,text width=13mm]
        {Stage 2\\coherence};
   \node[left=1mm of resp,font=\scriptsize\itshape,align=right,text width=13mm,
         yshift=0mm] {Stage 1\\factuality};
 \end{tikzpicture}}
+% scripts/make_pipeline_png.sh defines \plnocaption to render this figure for
+% standalone export, where surrounding prose supplies the explanation. Undefined
+% in the paper, so the caption below is typeset normally there.
+\ifdefined\plnocaption\else
 \caption{The two-stage pipeline. Stage 1 (\S\ref{sec-factuality}) is FactReasoner
   \citep{factreasoner}: it grounds each atom against retrieved evidence and returns a
   posterior marginal $q_i$. Stage 2 (\S\ref{sec-coherence}) builds a second MRF over
-  the atoms \emph{alone}, takes $q_i$ as its unary priors, and adds one pairwise factor
-  per mined atom--atom relation. Atomization is shared, so the response is decomposed
-  once. Setting $q_i\!\equiv\!\tfrac12$ recovers a pure coherence score that consults no
-  external evidence.}
+  the atoms \emph{alone} and adds one pairwise factor per mined atom--atom relation;
+  the mined relation already carries its Level-1 coupling, so no separate compile step
+  intervenes. The dashed arrow is the only coupling between the stages, and carries
+  the composition $\pi_i\!\gets\!q_i$ into the $\phi_i=[1-\pi_i,\pi_i]$ of
+  Def.~\ref{def-mrf}. Atomization is shared, so the response is decomposed once and
+  both stages score the same claim set; setting $\pi_i\!\equiv\!\tfrac12$ instead
+  recovers a pure coherence score that consults no external evidence
+  (Rem.~\ref{rem-noevidence}).}
 \label{fig:pipeline}
+\fi
 \end{figure}

@@ -101,8 +101,16 @@ def _acall(extractor, premise: str, hypothesis: str):
     from fact_reasoner.core.nli import INSTRUCTION_NLI
     from fact_reasoner.utils import extract_nli_label_and_span
 
+    # The extractor's OWN prompt, not a hardcoded one: with nli_method="direct" the
+    # prompt is what makes the label probability informative rather than saturated
+    # (see core/nli.py::INSTRUCTION_NLI_DIRECT), so hardcoding INSTRUCTION_NLI here
+    # would silently score the baselines under a different estimator than the one
+    # the caller asked for -- and than the LCS it is being compared against.
+    # `getattr` keeps the stub extractors in the tests working.
+    instruction = getattr(extractor, "_instruction", None) or INSTRUCTION_NLI
+
     return mfuncs.ainstruct(
-        INSTRUCTION_NLI,
+        instruction,
         context=SimpleContext(),
         backend=extractor.backend,
         requirements=[
@@ -162,6 +170,7 @@ def run_pairs(
     max_concurrency: int = MAX_CONCURRENT_REQUESTS,
     rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
     show_progress: bool = False,
+    verdict_cache: Any = None,
 ) -> list[Any]:
     """Score many premise/hypothesis pairs, throttled, preserving failures.
 
@@ -174,6 +183,14 @@ def run_pairs(
         max_concurrency: In-flight call ceiling.
         rate_per_minute: Token-bucket rate, defaulting to the pipeline's 1500/min.
         show_progress: Whether to draw a tqdm bar.
+        verdict_cache: Optional
+            :class:`~fact_reasoner.core.nli_cache.NLIVerdictCache`. Every NLI
+            baseline funnels through this function over the SAME claim pairs
+            (contradiction hard/soft, ROSCOE and its two ablation arms), so on a
+            26-claim response the identical 325 pairs are otherwise scored five
+            times. With a cache the model sees each distinct pair once. Failures
+            are never cached -- a throttled or unparseable call must stay a
+            failure, not become a stored "no contradiction here" verdict.
 
     Returns:
         One entry per pair, positionally aligned: either the extractor's verdict
@@ -182,6 +199,42 @@ def run_pairs(
     """
     if not pairs:
         return []
+
+    # Cache lookup, before any call is built. `keys[i] is None` marks a pair the
+    # cache cannot address, which is then simply always computed.
+    cached: dict[int, Any] = {}
+    keys: list[str | None] = [None] * len(pairs)
+    if verdict_cache is not None:
+        from fact_reasoner.core.nli_cache import extractor_identity
+
+        model_id, method = extractor_identity(extractor)
+        for i, (premise, hypothesis) in enumerate(pairs):
+            keys[i] = verdict_cache.make_key(model_id, method, premise, hypothesis)
+        found = verdict_cache.get_many([k for k in keys if k])
+        for i, key in enumerate(keys):
+            if key is not None and key in found:
+                cached[i] = found[key]
+
+    todo = [i for i in range(len(pairs)) if i not in cached]
+    if not todo:
+        return [cached[i] for i in range(len(pairs))]
+    if cached:
+        # Only the misses are sent to the model; results are merged back in order.
+        sub = run_pairs(
+            extractor,
+            [pairs[i] for i in todo],
+            max_concurrency=max_concurrency,
+            rate_per_minute=rate_per_minute,
+            show_progress=show_progress,
+            verdict_cache=None,
+        )
+        _store_verdicts(verdict_cache, [keys[i] for i in todo], sub)
+        merged: list[Any] = [None] * len(pairs)
+        for i, value in cached.items():
+            merged[i] = value
+        for i, value in zip(todo, sub):
+            merged[i] = value
+        return merged
 
     if not hasattr(extractor, "backend"):
         # Sequential path: no event loop, no throttle needed (a stub extractor in
@@ -192,6 +245,7 @@ def run_pairs(
                 out.append(extractor.run(premise, hypothesis))
             except Exception:  # noqa: BLE001
                 out.append(CALL_FAILED)
+        _store_verdicts(verdict_cache, keys, out)
         return out
 
     # Reuse one loop rather than asyncio.run()'s create-and-close-per-call, so the
@@ -220,4 +274,23 @@ def run_pairs(
             out.append(extractor._parse_output(item))
         except Exception:  # noqa: BLE001 - an unparseable generation is a failure
             out.append(CALL_FAILED)
+    _store_verdicts(verdict_cache, keys, out)
     return out
+
+
+def _store_verdicts(verdict_cache: Any, keys: Sequence[Any], verdicts: Sequence[Any]):
+    """Write successful verdicts to the cache, skipping failures.
+
+    A ``CALL_FAILED`` entry must never be stored: caching it would turn a transient
+    throttle or a single unparseable generation into a permanent verdict, which for
+    a contradiction baseline reads as positive evidence of coherence.
+    """
+    if verdict_cache is None:
+        return
+    rows = [
+        (key, verdict)
+        for key, verdict in zip(keys, verdicts)
+        if key is not None and isinstance(verdict, dict)
+    ]
+    if rows:
+        verdict_cache.put_many(rows)

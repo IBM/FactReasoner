@@ -738,3 +738,114 @@ def test_weighting_can_be_disabled():
     lp = [{"token": "4", "top_logprobs": [{"token": "3", "logprob": math.log(1.0)}]}]
     out = GEvalCoherence(lambda p: ("[4]", lp), weighted=False).score(["a"], "resp")
     assert out.score == pytest.approx(0.75)  # the emitted 4, not the weighted 3
+
+
+# --------------------------------------------------------------------------
+# Verdict caching in the batching chokepoint.
+# --------------------------------------------------------------------------
+
+
+def test_run_pairs_cache_serves_repeats(tmp_path):
+    """The second pass over the same pairs must not call the model again.
+
+    Every NLI baseline funnels through ``run_pairs`` over the SAME claim pairs, so
+    without a shared cache a 26-claim response pays for its 325 pairs five times.
+    """
+    from fact_reasoner.core.nli_cache import NLIVerdictCache
+
+    cache = NLIVerdictCache(str(tmp_path / "c"))
+    calls: list = []
+    nli = ScriptedNLI(record=calls)
+    pairs = [("a", "b"), ("c", "d")]
+
+    first = run_pairs(nli, pairs, verdict_cache=cache)
+    assert len(calls) == 2
+    second = run_pairs(nli, pairs, verdict_cache=cache)
+    assert len(calls) == 2, "the repeat pass must be served from the cache"
+    assert second == first
+
+
+def test_run_pairs_cache_computes_only_the_misses(tmp_path):
+    """A partial hit must call the model for the new pairs only, and stay in order."""
+    from fact_reasoner.core.nli_cache import NLIVerdictCache
+
+    cache = NLIVerdictCache(str(tmp_path / "c"))
+    verdicts = {
+        ("a", "b"): {"label": "entailment", "probability": 0.8},
+        ("c", "d"): {"label": "contradiction", "probability": 0.7},
+        ("e", "f"): {"label": "neutral", "probability": 0.6},
+    }
+    calls: list = []
+    nli = ScriptedNLI(verdicts=verdicts, record=calls)
+
+    run_pairs(nli, [("c", "d")], verdict_cache=cache)
+    assert calls == [("c", "d")]
+
+    out = run_pairs(
+        nli, [("a", "b"), ("c", "d"), ("e", "f")], verdict_cache=cache
+    )
+    # Only the two misses were computed; ("c", "d") came from the cache.
+    assert sorted(calls[1:]) == [("a", "b"), ("e", "f")]
+    # Positional alignment must survive the merge.
+    assert [v["label"] for v in out] == ["entailment", "contradiction", "neutral"]
+
+
+def test_run_pairs_cache_never_stores_failures(tmp_path):
+    """A failed call must stay a failure, not become a stored neutral verdict.
+
+    Caching a throttled call would turn a transient outage into permanent positive
+    evidence of coherence -- the same substitution the CALL_FAILED contract exists
+    to prevent, made durable.
+    """
+    from fact_reasoner.core.nli_cache import NLIVerdictCache
+
+    cache = NLIVerdictCache(str(tmp_path / "c"))
+
+    class Boom:
+        def run(self, premise, hypothesis):
+            raise RuntimeError("429 rate limited")
+
+    assert run_pairs(Boom(), [("a", "b")], verdict_cache=cache) == [CALL_FAILED]
+    assert len(cache) == 0, "a failure must not be cached"
+
+    # A later successful call for the same pair is computed, not served.
+    good = ScriptedNLI(verdicts={("a", "b"): {"label": "entailment",
+                                             "probability": 0.9}})
+    out = run_pairs(good, [("a", "b")], verdict_cache=cache)
+    assert out[0]["label"] == "entailment"
+    assert len(cache) == 1
+
+
+def test_run_pairs_without_cache_is_unchanged(tmp_path):
+    """The cache is opt-in: omitting it must not alter behaviour."""
+    calls: list = []
+    nli = ScriptedNLI(record=calls)
+    pairs = [("a", "b"), ("a", "b")]
+    out = run_pairs(nli, pairs)
+    assert len(out) == 2
+    assert len(calls) == 2, "no cache means no deduplication"
+
+
+def test_run_pairs_cache_keys_on_the_estimator(tmp_path):
+    """Two estimators must not share verdicts.
+
+    ``direct`` and ``logprobs`` read the same label from different prompts and
+    report different probabilities, so a cache shared between them would serve a
+    number the caller did not ask for.
+    """
+    from fact_reasoner.core.nli_cache import NLIVerdictCache
+
+    cache = NLIVerdictCache(str(tmp_path / "c"))
+
+    class Stub(ScriptedNLI):
+        def __init__(self, method, **kw):
+            super().__init__(**kw)
+            self.method = method
+
+    a = Stub("logprobs", verdicts={("a", "b"): {"label": "neutral",
+                                               "probability": 1.0}})
+    b = Stub("direct", verdicts={("a", "b"): {"label": "neutral",
+                                             "probability": 0.6}})
+    run_pairs(a, [("a", "b")], verdict_cache=cache)
+    out = run_pairs(b, [("a", "b")], verdict_cache=cache)
+    assert out[0]["probability"] == 0.6, "the direct estimator must not read the CoT cache"

@@ -281,7 +281,7 @@ def main() -> int:
     parser.add_argument(
         "--nli-method",
         default="logprobs",
-        choices=("logprobs", "simbauq"),
+        choices=("logprobs", "direct", "simbauq"),
         help="How the NLI extractor estimates label probabilities.",
     )
     parser.add_argument(

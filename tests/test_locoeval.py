@@ -1276,6 +1276,44 @@ def test_report_renders_every_arm(dataset, mined_specs, mock_llm):
         assert ":" not in label.split(":", 1)[1] if ":" in label else True
 
 
+def test_ladder_caption_assertion_count_matches_the_row_totals(
+    dataset, mined_specs, mock_llm
+):
+    """The caption's denominator must be read off the data, not assumed.
+
+    Families do not all declare the same number of ordering checks (the shipped
+    corpus mixes 14 and 15), so computing the caption as `n_families * 14` under-
+    reported it: the caption said 196 while every row total said 202. A caption that
+    disagrees with its own table is worse than no caption, since it is the number a
+    reader quotes.
+    """
+    arms = ("gold", MINED_ARM)
+    results, out_dir = _mined_results(dataset, "rep_caption", mined_specs, arms)
+    tex = open(rp.write_report(results, out_dir)).read()
+
+    m = re.search(r"With ([0-9]+(?:--[0-9]+)?) assertions per arm", tex)
+    assert m, "the ladder caption must state an assertion count"
+    caption = m.group(1)
+
+    # Pull the denominators the table itself reports, from the `total & %` column.
+    body = tex.split(r"\label{tab:ladder-by-arm}", 1)[1]
+    body = body.split(r"\end{tabular}", 1)[0]
+    totals = {
+        int(d)
+        for d in re.findall(r"& [0-9]+/([0-9]+) & [0-9.]+ \\\\", body)
+    }
+    if not totals:  # tolerate spacing differences in the row format
+        totals = {int(d) for d in re.findall(r"[0-9]+/([0-9]+) &", body)}
+    assert totals, "expected per-arm row totals in the ladder table"
+    if "--" in caption:
+        lo, hi = (int(x) for x in caption.split("--"))
+        assert min(totals) == lo and max(totals) == hi
+    else:
+        assert totals == {int(caption)}, (
+            f"caption says {caption} but row totals are {sorted(totals)}"
+        )
+
+
 def test_report_arm_delta_generalizes_to_mined_arms(dataset, mined_specs, mock_llm):
     results, out_dir = _mined_results(
         dataset, "rep2", mined_specs, ("gold", "gold_valid", MINED_ARM)

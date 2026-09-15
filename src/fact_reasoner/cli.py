@@ -72,9 +72,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--nli-method",
         default="logprobs",
-        choices=["logprobs", "simbauq"],
+        choices=["logprobs", "direct", "simbauq"],
         help="How the NLI extractor estimates relation probabilities: "
         "'logprobs' needs a logprobs-capable backend (rits/vllm/OpenAI); "
+        "'direct' uses the same logprobs but with a no-reasoning few-shot prompt, "
+        "so the label probability is informative rather than saturated at ~1.0 "
+        "(and ~6 output tokens instead of ~200); "
         "'simbauq' uses self-consistency and works on any backend (required for "
         "ollama and for Claude via Anthropic's OpenAI-compatible endpoint, "
         "neither of which exposes logprobs). Default: logprobs.",

@@ -181,6 +181,29 @@ expressible there.
 
 \input{figures/pipeline}
 
+\paragraph{The pipeline in one pass.} Figure~\ref{fig:pipeline} is the whole measure, and reading it
+left to right fixes what each stage owns. A response $y$ is atomized \emph{once}, into the claim set
+both stages then share. Stage~1 takes that set outward: it retrieves evidence $\mathcal{C}$ for each
+claim, labels claim--evidence and evidence--evidence pairs by NLI, and runs inference over a factor
+graph of claim \emph{and} evidence variables, returning a posterior $q_i=\pr{a_i{=}1\mid\mathcal{C}}$
+per claim. Stage~2 takes the same set inward: it mines relations \emph{between} claims from the
+response text --- each arriving already typed by an inferential coupling, so nothing intervenes
+between mining and model construction --- and builds a second MRF over the claims alone, one pairwise
+factor per relation. The two stages meet at exactly one place, the dashed arrow: Stage~1's posterior
+becomes Stage~2's prior, $\pi_i\!\gets\!q_i$, occupying the free $\phi_i$ slot of
+Def.~\ref{def-mrf}. Everything else runs one way.
+
+That single point of contact is what buys the properties we rely on later. Because atomization is
+shared, a factuality verdict and a coherence verdict are statements about the same objects, and the
+composition is a substitution into an existing slot rather than a new model
+(\S\ref{sec-twostage}). Because the coupling is only the priors, the axes stay separable in both
+directions: Stage~1 remains independently reportable, and setting $\pi_i\equiv\tfrac12$ recovers a
+coherence score that consults no evidence at all (Rem.~\ref{rem-noevidence}) --- which is the
+condition under which every evidence-free comparison of \S\ref{sec-experiments} is run. And because
+priors are applied when the network is scored rather than by mutating the mined graph, one mined
+graph can be rescored under uniform, factuality-derived or ablated priors without re-running the
+estimator, making the prior ablations essentially free.
+
 The coherence model consumes claim-level probabilities and reuses the inference machinery that
 produces them, so we describe that stage before defining the model itself. It is FactReasoner
 \citep{factreasoner}; the account here is a summary sufficient to make the composition of
@@ -481,19 +504,93 @@ Coupling $\tau$ & No priors & With priors & Symmetry \\
 \end{tabular}
 \end{table}
 
-\begin{proposition}[Row-stochasticity]
+\begin{proposition}[Row-stochasticity of the asymmetric couplings]
 \label{prop-rowstoch}
-Each with-priors table in Table~\ref{tab:factors} is row-stochastic in the source state: for
-$\tau\in\{\ent,\con,\cnc\}$ both rows sum to one, giving the conditional readings
+The with-priors tables of the two \emph{asymmetric} couplings are row-stochastic in the source
+state: for $\tau\in\{\ent,\con\}$ each row of $\psi_{\tau,p}$ sums to one, so the row indexed by
+$a_s$ \emph{is} the conditional distribution $\pr{a_t \mid a_s}$, with
 \[
 \pr{a_t{=}1 \mid a_s{=}0} = \pi_s, \qquad
 \pr{a_t{=}1 \mid a_s{=}1} = \begin{cases}
-p & \tau=\ent\\ 1-p & \tau=\con\\ p & \tau=\cnc .
+p & \tau=\ent\\ 1-p & \tau=\con .
 \end{cases}
 \]
-Consequently the factor asserts something about the target only when the source is true; when the
-source is false, the target is returned to its prior.
+Consequently such a factor constrains the target only when the source is true; when the source is
+false it returns the target to the prior. The symmetric couplings are not of this form, and are not
+claimed to be. In particular
+$\cnc$ is \emph{not} row-stochastic: its rows sum to $(1-p)+\pi_s$ and $\pi_s+p$, which both equal
+one only in the degenerate case $p=\pi_s=\tfrac12$.
 \end{proposition}
+
+\begin{proof}
+For both asymmetric tables the $a_s{=}0$ row is $[1-\pi_s,\;\pi_s]$, which sums to one; the
+$a_s{=}1$ row is $[1-p,\;p]$ for \ent{} and $[p,\;1-p]$ for \con{}, each summing to one. Dividing a
+row by its sum is therefore the identity, so the rows already are conditionals and may be read off
+directly. For \cnc{} $=[1-p,\;\pi_s,\;\pi_s,\;p]$, row-stochasticity would require
+$(1-p)+\pi_s=1$ and $\pi_s+p=1$, i.e.\ $\pi_s=p$ and $\pi_s=1-p$ simultaneously, hence $p=1-p$.
+\end{proof}
+
+\paragraph{What row-stochasticity means, and what it does not.} The condition is a statement about
+the \emph{table}: it says each row of $\psi$, read across the target's two states, is already
+normalized, so $\psi(a_s,\cdot)$ can be read as $\pr{a_t\mid a_s}$ rather than as an unnormalized
+compatibility score. Two consequences follow, and a third does not. First, the $a_s{=}0$ row being
+the prior $[1-\pi_s,\pi_s]$ is what makes a false source \emph{uninformative} about the target,
+which is the formal content of ``an implication says nothing when its antecedent fails''. Second,
+writing $\ln\psi = \alpha+\beta a_s+\gamma a_t+\delta\,a_s a_t$, row-stochasticity \emph{pins} the
+source-only weight: $\beta=\ln\frac{1-p}{1-\pi_s}$ for \ent{}, with the other couplings tabulated in
+App.~\ref{app-mln}. The source term is not zero, but neither is it free --- it is exactly the amount
+needed to hold the $a_s{=}0$ row at the prior, so no residual degree of freedom is left with which
+the relation could bid the source's own plausibility up or down. That is what distinguishes these
+tables from the no-priors family below, whose $(0,\cdot)$ row is $[p,p]$ and so trades the source's
+truth against the target's. What does \emph{not} follow is any invariance of the marginals in the assembled
+model: once a factor is multiplied against its neighbours and renormalized, both endpoints can
+move, and for an isolated \ent{} relation the source's own marginal already departs from $\pi_s$
+whenever $\pi_t\neq\tfrac12$. Row-stochasticity constrains how a relation \emph{enters} the joint,
+not where inference then lands.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Proposition~\ref{prop-rowstoch} made concrete, at $p=0.9$ and $\pi_s=0.5$ so the three
+  couplings are directly comparable. Tables are row-major over $(0,0),(0,1),(1,0),(1,1)$, so the
+  first pair is the $a_s{=}0$ row and the second the $a_s{=}1$ row. The two asymmetric couplings
+  have both rows summing to one and so admit the conditional reading; \cnc{} does not, and its
+  rows are the entry marked in bold. Every value is produced by
+  \texttt{fact\_reasoner.factors.edge\_factor\_values}.}
+\label{tab:rowstoch-ex}
+\begin{tabular}{@{}llccccl@{}}
+\toprule
+$\tau$ & Table & \multicolumn{2}{c}{Row sums} & \multicolumn{2}{c}{Conditional reading} & \\
+\cmidrule(r){3-4}\cmidrule(r){5-6}
+ & & $a_s{=}0$ & $a_s{=}1$ & $\pr{a_t{=}1|a_s{=}0}$ & $\pr{a_t{=}1|a_s{=}1}$ & Reading \\
+\midrule
+\ent & $[.5,\,.5,\,.1,\,.9]$ & $1.0$ & $1.0$ & $0.5=\pi_s$ & $0.9=p$
+  & source true $\Rightarrow$ target up \\
+\con & $[.5,\,.5,\,.9,\,.1]$ & $1.0$ & $1.0$ & $0.5=\pi_s$ & $0.1=1\!-\!p$
+  & source true $\Rightarrow$ target down \\
+\cnc & $[.1,\,.5,\,.5,\,.9]$ & $\mathbf{0.6}$ & $\mathbf{1.4}$ & $0.833$ & $0.643$
+  & source \emph{false} $\Rightarrow$ target up \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:rowstoch-ex} states the proposition in numbers, and the three rows are worth reading
+against the prose they encode. For \ent{} --- ``Voyager~1 crossed the heliopause, so its
+instruments measured the density rise'' --- a true source pulls the target up to $p=0.9$, while a
+false source leaves it at the $0.5$ prior: the row is flat, which is exactly a vacuous antecedent.
+For \con{} --- ``the probe is in interstellar space, so it has \emph{not} left the Solar System''
+--- a true source pushes the target down to $1-p=0.1$, and a false source is again silent. Both
+rows normalize, so both readings are conditional probabilities.
+
+\cnc{} inverts the direction of information and thereby breaks the property. Reading the weld
+example of Table~\ref{tab:coupex} --- ``at least one of the weld and the fastener must have given
+way'' --- it is the weld \emph{holding} that forces the fastener to have failed, so the
+informative row is $a_s{=}0$, where the reading is $0.833$, well above the $0.5$ prior. The
+$a_s{=}1$ row is the weak one: once the weld has failed the disjunction is already satisfied and
+the fastener is left near its prior. A source-conditioned normalization cannot express this, since
+it reserves the flat row for the false source; the rows sum to $0.6$ and $1.4$ instead of to one.
+This is not a defect of the \cnc{} table but a property of disjunction, and Example~\ref{ex-cnc}
+shows the same fact from the joint side: both endpoints rise together, from $0.5$ to $0.7$,
+because the factor is symmetric and pushes neither endpoint preferentially.
 
 Proposition~\ref{prop-rowstoch} is the substantive modelling choice of this section, and the
 contrast with the no-priors family is worth being precise about. In the no-priors \ent{} table the
@@ -992,9 +1089,10 @@ over worlds cannot increase.
 Lemma~\ref{lem-floor} is not a technicality; it replaces two floors that look more natural and are
 wrong. Retyping every edge to \con{}, or saturating conflicts to $p=1$, both fail to bound $\log Z$
 below for the row-stochastic tables of Prop.~\ref{prop-rowstoch}: an isolated conflict removes no
-mass at all under those tables, whereas a mass-concentrating entailment backbone concentrates a great
-deal, so a network combining a strong backbone with several soft conflicts can have a base $\log Z$
-\emph{below} either candidate floor. We observed exactly this on real graphs, which put
+mass at all when its endpoints sit at the uniform prior --- the setting in which both candidates were
+checked --- and little away from it, whereas a mass-concentrating entailment backbone concentrates a
+great deal, so a network combining a strong backbone with several soft conflicts can have a base
+$\log Z$ \emph{below} either candidate floor. We observed exactly this on real graphs, which put
 Eq.~\ref{eq-logz} outside $[0,1]$ until the MAP floor replaced them. In practice we clamp the ratio
 to $[0,1]$ regardless, since approximate inference computes $\log Z$ and the MAP bound with finite
 i-bound and small tolerance violations are possible.
@@ -1364,6 +1462,21 @@ attributable to relation sourcing alone. The \textsc{gold} arm compiles each ite
 \textsc{windowed} (forward-only, within an order window) and \textsc{bidirectional} (both arc
 directions within the same radius).
 
+\paragraph{Which relation estimator these arms used, and why it matters.} The mined arms in this
+section read the relation type-confidence from the label token's logprobs under the
+chain-of-thought prompt --- the estimator \S\ref{sec-fc-protocol} later shows to be
+\emph{saturated}, returning $\approx\!1$ for essentially every pair. So in the mined arms below the
+relation \emph{type} is informative and the relation \emph{probability} is not, and the coupling
+strengths that enter Eq.~\ref{eq-joint} are near-deterministic. We report the arms as measured rather
+than re-mining them under the no-reasoning prompt, and the reader should read the mined percentages as
+a lower bound for that reason. Two considerations bound how much this matters. First, the gold arms are
+unaffected: they compile the corpus's own labels and consume no estimator, so the gold-versus-mined gap
+--- the section's central claim --- is not an artifact of the probability channel. Second,
+\S\ref{sec-fc-results} finds the readouts' behaviour is driven by relation \emph{type} rather than by
+the probabilities attached to it, which predicts that repairing the channel would move these numbers
+modestly rather than closing the gap. That prediction is untested here and we flag it as the obvious
+next experiment.
+
 Mining is sampled once per cell at the model's default temperature, so the mined arms are not
 deterministic. We measure that rather than estimate it: two \emph{independent} runs of the same two
 \textsc{windowed} configurations moved every pair, coupling and sense F1 by at most $0.014$, while the
@@ -1682,6 +1795,130 @@ invariance freely --- \texttt{gpt-oss}'s G-Eval moves by up to $0.55$ across run
 sentence order. A judge asked for a coherence rating is answering a question about the text, so it
 inherits the text's surface variation.
 
+\subsection{The same two comparisons, on mined relations}
+\label{sec-mined-baselines}
+
+Tables~\ref{tab:ladder-baselines} and~\ref{tab:summary} score the LCS on \emph{gold} relations, which
+is the right way to ask whether the probabilistic model works but not whether the \emph{pipeline} does.
+Tables~\ref{tab:ladder-baselines-mined} and~\ref{tab:summary-mined} repeat both comparisons with the
+relation graphs mined from prose by the two miners of \S\ref{sec-experiments}, on exactly the axes the
+baselines are held to, so a mined arm can be read against a cohesion metric directly. Everything else
+--- the claims, the atom priors, the readouts, the assertion sets --- is unchanged, and the gold rows
+are repeated in both tables as the reference. These numbers come from the same cached runs as
+Table~\ref{tab:ladder}; the estimator caveat of \S\ref{sec-experiments} applies to them equally.
+
+\begin{table}[t]
+\centering\small
+\caption{The increase axis of Table~\ref{tab:ladder-baselines}, with relations mined from prose
+  instead of taken from the corpus. Scored on the same $50$ readout-independent assertions (C1
+  consecutive increase plus C3 endpoint separation, over the eight \textsc{conflict} and two
+  \textsc{chain} families), so every row here is comparable to every row of
+  Table~\ref{tab:ladder-baselines}. Gold rows repeated for reference; the best baseline in that table
+  is noun-repetition cohesion at $30/50$ ($60.0$), shown here as the line a mined arm must clear.}
+\label{tab:ladder-baselines-mined}
+\begin{tabular}{@{}llr@{}}
+\toprule
+Relations & Readout & Assertions satisfied \\
+\midrule
+\textsc{gold} & $\LCS_{\mm}$   & $37/50$ \quad \textbf{74.0} \\
+              & $\LCS_{\lp}$   & $36/50$ \quad 72.0 \\
+              & $\LCS_{\cons}$ & $34/50$ \quad 68.0 \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{mined by} \texttt{llama-3.3-70b}} \\
+\textsc{windowed}      & $\LCS_{\mm}$   & $20/50$ \quad 40.0 \\
+                       & $\LCS_{\lp}$   & $35/50$ \quad \textbf{70.0} \\
+                       & $\LCS_{\cons}$ & $23/50$ \quad 46.0 \\
+\textsc{bidirectional} & $\LCS_{\mm}$   & $28/50$ \quad 56.0 \\
+                       & $\LCS_{\lp}$   & $25/50$ \quad 50.0 \\
+                       & $\LCS_{\cons}$ & $34/50$ \quad 68.0 \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{mined by} \texttt{gpt-oss-120b}} \\
+\textsc{windowed}      & $\LCS_{\mm}$   & $25/50$ \quad 50.0 \\
+                       & $\LCS_{\lp}$   & $29/50$ \quad 58.0 \\
+                       & $\LCS_{\cons}$ & $25/50$ \quad 50.0 \\
+\textsc{bidirectional} & $\LCS_{\mm}$   & $21/50$ \quad 42.0 \\
+                       & $\LCS_{\lp}$   & $28/50$ \quad 56.0 \\
+                       & $\LCS_{\cons}$ & $24/50$ \quad 48.0 \\
+\midrule
+\multicolumn{2}{@{}l}{\textsc{rc} (cohesion; best baseline, Table~\ref{tab:ladder-baselines})}
+  & $30/50$ \quad 60.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\caption{Both axes of Table~\ref{tab:summary}, on mined relations. \textbf{Increase} is the $50$
+  readout-independent assertions; \textbf{Invariance} is the $20$ rung pairs of the three
+  \textsc{order} and one \textsc{control} families, satisfied when the score is unchanged to
+  $10^{-6}$. The final column takes the weaker axis, as in Table~\ref{tab:summary}. Every mined arm
+  scores $0/20$ on invariance, and \S\ref{sec-mined-invariance} shows this is real movement rather
+  than absent scores.}
+\label{tab:summary-mined}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Relations & Readout & Increase & Invariance & $\min$ \\
+ & & (of 50) & (of 20) & \\
+\midrule
+\textsc{gold} & $\LCS_{\mm}$   & $37$ \quad \textbf{74} & $20$ \quad \textbf{100} & \textbf{74} \\
+              & $\LCS_{\lp}$   & $36$ \quad 72 & $20$ \quad 100 & 72 \\
+              & $\LCS_{\cons}$ & $34$ \quad 68 & $20$ \quad 100 & 68 \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{mined by} \texttt{llama-3.3-70b}} \\
+\textsc{windowed}      & $\LCS_{\mm}$   & $20$ \quad 40 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\lp}$   & $35$ \quad 70 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\cons}$ & $23$ \quad 46 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+\textsc{bidirectional} & $\LCS_{\mm}$   & $28$ \quad 56 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\lp}$   & $25$ \quad 50 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\cons}$ & $34$ \quad 68 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{mined by} \texttt{gpt-oss-120b}} \\
+\textsc{windowed}      & $\LCS_{\mm}$   & $25$ \quad 50 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\lp}$   & $29$ \quad 58 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\cons}$ & $25$ \quad 50 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+\textsc{bidirectional} & $\LCS_{\mm}$   & $21$ \quad 42 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\lp}$   & $28$ \quad 56 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+                       & $\LCS_{\cons}$ & $24$ \quad 48 & $0$ \quad \phantom{00}0 & \phantom{0}0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{On the increase axis a mined arm is competitive; on invariance it is not.} Read
+Table~\ref{tab:ladder-baselines-mined} against the baselines and the mined arms are not the collapse
+that Table~\ref{tab:ladder}'s $34.7$--$37.1\%$ might suggest --- that figure is over the fuller
+$202$-assertion set, which includes the invariance families the mined arms fail wholesale. Restricted
+to the increase axis the mined arms span $40$--$70\%$: two of the twelve mined rows clear the best
+evidence-free baseline's $60.0\%$ (\texttt{llama}/\textsc{windowed} $\LCS_{\lp}$ at $70.0$ and
+\texttt{llama}/\textsc{bidirectional} $\LCS_{\cons}$ at $68.0$) and three more reach $56$--$58\%$,
+while the remaining seven fall below it. But
+Table~\ref{tab:summary-mined} is the honest summary, and there every mined arm scores
+$\mathbf{0/20}$ on invariance and therefore $0$ on the weaker-axis column. The gold arms' categorical
+advantage is entirely on that second axis.
+
+\paragraph{Why the invariance failure is the substantive one.}
+\label{sec-mined-invariance}
+A $0/20$ could in principle be an artefact of missing scores, since a missing score fails rather than
+passes. It is not: the readouts move, and by margins far above the $10^{-6}$ tolerance. On
+\texttt{llama}'s \textsc{windowed} arm the $\LCS_{\mm}$ range across the five rungs of an
+invariance family is $0.084$ on \texttt{f003} (\textsc{control}), $0.165$ on \texttt{f004},
+$0.123$ on \texttt{f007} and $0.378$ on \texttt{f011} (all \textsc{order}) --- movement of up to a
+third of the scale on rungs that only permute sentences. The mechanism is the one
+\S\ref{sec-summary} identifies: the readouts are reorder-invariant \emph{given a fixed relation set},
+because a \textsc{Precedence}$\leftrightarrow$\textsc{Succession} swap compiles to no factor and
+shuffling sentences does not change which claims stand in which relation. Mining breaks the premise
+rather than the theorem --- an order-window policy reads adjacency as evidence, so permuting the prose
+changes which pairs are even considered, and the network is no longer identical. Invariance is a
+property the model has and the current extractor destroys, which is a sharper localization of the open
+problem than the aggregate percentage gives.
+
+\paragraph{A row not to over-read.} \texttt{llama}/\textsc{windowed} $\LCS_{\lp}$ at $35/50$ ($70.0$)
+sits just below the gold $\LCS_{\lp}$ of $36/50$, which invites the reading that mined relations nearly
+match gold on this readout. They do not. That arm's per-rung sequences are not monotone --- on
+\texttt{f001} the five rungs read $0.162, 0.169, 0.138, 0.125, 0.130$ --- so it satisfies the
+consecutive-increase and endpoint assertions the axis counts while wandering in between, and its mean
+value ($0.224$) is roughly half gold's ($0.410$). The C1/C3 subset is a coarse instrument by
+construction, which is exactly why it is paired with the invariance axis rather than reported alone.
+
 \paragraph{Two honest qualifications.} First, the LCS column above is the \emph{gold-relation} arm.
 Handed graphs mined from prose the same readouts fall to $34.7$--$37.1\%$ of the full $202$ assertions
 and to $0/45$ and $0/15$ on the invariance ladders (\S\ref{sec-baselines-measured},
@@ -1694,17 +1931,306 @@ two are the cohesion metrics. Invariance alone is therefore not a discriminating
 necessary condition most baselines meet, and the three constant baselines meet trivially. The claim
 rests on passing both, which only the LCS does.
 
+%% ================================================================
+\section{Beyond ladders: the two-stage model on factuality corpora}
+\label{sec-factuality-corpora}
+%% ================================================================
+
+Everything up to here was measured on the ladder corpus, where every item is a controlled
+perturbation of a claim set and the ground truth is an \emph{ordering} the rungs must exhibit. That
+design is what makes the relation graph auditable, but it buys auditability at the cost of realism: the
+responses are generated to a plan, and the claim sets are small and hand-checked. This section asks the
+complementary question. Run the whole two-stage pipeline --- retrieval-grounded factuality
+(\S\ref{sec-factuality}) feeding the coherence MRF (\S\ref{sec-coherence}) --- over
+\emph{naturally occurring} long-form generations, with no planted relations and no declared ordering,
+and report what each measure actually does there.
+
+There is no ordering ground truth on such a corpus, so the question is not ``does the measure move the
+right way''. It is the prior question, which the ladder design cannot ask: \textbf{does the measure
+distinguish these responses from one another at all?} A coherence measure that returns the same number
+for every response has no ordering to be right or wrong about. We therefore report, for every measure,
+the number of \emph{distinct} values it takes across the corpus alongside its mean --- and it is this
+column, not the mean, that separates the measures.
+
+\subsection{The corpora}
+\label{sec-fc-corpus}
+
+Five long-form generation datasets, each already decomposed into atomic claims with retrieved
+evidence passages attached per claim: \textsc{bio} (biographies of rare entities, verified against
+Wikipedia), \textsc{askhist} and \textsc{eli5} (long-form question answering), \textsc{books}
+(literary questions) and \textsc{lfobj} (long-form objective questions), the last four retrieved from
+web search. Together they hold $1{,}137$ responses and $28{,}646$ claims.
+
+We evaluate on a \textbf{seeded stratified sample of $250$ responses and $6{,}266$ claims} --- fifty
+from each dataset, so no dataset dominates by size (they range from $157$ to $380$ items), drawn by a
+seed recorded with the sample so it regrows exactly. The sample is a cost decision and we state it
+plainly: the full corpus prices at roughly $131$K relation calls for stage one plus $619$K mining
+calls for stage two \emph{per model}, and the experiment runs two models under two pair policies. Items
+with fewer than five claims are excluded, having too few pairs to form a coherence graph at all.
+
+\textsc{bio} carries one thing the others do not: human \textsc{supported}/\textsc{not-supported}
+labels on every claim. Those labels are never shown to either stage; they are held out as an external
+check on stage one, reported below.
+
+\subsection{Protocol}
+\label{sec-fc-protocol}
+
+Nothing is atomized and nothing is retrieved: the corpora already carry both, so both stages read the
+same fixed claim set and the same fixed passages, and the only variables are the estimator and the
+pair policy. Stage one is FactReasoner v2 over claims and passages, scoring claim--passage relations
+under the provenance candidate-pair preset, which resolves the same graph as scoring every pair while
+issuing roughly $2.8\times$ fewer calls. Stage two is the pairwise coherence MRF of
+\S\ref{sec-coherence} with stage one's posterior marginals as the claims' unary priors, read out four
+ways.
+
+One protocol point is load-bearing for the comparison. \textbf{Stage one runs once per response, not
+once per pair policy.} The marginals do not depend on how candidate claim pairs are selected, so they
+are computed once and both policies are scored against the identical prior vector. The two policies are
+therefore an exact ablation: any difference between the \textsc{windowed} column and the
+\textsc{bidirectional} column is attributable to pair selection alone, not to a re-run of stage one.
+The baselines are handed the same claim texts, and never atomize for themselves, for the same reason.
+
+\paragraph{Relation probabilities, and a prompt that had to change.} The relation estimator of
+\S\ref{sec-mining} reads its confidence from the label token's logprob. Doing that on these models
+exposed a defect in how that probability was being obtained, and it is worth reporting because it is
+invisible to any evaluation that reads only labels. The original prompt asks the model to reason and
+\emph{then} emit the label. By the time the label token is generated the model has already argued the
+verdict in prose, so the token is all but determined by its own preceding reasoning: measured over
+real claim--passage pairs, the estimate was $\geq 0.999$ on $30$ of $30$ pairs, taking a single
+distinct value to four decimal places. The channel carried no information, and every relation entered
+the network as a near-deterministic constraint.
+
+Two candidate repairs do not work, and both are instructive. Raising the sampling temperature changes
+nothing, because the serving stack reports logprobs computed before temperature scaling --- $T = 0$
+through $T = 2$ moved one borderline pair's estimate from $0.9941$ to $0.9941$. And the apparent spread
+of the label token's raw probability is an artifact: renormalizing its mass over the three admissible
+labels returns exactly $1.0$, because the competing mass sits on \emph{casing variants of the same
+label} rather than on rival labels.
+
+What does work is removing the reasoning. A few-shot prompt that maps premise and hypothesis directly
+to a bracketed label, with no intermediate reasoning, makes the label the model's first commitment, and
+its probability a posterior over the three classes; we renormalize over those classes so that
+surface-form mass cannot read as uncertainty. Labels are unchanged from the reasoning prompt on the
+same pairs, and output shrinks from roughly $200$ tokens to six, so the informative estimator is also
+the cheaper one. On deliberately borderline pairs it spreads $0.59$--$1.00$ (standard deviation
+$0.13$), e.g.\ $0.59$ where a premise says ``most regions'' and the hypothesis says ``every region''.
+All results in this section use this estimator.
+
+The repair is model-dependent, which bounds the claim. \texttt{gpt-oss-120b} does not comply with the
+instruction not to reason: it emits an internal analysis channel regardless, so its label remains
+post-hoc and its probability saturated even on the borderline pairs. For that model the relation
+\emph{type} is informative and the relation \emph{probability} is not. We report both models under the
+same estimator rather than quietly giving them different ones, so this difference is visible in the
+tables instead of hidden in the configuration.
+
+\subsection{Stage one: the marginals separate supported from unsupported claims}
+\label{sec-fc-stage-one}
+
+Before asking anything of the coherence stage, stage one should be checked against the only external
+ground truth available, the held-out human labels on \textsc{bio}. It passes, on the fifty
+\textsc{bio} responses ($992$ supported and $563$ not-supported claims): supported claims receive a mean
+posterior of $0.934$ and not-supported claims $0.576$, a separation of $\mathbf{+0.357}$. The gap is
+wide but the distributions overlap --- both span the full unit interval, and the not-supported claims
+have the larger spread ($0.289$ against $0.191$) --- so stage one is a graded, imperfect signal about
+support rather than a classifier, which is exactly how the coherence stage consumes it. What matters
+downstream is that the marginals are genuinely graded rather than saturated: they take $455$ distinct
+values over $6{,}266$ claims. A stage that returned $0.5$ everywhere, or $1.0$ everywhere, would reduce
+the two-stage model to the coherence-only one.
+
+The distribution is nonetheless strongly ceiling-weighted, and it is worth reporting exactly rather than
+merely calling it graded: $82.7\%$ of claims land above $0.99$, $10.3\%$ in the informative middle
+$[0.2, 0.8)$, and $2.3\%$ below $0.01$. That concentration is a property of the corpus, not a failure of
+the estimator, and the human labels are what establish the difference. Bucketing the labelled
+\textsc{bio} claims by their marginal, the above-$0.99$ bucket is $88.1\%$ \textsc{supported} against a
+$63.8\%$ base rate, while the middle bucket inverts to $73.4\%$ \textsc{not-supported} and the
+below-$0.01$ bucket to $74.5\%$. The ceiling is therefore populated by claims that really are supported,
+and the graded interior is where the genuinely doubtful claims sit --- which is the behaviour a prior
+should have. It does mean the coherence stage receives a near-uniform prior on five claims in six, so
+on this corpus the composition is doing most of its work on the remaining sixth. A
+stage that returned $0.5$ everywhere, or $1.0$ everywhere, would reduce the two-stage model to the
+coherence-only one.
+
+\subsection{What the corpus shows}
+\label{sec-fc-results}
+
+Table~\ref{tab:factuality-coherence} reports every measure's mean, spread and distinct-value
+count over the sample, per miner.
+
+\begin{table}[t]
+\centering\small
+\caption{The two-stage model and the evidence-free baselines on the factuality corpora:
+  $250$ responses, $6{,}266$ claims, five domains, scored under two relation miners with the
+  \textsc{windowed} pair policy. \textbf{d} counts the \emph{distinct} values a measure takes
+  over the $250$ responses: a measure with $d$ near $1$ is a constant and cannot rank
+  responses whatever its mean. This corpus has no ordering ground truth, so the column to read
+  is $d$, not the mean.}
+\label{tab:factuality-coherence}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Miner & Measure & Mean & SD & Range & d \\
+\midrule
+\texttt{llama-3.3-70b} & $\LCS_{\mm}$ & 0.9759 & 0.0692 & $[0.27, 1.00]$ & $90$ \\
+ & $\LCS_{\cons}$ & 0.8032 & 0.2465 & $[0.26, 1.00]$ & $74$ \\
+ & $\LCS_{\lp}$ & 0.6850 & 0.4507 & $[0.00, 1.00]$ & $45$ \\
+ & \textsc{judge, G-Eval} & 0.9998 & 0.0032 & $[0.95, 1.00]$ & $5$ \\
+ & \textsc{judge, direct rating} & 1.0000 & 0.0000 & $[1.00, 1.00]$ & $3$ \\
+ & \textsc{roscoe-sc (max)} & 0.6252 & 0.4684 & $[0.00, 1.00]$ & $51$ \\
+ & \textsc{roscoe-sc (mean)} & 0.9955 & 0.0112 & $[0.91, 1.00]$ & $73$ \\
+ & \textsc{contradiction rate} & 0.9971 & 0.0078 & $[0.95, 1.00]$ & $48$ \\
+ & \textsc{rc (cohesion)} & 0.5024 & 0.1808 & $[0.06, 1.00]$ & $224$ \\
+ & \textsc{entity graph} & 0.9724 & 0.1194 & $[0.11, 1.00]$ & $17$ \\
+ & \textsc{length (control)} & 0.2066 & 0.0461 & $[0.09, 0.33]$ & $136$ \\
+ & \textsc{claim count (control)} & 0.3916 & 0.1064 & $[0.08, 0.78]$ & $37$ \\
+\midrule
+\texttt{gpt-oss-120b} & $\LCS_{\mm}$ & 0.9475 & 0.0903 & $[0.43, 1.00]$ & $148$ \\
+ & $\LCS_{\cons}$ & 0.7107 & 0.2535 & $[0.12, 1.00]$ & $134$ \\
+ & $\LCS_{\lp}$ & 0.6713 & 0.4340 & $[0.00, 1.00]$ & $85$ \\
+ & \textsc{judge, G-Eval} & 0.9166 & 0.1017 & $[0.45, 1.00]$ & $10$ \\
+ & \textsc{judge, direct rating} & 0.8286 & 0.1619 & $[0.20, 1.00]$ & $16$ \\
+ & \textsc{roscoe-sc (max)} & 0.5640 & 0.4969 & $[0.00, 1.00]$ & $2$ \\
+ & \textsc{roscoe-sc (mean)} & 0.9944 & 0.0118 & $[0.89, 1.00]$ & $69$ \\
+ & \textsc{contradiction rate} & 0.9961 & 0.0086 & $[0.93, 1.00]$ & $54$ \\
+ & \textsc{rc (cohesion)} & 0.5024 & 0.1808 & $[0.06, 1.00]$ & $224$ \\
+ & \textsc{entity graph} & 0.9724 & 0.1194 & $[0.11, 1.00]$ & $17$ \\
+ & \textsc{length (control)} & 0.2066 & 0.0461 & $[0.09, 0.33]$ & $136$ \\
+ & \textsc{claim count (control)} & 0.3916 & 0.1064 & $[0.08, 0.78]$ & $37$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The evidence-free baselines collapse here, and more completely than on the ladders.}
+The failure is not uniform across the baselines, and the distinction matters. Under
+\texttt{llama-3.3} the \emph{LLM judges} are effectively constants: over all $250$ responses the direct
+rating takes
+\textbf{three} distinct values and the G-Eval rubric \textbf{five}, with a run-to-run spread across five
+seeds below $10^{-2}$. Within a single dataset they are frequently \emph{literal constants}: the direct
+rating takes one distinct value on each of \textsc{bio}, \textsc{books} and \textsc{lfobj}, and G-Eval
+one on each of \textsc{eli5} and \textsc{lfobj} --- fifty documents, one number. A measure with three
+distinct values on two hundred and fifty documents has no ordering to be right or wrong about; this is the practical incumbent, and on realistic long-form text it is close to not being
+a measure at all. The \emph{contradiction-based baselines} are better than that and worse than they
+look: they are heavily ceiling-skewed --- most responses sit at exactly $1.0$ for the pairwise
+contradiction rate --- but they do take $48$--$73$ distinct values over the $250$, so they
+rank the minority of responses in which the extractor finds any conflict at all. Their problem on this
+corpus is not degeneracy but coverage: naturally occurring prose rarely contradicts itself outright, so
+a measure keyed on contradiction alone is uninformative about most of the corpus by construction.
+
+\paragraph{A saturated estimator degrades \textsc{roscoe}'s $\max$ to a coin flip.} One
+model--baseline interaction deserves its own note, because it shows how a saturated relation probability
+propagates into a baseline that appears unrelated to it. \textsc{roscoe}'s Self-Consistency aggregates
+pairwise contradiction with $1 - \max_{ij} p^{\mathrm{con}}_{ij}$. Under \texttt{llama-3.3} that takes
+$51$ distinct values over the $250$ responses. Under \texttt{gpt-oss-120b} it takes
+\textbf{exactly two}: $1.0$ on $141$ responses and $0.0$ on $109$, with nothing in between. Its
+symmetric variant collapses identically ($2$ values against \texttt{llama}'s $52$). The mechanism
+is immediate once stated --- \texttt{gpt-oss}'s contradiction probabilities are pinned at
+$\approx\!1$ (\S\ref{sec-fc-protocol}), so the $\max$ is $1$ whenever \emph{any} pair is labelled a
+contradiction and $0$ otherwise, and the readout degenerates into an indicator for ``the extractor found
+at least one conflict''. The $\mathrm{mean}$ variant of the same baseline survives on the same verdicts
+($1.0$ down to $0.99$, many values), as does the soft contradiction rate ($52$ values), because both
+average over all pairs instead of taking an extremum. The lesson generalizes beyond \textsc{roscoe}: an
+aggregator that reads a single extremal probability inherits that probability's calibration completely,
+whereas one that averages is partially protected. It is also a reason to report a baseline under more
+than one model --- the same metric looks serviceable under one estimator and is a coin flip under
+another.
+
+\paragraph{The cohesion metrics and the controls do vary, and that is the point of including them.}
+Being functions of the surface, they take \emph{more} distinct values than the LCS does
+--- $224$ and $209$ of $250$ for the two cohesion metrics, $136$ for response length, against $74$ for
+the consistency readout. That is exactly why variation alone is not evidence of measuring coherence: a
+character count varies freely and knows nothing. Their spread is the null model a coherence measure must
+beat on something other than spread, which is what \S\ref{sec-summary}'s invariance axis tests and this
+corpus cannot.
+
+\paragraph{The two pair policies disagree, and the disagreement is informative.}
+Windowed mining is forward-only, so it cannot assert a relation that runs backward in assertion order;
+bidirectional mining can, within the same radius. Because both are scored against identical priors, the
+gap isolates what the backward arcs contribute --- and on this corpus that contribution is small. The
+bidirectional policy recovers more relations per response ($96.4$ against $89.8$ under
+\texttt{llama-3.3}; $62.8$ against $58.6$ under \texttt{gpt-oss-120b}), yet over $250$ responses the
+headline readout barely separates the two: $0.9796$ against $0.9759$ for \texttt{llama} and $0.9596$
+against $0.9475$ for \texttt{gpt-oss}, with the consistency readout moving by $0.0008$ and $0.0105$
+respectively. The direction is consistent --- bidirectional scores marginally higher, as more mined
+support should imply --- but the magnitude is a fraction of the between-response spread ($\mathrm{sd}
+\approx 0.25$ on consistency). Backward arcs are therefore not the
+binding constraint on this corpus: most of what the coherence graph finds in naturally occurring prose
+is already reachable in assertion order. That is a negative result about the pair policy, not about the
+model, and it is worth stating because the forward-only policy is the cheaper of the two.
+
+\paragraph{The second model discriminates, and it does not help.} The degeneracy above is
+\texttt{llama-3.3}'s. \texttt{gpt-oss-120b}'s judges are \emph{not} constants: over all $250$ responses its
+direct rating takes sixteen distinct values against \texttt{llama}'s three, and it is constant on no
+domain. Read
+carelessly that looks like a working judge, and it is worth showing why it is not. Its per-seed ratings resolve to only
+\emph{four} underlying rungs of the five-point scale ($0.25$, $0.5$, $0.75$, $1.0$); the apparent
+resolution comes from averaging five seeds that \emph{disagree with each other}, roughly half the
+responses showing a $0.25$ spread, i.e.\ the judge moving a full rung on byte-identical input. That is
+why a judge must be reported with its spread rather than as a point estimate.
+
+Whether the residual variation carries information is a fair question and the answer is: a little, but
+not reliably. Within a domain the correlation between this judge and the LCS consistency readout is
+$-0.02$ on \textsc{bio} ($n = 50$) and $+0.21$ on \textsc{askhist} ($n = 49$), neither significant;
+pooled over the two it is $+0.24$ ($t = 2.5$), which is nominally significant but is also what one
+expects when two measures share a between-domain offset, since \textsc{askhist} is both the
+lower-scoring domain for the judge and the more conflicted one. We therefore do not claim this judge is
+pure noise --- only that its usable resolution is four rungs, its run-to-run spread is a full rung, and
+any ordering signal it carries is weak enough to be confounded with domain. The two judges fail in the
+two different ways available to a saturated rater, one returning a constant and the other returning
+four rungs with rung-scale noise, and the LCS readouts take $34$--$48$ distinct values on the same items
+either way.
+
+\paragraph{The readouts respond to relational structure, not to the priors.} A measure built by
+composing two stages invites the worry that the second stage is only echoing the first. The corpus lets
+us check, because the five domains disagree sharply on the consistency readout, and that ordering is
+\emph{not} the ordering of the priors. It is the ordering of mined conflict. Writing each domain as
+(conflict-bearing responses of $50$, mean consistency), where a response is conflict-bearing when its
+contradiction-free ceiling exceeds its partition function: \textsc{askhist} $(40, 0.589)$,
+\textsc{eli5} $(23, 0.757)$, \textsc{books} $(17, 0.820)$, \textsc{lfobj} $(7, 0.927)$ and \textsc{bio}
+$(6, 0.922)$. The readout falls monotonically in conflict prevalence across all five, the single
+inversion being the two least-conflicted domains, which are within $0.005$ of each other. Meanwhile the
+correlation between a response's mean prior and its consistency is $-0.13$, i.e.\ nil. Stage two is therefore responding to the
+relational structure it mines rather than to the factuality signal it inherits, which is what the
+composition was supposed to buy and is not something the ladder corpus can show, its items being
+matched on claim content by construction.
+
+The per-response form of that test is sharper than the per-domain one, and it replicates across both
+miners. Splitting responses by whether their mined graph contains any conflict edge at all,
+conflict-bearing responses score $0.496$ on the consistency readout against $0.985$ for conflict-free
+ones under \texttt{llama-3.3} --- a gap of $0.489$ over $250$ responses (Welch $t = 55$) --- and $0.483$
+against $0.921$ under \texttt{gpt-oss-120b}, a gap of $0.438$ (Welch $t = 28$). The readout is thus
+separating responses by the presence of relational conflict, not by domain, length or prior mass, and it
+does so under a miner whose relation \emph{probabilities} are uninformative as well as one whose are
+not --- which localizes what the readout needs from the extractor to the relation \emph{type}.
+
+\paragraph{The degeneracy of the judges is not an artifact of pooling domains.} Aggregate
+distinct-value counts could in principle hide a judge that discriminates within a domain while being
+offset between them. It does not. Per dataset ($50$ responses each) \texttt{llama}'s direct rating takes
+$1, 1, 1, 2, 2$ distinct values on \textsc{bio}, \textsc{books}, \textsc{lfobj}, \textsc{askhist} and
+\textsc{eli5} --- a literal constant on three of the five --- while the LCS consistency readout takes
+$35, 13, 10, 17$ and $11$. The gap is a property of each domain separately, not of the pooled corpus.
+\texttt{gpt-oss}'s rating is not constant on any domain ($9$--$13$ values), which is the behaviour the
+next paragraph takes apart.
+
+\paragraph{Qualification.} This corpus has no ordering ground truth, so nothing here
+establishes that the LCS orders responses \emph{correctly} --- only that it discriminates among them
+where the incumbent judges do not, that it separates conflict-bearing from conflict-free responses by
+roughly half the scale under both miners, and that its inputs are sound. The ladder corpus is where
+correctness of ordering is tested; this corpus is where the measures meet realistic text. Neither result
+substitutes for the other, and the surface baselines above are a reminder that discrimination alone is
+cheap: the argument requires both axes.
+
+
 \section{Worked examples}
 \label{sec-examples}
 %% ================================================================
 
-We work four examples. The first is the smallest complete instance of the two-stage model: one
-claim set, two responses, exact inference. The second is a richer sixteen-claim graph that exercises
-the conflict taxonomy. The third is a claim-identical pair that isolates ordering. The first three
-are hand-authored, which bounds what they can show: they demonstrate that the model reads a graph
-correctly, not that the estimator finds such graphs in text it has never seen. The fourth is
-therefore a corpus rather than an example --- one hundred machine-generated responses whose
-incoherence is planted by construction, scored end to end with no hand-drawn relations anywhere.
+We work five examples. The first is the smallest complete instance of the two-stage model: one
+claim set, two responses, exact inference; the second takes one of those two responses on its own
+and follows it from relation graph to MRF to score, which is the pipeline in miniature. The third is
+a richer sixteen-claim graph that exercises the conflict taxonomy. The fourth is a claim-identical
+pair that isolates ordering. The first four are hand-authored, which bounds what they can show: they
+demonstrate that the model reads a graph correctly, not that the estimator finds such graphs in text
+it has never seen. The fifth is therefore a corpus rather than an example --- one hundred
+machine-generated responses whose incoherence is planted by construction, scored end to end with no
+hand-drawn relations anywhere.
 
 \subsection{A five-claim pair, end to end}
 \label{sec-example-pair}
@@ -1743,15 +2269,16 @@ full, with the span asserting each claim marked \claimref{i} at its first mentio
 \toprule
 \textbf{Response A} (coherent) --- $\LCS_{\mm}=0.590$, $\LCS_{\cons}=0.963$, $\log Z=-0.95$ \\
 \midrule
-Voyager~1 crossed the heliopause in August 2012.\,\claimref{1} After the crossing, its
-instruments measured a sharp rise in plasma density,\,\claimref{2} and that measurement is what
-established the boundary had been passed; Voyager~1 is therefore in interstellar
-space.\,\claimref{3} Two claims that circulate about the mission do not survive scrutiny. It is
-sometimes said that the plasma wave instrument had failed permanently before the
-crossing,\,\claimref{4} \emph{but it cannot have failed and also have returned the density
-measurement that settled the question.} It is also said that the probe has left the Solar System
-entirely;\,\claimref{5} \emph{being in interstellar space is not the same thing, since the Oort
-cloud remains gravitationally bound and lies far beyond Voyager~1.} \\
+Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and in the days that followed its
+instruments measured a sharp rise in plasma density\,\claimref{2} --- the signature of the denser
+medium beyond, and \emph{the measurement that established the boundary had been passed.}
+Voyager~1 is therefore in interstellar space.\,\claimref{3} Two persistent misconceptions are
+worth clearing up. The first is that the probe's plasma wave instrument had failed permanently
+before the crossing;\,\claimref{4} \emph{it cannot have, since it is precisely that instrument
+which returned the density profile the conclusion rests on.} The second is that Voyager~1 has
+left the Solar System altogether.\,\claimref{5} \emph{Being in interstellar space is not the same
+thing: the Sun's gravitational reach extends through the Oort cloud, far beyond the probe's
+present distance.} \\
 \addlinespace[4pt]
 \midrule
 \textbf{Response B} (incoherent) --- $\LCS_{\mm}=0.494$, $\LCS_{\cons}=0.414$, $\log Z=-3.78$ \\
@@ -1866,6 +2393,41 @@ $\log Z_{\max}$ and $\log Z_{\min}$ are recomputed \emph{per response} ($-0.49$ 
 $-1.65$ and $-4.55$ for B), so it reports how close a response comes to the ceiling of \emph{its
 own} edge skeleton, not how the two responses compare. It is a within-response diagnostic. Raw
 $\log Z$ is comparable across responses and moves the right way, by $2.83$ nats.
+
+\subsection{Response B at two levels of resolution}
+\label{sec-example-b-anatomy}
+
+\input{figures/response-b-anatomy}
+
+The pair above varies the arrangement and reads off the difference. It is worth pausing on one of
+the two responses on its own, because the step from a relation graph to a probability model is the
+step at which most of the modelling content sits, and on a five-claim instance it can be shown in
+full rather than described. Figure~\ref{fig:response-b-anatomy} puts Response~B's relation graph
+next to the MRF that graph induces, and lists what inference over that MRF returns.
+
+The two panels are the same object at two resolutions, and the translation between them is
+mechanical: Def.~\ref{def-mrf} sends each mined relation to exactly one pairwise factor and each
+claim to exactly one unary, so B's six edges become $\psi_1,\dots,\psi_6$ and its five priors become
+$\phi_1,\dots,\phi_5$. Nothing is added in the crossing and nothing is dropped; what the right panel
+supplies is that the priors, implicit in the node colours on the left, become factors of the same
+kind as the relations, and therefore quantities the inference trades off against one another. This
+is what makes the two-stage composition of \S\ref{sec-twostage} a substitution rather than a
+redesign: replacing a uniform $\phi_i$ with a factuality posterior changes a number in an existing
+slot.
+
+Three things in the score panel are worth reading off. First, $\LCS_{\mm}=0.494$ sits \emph{below}
+the prior-only mean of $0.580$, so B's argument is not merely failing to add support --- it is
+removing some, which a measure that only counted satisfied relations could not report
+(Prop.~\ref{prop-vacuous}). Second, the readouts agree on the ordering where they are entitled to:
+$\LCS_{\mm}$, $\LCS_{\cons}$, $\LCS_{\rei}$ and raw $\log Z$ all place B below the coherent
+arrangement, while $\LCS_{\lp}$ is parenthesized because its references are rebuilt per response and
+so cannot be compared across the pair. Third, and the reason a scalar is not the whole output, the
+per-claim marginals localize the damage: $a_3$ is true of the world and carries a $0.9$ prior, yet
+finishes at $0.513$. Reading the mechanism off the right panel, $a_3$'s only support is $\psi_3$,
+which arrives from $a_4$; but $\psi_4$ encodes the response denying $a_4$, and $\psi_2$ has it
+denying $a_3$ directly. A premise the text refuses cannot transmit support, so the claim that
+should have been B's conclusion is left at a coin flip --- by the argument built around it rather
+than by anything it says.
 
 \subsection{A sixteen-claim recall report}
 \label{sec-example-aero}
@@ -2220,22 +2782,30 @@ encoding that scores rule satisfaction rather than belief can be maximized by ha
 
 Writing the log-potential in the general pairwise form
 $\ln\psi(a_s,a_t)=\alpha+\beta a_s+\gamma a_t+\delta\,a_s a_t$ and matching it against the
-with-priors tables of Table~\ref{tab:factors} gives, for $\pi_s$ the source prior:
+with-priors tables of Table~\ref{tab:factors} gives, for $\pi_s$ the source prior and
+$\mathrm{L}(x)=\mathrm{logit}(x)$:
 \begin{center}\small
 \begin{tabular}{@{}lllll@{}}
 \toprule
 $\tau$ & $\alpha$ (unit) & $\beta$ (source) & $\gamma$ (target) & $\delta$ (conjunction) \\
 \midrule
-\ent & $\ln\frac{1-p}{\pi_s}$ & $0$ & $0$ & $+\mathrm{logit}(p)$ \\
-\con & $\ln\frac{p}{\pi_s}$   & $0$ & $0$ & $-\mathrm{logit}(p)$ \\
-\eqv & $\ln\frac{1-p}{p}$ & $\ln\frac{1-p}{p}$ & $0$ & $+2\,\mathrm{logit}(p)$ \\
+\ent & $\ln(1-\pi_s)$ & $\ln\frac{1-p}{1-\pi_s}$ & $\mathrm{L}(\pi_s)$
+     & $+\mathrm{L}(p)-\mathrm{L}(\pi_s)$ \\
+\con & $\ln(1-\pi_s)$ & $\ln\frac{p}{1-\pi_s}$   & $\mathrm{L}(\pi_s)$
+     & $-\mathrm{L}(p)-\mathrm{L}(\pi_s)$ \\
+\eqv & $\ln p$ & $\ln\frac{1-p}{p}$ & $\ln\frac{1-p}{p}$ & $+2\,\mathrm{L}(p)$ \\
 \bottomrule
 \end{tabular}
 \end{center}
-The conjunction weight is exactly $\pm\mathrm{logit}(p)$ --- the interaction the implication was meant
-to carry all along --- and the unit clause is the correction that restores row-stochasticity. With this
-expansion the ground Markov logic network reproduces the MRF exactly: mean support $0.5866$ and
-$\log Z=-9.751$ for both, with zero per-claim difference to machine precision.
+At the atom prior $\pi_s=\tfrac12$ the $\mathrm{L}(\pi_s)$ terms vanish, and the table reduces to
+$\gamma=0$ with $\delta=\pm\mathrm{L}(p)$: in that setting the conjunction weight \emph{is} exactly
+$\pm\mathrm{logit}(p)$, the interaction the implication was meant to carry all along, and the unit and
+source clauses are the correction that makes each row a conditional. Away from $\tfrac12$ the
+$\mathrm{L}(\pi_s)$ terms are load-bearing, which matters for the two-stage composition of
+\S\ref{sec-twostage}, where the priors are factuality posteriors rather than uniform. With this
+expansion the ground Markov logic network reproduces the MRF exactly: at $\pi_s=\tfrac12$, mean
+support $0.5866$ and $\log Z=-9.751$ for both, with zero per-claim difference to machine precision;
+the agreement is verified against the brute-force oracle at priors on and off $\tfrac12$.
 
 We establish the equivalence for the three original couplings only. \exc{} and \cnc{} are not tabulated
 here, so the claim ``the MLN encoding reproduces the MRF'' should be read as scoped to the

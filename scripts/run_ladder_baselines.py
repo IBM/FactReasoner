@@ -169,7 +169,7 @@ def main() -> int:
     parser.add_argument("--no-judges", action="store_true")
     parser.add_argument("--judge-seeds", type=int, default=5)
     parser.add_argument(
-        "--nli-method", default="logprobs", choices=("logprobs", "simbauq")
+        "--nli-method", default="logprobs", choices=("logprobs", "direct", "simbauq")
     )
     parser.add_argument("--rate-per-minute", type=int, default=None)
     parser.add_argument("--rits-model", default=None)

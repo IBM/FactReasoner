@@ -19,7 +19,11 @@ import asyncio
 import math
 import pytest
 from unittest.mock import MagicMock, patch
-from fact_reasoner.core.nli import NLIExtractor, INSTRUCTION_NLI
+from fact_reasoner.core.nli import (
+    NLIExtractor,
+    INSTRUCTION_NLI,
+    INSTRUCTION_NLI_DIRECT,
+)
 
 
 class TestNLIExtractorInit:
@@ -678,3 +682,227 @@ class TestNLIExtractorSimbauqParse:
         out.success = False
         result = nli._parse_output(out)
         assert result == {"label": "neutral", "probability": 1.0}
+
+
+class TestNLIDirectMethod:
+    """Tests for the "direct" method: the no-reasoning prompt and its probability.
+
+    The "direct" method exists because the chain-of-thought prompt makes the label
+    logprob saturate at ~1.0 (measured: 30/30 real pairs, one distinct value at
+    4dp). Its probability pools the decision token's top-k mass by label CLASS, so
+    casing variants do not read as uncertainty.
+    """
+
+    @staticmethod
+    def _backend():
+        b = MagicMock()
+        b.model_id = "test-model"
+        return b
+
+    @staticmethod
+    def _output(content):
+        out = MagicMock()
+        out._meta = {
+            "oai_chat_response": {"choices": [{"logprobs": {"content": content}}]}
+        }
+        return out
+
+    def _extractor(self):
+        return NLIExtractor(backend=self._backend(), nli_method="direct")
+
+    # -- construction / plumbing --------------------------------------------
+
+    def test_direct_is_a_valid_method(self):
+        assert NLIExtractor(backend=self._backend(), nli_method="direct").method == "direct"
+
+    def test_direct_selects_the_direct_prompt(self):
+        assert self._extractor()._instruction is INSTRUCTION_NLI_DIRECT
+
+    def test_other_methods_keep_the_cot_prompt(self):
+        nli = NLIExtractor(backend=self._backend(), nli_method="logprobs")
+        assert nli._instruction is INSTRUCTION_NLI
+
+    def test_direct_requests_logprobs(self):
+        opts = self._extractor()._logprobs_model_options()
+        assert opts["logprobs"] is True
+
+    def test_direct_requests_wide_top_k(self):
+        # The renormalization needs enough candidates to see the rival labels.
+        assert self._extractor()._logprobs_model_options()["top_logprobs"] == 20
+
+    def test_direct_prompt_forbids_reasoning(self):
+        text = INSTRUCTION_NLI_DIRECT.lower()
+        assert "do not reason" in text and "do not explain" in text
+
+    def test_direct_prompt_has_all_three_labels(self):
+        for label in ("[entailment]", "[contradiction]", "[neutral]"):
+            assert label in INSTRUCTION_NLI_DIRECT
+
+    def test_direct_prompt_has_placeholders(self):
+        assert "{{premise_text}}" in INSTRUCTION_NLI_DIRECT
+        assert "{{hypothesis_text}}" in INSTRUCTION_NLI_DIRECT
+
+    def test_direct_prompt_has_examples_of_every_label(self):
+        # Few-shot coverage: each label must be demonstrated at least once.
+        for label in ("[entailment]", "[contradiction]", "[neutral]"):
+            assert INSTRUCTION_NLI_DIRECT.count(label) >= 2  # menu + >=1 demo
+
+    # -- label class mapping ------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "token,expected",
+        [
+            ("neutral", "neutral"),
+            (" neutral", "neutral"),
+            ("Neutral", "neutral"),
+            ("[neutral", "neutral"),
+            ("-neutral", "neutral"),
+            ("ent", "entailment"),
+            ("contr", "contradiction"),
+            ("CONTRADICTION", "contradiction"),
+        ],
+    )
+    def test_label_class_recognized(self, token, expected):
+        assert NLIExtractor._label_class_of(token) == expected
+
+    @pytest.mark.parametrize("token", ["", " ", "c", "x", "the", "yes", "1"])
+    def test_label_class_rejects_non_labels(self, token):
+        # A single character is too ambiguous to attribute to a class.
+        assert NLIExtractor._label_class_of(token) is None
+
+    # -- the probability ----------------------------------------------------
+
+    def test_casing_variants_do_not_count_as_uncertainty(self):
+        """The mirage this method is designed to kill.
+
+        Raw first-token probability is 0.6, but the competing mass is "Neutral" --
+        the SAME label in different casing -- so the semantic probability is 1.0.
+        """
+        content = [
+            {
+                "token": "[",
+                "logprob": -0.01,
+                "top_logprobs": [{"token": "[", "logprob": -0.01}],
+            },
+            {
+                "token": "neutral",
+                "logprob": math.log(0.6),
+                "top_logprobs": [
+                    {"token": "neutral", "logprob": math.log(0.6)},
+                    {"token": "Neutral", "logprob": math.log(0.4)},
+                ],
+            },
+            {
+                "token": "]",
+                "logprob": -0.01,
+                "top_logprobs": [{"token": "]", "logprob": -0.01}],
+            },
+        ]
+        assert self._extractor()._get_probability_direct(
+            self._output(content)
+        ) == pytest.approx(1.0)
+
+    def test_rival_labels_do_count_as_uncertainty(self):
+        """A genuine three-way split is reported as such."""
+        content = [
+            {"token": "[", "logprob": -0.01, "top_logprobs": []},
+            {
+                "token": "contradiction",
+                "logprob": math.log(0.5),
+                "top_logprobs": [
+                    {"token": "contradiction", "logprob": math.log(0.5)},
+                    {"token": "neutral", "logprob": math.log(0.3)},
+                    {"token": "entailment", "logprob": math.log(0.2)},
+                ],
+            },
+            {"token": "]", "logprob": -0.01, "top_logprobs": []},
+        ]
+        assert self._extractor()._get_probability_direct(
+            self._output(content)
+        ) == pytest.approx(0.5)
+
+    def test_non_label_mass_is_excluded_from_the_denominator(self):
+        # Mass on tokens that commit to no label is not uncertainty ABOUT the
+        # label, so it must not dilute the estimate: 0.6 / (0.6 + 0.2) = 0.75.
+        content = [
+            {"token": "[", "logprob": -0.01, "top_logprobs": []},
+            {
+                "token": "neutral",
+                "logprob": math.log(0.6),
+                "top_logprobs": [
+                    {"token": "neutral", "logprob": math.log(0.6)},
+                    {"token": "entailment", "logprob": math.log(0.2)},
+                    {"token": "The", "logprob": math.log(0.2)},
+                ],
+            },
+            {"token": "]", "logprob": -0.01, "top_logprobs": []},
+        ]
+        assert self._extractor()._get_probability_direct(
+            self._output(content)
+        ) == pytest.approx(0.75)
+
+    def test_falls_back_to_span_geomean_without_top_logprobs(self):
+        # No top-k at all: behave like the "logprobs" method rather than guess.
+        content = [
+            {"token": "[", "logprob": -0.1},
+            {"token": "ent", "logprob": -0.5},
+            {"token": "ail", "logprob": -0.3},
+            {"token": "]", "logprob": -0.1},
+        ]
+        expected = math.exp((-0.5 - 0.3) / 2)
+        assert self._extractor()._get_probability_direct(
+            self._output(content)
+        ) == pytest.approx(expected)
+
+    def test_unknown_probability_when_no_label_present(self):
+        content = [{"token": "hello", "logprob": -0.1}]
+        nli = self._extractor()
+        assert nli._get_probability_direct(
+            self._output(content)
+        ) == nli._UNKNOWN_PROBABILITY
+
+    def test_probability_matches_the_reported_label(self):
+        """Label and probability must never disagree.
+
+        The span extractor reports the LAST bracketed label; the probability must
+        be read at that label's decision token, not the first one in the text.
+        """
+        content = [
+            {"token": "[", "logprob": -0.01, "top_logprobs": []},
+            {
+                "token": "entailment",
+                "logprob": math.log(0.9),
+                "top_logprobs": [
+                    {"token": "entailment", "logprob": math.log(0.9)},
+                    {"token": "neutral", "logprob": math.log(0.1)},
+                ],
+            },
+            {"token": "]", "logprob": -0.01, "top_logprobs": []},
+        ]
+        nli = self._extractor()
+        out = self._output(content)
+        # _get_label reads str(output); the probability reads the logprob stream.
+        # Both must land on the same label.
+        out.__str__ = lambda self: "[entailment]"
+        assert nli._get_label(out) == "entailment"
+        assert nli._get_probability_direct(out) == pytest.approx(0.9)
+
+    def test_parse_output_dispatches_to_direct(self):
+        content = [
+            {"token": "[", "logprob": -0.01, "top_logprobs": []},
+            {
+                "token": "neutral",
+                "logprob": math.log(0.8),
+                "top_logprobs": [
+                    {"token": "neutral", "logprob": math.log(0.8)},
+                    {"token": "contradiction", "logprob": math.log(0.2)},
+                ],
+            },
+            {"token": "]", "logprob": -0.01, "top_logprobs": []},
+        ]
+        sampling = MagicMock()
+        sampling.success = True
+        sampling.result = self._output(content)
+        parsed = self._extractor()._parse_output(sampling)
+        assert parsed["label"] == "neutral"
+        assert parsed["probability"] == pytest.approx(0.8)

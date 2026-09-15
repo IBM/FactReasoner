@@ -300,9 +300,16 @@ class CoherenceRunner:
         # so they are built once here; the pipeline itself is built per call.
         self.atomizer = Atomizer(backend)
         self.reviser = Reviser(backend) if revise_atoms else None
+        # "direct" names a PROMPT for the factuality stage's NLI extractor (see
+        # core/nli.py::INSTRUCTION_NLI_DIRECT). The coherence miner has its own
+        # relation prompts, so for it the method only selects the probability
+        # MACHINERY -- which is the logprobs one. Mapping it here keeps a single
+        # --nli-method flag meaningful for both stages instead of forcing the
+        # caller to pass two.
+        miner_nli_method = "logprobs" if nli_method == "direct" else nli_method
         self.miner = RelationMiner(
             backend,
-            nli_method=nli_method,
+            nli_method=miner_nli_method,
             atomizer=self.atomizer,
             reviser=self.reviser,
             pair_policy=pair_policy,

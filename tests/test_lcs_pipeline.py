@@ -327,7 +327,11 @@ class TestMLNWeights:
             mln_weight(p)
 
     def test_three_clause_table_matches_the_deepdive(self):
-        """b, c, d for the three tabulated couplings (pi_s = 0.5)."""
+        """b, c, d for the three tabulated couplings at the atom prior pi_s = 0.5.
+
+        At pi_s = 0.5 the logit(pi_s) terms vanish, so this is the reduced form the
+        coherence paper's MLN appendix reports next to its equivalence numbers.
+        """
         p = 0.8
         logit = math.log(p / (1 - p))
 
@@ -342,6 +346,34 @@ class TestMLNWeights:
         b, c, d = three_clause_weights("equivalence", p)
         shared = math.log((1 - p) / p)
         assert (b, c, d) == pytest.approx((shared, shared, 2 * logit), abs=1e-12)
+
+    @pytest.mark.parametrize("pi_s", [0.1, 0.3, 0.7, 0.9])
+    @pytest.mark.parametrize("level1_type", ["entailment", "contradiction", "equivalence"])
+    @pytest.mark.parametrize("p", [0.55, 0.8, 0.93])
+    def test_three_clause_general_prior(self, level1_type, p, pi_s):
+        """The expansion must hold at pi_s != 0.5, not just at the atom default.
+
+        This is the case the suite used to miss. The old closed forms dropped the
+        logit(pi_s) terms and used ln((1-p)/pi_s) for the source weight -- both of
+        which coincide with the truth only when pi_s = 1 - pi_s, so the expansion
+        silently disagreed with the factor table for every other prior. The
+        two-stage composition supplies factuality posteriors as priors, which are
+        precisely not 0.5.
+        """
+        if level1_type == "entailment":
+            want = [1 - pi_s, pi_s, 1 - p, p]
+        elif level1_type == "contradiction":
+            want = [1 - pi_s, pi_s, p, 1 - p]
+        else:
+            want = [p, 1 - p, 1 - p, p]
+
+        b, c, d = three_clause_weights(level1_type, p, pi_s=pi_s)
+        a = math.log(want[0])  # the constant, read off the (0,0) cell
+        got = [
+            math.exp(a + b * s + c * t + d * s * t)
+            for s, t in itertools.product((0, 1), (0, 1))
+        ]
+        assert got == pytest.approx(want, abs=1e-12)
 
     @pytest.mark.parametrize("level1_type", ["entailment", "contradiction", "equivalence"])
     @pytest.mark.parametrize("p", [0.55, 0.65, 0.8, 0.93])

@@ -33,7 +33,14 @@ from fact_reasoner.utils import (
 )
 
 # Supported methods for estimating the NLI relationship probability.
-NLI_METHODS = ("logprobs", "simbauq")
+#
+# "logprobs" and "direct" both read token logprobs; they differ in the PROMPT they
+# read them from, which turns out to be what decides whether the number means
+# anything. See INSTRUCTION_NLI_DIRECT below for the measurement.
+NLI_METHODS = ("logprobs", "direct", "simbauq")
+
+# The methods that need the backend to return token logprobs.
+_LOGPROB_METHODS = ("logprobs", "direct")
 
 INSTRUCTION_NLI = """
 
@@ -92,6 +99,88 @@ PREMISE: {{premise_text}}
 HYPOTHESIS: {{hypothesis_text}}
 """
 
+# The DIRECT prompt: few-shot, no reasoning, label only.
+#
+# Why this exists. INSTRUCTION_NLI above is chain-of-thought-then-label ("Provide
+# the reasoning ... Final Answer: Based on your reasoning"). That ordering makes the
+# label token's logprob useless as a confidence: by the time the model emits the
+# label it has already argued the verdict in prose, so the label is conditionally
+# determined by its own reasoning and its probability is ~1 regardless of how
+# genuinely uncertain the judgement was. Measured on RITS
+# (llama-3.3-70b-instruct, real context/atom pairs from
+# data/factuality/fr-bio-labeled-wiki-doc.jsonl): 30/30 pairs >= 0.999, ONE distinct
+# value at 4 decimal places. The estimate carried no information.
+#
+# This prompt removes the reasoning entirely: six few-shot demonstrations map
+# PREMISE/HYPOTHESIS straight to a bracketed label, so the label is the FIRST token
+# the model commits to and its logprob is a real posterior over the three classes.
+# On ten deliberately borderline pairs the resulting probability spreads
+# 0.593-1.000 (stdev 0.129) -- e.g. 0.593 on a "most regions" vs "every region"
+# scope mismatch. Labels are UNCHANGED from the CoT prompt on the bio-30 (5
+# entailment / 25 neutral), and output shrinks from ~200 tokens to ~6, so this is
+# also the cheaper and faster path. See scripts/probe_nli_direct_prompt.py and
+# results/nli_direct_prompt/.
+#
+# Two caveats worth knowing before trusting a number from this path:
+#   * Reasoning models may ignore the instruction. gpt-oss-120b still emits a
+#     `<|channel|>analysis` harmony block (mean 487 chars, 30/30 outputs) and so
+#     stays saturated (stdev 0.0000) even on the hard pairs. Harmony-format
+#     reasoning is not suppressible by prompt text.
+#   * Temperature does not help. RITS/vLLM returns logprobs computed BEFORE
+#     temperature scaling, so T=0.0/0.7/1.5/2.0 gave 0.994078/0.994078/0.993295/
+#     0.994079 on one borderline pair. Temperature changes which token is sampled,
+#     never the reported distribution.
+INSTRUCTION_NLI_DIRECT = """
+
+Instructions:
+You are given a PREMISE and a HYPOTHESIS. Decide the relationship between them.
+
+Answer with EXACTLY one of the following labels, wrapped in square brackets, and NOTHING else:
+- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS
+- [contradiction] if the PREMISE contradicts the HYPOTHESIS
+- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other
+
+Do not explain. Do not reason. Do not restate the inputs. Output only the bracketed label.
+
+Example 1:
+PREMISE: Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. Smith was knighted in 1999, appointed to the House of Lords as an independent crossbench peer in 2008, and appointed Knight of the Thistle in the 2014 New Year Honours.
+HYPOTHESIS: Robert Smith holds the title of Baron Smith of Kelvin.
+ANSWER: [entailment]
+
+Example 2:
+PREMISE: In 2022, Passover begins in Israel at sunset on Friday, 15 April, and ends at sunset on Friday, 22 April 2022.
+HYPOTHESIS: Passover in 2022 begins at sundown on March 27.
+ANSWER: [contradiction]
+
+Example 3:
+PREMISE: Little India in the East Village: Two restaurants ablaze with tiny colored lights stand at the top of a steep staircase.
+HYPOTHESIS: The village had colorful decorations on every street corner.
+ANSWER: [neutral]
+
+Example 4:
+PREMISE: Lanny Flaherty is an American actor. He was born in Pensacola, Florida on December 18, 1949.
+HYPOTHESIS: Lanny Flaherty was born in Mississippi.
+ANSWER: [contradiction]
+
+Example 5:
+PREMISE: The Great Barrier Reef is the world's largest coral reef system, composed of over 2,900 individual reefs off the coast of Queensland, Australia.
+HYPOTHESIS: The Great Barrier Reef is located off the coast of Australia.
+ANSWER: [entailment]
+
+Example 6:
+PREMISE: The company reported revenue of $4.2 billion for the fiscal year and opened twelve new distribution centres.
+HYPOTHESIS: The company's chief executive resigned in March.
+ANSWER: [neutral]
+
+Your task:
+PREMISE: {{premise_text}}
+HYPOTHESIS: {{hypothesis_text}}
+ANSWER:"""
+
+# The label classes, used to renormalize the top-k logprob mass at the decision
+# token (see NLIExtractor._get_probability_direct).
+NLI_LABELS = ("entailment", "contradiction", "neutral")
+
 
 class NLIExtractor:
     """
@@ -129,8 +218,18 @@ class NLIExtractor:
             nli_method: str
                 How to estimate the probability of the predicted NLI label.
                 - "logprobs" (default): derive the probability from the token
-                  logprobs of the generated label. Requires a backend that
-                  exposes logprobs (RITS / vLLM); does NOT work with Ollama.
+                  logprobs of the generated label, using the chain-of-thought
+                  prompt. Requires a backend that exposes logprobs (RITS /
+                  vLLM); does NOT work with Ollama. NOTE: because that prompt
+                  reasons before emitting the label, the probability is
+                  saturated at ~1.0 in practice and carries little information
+                  (see INSTRUCTION_NLI_DIRECT); prefer "direct".
+                - "direct": same logprob machinery, but with the no-reasoning
+                  few-shot prompt, so the label token is the model's first
+                  commitment and its probability is a real posterior over the
+                  three classes. The probability is renormalized over the label
+                  classes at the decision token, which discards surface-form
+                  (casing) mass. One call per pair, ~6 output tokens.
                 - "simbauq": estimate the probability via SIMBA-UQ
                   self-consistency (samples across temperatures and scores by
                   consensus). Backend-agnostic; use this for Ollama.
@@ -294,7 +393,17 @@ class NLIExtractor:
 
     def _uses_logprobs(self) -> bool:
         """Whether the current method requires the backend to return logprobs."""
-        return self.method == "logprobs"
+        return self.method in _LOGPROB_METHODS
+
+    @property
+    def _instruction(self) -> str:
+        """The prompt template for the current method.
+
+        The "direct" method is defined by its prompt (no reasoning, label only),
+        which is what makes its label logprob meaningful; every other method uses
+        the chain-of-thought prompt.
+        """
+        return INSTRUCTION_NLI_DIRECT if self.method == "direct" else INSTRUCTION_NLI
 
     def _logprobs_model_options(self) -> dict[str, Any] | None:
         """Model options for the current method.
@@ -303,6 +412,12 @@ class NLIExtractor:
         SIMBA-UQ method must NOT (Ollama rejects the option, and SIMBA-UQ
         drives its own per-temperature model_options internally).
         """
+        if self.method == "direct":
+            # A wider top-k than "logprobs" needs: the renormalization sums mass
+            # over every candidate token that commits to one of the three labels,
+            # and those variants (case, leading punctuation, subword splits) can
+            # sit well down the list.
+            return {"logprobs": True, "top_logprobs": 20}
         if self._uses_logprobs():
             return {"logprobs": True, "top_logprobs": 5}
         return None
@@ -372,6 +487,99 @@ class NLIExtractor:
         return math.exp(avg_logprob)
 
     @staticmethod
+    def _label_class_of(token: str) -> str | None:
+        """Map a candidate token to the label class it commits to, or None.
+
+        Used to pool the top-k logprob mass by MEANING rather than by surface
+        form. A model that splits its mass between ``"neutral"`` and
+        ``"Neutral"`` is not uncertain about the relation, only about casing, and
+        counting that as uncertainty is the specific mistake this pooling avoids:
+        with the chain-of-thought prompt the raw first-token probability appears
+        to spread 0.78-0.9998, yet renormalizing over classes gives exactly 1.0
+        because every competitor was a casing variant of the same label.
+
+        Args:
+            token: A candidate token string from ``top_logprobs``.
+
+        Returns:
+            The label in :data:`NLI_LABELS` this token is a prefix of, or None if
+            it commits to no label. A one-character match is rejected as too
+            ambiguous to attribute (e.g. "c" could begin "contradiction" but also
+            any number of other continuations).
+        """
+        stripped = token.strip().lstrip("[-_ ").lower()
+        if len(stripped) < 2:
+            return None
+        for label in NLI_LABELS:
+            if label.startswith(stripped):
+                return label
+        return None
+
+    def _get_probability_direct(self, output: ModelOutputThunk) -> float:
+        """Probability of the predicted label under the no-reasoning prompt.
+
+        Reads the distribution at the DECISION token -- the first token of the
+        label span -- and renormalizes it over the three label classes, so the
+        result is ``P(label | premise, hypothesis)`` among the admissible answers
+        rather than a probability diluted by formatting alternatives.
+
+        Falls back to the span geometric mean (the ``"logprobs"`` behaviour) when
+        the top-k list is absent or commits to no label class, and to
+        ``_UNKNOWN_PROBABILITY`` when the label cannot be located at all.
+
+        Args:
+            output: The model raw output (via Mellea).
+
+        Returns:
+            The label probability in ``(0, 1]``.
+        """
+        logprobs = extract_logprobs_from_output(output)
+        if not logprobs:
+            print("[NLI] No logprobs available; using default label probability.")
+            return self._UNKNOWN_PROBABILITY
+
+        spans = []
+        pos = 0
+        for item in logprobs:
+            tok = str(item["token"])
+            spans.append((pos, pos + len(tok), item))
+            pos += len(tok)
+        text = "".join(str(item["token"]) for item in logprobs)
+
+        label, span = extract_nli_label_and_span(text)
+        if span is None:
+            print("[NLI] No label span in logprobs; using default probability.")
+            return self._UNKNOWN_PROBABILITY
+        span_start, span_end = span
+
+        covering = [
+            item for (t0, t1, item) in spans if t1 > span_start and t0 < span_end
+        ]
+        if not covering:
+            print("[NLI] Could not align label tokens; using default probability.")
+            return self._UNKNOWN_PROBABILITY
+
+        # Pool the decision token's top-k mass by label class.
+        decision = covering[0]
+        mass: dict[str, float] = {}
+        for alt in decision.get("top_logprobs") or []:
+            cls = self._label_class_of(str(alt["token"]))
+            if cls is not None:
+                mass[cls] = mass.get(cls, 0.0) + math.exp(alt["logprob"])
+
+        total = sum(mass.values())
+        if total > 0.0:
+            # Attribute to the label actually reported, so label and probability
+            # can never disagree; if the reported label somehow drew no mass,
+            # fall back to the largest class.
+            return (mass.get(label) or max(mass.values())) / total
+
+        # No usable top-k: the span geometric mean is the best available estimate.
+        return math.exp(
+            sum(item["logprob"] for item in covering) / len(covering)
+        )
+
+    @staticmethod
     def _get_simbauq_confidence(output: ModelOutputThunk) -> float | None:
         """
         Read the SIMBA-UQ confidence of the selected sample.
@@ -431,7 +639,7 @@ class NLIExtractor:
         # as a result with success=False), so guard the whole generation.
         try:
             output = mfuncs.instruct(
-                INSTRUCTION_NLI,
+                self._instruction,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[
@@ -477,6 +685,8 @@ class NLIExtractor:
                     # Degraded single-sample case: no reliable confidence.
                     return self._fallback()
                 probability = float(confidence)
+            elif self.method == "direct":
+                probability = self._get_probability_direct(output.result)
             else:
                 probability = self._get_probability(output.result)
         except Exception as e:  # noqa: BLE001
@@ -511,7 +721,7 @@ class NLIExtractor:
         def factory(pair):
             premise, hypothesis = pair
             return mfuncs.ainstruct(
-                INSTRUCTION_NLI,
+                self._instruction,
                 context=SimpleContext(),
                 backend=self.backend,
                 requirements=[

@@ -1,0 +1,276 @@
+% ---------------------------------------------------------------------------
+% MOTIVATING FIGURE (Sec. sec-intro). Self-contained view of the five-claim
+% Voyager 1 pair that Sec. sec-example later works formally and App. F.1 gives
+% in full. Four bands, top to bottom:
+%   (a) the two responses, abridged to their claim- and relation-bearing spans;
+%   (b) the relation graphs those spans induce (transcribed from
+%       figures/graph-coherence-pair.tex, so the two figures cannot diverge);
+%   (c) the per-claim posterior marginals, with each claim's prior ticked;
+%   (d) the scores and the gap.
+% Every number is produced by scripts/lcs_worked_pair.py from
+% data/lcs/example-7-coherence-pair.json -- exact, 2^5 = 32-world enumeration,
+% computed twice by independent paths and asserted equal. Do not edit a value
+% here without rerunning that script.
+% Node, edge and relw=p styles live in preamble.tex, shared with the Sec. 3.7
+% and App. F figures, so no panel can drift from another. The two graph panels
+% are drawn at ONE fixed scale (\mtvscale) rather than each in its own
+% \resizebox, so a difference in bounding box cannot make one look larger.
+% ---------------------------------------------------------------------------
+\begin{figure}[p]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{0pt}
+% one shared scale for both relation graphs
+\newcommand{\mtvx}{13.2mm}
+\newcommand{\mtvy}{11.6mm}
+
+%% ===== band (0): the query both responses answer =========================
+% Grey and unadorned: it belongs to neither response, and the point of showing
+% it is that BOTH answer it. Its two parts are why a good answer must both
+% assert a3 and dispatch the a5 confusion.
+\colorbox{black!5}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\centering
+  \scriptsize \textbf{Query}\ \ \emph{Where is Voyager~1 now, and has it left
+  the Solar System?}\strut}}
+
+\smallskip
+%% ===== band (a): the two responses ======================================
+% Both boxes are set to ONE height (\mtvbox), so the pair aligns top and bottom
+% however the two texts happen to break. Raise it if either box overflows.
+\newcommand{\mtvbox}{33.5mm}
+\begin{tabularx}{\textwidth}{@{}X@{\hspace{7pt}}X@{}}
+\begin{minipage}[t]{\linewidth}
+  \colorbox{blue!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
+  \textbf{\textcolor{blue!55!black}{Response A}} \; \emph{coherent}\\[2pt]
+  \scriptsize
+  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and in the days
+  that followed its instruments measured a sharp rise in plasma
+  density\,\claimref{2} --- \emph{the measurement that established the boundary
+  had been passed.} Voyager~1 is therefore in interstellar space.\,\claimref{3}
+  Two persistent misconceptions are worth clearing up. The first is that the
+  plasma wave instrument had failed permanently before the
+  crossing;\,\claimref{4} \emph{it cannot have, since it is precisely that
+  instrument which returned the density profile the conclusion rests on.} The
+  second is that Voyager~1 has left the Solar System
+  altogether.\,\claimref{5} \emph{Being in interstellar space is not the same
+  thing: the Sun's gravitational reach extends through the Oort cloud.}\strut}}
+\end{minipage}
+&
+\begin{minipage}[t]{\linewidth}
+  \colorbox{red!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
+  \textbf{\textcolor{red!60!black}{Response B}} \; \emph{incoherent}\\[2pt]
+  \scriptsize
+  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and after the
+  crossing its instruments measured a sharp rise in plasma
+  density.\,\claimref{2} \emph{That said, the probe cannot really be counted as
+  being in interstellar space.}\,\claimref{3} The plasma wave instrument had
+  \textbf{in fact} failed permanently before the crossing,\,\claimref{4}
+  \emph{and it is precisely that failure which tells us the probe reached
+  interstellar space.} \emph{The instrument failure also means} Voyager~1 has
+  left the Solar System entirely.\,\claimref{5} \emph{Of course, the crossing
+  rules out any such failure, and the density measurement is inconsistent with
+  the probe having left the Solar System.}\strut}}
+\end{minipage}
+\end{tabularx}
+
+\smallskip
+{\scriptsize
+  \textbf{The same five claims} $a_1,\dots,a_5$ (\claimref{i} marks each first
+  mention) $\Rightarrow$ \textbf{identical per-claim factuality verdicts.}
+  Only the italicized \emph{relation-bearing} spans differ.}
+
+\medskip
+%% ===== band (b): the relation graphs, at one shared scale ===============
+\begin{tabularx}{\textwidth}{@{}X@{\hspace{7pt}}X@{}}
+\begin{minipage}[b]{\linewidth}\centering
+\begin{tikzpicture}[x=\mtvx, y=\mtvy]
+  \node[atomtrue]  (a1) at (0,0)        {$a_1$};
+  \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
+  \node[atomfalse] (a4) at (1.7,-1.55)  {$a_4$};
+  \node[atomfalse] (a5) at (2.9,-1.55)  {$a_5$};
+
+  \node[prlab,above=0.4mm of a1] {$\pi{=}.9$};
+  \node[prlab,above=0.4mm of a2] {$\pi{=}.9$};
+  \node[prlab,above=0.4mm of a3] {$\pi{=}.9$};
+  \node[prlab,below=0.4mm of a4] {$\pi{=}.1$};
+  \node[prlab,below=0.4mm of a5] {$\pi{=}.1$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+  \draw[ent,relw=0.85] (a2) -- (a3) node[wlab,above]{$.85$};
+  \draw[con,relw=0.90] (a3) -- (a4) node[wlab,left,pos=0.5]{$.90$};
+  \draw[con,relw=0.85] (a3) -- (a5) node[wlab,right,pos=0.5]{$.85$};
+
+  \node[font=\tiny,align=center,text=black!65,anchor=north] at (0.45,-0.90)
+       {both conflicts point\\\emph{outward}, at the\\two false claims};
+  % invisible strut matching panel B's annotation depth, so the two panels
+  % share a baseline instead of one riding higher than the other.
+  \path (0.45,-2.62) -- (0.45,0.98);
+\end{tikzpicture}\\[3pt]
+{\scriptsize \textbf{A:} a support chain over the true claims;
+ each false claim \emph{attributed, then refused} from $a_3$.}
+\end{minipage}
+&
+\begin{minipage}[b]{\linewidth}\centering
+\begin{tikzpicture}[x=\mtvx, y=\mtvy]
+  % Six edges over five nodes, so B needs more room than A: the two false
+  % claims sit a full row lower and the row is wider, which keeps the
+  % a4 -> a3 edge and the a2 -> a5 curve from crossing on top of each other.
+  \node[atomtrue]  (a1) at (0,0)        {$a_1$};
+  \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
+  \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
+  \node[atomfalse] (a4) at (0.55,-1.55) {$a_4$};
+  \node[atomfalse] (a5) at (1.75,-1.55) {$a_5$};
+
+  % Priors sit clear of the two orange change annotations.
+  \node[prlab,above=0.4mm of a1] {$\pi{=}.9$};
+  \node[prlab,above=0.4mm of a3] {$\pi{=}.9$};
+  \node[prlab,above=0.4mm of a2] {$\pi{=}.9$};
+  \node[prlab,left=0.5mm of a4]  {$\pi{=}.1$};
+  \node[prlab,right=0.5mm of a5] {$\pi{=}.1$};
+
+  \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+  \draw[con,relw=0.90] (a2) -- (a3) node[wlab,above]{$.90$};
+  % the reversed edge: the false a4 now feeds the true a3
+  \draw[ent,relw=0.88] (a4) -- (a3)
+        node[wlab,above left=-0.4mm and -1.0mm,pos=0.30]{$.88$};
+  \draw[con,relw=0.90] (a1) -- (a4) node[wlab,left,pos=0.55]{$.90$};
+  \draw[ent,relw=0.85] (a4) -- (a5) node[wlab,below]{$.85$};
+  % a2 -> a5 swings out to the right of a5 so it never lands on a4 -> a3
+  \draw[con,relw=0.88] (a2) to[out=-8,in=25]
+        node[wlab,right,pos=0.55,inner sep=1pt]{$.88$} (a5);
+
+  % --- the two changes that carry the whole difference ---------------------
+  % The two annotations are numbered and placed in the free space to the
+  % RIGHT of the graph and BELOW it, so neither overlays a prior label, an
+  % edge, or a weight. Each carries a dotted leader to what it marks.
+  % (1) marks the a2--a3 edge, whose coupling flipped.
+  \node[chgnum] (n1) at (2.98,-0.46) {1};
+  \draw[chglead] (n1) -- (1.90,-0.06);
+  % (2) rings a4, whose role reversed. The ring is drawn BEHIND the node so it
+  % cannot cover the label; the number sits outside it.
+  \begin{scope}[on background layer]
+    \node[chg,circle,minimum size=9.4mm,inner sep=0pt] at (0.55,-1.55) {};
+  \end{scope}
+  \node[chgnum] (n2) at (-0.42,-1.05) {2};
+  \draw[chglead] (n2) -- (0.22,-1.35);
+  \node[chglab,anchor=north west,align=left] at (2.55,-0.75)
+       {\textbf{1} support $\to$ \con{}:\\B denies its own\\conclusion $a_3$};
+  \node[chglab,anchor=north,align=center] at (0.9,-2.20)
+       {\textbf{2} the arrow \emph{reverses}: the false $a_4$\\is now a premise
+        \emph{for} the true $a_3$};
+\end{tikzpicture}\\[3pt]
+{\scriptsize \textbf{B:} the same five claims, \emph{rearranged}. Half its
+ conflicts point \emph{inward}, at what it asserts.}
+\end{minipage}
+\end{tabularx}
+
+\medskip
+%% ===== band (c): the per-claim posteriors ===============================
+\begin{tikzpicture}[x=1mm, y=1mm]
+  \def\bw{30}          % bar-track width
+  \def\rh{5.2}         % row height
+  \def\ca{47}          % left edge, track A
+  \def\cb{88}          % left edge, track B
+
+  \node[font=\bfseries\scriptsize,anchor=west] at (0,4.2)  {Claim};
+  \node[font=\bfseries\scriptsize] at (\ca+0.5*\bw,4.2)    {$\Pr(a_i{=}1)$ under A};
+  \node[font=\bfseries\scriptsize] at (\cb+0.5*\bw,4.2)    {$\Pr(a_i{=}1)$ under B};
+  \draw[black!35,line width=0.3pt] (0,2.0) -- (127,2.0);
+
+  % {i}{prior}{postA}{postB}{fill}{edge}{tag}{gloss} -- the colour is carried in
+  % the list rather than branched on, so no \ifthenelse (not loaded) is needed.
+  \foreach \i/\pri/\pa/\pb/\bc/\ec/\tag/\gloss in {%
+      1/0.9/0.9386/0.9601/blue!35!white/blue!55!black/true/heliopause crossing\, Aug 2012,
+      2/0.9/0.9891/0.9732/blue!35!white/blue!55!black/true/plasma-density rise after it,
+      3/0.9/0.9920/0.5126/blue!35!white/blue!55!black/true/{\emph{therefore} in interstellar space},
+      4/0.1/0.0129/0.0055/red!30!white/red!60!black/false/instrument failed pre-crossing,
+      5/0.1/0.0199/0.0177/red!30!white/red!60!black/false/left the Solar System entirely}
+  {
+    \pgfmathsetmacro{\y}{-\i*\rh}
+    \node[anchor=west,font=\scriptsize] at (0,\y)
+         {$a_\i$ \textcolor{black!55}{(\tag)}\ \gloss};
+    \foreach \x in {\ca,\cb}{
+      \draw[black!22,line width=0.25pt] (\x,\y-1.7) rectangle (\x+\bw,\y+1.7);
+    }
+    \pgfmathsetmacro{\wa}{\pa*\bw}
+    \pgfmathsetmacro{\wb}{\pb*\bw}
+    \fill[\bc,draw=\ec,line width=0.3pt] (\ca,\y-1.7) rectangle (\ca+\wa,\y+1.7);
+    \fill[\bc,draw=\ec,line width=0.3pt] (\cb,\y-1.7) rectangle (\cb+\wb,\y+1.7);
+    % each claim's own prior, as a tick across the track
+    \foreach \x in {\ca,\cb}{
+      \pgfmathsetmacro{\tk}{\x+\pri*\bw}
+      \draw[black!75,line width=0.6pt,dash pattern=on 0.6mm off 0.5mm]
+            (\tk,\y-2.5) -- (\tk,\y+2.5);
+    }
+    \node[anchor=west,font=\tiny] at (\ca+\bw+1.4,\y) {\pa};
+    \node[anchor=west,font=\tiny] at (\cb+\bw+1.4,\y) {\pb};
+  }
+
+  % the diagnostic callout: a3 under B
+  \pgfmathsetmacro{\ythree}{-3*\rh}
+  \draw[orange!85!black,line width=0.65pt,rounded corners=0.7mm]
+        (\cb-0.9,\ythree-2.9) rectangle (\cb+\bw+9.5,\ythree+2.9);
+  \draw[orange!85!black,line width=0.5pt,-{Stealth[length=1.3mm]}]
+        (\cb+\bw+9.5,\ythree) -- (\cb+\bw+13,\ythree);
+
+  \foreach \x in {\ca,\cb}{
+    \node[font=\tiny,text=black!55] at (\x,-5*\rh-3.8)     {$0$};
+    \node[font=\tiny,text=black!55] at (\x+\bw,-5*\rh-3.8) {$1$};
+  }
+  \node[font=\tiny,text=black!60,anchor=west] at (0,-5*\rh-3.8)
+       {dashed rule $=$ that claim's own prior $\pi_i$};
+\end{tikzpicture}
+
+\smallskip
+{\footnotesize\raggedright
+\textcolor{orange!55!black}{\textbf{The diagnostic.}} $a_3$ is \textbf{true of
+the world}, yet B drags it to a coin flip --- $0.992 \to 0.513$, far below its
+own $0.9$ prior --- because its only support now arrives from $a_4$, a claim
+the response itself denies. No aggregate score reveals this; a per-claim
+marginal locates it.\par}
+
+\medskip
+%% ===== band (d): the scores =============================================
+\begin{tabularx}{\textwidth}{@{}p{31mm}@{\hspace{8pt}}X@{}}
+\toprule
+\small\textbf{Coherence score}
+& \small $\LCS_{\mm}$:\quad
+  \textcolor{blue!55!black}{\textbf{$0.590$}}~(A)
+  \ \ $\longrightarrow$\ \
+  \textcolor{red!60!black}{\textbf{$0.494$}}~(B)
+  \qquad $\boldsymbol{\Delta = -0.097}$ \\
+\scriptsize\textcolor{black!60}{exact, by $2^5{=}32$-world enum.}
+& \scriptsize $\LCS_{\cons}$: $0.963 \to 0.414$ \ \textbullet\
+  $\log Z$: $-0.95 \to -3.78$ \ \textbullet\
+  prior-only baseline $0.580$ (A \emph{above} it, B \emph{below}) \\
+\midrule
+\multicolumn{2}{@{}X@{}}{\scriptsize The priors enter \emph{only} through the
+  unary factors, which are identical in the two responses. The entire
+  $0.590\to0.494$ drop is produced by the pairwise relation factors --- that
+  is, by \textbf{arrangement alone}.} \\
+\bottomrule
+\end{tabularx}
+
+% scripts/make_motivating_png.sh defines \mtvnocaption to render the figure
+% for standalone export, where the surrounding prose supplies the explanation.
+% Undefined in the paper, so the caption below is typeset normally there.
+\ifdefined\mtvnocaption\else
+\caption{\textbf{Two responses, the same five claims, different coherence.}
+  Five claims about Voyager~1 are fixed once and for all: $a_1,a_2,a_3$ true of
+  the world (priors $\pi_i{=}0.9$, blue) and $a_4,a_5$ false ($\pi_i{=}0.1$,
+  red). Both responses answer the \emph{same} query and assert \emph{all five}
+  claims, so every per-claim factuality check returns the same verdict on both
+  and no decompose-then-verify score can separate them. \textbf{A} attributes the two falsehoods and then refuses each
+  on a stated ground; \textbf{B} asserts them and reasons \emph{from} them,
+  offering the false $a_4$ as the reason the true $a_3$ holds while denying
+  $a_3$ outright --- then denying $a_4$ and $a_5$ in its closing sentence.
+  Middle: the relation graphs those spans induce (solid blue \ent{}, dashed red
+  \con{}, line width growing with the mined weight $p$), drawn at one shared
+  scale; the two numbered orange callouts \textbf{1} and \textbf{2} mark the
+  only two changes, which carry the whole difference. Bottom: the posterior marginals of the coherence MRF, and the
+  score. Mentioning a falsehood is not what costs B its score; asserting it and
+  reasoning from it is. \S\ref{sec-example} works this pair formally and
+  App.~\ref{app-examples} gives both responses in full.}
+\label{fig:motivating}
+\fi
+\end{figure}

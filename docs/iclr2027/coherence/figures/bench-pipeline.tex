@@ -1,0 +1,45 @@
+% The LoCoBench generation pipeline: five prompted stages, then three validators.
+%
+% Extracted from submit.tex so the figure has a single source and can be exported
+% standalone by scripts/make_bench_pipeline_png.sh. The validators are V1, V3 and
+% V4 by design -- those are the three that gate admission, and the numbering
+% matches locobench/validate.py's threshold keys (v1_coupling, v1_sense,
+% v3_min_score, v4_coverage). There is deliberately no V2 box.
+%
+% The committee that runs the validators EXCLUDES the generating model, which is
+% why the two left-hand annotations name different model counts.
+% ---------------------------------------------------------------------------
+\begin{figure}[tbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  st/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=blue!5},
+  vd/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=orange!10},
+  fin/.style={draw,rounded corners=1.5pt,align=center,inner sep=3.5pt,minimum height=9mm,fill=green!12},
+  ar/.style={-{Stealth[length=1.9mm]},thick}, node distance=3.4mm]
+  \node[st] (t) {topic};
+  \node[st,right=of t] (p1) {\textbf{P1}\\question};
+  \node[st,right=of p1] (p2) {\textbf{P2}\\$26$ claims};
+  \node[st,right=of p2] (p3) {\textbf{P3}\\relation plan};
+  \node[st,right=of p3] (p4) {\textbf{P4}\\base response};
+  \node[st,right=of p4] (p5) {\textbf{P5}\\$\times 4$ rungs};
+  \foreach \a/\b in {t/p1,p1/p2,p2/p3,p3/p4,p4/p5} \draw[ar] (\a) -- (\b);
+  \node[vd,below=9mm of p3] (v1) {\textbf{V1} recover\\relations};
+  \node[vd,right=of v1] (v3) {\textbf{V3} prose\\audit};
+  \node[vd,right=of v3] (v4) {\textbf{V4} claim\\coverage};
+  \node[fin,right=of v4] (adm) {admit family\\(all $5$ rungs)};
+  \draw[ar] (p5.south) -- ++(0,-3mm) -| (v1.north);
+  \draw[ar] (v1) -- (v3); \draw[ar] (v3) -- (v4); \draw[ar] (v4) -- (adm);
+  \node[left=1mm of v1,font=\scriptsize\itshape,align=right,text width=15mm] {committee\\($3$ models)};
+  \node[left=1mm of t,font=\scriptsize\itshape,align=right,text width=15mm] {generator\\($1$ model)};
+\end{tikzpicture}}
+% scripts/make_bench_pipeline_png.sh defines \bpnocaption to render this figure
+% for standalone export, where surrounding prose supplies the explanation.
+% Undefined in the paper, so the caption below is typeset normally there.
+\ifdefined\bpnocaption\else
+\caption{The generation pipeline. Five stages produce a family of five rungs from one topic; three
+  validators, run by a committee that \emph{excludes} the generating model, gate admission. A family is
+  admitted whole or rejected whole (Def.~\ref{def-ladder}).}
+\label{fig:bench-pipeline}
+\fi
+\end{figure}

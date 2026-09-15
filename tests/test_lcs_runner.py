@@ -943,3 +943,40 @@ class TestEndToEndDryRun:
         assert set(out.priors.values()) == {0.5}
         # The async miner reached the same atom set the sync one would.
         assert set(out.mining.atoms) == set(mining.atoms)
+
+class TestUniformPriorsArm:
+    """The coherence-only arm: `prior_source="none"` must run NO factuality stage.
+
+    The ablation's whole claim is that no factuality assessment happens, so this is
+    verified structurally rather than trusted: building a factuality runner would mean
+    retrieval and atom-context NLI calls, i.e. the thing the arm says it omits.
+    """
+
+    @staticmethod
+    def _backend():
+        b = MagicMock()
+        b.model_id = "test-model"
+        return b
+
+    def test_none_prior_source_yields_no_provider(self):
+        r = CoherenceRunner(
+            self._backend(), merlin_path="/bin/true", prior_source="none"
+        )
+        assert r._build_prior_provider({"atoms": [], "contexts": []}) is None
+
+    def test_none_prior_source_never_builds_a_factuality_runner(self):
+        r = CoherenceRunner(
+            self._backend(), merlin_path="/bin/true", prior_source="none"
+        )
+        r._build_prior_provider({"atoms": [], "contexts": []})
+        # The memo stays empty: no FactualityRunner was ever constructed, so no
+        # retrieval and no atom-context NLI can have been issued.
+        assert r._factuality_runner is None
+
+    def test_none_coerces_to_a_uniform_half_prior(self):
+        from fact_reasoner.lcs.priors import coerce_prior_provider
+
+        priors = coerce_prior_provider(None).priors_for(response="x")
+        assert priors.source == "uniform"
+        assert priors.default == 0.5
+        assert priors.priors == {}
