@@ -26,19 +26,22 @@ from io import BytesIO
 from itertools import islice
 from typing import Any
 
-import chromadb
 import requests
 import wikipedia
 from bs4 import BeautifulSoup
-from chromadb.config import Settings as ChromaSettings
-from chromadb.utils import embedding_functions
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from tqdm import tqdm
+
+# chromadb is one of three retrieval backends (google / wikipedia / chromadb) and
+# is imported lazily inside ChromaReader rather than here, so the package is an
+# optional install: `pip install fact_reasoner[chroma]`. Importing it eagerly made
+# every entry point -- including `fact-reasoner --help` -- depend on it, and it
+# currently carries unpatched advisories that no released version fixes.
 
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -261,6 +264,17 @@ class ChromaReader:
             collection_metadata: dict
                 A dict containing the collection metadata.
         """
+
+        try:
+            import chromadb
+            from chromadb.config import Settings as ChromaSettings
+            from chromadb.utils import embedding_functions
+        except ImportError as exc:  # pragma: no cover - depends on the install extra
+            raise ImportError(
+                "The chromadb retrieval backend requires the optional 'chroma' extra: "
+                "pip install 'fact_reasoner[chroma]'. The other backends "
+                "(service_type='google' or 'wikipedia') need no extra install."
+            ) from exc
 
         self.client = chromadb.PersistentClient(
             path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)

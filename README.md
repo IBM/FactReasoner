@@ -132,9 +132,17 @@ the embedding similarity gate behind `--nli-mode fast`. Only backend-specific pi
 are optional extras:
 
 ```bash
+uv pip install "fact_reasoner[chroma]" # ChromaDB retrieval backend (see note below)
 uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
 uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
 ```
+
+> **Note on `chroma`.** The ChromaDB backend is optional because it is one of three
+> interchangeable retrieval backends and the other two (`google`, `wikipedia`) need no
+> extra install. It is kept out of the default dependency set because `chromadb`
+> releases up to 1.5.9 carry security advisories with no patched release available;
+> installing the extra opts you into them. `--service-type chromadb` raises an
+> `ImportError` naming this extra if it is missing.
 
 ### From Source
 
@@ -359,7 +367,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 
 | Option | Meaning |
 |--------|---------|
-| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`). |
+| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`, `chromadb` needs the `chroma` extra). |
 | `--top-k` | Contexts retrieved per atom (default 3). |
 | `--cache-dir` | Retriever cache directory. |
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
@@ -788,6 +796,8 @@ retriever = SourceRetriever(
 ```
 
 ### ChromaDB Vector Store
+
+Requires the optional extra: `pip install "fact_reasoner[chroma]"`.
 
 ```python
 retriever = SourceRetriever(
