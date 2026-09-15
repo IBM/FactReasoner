@@ -1,0 +1,30 @@
+# Dependabot configuration.
+#
+# The repository accumulated 78 open advisories before this file existed, because
+# nothing was watching the dependency set. Weekly checks plus the security floors
+# in pyproject.toml are the two halves of the fix: the floors stop a resolver from
+# choosing a known-vulnerable version, and this stops the floors going stale.
+#
+# Note that opening PRs for *advisories* additionally requires
+# Settings -> Advanced Security -> Dependabot security updates to be enabled;
+# this file governs version-update PRs and the schedule.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    # Security patches should arrive as small, reviewable PRs. Grouping the
+    # routine minor/patch churn keeps those from being buried in noise.
+    groups:
+      dev-and-tooling:
+        patterns: ["pytest*", "ruff", "mypy", "build", "twine"]
+        update-types: ["minor", "patch"]
+      langchain:
+        patterns: ["langchain*", "langsmith"]
+        update-types: ["minor", "patch"]
+    labels:
+      - dependencies
+      - security
