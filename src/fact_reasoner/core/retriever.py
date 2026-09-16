@@ -37,11 +37,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 from tqdm import tqdm
 
-# chromadb is one of three retrieval backends (google / wikipedia / chromadb) and
-# is imported lazily inside ChromaReader rather than here, so the package is an
-# optional install: `pip install fact_reasoner[chroma]`. Importing it eagerly made
-# every entry point -- including `fact-reasoner --help` -- depend on it, and it
-# currently carries unpatched advisories that no released version fixes.
+# chromadb is one of three retrieval backends (google / wikipedia / chromadb) and is
+# imported lazily inside ChromaReader rather than here. It is not a declared
+# dependency of this project at all: every release up to and including 1.5.9 (the
+# latest) carries unpatched critical advisories (CVE-2026-45829, CVE-2026-45833), so
+# users opt in explicitly with `pip install chromadb`. Importing it eagerly also made
+# every entry point -- including `fact-reasoner --help` -- depend on it.
 
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -269,10 +270,14 @@ class ChromaReader:
             import chromadb
             from chromadb.config import Settings as ChromaSettings
             from chromadb.utils import embedding_functions
-        except ImportError as exc:  # pragma: no cover - depends on the install extra
+        except ImportError as exc:  # pragma: no cover - depends on a manual install
             raise ImportError(
-                "The chromadb retrieval backend requires the optional 'chroma' extra: "
-                "pip install 'fact_reasoner[chroma]'. The other backends "
+                "The chromadb retrieval backend requires chromadb, which is "
+                "deliberately not a dependency of fact_reasoner: every release up to "
+                "and including 1.5.9 (the latest) carries unpatched critical "
+                "advisories (CVE-2026-45829 pre-auth code injection, CVE-2026-45833 "
+                "code injection). Install it explicitly to opt into that risk: "
+                "pip install chromadb. The other backends "
                 "(service_type='google' or 'wikipedia') need no extra install."
             ) from exc
 
