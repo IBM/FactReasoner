@@ -201,7 +201,7 @@ Three structural properties are deliberate commitments, each load-bearing later.
 
 \begin{remark}[The factor family is closed]
 \label{rem-closed}
-Every $\psi_{\tau,p}$ is determined by $p$, the source prior $\pi_s$ and the penalized set, so the whole
+Every $\psi_{\tau,p}$ is determined by $p$, the family's fixed source-prior parameter $\pi_s$ and the penalized set, so the whole
 inferential vocabulary is a three-parameter pairwise family --- a guarantee about what the model \emph{cannot}
 do: no relation type, however elaborately named at the discourse level, can smuggle in expressiveness beyond a
 pairwise potential.
@@ -301,12 +301,26 @@ $\lambda$, is the one place hand-set constants enter.
 \subsection{The pairwise potentials, and why factuality's tables are wrong here}
 \label{sec-potentials}
 
-A coupling names the world it penalizes; it does not say by how much. Filling that in is the second half of
+A coupling names the world it penalizes; it does not say by how much. Filling that in completes
 Def.~\ref{def-mrf}, and it is where a coherence model parts company with the factuality model it otherwise
 reuses.
 
-Listing $\psi_{\tau,p}(a_s,a_t)$ row-major over $(0,0),(0,1),(1,0),(1,1)$, with $\pi_s$ the source prior
-and bold marking $V(\tau)$:
+The reason is that the two settings put different objects at the \emph{source} end of an edge. In factuality the
+source is a retrieved passage, and its own reliability is exactly what is in doubt, so a factor that revises
+belief in the source is doing its job. In coherence the source is another claim of the same response. We are not
+asking whether that claim is reliable; we are asking what the response's own inferences do with it. A table
+built for the first job does the wrong thing in the second.
+
+\paragraph{The tables.} Each $\psi_{\tau,p}$ is a $2\times2$ table, written here as a list of four numbers in
+the order $(0,0),(0,1),(1,0),(1,1)$, with the penalized set $V(\tau)$ in bold. Read it as two rows: the first
+two numbers are the case where the source is false, the last two the case where it is true. The constant $\pi_s$ is a
+\emph{fixed parameter of the factor family}, set by the edge's link type rather than read off either endpoint:
+$\pi_s=\tfrac12$ on the claim--claim edges coherence uses (App.~\ref{app-stage1}). It is emphatically
+\emph{not} the source claim's own prior --- a source at $\pi_i=0.9$ still contributes the row
+$[1-\pi_s,\pi_s]=[\tfrac12,\tfrac12]$ --- and it is independent of the unary priors $\pi_i$ of
+Def.~\ref{def-mrf}, which remain free. At $\pi_s=\tfrac12$ that row is \emph{flat}, hence a constant
+multiplier that cancels under normalization; this is what Prop.~\ref{prop-rowstoch} means when it says a false
+source returns the target to its prior, and the target's \emph{own} prior is what it returns to.
 
 \begin{center}\small
 \begin{tabular}{@{}lllll@{}}
@@ -324,14 +338,14 @@ $[1\!-\!\pi_s,\pi_s,\mathbf{1\!-\!p},p]$
 
 \begin{proposition}[Row-stochasticity of the asymmetric couplings]
 \label{prop-rowstoch}
-The two \emph{asymmetric} tables are row-stochastic in the source state: for $\tau\in\{\ent,\con\}$
-each row sums to one, so the row indexed by $a_s$ \emph{is} the conditional $\pr{a_t\mid a_s}$, giving
-$\pr{a_t{=}1 \mid a_s{=}0} = \pi_s$ and $\pr{a_t{=}1 \mid a_s{=}1} = p$ for $\ent$ and $1-p$ for
-$\con$. Consequently such a factor constrains the target only when the source is true; when the
-source is false it returns the target to its prior. The symmetric couplings are not of this form and
-are not claimed to be: $\cnc$
-$=[1{-}p,\pi_s,\pi_s,p]$ has rows summing to $(1-p)+\pi_s$ and $\pi_s+p$, both one only in the
-degenerate case $p=\pi_s=\tfrac12$.
+For $\tau\in\{\ent,\con\}$ every row of $\psi_{\tau,p}$ sums to one, so the row indexed by $a_s$ \emph{is} the
+conditional $\pr{a_t\mid a_s}$:
+$\pr{a_t{=}1 \mid a_s{=}0} = \pi_s$, and $\pr{a_t{=}1 \mid a_s{=}1} = p$ for $\ent$ and $1-p$ for
+$\con$. Such a factor therefore constrains its target only when the source is true; when the source
+is false it contributes the constant row $[1-\pi_s,\pi_s]$, which at the $\pi_s=\tfrac12$ coherence uses is
+flat and so cancels under normalization, handing the target back to its \emph{own} prior. This fails for the symmetric couplings, and is not
+claimed of them: the rows of $\cnc=[1{-}p,\pi_s,\pi_s,p]$ sum to $(1-p)+\pi_s$ and $\pi_s+p$, which
+are both one only in the degenerate case $p=\pi_s=\tfrac12$.
 \end{proposition}
 
 \begin{proof}
@@ -340,28 +354,140 @@ and $[p,1-p]$ for $\con$; each sums to one, so dividing by the row sum is the id
 row-stochasticity needs $\pi_s=p$ and $\pi_s=1-p$ at once, hence $p=1-p$.
 \end{proof}
 
-Row-stochasticity is a property of the \emph{table}, not an invariance of the marginals: it says each
-row is already normalized over the target, so $\psi(a_s,\cdot)$ reads as $\pr{a_t\mid a_s}$ and the
-flat $a_s{=}0$ row makes a false source uninformative --- the formal content of ``an implication says
-nothing when its antecedent fails''. Once factors are multiplied and renormalized both endpoints can
-still move. Concretely, at $p=0.9,\pi_s=0.5$: $\ent=[.5,.5,.1,.9]$ and $\con=[.5,.5,.9,.1]$ have
-rows summing to $1$ and $1$, reading $\pr{a_t{=}1\mid a_s{=}0}=0.5=\pi_s$ with
-$\pr{a_t{=}1\mid a_s{=}1}=0.9=p$ and $0.1=1-p$ respectively; $\cnc=[.1,.5,.5,.9]$ has rows summing
-to $0.6$ and $1.4$, and its \emph{informative} row is $a_s{=}0$ (reading $0.833$, against $0.643$
-for $a_s{=}1$) --- a disjunction constrains its target when the source \emph{fails}, which no
-source-conditioned normalization can express. Example~\ref{ex-cnc} works the $\cnc$ joint through;
-both endpoints rise together, $0.5\to0.7$, the factor being symmetric.
+One caution about what the proposition does not say. It is a property of the \emph{table}, not of the
+marginals. Each row being normalized means $\psi(a_s,\cdot)$ can be read directly as
+$\pr{a_t\mid a_s}$, and the flat $a_s{=}0$ row is the formal content of ``an implication says nothing when its
+antecedent fails''. It does not mean the source stays put: once all the factors are multiplied together and the
+result renormalized, both endpoints can move.
 
-The factuality literature instead uses a \emph{no-priors} family whose \ent{} table is $[p,p,\mathbf{1-p},p]$:
-the $(0,\cdot)$ cells are both $p$, so the table charges the \emph{source} being true whenever the target is
-uncertain. That suits claim--evidence factuality, where the source is a retrieved passage whose own reliability
-is in question, but it is wrong for coherence, where the source is another claim of the same response and a
-well-supported premise must not be penalized for being a premise. The consequence is not a matter of degree: on
-the sixteen-claim recall report of App.~\ref{app-examples}, joined by a twelve-edge entailment backbone, the
-no-priors tables drive the root to $\pr{a_1{=}1}=0.19$, far below its $0.5$ prior, and the mean marginal sits at
-$0.490$, moving only to $0.498$ when every conflict edge is deleted --- a range of $0.008$ against $0.607$ to
-$0.620$ under the with-priors tables, all exact by $2^{16}$ enumeration. A coherence measure built on the
-factuality tables spends its dynamic range penalizing premises and has little left for conflicts.
+At $p=0.9$ and $\pi_s=0.5$ the two asymmetric tables are $\ent=[.5,.5,.1,.9]$ and $\con=[.5,.5,.9,.1]$. Both
+rows sum to one, and reading the rows off gives $\pr{a_t{=}1\mid a_s{=}0}=0.5=\pi_s$ in each case, with
+$\pr{a_t{=}1\mid a_s{=}1}$ equal to $0.9=p$ for \ent{} and $0.1=1-p$ for \con{}.
+
+The symmetric couplings behave differently, and \cnc{} shows why the proposition is stated only for
+$\{\ent,\con\}$. Its table $[.1,.5,.5,.9]$ has rows summing to $0.6$ and $1.4$, so neither is a conditional. Its
+\emph{informative} row is the one where the source is false ($0.833$, against $0.643$ where the source is
+true) --- a disjunction constrains its target when the source \emph{fails}, which no source-conditioned
+normalization can express. Example~\ref{ex-cnc} works the joint through: both endpoints rise together,
+$0.5\to0.7$, because the factor is symmetric.
+
+\paragraph{Where the factuality tables differ.} The factuality literature uses a \emph{no-priors} family whose
+\ent{} table is $[p,p,\mathbf{1-p},p]$. The whole disagreement sits in one row. Both families treat a
+\emph{true} source the same way, charging the world where it leaves its target false. They differ when the
+source is \emph{false}: our row is $[\tfrac12,\tfrac12]$, flat and uninformative, while theirs is $[p,p]$ ---
+also flat, but scaled by $p$. That extra factor of $p$ is the problem. It rewards worlds in which the source
+holds, which turns the factor into evidence \emph{for} the source instead of a constraint acting \emph{from} it.
+
+\paragraph{What that costs, in one edge.} Strip everything else away and the whole effect can be computed by
+hand. Take a single \ent{} edge $a_1\!\to\!a_2$ with $p=0.90$, over two claims that both start at prior
+$\pi_1=\pi_2=0.9$, and nothing else in the graph. Two distinct quantities meet here and must not be conflated:
+the claims' unary priors, $\pi_1=\pi_2=0.9$, which enter through $\phi_i=[0.1,0.9]$; and the factor family's
+source-prior parameter, $\pi_s=\tfrac12$, which enters through $\psi$ alone. The source's being at $0.9$ does
+\emph{not} put $0.9$ into the table --- the with-priors $(0,\cdot)$ row is $[1-\pi_s,\pi_s]=[0.5,0.5]$
+regardless. Eq.~\ref{eq-joint} then has four worlds, each weighted by two unary factors and one pairwise factor,
+$w(a_1,a_2)=\phi_1(a_1)\,\phi_2(a_2)\,\psi(a_1,a_2)$:
+
+\begin{center}\small
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+$(a_1,a_2)$ & $\phi_1\phi_2$ \ \scriptsize(from $\pi_i{=}0.9$) & $\psi$ (with / no priors) \ \scriptsize(from $\pi_s{=}\tfrac12$, $p$) & $w$ with & $w$ no \\
+\midrule
+$(0,0)$ & $0.1\times0.1=0.01$ & $1-\pi_s=0.5$ \ / \ $p=0.9$   & $0.005$ & $0.009$ \\
+$(0,1)$ & $0.1\times0.9=0.09$ & $\pi_s=0.5$ \ / \ $p=0.9$     & $0.045$ & $0.081$ \\
+$(1,0)$ & $0.9\times0.1=0.09$ & $\mathbf{1-p}=0.1$ \ (both)    & $0.009$ & $0.009$ \\
+$(1,1)$ & $0.9\times0.9=0.81$ & $p=0.9$ \ (both)              & $0.729$ & $0.729$ \\
+\midrule
+\multicolumn{3}{@{}l}{$Z=\sum w$} & $0.788$ & $0.828$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The source marginal is $\pr{a_1{=}1}=\bigl(w(1,0)+w(1,1)\bigr)/Z$. Its \emph{numerator is
+$0.009+0.729=0.738$ in both families} --- the two rows where the source is true are identical, as observed above.
+Only $Z$ differs, because the no-priors table puts more weight on the two worlds where the source is
+\emph{false}: $0.005\to0.009$ and $0.045\to0.081$. So
+\begin{equation*}
+\pr{a_1{=}1}\;=\;\frac{0.738}{0.788}\;=\;\frac{369}{394}\;=\;0.9365
+\qquad\text{against}\qquad
+\frac{0.738}{0.828}\;=\;\frac{41}{46}\;=\;0.8913 .
+\end{equation*}
+Our tables lift the source above its $0.9$ prior: its target is probably true, and an entailment whose target
+holds is mild corroboration. The no-priors tables push the same source \emph{below} its prior --- with nothing
+contradicting it and every relation touching it satisfied --- and the derivation shows exactly why. Nothing was
+charged against $a_1$; the source-false worlds were simply made more attractive, which is the same thing after
+normalization. The claim loses credence for one reason only: it was cited as a premise. In factuality that is
+right, since staking a claim on a passage should move belief in the passage. In coherence it is a defect,
+because being the thing an argument reasons \emph{from} should not by itself make a claim less credible.
+
+\paragraph{What that costs on the running example.} One edge is a toy; the effect survives at scale. Return to
+the five-claim Voyager~1 pair of Figure~\ref{fig:motivating}, worked formally in \S\ref{sec-example}. Everything
+is held fixed --- the same five claims, the same priors $(0.9,0.9,0.9,0.1,0.1)$, the same relation graphs (four
+edges for A, six for B) --- and only the potential family is swapped. Each score is the mean of the five
+posterior marginals, computed by enumerating all $2^5=32$ worlds of Eq.~\ref{eq-joint} exactly, so the
+comparison isolates the tables and nothing else:
+
+\begin{center}\small
+\begin{tabular}{@{}llccccccl@{}}
+\toprule
+& tables & $a_1$ & $a_2$ & $a_3$ & $a_4$ & $a_5$ & $\LCS_{\mm}$ & below own prior \\
+\midrule
+\multirow{2}{*}{A \emph{(coherent)}}
+ & with priors & $0.939$ & $0.989$ & $0.992$ & $0.013$ & $0.020$ & $\mathbf{0.590}$ & $a_4,a_5$ \\
+ & no priors   & $0.890$ & $0.976$ & $0.975$ & $0.014$ & $0.021$ & $0.575$          & $\mathbf{a_1},a_4,a_5$ \\
+\midrule
+\multirow{2}{*}{B \emph{(incoherent)}}
+ & with priors & $0.960$ & $0.973$ & $0.513$ & $0.006$ & $0.018$ & $\mathbf{0.494}$ & $a_3,a_4,a_5$ \\
+ & no priors   & $0.855$ & $0.890$ & $0.545$ & $0.004$ & $0.025$ & $0.464$          & all five \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \emph{ranking} survives: the coherent response A still beats the incoherent B, $0.575$ against $0.464$. What
+breaks is the per-claim reading, which is where a coherence score earns its keep. Response A asserts three true
+claims in an unbroken support chain and contradicts none of them, yet its chain root $a_1$ falls from $0.939$ to
+$0.890$ --- below its own $0.9$ prior --- by the same mechanism the four-world table above makes explicit, since
+$a_1$ is the source of A's $a_1\!\to\!a_2$ edge. Under our tables the only claims A leaves below their priors are
+$a_4$ and $a_5$, the two it explicitly refuses, which is the right answer.
+
+That matters because \S\ref{sec-score} uses the count of below-prior claims to \emph{localize} an incoherence.
+The no-priors tables report a support chain's own root as damage in a response with no conflict in it at all. In
+B they flag all three true claims instead of the single broken one, so B's real defect --- the true $a_3$
+collapsing because its only support is a premise the text itself denies --- no longer stands out from two
+artefacts of the table.
+
+\paragraph{And in the aggregate.} At sixteen claims the same mechanism costs the measure its dynamic range.
+The recall report of App.~\ref{app-examples} has a twelve-edge entailment backbone, one \eqv{} edge and two
+conflicts, with all sixteen priors uniform at $\pi_i=\tfrac12$. Here the effect compounds along the backbone:
+every claim on it is the source of a downstream entailment, so under the no-priors tables every one of them is
+charged, and the root --- the source of the longest chain --- absorbs the most, falling to
+$\pr{a_1{=}1}=0.19$ from its $0.5$ prior.
+
+The consequence is measured by the same procedure in both families: score the graph as given, then score it
+again with \emph{every} conflict edge deleted, and read the gap. That gap is the range the measure has available
+to separate a response with conflicts from the otherwise identical response without them. Under the no-priors
+tables the mean marginal moves $0.490\to0.498$, a range of $0.008$; under ours it moves $0.607\to0.620$, a range
+of $0.013$ sitting an order of magnitude higher on the scale. All four values are exact, by $2^{16}=65\,536$-world
+enumeration. A coherence measure built on the factuality tables spends its range penalizing premises and has
+almost none left for conflicts.
+
+\paragraph{In brief.} A relation's coupling says \emph{which} joint assignment of two claims it penalizes;
+the potential $\psi_{\tau,p}$ says \emph{by how much}. Read as two rows --- source false, then source true ---
+our \ent{} table is $[1{-}\pi_s,\pi_s,\mathbf{1{-}p},p]$ with $\pi_s=\tfrac12$, against the
+$[p,p,\mathbf{1{-}p},p]$ used throughout the factuality literature. The two agree wherever the source is true,
+and differ only where it is false: a flat, uninformative $[\tfrac12,\tfrac12]$ against a $[p,p]$ that is also
+flat but scaled up by $p$. That scaling makes the factor evidence \emph{for} the source rather than a constraint
+acting \emph{from} it, which is correct when the source is a retrieved passage whose reliability is in doubt and
+wrong when it is another claim of the same response. The cost is visible in four worlds: for one \ent{} edge at
+$p=0.9$ between two claims of prior $0.9$, the source's marginal has numerator $0.738$ under both families, but
+$Z=0.788$ under ours against $0.828$ under theirs, so the source moves to $0.9365$ in one and $0.8913$ in the
+other --- below its own prior, penalized for nothing but having been cited as a premise. On the five-claim pair
+of Figure~\ref{fig:motivating} this leaves the A-over-B ranking intact ($0.575$ against $0.464$) while
+corrupting the per-claim diagnostic: the coherent response's own chain root drops below its prior, so the count
+of below-prior claims, which \S\ref{sec-score} uses to localize an incoherence, now fires on a response that
+has none. On a sixteen-claim report the same charge compounds along the entailment backbone, driving the root to
+$0.19$ from a $0.5$ prior and leaving a $0.008$ range between the graph and its conflict-free variant, against
+$0.013$ an order of magnitude higher up the scale under ours. Hence Def.~\ref{def-mrf} takes the with-priors
+family: a coherence model must not spend its dynamic range penalizing premises.
 
 \subsection{The coherence score}
 \label{sec-score}
@@ -2536,7 +2662,8 @@ about whether either is true.
 \begin{table}[tbp]
 \centering\small
 \caption{Pairwise potentials $\psi_{\tau,p}(a_s,a_t)$, listed row-major over the assignments
-  $(0,0),(0,1),(1,0),(1,1)$; $\pi_s$ is the source claim's prior and bold marks the penalized set
+  $(0,0),(0,1),(1,0),(1,1)$; $\pi_s$ is the factor family's fixed source-prior parameter, set by the edge's
+  link type ($\tfrac12$ for claim--claim edges) and \emph{not} the source claim's own prior; bold marks the penalized set
   $V(\tau)$ of Def.~\ref{def-couplings}. The \emph{no-priors} family is correct for
   claim--evidence factuality, where the source passage's own truth is at stake; the
   \emph{with-priors} family is what coherence requires (Prop.~\ref{prop-rowstoch}) and what
@@ -3473,7 +3600,7 @@ encoding that scores rule satisfaction rather than belief can be maximized by ha
 
 Writing the log-potential in the general pairwise form
 $\ln\psi(a_s,a_t)=\alpha+\beta a_s+\gamma a_t+\delta\,a_s a_t$ and matching it against the
-with-priors tables of Table~\ref{tab:factors} gives, for $\pi_s$ the source prior and
+with-priors tables of Table~\ref{tab:factors} gives, for $\pi_s$ the family's fixed source-prior parameter and
 $\mathrm{L}(x)=\mathrm{logit}(x)$:
 \begin{center}\small
 \begin{tabular}{@{}lllll@{}}
