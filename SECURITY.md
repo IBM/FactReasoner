@@ -34,6 +34,7 @@ Critical advisories tracked in issue #36, with the change that remediated each.
 |---|---|---|---|---|
 | CVE-2026-78683 | nltk | <= 3.9.4 | 3.10.0 | Regenerated `uv.lock`: nltk 3.9.4 -> 3.10.3 |
 | CVE-2026-79657 | nltk | <= 3.10.2 | 3.10.3 | Regenerated `uv.lock`: nltk 3.9.4 -> 3.10.3 |
+| CVE-2026-79675 | nltk | <= 3.10.2 | 3.10.3 | Regenerated `uv.lock`: nltk 3.9.4 -> 3.10.3 |
 
 ## Known residual risk
 
