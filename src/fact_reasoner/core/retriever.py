@@ -50,7 +50,8 @@ logger.setLevel(logging.ERROR)
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
 DEFAULT_DB_PATH = "/tmp/nasa_contrib/accelerated-discovery/chroma_db"
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "ibm-granite/granite-embedding-30m-english"
+
 NEWLINES_RE = re.compile(r"\n{2,}")  # two or more "\n" characters
 
 CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
@@ -244,6 +245,7 @@ class ChromaDBReader:
         self,
         collection_name: str,
         persist_directory: str,
+        embedding_model: str = EMBEDDING_MODEL,
     ):
         """
         Initialize the VectorDB.
@@ -253,6 +255,9 @@ class ChromaDBReader:
                 The collection name in the vector database.
             persist_directory: str
                 The directory used for persisting the vector database.
+            embedding_model: str
+                Sentence Transformers model used to embed queries. Must match
+                whatever indexed the collection.
         """
         self.client = chromadb.PersistentClient(
             path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)
@@ -260,7 +265,7 @@ class ChromaDBReader:
         self.collection = self.client.get_collection(
             name=collection_name,
             embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name=EMBEDDING_MODEL
+                model_name=embedding_model
             ),
         )
         print(f"[ChromaDB] initialized with {self.collection.count()} items.")
@@ -295,6 +300,7 @@ class MilvusDBReader:
         self,
         collection_name: str,
         persist_directory: str,
+        embedding_model: str = EMBEDDING_MODEL,
     ):
         """
         Initialize the VectorDB.
@@ -303,13 +309,16 @@ class MilvusDBReader:
             collection_name: str
                 The collection name in the vector database.
             persist_directory: str
-                The directory used for persisting the vector database.
+                The Milvus connection URI (``http://localhost:19530``) or a local Milvus Lite file path.
+            embedding_model: str
+                Sentence Transformers model used to embed queries. It should match
+                whatever model indexed the collection.
         """
         self.collection_name = collection_name
         self.client = MilvusClient(uri=persist_directory)
         self.client.load_collection(collection_name=collection_name)
         self.embedding_fn = SentenceTransformerEmbeddingFunction(
-            model_name=EMBEDDING_MODEL
+            model_name=embedding_model
         )
 
     def is_empty(self):
@@ -324,7 +333,7 @@ class MilvusDBReader:
             data=embedded_question,
             limit=n_results,
             search_params={"metric_type": "IP", "params": {}},
-            output_fields=["text", "title", "source"],
+            output_fields=["text", "title", "source", "url"],
         )
         search_results = search_results[0] if search_results else []
         documents = [hit["entity"]["text"] for hit in search_results]
@@ -332,6 +341,7 @@ class MilvusDBReader:
             {
                 "title": hit["entity"].get("title", ""),
                 "source": hit["entity"].get("source", ""),
+                "url": hit["entity"].get("url", ""),
             }
             for hit in search_results
         ]
@@ -408,6 +418,7 @@ class SourceRetriever:
         query_builder: QueryBuilder = None,
         num_workers: int = 4,
         per_url_timeout: int = DEFAULT_PER_URL_TIMEOUT,
+        embedding_model: str | None = None,
     ):
         """
         Initialize the source retriever component.
@@ -437,6 +448,11 @@ class SourceRetriever:
             per_url_timeout: int
                 Wall-clock timeout (seconds) for each link fetch; hung fetches are
                 dropped and recorded as empty text.
+            embedding_model: str | None
+                Sentence Transformers model used to embed queries for
+                service_type in {chromadb, milvus}. Must match whatever
+                indexed the target collection. Defaults to the reader's own
+                default (EMBEDDING_MODEL) when None.
         """
 
         self.top_k = top_k
@@ -457,15 +473,20 @@ class SourceRetriever:
 
         assert self.service_type in ["chromadb", "milvus", "wikipedia", "google"]
 
+        # shared across chromadb/milvus so both take the same override
+        vectordb_kwargs = {} if embedding_model is None else {"embedding_model": embedding_model}
+
         if self.service_type == "chromadb":
             self.vectordb_retriever = ChromaDBReader(
                 collection_name=self.collection_name,
                 persist_directory=self.persist_dir,
+                **vectordb_kwargs,
             )
         elif service_type == "milvus":
             self.vectordb_retriever = MilvusDBReader(
                 collection_name=self.collection_name,
                 persist_directory=self.persist_dir,
+                **vectordb_kwargs,
             )
 
         elif self.service_type == "wikipedia":
@@ -528,7 +549,8 @@ class SourceRetriever:
                     "title": metadata.get("title", "No Title Provided"),
                     "text": make_uniform(cleaned),
                     "snippet": snippet,
-                    "link": metadata.get("source", ""),
+                    # fall back to source if url not present
+                    "link": metadata.get("url") or metadata.get("source", ""),
                 }
                 passages.append(passage)
 
