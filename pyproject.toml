@@ -29,20 +29,27 @@ classifiers = [
 #   * joblib is imported directly by uncertainty.nli_training rather than being
 #     used through scikit-learn, so it is declared here rather than relied on
 #     transitively.
+# Lower bounds are security floors, not preferences: each one is the first
+# release that patches a known advisory against this dependency set (see the
+# repository's security tracking issue). Raise them when new advisories land;
+# do not relax them. `chromadb` is deliberately not declared anywhere in this
+# file -- not even as an optional extra -- see the note below.
 dependencies = [
     "beautifulsoup4",
-    "chromadb",
     "joblib",
     "langchain-community",
-    "langchain-core",
+    "langchain-core>=1.3.3",
     "langchain-huggingface",
     "langchain-text-splitters",
-    "mellea==0.6.0",
+    "mellea==0.7.0",
     "networkx",
-    "nltk",
+    "nltk>=3.10.3",
     "numpy",
     "pandas>=2.3.1",
-    "pypdf2",
+    # pypdf supersedes the abandoned PyPDF2 (last release 3.0.1, CVE-2023-36464
+    # unpatched). Drop-in for the only API we use: PdfReader(BytesIO(...)),
+    # .pages and .extract_text() in core/retriever.py.
+    "pypdf>=6.1.1",
     "python-dotenv",
     "requests",
     "rouge-score",
@@ -51,9 +58,33 @@ dependencies = [
     "thefuzz",
     "tqdm",
     "wikipedia",
+    # Transitive pins. These are pulled in by langchain / chromadb / vllm rather
+    # than imported here, but the resolver will happily pick a vulnerable version
+    # unless we floor it.
+    "aiohttp>=3.14.3",
+    "idna>=3.15",
+    # langsmith 0.9+ switches to an httpx2 stack; the cap keeps that migration a
+    # deliberate change rather than a silent one.
+    "langsmith>=0.8.18,<0.13",
+    "pillow>=12.3.0",
+    "pydantic-settings>=2.14.2",
+    "soupsieve>=2.8.4",
+    "urllib3>=2.7.0",
 ]
 
 [project.optional-dependencies]
+# There is deliberately no `chroma` extra. The `--service-type chromadb` backend is
+# still supported, but `chromadb` is not declared here in any form, because every
+# release up to and including 1.5.9 -- the latest on PyPI -- carries unpatched
+# critical advisories: CVE-2026-45829 (pre-authentication code injection) and
+# CVE-2026-45833 (code injection). No patched release exists to floor against.
+#
+# An optional extra would not help: `uv lock` pins every extra, so declaring
+# chromadb even optionally writes a vulnerable version into uv.lock and keeps the
+# whole project in scope of those alerts. Users who want the backend install it
+# themselves (`pip install chromadb`), accepting that risk; ChromaReader imports it
+# lazily and raises an actionable ImportError when it is absent. The other two
+# backends (`google`, `wikipedia`) need no extra install.
 # RITS backends (IBM internal). See README for the mellea-ibm install source.
 rits = ["mellea-ibm"]
 # Local vLLM server path (GPU node). vLLM is invoked as an external process, not

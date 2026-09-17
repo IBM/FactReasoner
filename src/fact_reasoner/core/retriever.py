@@ -25,19 +25,23 @@ from io import BytesIO
 from itertools import islice
 from typing import Any
 
-import chromadb
 import requests
 import wikipedia
 from bs4 import BeautifulSoup
-from chromadb.config import Settings as ChromaSettings
-from chromadb.utils import embedding_functions
 from langchain_community.retrievers import WikipediaRetriever
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from tqdm import tqdm
+
+# chromadb is one of three retrieval backends (google / wikipedia / chromadb) and is
+# imported lazily inside ChromaReader rather than here. It is not a declared
+# dependency of this project at all: every release up to and including 1.5.9 (the
+# latest) carries unpatched critical advisories (CVE-2026-45829, CVE-2026-45833), so
+# users opt in explicitly with `pip install chromadb`. Importing it eagerly also made
+# every entry point -- including `fact-reasoner --help` -- depend on it.
 
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -260,6 +264,21 @@ class ChromaReader:
             collection_metadata: dict
                 A dict containing the collection metadata.
         """
+
+        try:
+            import chromadb
+            from chromadb.config import Settings as ChromaSettings
+            from chromadb.utils import embedding_functions
+        except ImportError as exc:  # pragma: no cover - depends on a manual install
+            raise ImportError(
+                "The chromadb retrieval backend requires chromadb, which is "
+                "deliberately not a dependency of fact_reasoner: every release up to "
+                "and including 1.5.9 (the latest) carries unpatched critical "
+                "advisories (CVE-2026-45829 pre-auth code injection, CVE-2026-45833 "
+                "code injection). Install it explicitly to opt into that risk: "
+                "pip install chromadb. The other backends "
+                "(service_type='google' or 'wikipedia') need no extra install."
+            ) from exc
 
         self.client = chromadb.PersistentClient(
             path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)

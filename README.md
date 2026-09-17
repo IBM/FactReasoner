@@ -127,14 +127,32 @@ uv pip install fact_reasoner
 ```
 
 The default install is self-contained: the **Ollama** backend (via `mellea`), the
-Google / Wikipedia / ChromaDB retrievers, SIMBA-UQ NLI uncertainty estimation, and
-the embedding similarity gate behind `--nli-mode fast`. Only backend-specific pieces
-are optional extras:
+Google / Wikipedia retrievers, SIMBA-UQ NLI uncertainty estimation, and the embedding
+similarity gate behind `--nli-mode fast`. Only backend-specific pieces are optional
+extras:
 
 ```bash
 uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
 uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
 ```
+
+> **Note on ChromaDB.** The `--service-type chromadb` backend is still supported, but
+> `chromadb` is **not** a dependency of this project and there is no `chroma` extra.
+> Every release up to and including 1.5.9 — the latest on PyPI — carries unpatched
+> **critical** advisories: [CVE-2026-45829](https://github.com/advisories/GHSA-f4j7-r4q5-qw2c)
+> (pre-authentication code injection) and
+> [CVE-2026-45833](https://github.com/advisories/GHSA-36p7-vc44-83pf) (code injection).
+> No patched release exists, and an optional extra would not help: `uv lock` pins every
+> extra, so declaring it at all writes a vulnerable version into `uv.lock`.
+>
+> The other two retrievers (`google`, `wikipedia`) need no extra install. If you do want
+> the ChromaDB backend, install it yourself and accept that risk:
+>
+> ```bash
+> pip install chromadb
+> ```
+>
+> `--service-type chromadb` raises an `ImportError` naming these CVEs if it is missing.
 
 ### From Source
 
@@ -359,7 +377,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 
 | Option | Meaning |
 |--------|---------|
-| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`). |
+| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`, `chromadb` needs a manual `pip install chromadb` — see the note above). |
 | `--top-k` | Contexts retrieved per atom (default 3). |
 | `--cache-dir` | Retriever cache directory. |
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
@@ -789,6 +807,10 @@ retriever = SourceRetriever(
 
 ### ChromaDB Vector Store
 
+Requires a manual `pip install chromadb`. It is not a dependency of this project and
+has no extra, because all releases through 1.5.9 carry unpatched critical advisories
+(CVE-2026-45829, CVE-2026-45833) — see [Note on ChromaDB](#installation) above.
+
 ```python
 retriever = SourceRetriever(
     service_type="chromadb",
@@ -974,3 +996,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on [GitHub](https://github.com/IBM/FactReasoner).
+
+## ConTrust: credibility-weighted context priors
+
+Contexts can be weighted by the credibility of their source instead of a fixed
+prior. See [docs/CONTRUST.md](docs/CONTRUST.md).
