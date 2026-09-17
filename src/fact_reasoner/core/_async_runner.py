@@ -15,21 +15,7 @@
 """
 Persistent background event loop for dispatching coroutines from sync code.
 
-Why not asyncio.run()
----------------------
-``asyncio.run()`` creates a fresh loop, runs the coroutine, then *closes the loop
-immediately*.  httpx schedules ``AsyncClient.aclose()`` as a background task via
-``loop.create_task()``; those tasks are sitting in the ready queue when the
-top-level coroutine returns.  ``asyncio.run()`` closes the loop before they
-execute, causing:
-
-    RuntimeError: Event loop is closed
-    Task exception was never retrieved
-    future: <Task finished ... coro=<AsyncClient.aclose() ...>
-
-Why run_coroutine_threadsafe on a persistent loop fixes it
-----------------------------------------------------------
-The loop never closes, so httpx cleanup tasks run to completion at whatever
+Keeps the loop open, so httpx cleanup tasks run to completion at whatever
 depth and pace they need.  The same loop ``id`` is reused across calls, so
 Mellea's ``OpenAIBackend._async_client`` cache returns the same
 ``AsyncOpenAI``/httpx ``AsyncClient`` instance instead of creating a new one
