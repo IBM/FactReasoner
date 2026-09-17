@@ -32,8 +32,8 @@ classifiers = [
 # Lower bounds are security floors, not preferences: each one is the first
 # release that patches a known advisory against this dependency set (see the
 # repository's security tracking issue). Raise them when new advisories land;
-# do not relax them. `chromadb` is deliberately NOT here -- see the `chroma`
-# extra below.
+# do not relax them. `chromadb` is deliberately not declared anywhere in this
+# file -- not even as an optional extra -- see the note below.
 dependencies = [
     "beautifulsoup4",
     "joblib",
@@ -73,12 +73,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The chromadb retrieval backend (`--retriever chromadb`). Optional because it is
-# one of three interchangeable backends, because the other two need no extra
-# install, and because chromadb <= 1.5.9 carries advisories with no patched
-# release available -- so requiring it would put every install in scope of them.
-# Only ChromaReader touches it, via a lazy import.
-chroma = ["chromadb"]
+# There is deliberately no `chroma` extra. The `--service-type chromadb` backend is
+# still supported, but `chromadb` is not declared here in any form, because every
+# release up to and including 1.5.9 -- the latest on PyPI -- carries unpatched
+# critical advisories: CVE-2026-45829 (pre-authentication code injection) and
+# CVE-2026-45833 (code injection). No patched release exists to floor against.
+#
+# An optional extra would not help: `uv lock` pins every extra, so declaring
+# chromadb even optionally writes a vulnerable version into uv.lock and keeps the
+# whole project in scope of those alerts. Users who want the backend install it
+# themselves (`pip install chromadb`), accepting that risk; ChromaReader imports it
+# lazily and raises an actionable ImportError when it is absent. The other two
+# backends (`google`, `wikipedia`) need no extra install.
 # RITS backends (IBM internal). See README for the mellea-ibm install source.
 rits = ["mellea-ibm"]
 # Local vLLM server path (GPU node). vLLM is invoked as an external process, not
