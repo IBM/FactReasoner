@@ -14,7 +14,6 @@
 
 # Context summarization using LLMs
 
-import asyncio
 import math
 from typing import Any
 
@@ -232,11 +231,9 @@ class ContextSummarizer:
             List[Dict[str, Any]]: A list of summarized contexts.
         """
 
-        import concurrent.futures
+        from ._async_runner import run_coroutine
 
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, self.run_batch(contexts, atom_text))
-            return future.result()
+        return run_coroutine(self.run_batch(contexts, atom_text))
 
     async def run_batch(
         self, contexts: list[str], atom_text = None
