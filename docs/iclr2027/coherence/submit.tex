@@ -830,12 +830,10 @@ neighbour.
 ordering-only status and exhaustiveness are re-derived from the new sense through the compile map
 $\mathcal{C}$ rather than carried over, so a transformed edge cannot contradict $\mathcal{C}$.
 
-\emph{The adjacency gate.} A family is rejected when two \emph{adjacent} rungs build the same edge set
-while the higher rung's calls claim a change. Adjacency rather than parentage is the right comparison:
-every \textsc{conflict} rung declares the base as its parent, so a parent-only check passes a rung that
-duplicates the rung immediately below it. The two factor-invariant calls of \textsc{o6} are exempt, since
-they are \emph{intended} to leave the edge set unchanged --- which is exactly what makes them usable as
-invariance tests.
+\emph{The adjacency gate.} Deriving a rung's labels this way makes one failure possible that no textual
+check can see: two adjacent rungs can come out with the \emph{same} edge set, in which case they build the
+same network and nothing can order them. That is an admission gate rather than a property of the derivation,
+so \S\ref{sec-bench-admission} states it with the rest of the mechanism.
 
 \subsection{Validation}
 \label{sec-bench-validation}
@@ -846,7 +844,8 @@ arrangement matter more than the individual gates.
 \textbf{The committee excludes the generator.} Validation is run by a panel of models, and the model that
 generated a family is removed from its own panel before voting. Without this, the dominant failure mode of
 an LLM-generated benchmark --- the generator certifying its own idiosyncrasies as ground truth --- is
-structurally unaddressed. Each gate is decided by \emph{majority} of the remaining panel, and a facet
+structurally unaddressed. The gates are then combined by three different rules ---
+V1 by best rater, V3 and V4 by majority --- for reasons \S\ref{sec-bench-admission} gives, and a V3 facet
 counts as failed only when a majority objects, so one unusually strict auditor cannot reject a sound
 family.
 
@@ -862,18 +861,23 @@ labels no longer describe a process we can state.
 \begin{table}[tbp]
 \centering\small
 \caption{Every acceptance threshold. V1 rates are computed over the \emph{valid} planned relations only,
-  since an invalid planned relation is one the prose is not required to draw soundly. The rightmost
-  column is the committee decision rule for that gate.}
+  since an invalid planned relation is one the prose is not required to draw soundly; with P3's six valid
+  relations both V1 rates quantize to $5$ of $6$ (\S\ref{sec-bench-admission}). The rightmost column is
+  the decision rule over the committee, and the three gates use three different ones on purpose: V1 is
+  satisfied by the best rater, V3 rejects a facet only on a majority of auditors, and V4 needs a majority
+  to call a claim lost. Every gate is boolean and admission is their conjunction at \emph{family}
+  granularity --- see \S\ref{sec-bench-admission} for the mechanism, including the two per-rung gates and
+  the adjacent-pair edge-effect gate, which are not per-item thresholds and so have no row here.}
 \label{tab:thresholds}
 \begin{tabular}{@{}llll@{}}
 \toprule
 Gate & Quantity & Threshold & Rule \\
 \midrule
-V1 & planned relations recovered with correct coupling & $\ge 0.80$ & majority \\
-V1 & \dots\ and with correct sense & $\ge 0.70$ & majority \\
-V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority \\
-V3 & leakage and hedging span lists & must be empty & majority \\
-V4 & claim coverage over gating statuses & $=1.00$ & majority \\
+V1 & planned relations recovered with correct coupling & $\ge 0.80$ & any-of \\
+V1 & \dots\ and with correct sense & $\ge 0.70$ & any-of \\
+V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority (facet) \\
+V3 & leakage and hedging span lists & must be empty & majority (facet) \\
+V4 & claim coverage over gating statuses & $=1.00$ & majority (atom) \\
 \midrule
 P3 & claims selected & $14$--$16$ & --- \\
 P3 & relations planned (accepted band; $10$ instructed) & $8$--$12$ & --- \\
@@ -896,6 +900,76 @@ leakage being any text that names the annotation scheme or the perturbation, whi
 detect the rung without reading for coherence. \textbf{V4} checks that every selected claim is actually
 asserted, gating on the \textsf{missing} and \textsf{merged} statuses, since a claim the response never
 makes cannot stand in a relation.
+
+\subsection{How a family is admitted}
+\label{sec-bench-admission}
+
+\S\ref{sec-bench-validation} names the gates and their thresholds; this section states the
+\emph{mechanism} that combines them, because the arithmetic of admission is not a scoring rule and
+reporting it as one would misdescribe the corpus. There is no score, no average and no threshold on how
+many rungs cleared: every gate returns a boolean and a family is admitted when the conjunction of all of
+them is true.
+
+\paragraph{The unit of admission is the family, not the rung.} A ladder's claim is \emph{relational} --- that
+rung $k{+}1$ is more coherent than rung $k$ --- so four rungs out of five is not four fifths of a benchmark
+item. It is nothing: the four surviving rungs carry no ranking claim that any readout could be held to, and
+the pair that failed is precisely the comparison the family existed to license. A family is therefore
+admitted whole or rejected whole, and a rejection is stored with the gate and reason that caused it rather
+than repaired. Concretely, admission requires that the family reach the final stage with all five items
+present and every recorded gate passing; one failing gate anywhere discards all five.
+
+\paragraph{Gates apply at four different granularities.} Reading Table~\ref{tab:thresholds} as a
+per-item checklist would miss that its rows are evaluated against different objects.
+\emph{Per plan}, once per family: the P3 structural quotas, before any prose exists.
+\emph{Per base response}, once per family: V1, V3 and V4, on the committee of
+\S\ref{sec-bench-validation}. \emph{Per rung}, on each of the four derived rungs: the perturbation gates
+below. \emph{Per adjacent rung pair}: the edge-effect gate below. The four derived rungs are never
+validated by V1/V3/V4 individually --- those run on the base prose, and the derived rungs inherit its
+certification through the perturbation gates, which bound how far an edit may move the text.
+
+\paragraph{The three committee gates combine by three different rules, deliberately.} They measure
+different things, so a single rule would be wrong for at least two of them.
+\textbf{V1 is any-of}: recoverability asserts that a careful reader \emph{can} recover the plan from the
+prose, so one competent rater succeeding is sufficient evidence, and the best rater's verdict is the one
+reported while every rater's rates are recorded. Requiring each rater to clear the threshold independently
+would be a materially harsher gate than the one we intend. \textbf{V3 is majority per facet}: a facet
+counts as failed only when a majority of auditors objects, so one unusually strict auditor cannot reject
+sound prose. \textbf{V4 is majority per atom}: no single rater can declare a claim absent. Majority
+throughout means a \emph{strict} majority, and a tie escalates rather than resolving silently.
+
+\paragraph{V1's thresholds are integer gates in disguise.} Both V1 rates are computed over the
+\emph{valid} planned relations only, and P3 mandates six valid relations of the ten it plans, so the
+denominator is $6$ and the thresholds quantize: $0.80$ requires $5$ of $6$ and $0.70$ also requires $5$ of
+$6$, since $4/6 = 0.667$ clears neither. A single relation therefore decides admission. This also bounds
+how far the coupling threshold can be raised: at any value above $0.834$ it becomes unanimity-of-six, a
+gate no rater panel reliably clears, so the nominal headroom between $0.80$ and $1.00$ is not usable.
+
+\paragraph{Per-rung gates: the edit must happen, and must stay small.} Each derived rung is produced by
+one or two perturbation calls, and each call is checked twice. \emph{Text-changed} requires the prose to
+differ from what that call was handed --- not from the base --- so a composed rung whose second call is a
+no-op is caught even though its first call already moved the text away from the base. \emph{Length drift}
+requires the rung to stay within $15\%$ of the base length, so a perturbation cannot smuggle in a coherence
+change by rewriting at volume. A failure of either aborts the family immediately.
+
+\paragraph{The gate that is not about prose: adjacent rungs must build different graphs.} A ladder can
+satisfy every textual gate and still be unusable, if two adjacent rungs happen to induce the \emph{same}
+gold edge set. Then the two rungs build the identical Markov network, no readout can separate them, and the
+ranking assertion across that pair has no label behind it. The edge-effect gate compares the edge
+signatures of each adjacent pair and rejects the family when they coincide. Two details of its scope are
+load-bearing. It compares \emph{adjacent} rungs rather than each rung against its parent: every
+\textsc{conflict} rung has the base as its parent, so a parent comparison admits a rung that duplicates the
+one immediately below it. And it \emph{exempts} any pair in which either rung's calls are all
+edge-invariant --- sentence reordering and swapping \sense{Precedence} for \sense{Succession} move no edge
+by construction, which is exactly the invariance the \textsc{order} and \textsc{control} ladders exist to
+test, so flagging those pairs would reject the negative controls for doing their job.
+
+\paragraph{Why the yields in \S\ref{sec-bench-corpus} are what they are.} Because admission is a
+conjunction, rejections are single-point rather than cumulative: the first binding gate is the only one
+visible in a rejection record, and a campaign that fails on a structural quota reports nothing about the
+prose gates that never ran. In development this produced several successive regimes in which the admitted
+count was zero for a different single reason each time. It is the honest behaviour for a conjunction, but it
+means a low yield localizes one gate and says nothing about the rest, and a reader comparing yields across
+configurations should read the gate attribution rather than the count.
 
 \subsection{The released corpus}
 \label{sec-bench-corpus}
