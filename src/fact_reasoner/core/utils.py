@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
-import concurrent.futures
 import time
 
 import nltk
@@ -34,6 +32,7 @@ from .base import (  # noqa: F401
     Context,
     Relation,
 )
+from ._async_runner import run_coroutine
 from .nli import NLIExtractor
 from .nli_cache import extractor_identity
 from .nli_config import FAITHFUL, NLIPairConfig
@@ -130,21 +129,9 @@ def predict_nli_relationships(
     if todo:
         sub_premises = [premises[i] for i in todo]
         sub_hypotheses = [hypotheses[i] for i in todo]
-        try:
-            # If an event loop is already running, we cannot call asyncio.run()
-            # directly, so run the batch in a separate thread with its own loop.
-            asyncio.get_running_loop()
-
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                computed = pool.submit(
-                    asyncio.run,
-                    nli_extractor.run_batch(sub_premises, sub_hypotheses),
-                ).result()
-        except RuntimeError:
-            # No running loop -- safe to run directly.
-            computed = asyncio.run(
-                nli_extractor.run_batch(sub_premises, sub_hypotheses)
-            )
+        computed = run_coroutine(
+            nli_extractor.run_batch(sub_premises, sub_hypotheses)
+        )
         for slot, result in zip(todo, computed):
             results[slot] = result
         if cache is not None:
