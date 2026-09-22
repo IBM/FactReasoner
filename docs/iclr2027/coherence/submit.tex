@@ -1237,10 +1237,14 @@ is the operational content.
 single-document metrics from DiscoScore \citep{discoscore}. DiscoScore is presented as
 reference-based and most of its variants consume a reference a standalone response does not have;
 these three ignore the reference argument entirely, and the last \emph{is} an entity grid
-\citep{barzilay}, so the classical baseline comes from the same implementation. \textsc{rc} is
+\citep{barzilay}, so the classical baseline comes from the same definition. \textsc{rc} is
 repeated noun mentions over distinct nouns; \textsc{lc} is nouns occurring in more than one sentence
 over distinct nouns; \textsc{entity graph} is the mean sentence-adjacency weight, an edge of weight
-$1/(j-i)$ wherever sentences $i$ and $j$ share a noun lemma. All three therefore reduce to
+$1/(j-i)$ wherever sentences $i$ and $j$ share a noun lemma. The reported values are computed by our
+own implementation of these three definitions rather than by DiscoScore's code, which is not
+installable as a dependency --- it is absent from PyPI and downloads a model at import time --- and
+\S\ref{app-baseline-discourse} states exactly what our noun approximation does and in which direction
+it errs; the comparison rests on the definitions, which are theirs. All three therefore reduce to
 noun-lemma repetition, with no representation of entailment, relation type or contradiction. A
 response can contradict itself in every sentence and still score at ceiling provided its nouns
 recur, which is what makes them a test of whether coherence is separable from \emph{cohesion} rather
@@ -1287,19 +1291,23 @@ they catch a measure secretly tracking edit count or graph density. A control th
 \emph{succeeds} is bad news for the corpus, not good news for the control.
 
 \paragraph{Reading the vacuous rows.} Three rows reach $20/20$ on invariance without measuring
-anything, and the mechanism differs between them --- and, for one of them, between the two backends.
-\textsc{entity graph} returns a single value on all seventy items --- one distinct value, exactly
-constant --- as does \textsc{roscoe-sc} (max) under \texttt{llama}. Under \texttt{gpt-oss} that same
-measure is \emph{not} constant: it takes $18$ distinct values, but every one lies below
-$5\times10^{-7}$, so no rung pair separates by the $10^{-6}$ the axis requires and it passes by
-tolerance rather than by constancy. The two are worth distinguishing because only the first is a
-measure that cannot move; the second is one whose movement is entirely beneath the floor at which the
-maximum has saturated. \textsc{claim count} is not constant either: it takes two distinct values across
-the corpus ($65$ items at one, $5$ at the other), but it never varies \emph{within} a family, in
-$0$ of $14$. Since invariance is a within-family test, that is enough to pass it perfectly while
-scoring $0/50$ on ordering. In all three cases the $20/20$ is an artefact of a measure that cannot
-move where the test looks, which is why Table~\ref{tab:summary-mined} reports the two axes side by side and
-never combines them: averaged with an ordering score, a vacuous $20/20$ would read as competence.
+anything, and the mechanism differs in all three cases --- and, for one of them, between the two
+backends. \textsc{entity graph} reports a single value on all seventy items, but it is not a measure
+that cannot move: the metric is an unbounded sum of $1/(j-i)$ adjacency weights, and its raw value
+takes $62$ distinct values spanning $1.36$ to $4.93$ on these items. Every one of them exceeds the
+$[0,1]$ reporting range, so all seventy clamp to the ceiling and the reported constancy is
+saturation \emph{above} the range rather than constancy within it. \textsc{roscoe-sc} (max) is the
+mirror image, saturated at the floor: under \texttt{llama} it is exactly constant at zero, while
+under \texttt{gpt-oss} it is \emph{not} constant --- it takes $18$ distinct values --- but every one
+lies below $5\times10^{-7}$, so no rung pair separates by the $10^{-6}$ the axis requires and it
+passes by tolerance rather than by constancy. \textsc{claim count} is the third mechanism: it takes
+two distinct values across the corpus ($65$ items at one, $5$ at the other), but it never varies
+\emph{within} a family, in $0$ of $14$. Since invariance is a within-family test, that is enough to
+pass it perfectly while scoring $0/50$ on ordering. Clamped above the ceiling, saturated at the
+floor, and flat within families though not across the corpus: three ways for a measure to be unable
+to move \emph{where the test looks}, which is why Table~\ref{tab:summary-mined} reports the two axes
+side by side and never combines them --- averaged with an ordering score, a vacuous $20/20$ would
+read as competence.
 
 \subsection{Comparison with evidence-free baselines, on gold and mined graphs}
 \label{sec-baselines-measured}
@@ -1490,6 +1498,193 @@ probabilistic model is needed at all. They do not say whether the end-to-end pip
 separate question with a different answer, which is why blocks~\textbf{a} and \textbf{c} of
 Table~\ref{tab:summary-mined} sit in the same units: only the provenance of the relation graph changes down
 the table, so a mined source can be read against gold and against a cohesion metric in a single glance.
+
+
+\subsection{Do readers agree? A human study}
+\label{sec-human-study}
+
+Every ordering in this section is declared by construction: the corpus states how consecutive rungs
+must rank, and a measure is scored against that declaration. A constructed ground truth is only worth
+having if readers agree it is the truth, so we ran a human study on a subset of the ladders. The
+falsifiable version of the claim is sharp --- if readers cannot reproduce the declared orderings, then
+$82.7\%$ against those orderings measures agreement with our perturbation recipe rather than with
+coherence, and every comparison in Table~\ref{tab:summary-mined} loses its referent.
+
+\paragraph{Design.} Four annotators each judged the same $14$ screens, a complete design of $56$
+ratings with no missing data. A screen shows two responses and the query that produced them, and asks
+which is more logically coherent --- A, B, or about equal --- with a confidence rating, a free-text
+reason, and a checkbox for whether the two looked like the same content reordered. The screens cover
+seven families across all four ladder types and seven topics: $10$ \emph{increase} screens, where the
+corpus declares one side more coherent, and $4$ \emph{invariance} screens, where it declares the two
+equal. Families were chosen on \emph{measured} disagreement between the LCS and the strongest
+evidence-free baseline rather than on convenience, and one family was kept deliberately because the
+baseline wins there. Two pairs per family bracket the ends of each ladder: the $(0,4)$ endpoint
+assertion, the largest intended gap, and the $(0,1)$ adjacent step, the hardest. The \textsc{control}
+ladder is symmetric by construction, so its $(0,4)$ pair is byte-identical and would ask a reader to
+compare a text with itself; it contributes $(0,2)$ and $(1,2)$ instead.
+
+Annotators saw only the query and the two responses. This redaction is not incidental: \texttt{items.jsonl}
+states the intended answer in six independent places --- the rung name is literally \textsf{worse} or
+\textsf{coherent}, the item id suffix is monotone in the ladder, the perturbation record names the edit
+and its call-list \emph{length} alone reveals the rung index, the notes say outright that the items form
+an ordered ladder, and per-atom flags mark the planted falsehoods --- and App.~\ref{app-protocol}'s
+export asserts against a forbidden-key list rather than relying on omission. Both invariance outcomes
+were pre-declared publishable before the data arrived, which matters for how the result below should be
+read: readers calling the reordered rungs equal would validate the invariance requirement, and readers
+seeing a real difference would say the requirement is too strict. We got one of each, and which one
+depended on the ladder.
+
+\paragraph{Agreement.} Krippendorff's $\alpha$ (nominal) is $0.748$ over all screens, $0.744$ on the
+increase screens and $0.667$ on the invariance screens. Two screens have no strict majority and are
+reported as genuinely ambiguous rather than resolved: on a corpus whose ground truth is declared by
+construction, ``readers do not agree here'' is a finding about the item, not noise to average away.
+Per-annotator accuracy against the declared answer on the increase screens is $9$, $9$, $7$ and $7$ of
+$10$. The median time per screen is $15.5$ minutes; the maximum is $42$ hours, which is a browser tab
+left open rather than reading time, so we report the median only and no mean.
+
+\paragraph{Readers reproduce the increase ladders.} Eight of the ten increase screens have a majority
+matching the declared answer, and $32$ of the $40$ individual ratings agree with it. At the rating
+level that is far from chance ($p=1.8\times10^{-9}$ against a uniform choice over the three options,
+$p=9.1\times10^{-5}$ against a coin flip between A and B). At the screen level, $8/10$ gives
+$p=0.003$ against the uniform null but only $p=0.055$ against a coin flip, which does not clear
+$0.05$: with ten screens the majority-level test is underpowered, and we state that rather than quote
+the favourable null alone. The free-text reasons say what readers were responding to. Of the $55$
+ratings of $56$ that carry a written reason, $32$ name a relational defect --- a contradiction, a presupposition used
+before it is introduced, a broken chain of support --- and only $2$ mention surface fluency or style.
+Readers were reasoning about structure, not readability.
+
+\paragraph{One invariance requirement is validated and the other is not.} Pooled, the invariance
+screens look like a failure: $1$ of $4$ majorities match. Split by ladder type they are two different
+results, and the pooled fraction is an average of them (Table~\ref{tab:human}).
+
+\begin{table}[tbp]
+\centering\small
+\caption{The four invariance screens, split by ladder type. Both ladders are built from operators that
+  provably move no factor, so the LCS is exactly invariant across every rung of both --- to six
+  decimals, $\LCS_{\mm}=0.784182$ on all five \textsc{order} rungs and $0.788987$ on all five
+  \textsc{control} rungs. Readers separate the two cases sharply. Fisher's exact test on
+  equal-versus-not by ladder gives $p=0.007$; the ratings within a ladder are four annotators over two
+  screens of one family rather than eight independent trials, so this is a descriptive contrast rather
+  than a family-level significance claim.}
+\label{tab:human}
+\begin{tabular}{@{}llccl@{}}
+\toprule
+Ladder & Screens & ``Equal'' ratings & LCS & What readers said \\
+\midrule
+\textsc{control} & \textsf{s013}, \textsf{s014} & $6/8$ & invariant & the pair is the same content \\
+\textsc{order}   & \textsf{s011}, \textsf{s012} & $0/8$ & invariant & the shuffled response is worse \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On \textsc{control}, which exchanges \sense{Precedence}$\leftrightarrow$\sense{Succession} while
+preserving chronology, six of eight ratings say the pair is equal and one screen is unanimous. That
+invariance requirement is human-validated, and the LCS's exact flatness there is a property readers
+endorse. On \textsc{order}, which permutes sentences, \emph{not one} of the eight ratings called the
+pair equal, and all eight preferred the same side --- the less aggressively shuffled one. On both
+screens the rejected side was the \textsf{shuffle\_full} rung, and on one of them readers preferred a
+mere \sense{Precedence} swap over it, so they were tracking the \emph{degree} of scrambling that the
+shuffle levels encode.
+
+The reasons name a specific and checkable defect: dangling anaphora. Two annotators independently
+flagged that the shuffled response ``relies on \emph{that deficit} and \emph{that stress} before those
+concepts are introduced'' and ``contains summary-level language to concepts before they have been
+introduced''. This is verifiable in the corpus text. In the base response the phrase \emph{that stress}
+occurs after the sentence introducing drought-induced stress; in \textsf{shuffle\_full} it occurs
+roughly $1{,}500$ characters earlier, with no antecedent anywhere before it. The claim set is
+identical, every relation is identical, and the perturbation record says so in as many words:
+\emph{sentence order only; edge set unchanged}.
+
+So the LCS is invariant here for a principled reason and readers disagree for an equally principled
+one. Atoms are order-free by construction --- nothing in Eq.~\ref{eq-joint} references claim position
+(Rem.~\ref{rem-order}) --- which is what makes that determinism provable; the cost is that referential cohesion between sentences
+is not representable at all, and it is a real component of what readers call coherence. The
+\textsc{order} ladder's $20/20$ invariance is therefore not a human-referenced success but a measured
+blind spot, and we count it as a limitation (\S\ref{sec-limitations}) rather than as evidence. The
+\textsc{control} result is the human-referenced success, and it is the one the invariance claim should
+rest on.
+
+\paragraph{Measures against the human majority.} Scoring each measure the way a reader was scored ---
+mapping the sign of its two rung scores onto the side that held the higher rung, with the ladder
+scorer's own $10^{-6}$ tie tolerance so that float noise reads as ``equal'' rather than as a
+preference --- gives the only comparison in this paper where a measure is graded against human
+judgement rather than against a construction. The twelve screens with a majority are the denominator;
+a measure cannot be credited for agreeing with a majority that does not exist.
+
+\begin{table}[tbp]
+\centering\small
+\caption{Agreement with the human majority on the twelve screens that have one, beside agreement with
+  the declared ordering on all fourteen. LCS rows are the $\mm$ readout. The gold row is the model
+  given a correct graph; the mined rows are the end-to-end pipeline. Only measures covering all
+  fourteen screens are listed. Generated by \texttt{scripts/analyze\_human\_study.py}.}
+\label{tab:human-measures}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Measure & vs.\ human majority & vs.\ declared \\
+\midrule
+$\LCS_{\mm}$, gold graph                        & $\mathbf{9}/12$ & $\mathbf{14}/14$ \\
+$\LCS_{\cons}$, gold graph                      & $8/12$ & $13/14$ \\
+\midrule
+$\LCS_{\mm}$, mined (\texttt{gpt-oss}, bidir.)  & $7/12$ & $7/14$ \\
+$\LCS_{\mm}$, mined (\texttt{llama}, windowed)  & $3/12$ & $4/14$ \\
+\midrule
+\textsc{judge} direct (\texttt{gpt-oss})        & $8/12$ & $5/14$ \\
+\textsc{length} control                         & $7/12$ & $9/14$ \\
+\textsc{judge} G-Eval (\texttt{gpt-oss})        & $6/12$ & $7/14$ \\
+\textsc{roscoe-sc} mean (\texttt{gpt-oss})      & $6/12$ & $6/14$ \\
+\textsc{rc} cohesion                            & $4/12$ & $8/14$ \\
+\textsc{claim count} control                    & $2/12$ & $4/14$ \\
+\textsc{contradiction rate} (\texttt{gpt-oss})  & $1/12$ & $2/14$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three readings, in descending order of how comfortable they are. First, on a correct graph the LCS
+leads both columns, at $9/12$ against the best baseline's $8/12$ and $14/14$ against the best
+baseline's $9/14$; and its three misses are exactly the cases already discussed --- the two
+\textsc{order} screens, plus one screen where four readers unanimously called a single-conflict repair
+too subtle to matter while the model separated the pair. Second, the baseline ranking is not the
+ladder ranking: the length control reaches $7/12$, which is a reminder that fourteen screens cannot
+separate measures finely, and the direct judge at $8/12$ does far better against readers than against
+the declared orderings ($5/14$) --- a judge and a human agree partly because both read prose. Third
+and least comfortable, the mined arms do not beat the best baseline here. At $7/12$ and $3/12$ they
+are well below the gold row, which is the same gold-versus-mined gap as finding~(2) of
+\S\ref{sec-summary}, now measured against readers instead of against the corpus. The human study
+localizes the bottleneck to relation extraction rather than to the scoring model, and it does not show
+that the deployable configuration tracks human judgement.
+
+\paragraph{What this does and does not establish.} It establishes that the increase ladders track
+reader judgement, so the declared orderings are not an artefact of our recipe; that the
+\textsc{control} invariance requirement is one readers endorse; and that the \textsc{order} invariance
+requirement is not. It does not establish human correlation at scale. Fourteen screens over seven of
+the fourteen families, one generator, four annotators and a single judgement per screen is a
+validation of the corpus, not a benchmark of measures against human coherence ratings; the
+comparison above should be read as a consistency check with a known answer, and the wide confidence
+intervals implied by $n=12$ are why we draw no ranking conclusion from the one-screen differences among
+the baselines.
+
+\paragraph{Summary.} Four annotators rated $14$ screens drawn from seven of the corpus's fourteen
+families, $56$ ratings in a complete design, at $\alpha=0.748$. Three conclusions follow, and together
+they change how two numbers elsewhere in this paper should be read. \emph{First, the constructed
+increase orderings are real.} Readers reproduce $8$ of $10$ of them by majority and $32$ of $40$ at the
+rating level ($p=1.8\times10^{-9}$ against a uniform null), and their written reasons name relational
+defects --- contradiction, presupposition, broken support --- in $32$ of $55$ cases against surface
+fluency in $2$. The $82.7\%$ gold-graph figure of \S\ref{sec-ladder-results} is therefore agreement
+with coherence as readers construe it, not agreement with our perturbation recipe. \emph{Second, the
+two invariance ladders are not one requirement, and only one of them is validated.} \textsc{control},
+which reverses a relation's direction, draws $6$ of $8$ ``equal'' ratings; \textsc{order}, which
+shuffles sentences, draws $0$ of $8$, with readers naming anaphora left stranded by the permutation
+(Fisher $p=0.007$). Because assertion order reaches Eq.~\ref{eq-joint} only through which pairs are
+related, that defect is outside the model's expressive range rather than mismeasured by it, so the
+$45/45$ \textsc{order} invariance result is a blind spot and the invariance claim rests on
+\textsc{control}'s $15/15$. \emph{Third, the gold-versus-mined gap is not an artefact of the corpus.}
+Given a correct graph the measure leads every rival against the human majority, $9/12$ to the best
+baseline's $8/12$; given a mined one it reaches $3/12$--$7/12$ and leads nothing. Finding~(2)'s
+bottleneck thus reproduces against human judgement, on responses and readers that know nothing of the
+declared constraints --- which is the strongest available evidence that relation extraction, and not
+the scoring model, is what stands between this measure and use. What the study cannot support is a
+ranking of measures against human coherence ratings, for the reasons just given; $56$ ratings validate
+a corpus, they do not benchmark a field.
 
 
 \subsection{Real responses: the factuality corpora}
@@ -2298,6 +2493,17 @@ backward-recall gap (finding 4) confirmed on naturally occurring prose.
 count of claims dragged below their own prior localizes an incoherence to the claims responsible. A rubric
 scalar, however well correlated, cannot do this.
 
+\textbf{(13) Readers reproduce the increase ladders, endorse one invariance requirement and reject the other.}
+Four annotators over $14$ screens ($56$ ratings, $\alpha=0.748$) confirm $8$ of $10$ declared increase orderings,
+$32$ of $40$ at the rating level ($p=1.8\times10^{-9}$ against a uniform null), so those orderings are not an
+artefact of our perturbation recipe. The invariance screens split by ladder rather than pooling: \textsc{control}
+draws $6$ of $8$ ``equal'' ratings, while \textsc{order} draws $0$ of $8$, with readers naming dangling anaphora
+in the sentence-shuffled rungs (Fisher $p=0.007$). Since sentence order enters the model only through which pairs
+are related, the \textsc{order} invariance result is a blind spot rather than a success, and finding (1)'s
+$45/45$ on that ladder should be read accordingly. Against the human majority the gold-graph measure leads at
+$9/12$ versus the best baseline's $8/12$, but the mined arms reach only $3/12$--$7/12$, which is finding (2)'s
+bottleneck measured against readers instead of against the corpus (\S\ref{sec-human-study}).
+
 \paragraph{Lessons learned.} Three of these findings only became visible because the evaluation used two
 corpora with opposite weaknesses, and that is the methodological lesson we would carry to the next measure of
 this kind. A constructed corpus can fix the ordering and therefore localize a failure --- it is what tells us
@@ -2331,17 +2537,32 @@ rest.
 \subsection{Limitations}
 \label{sec-limitations}
 
-Four of the results above are strong enough to be worth bounding precisely. The invariance guarantee holds only
-given a correct graph, the pairwise factorization excludes a class of real incoherence, two constants in the
-design are set by hand rather than derived, and the natural-corpus results bound usefulness rather than
-correctness. On that last point: the factuality sample carries human labels at the \emph{atom} level only, so it
+Five of the results above are strong enough to be worth bounding precisely. The invariance guarantee holds only
+given a correct graph and, on one of the two invariance ladders, does not match reader judgement; the pairwise
+factorization excludes a class of real incoherence; two constants in the design are set by hand rather than
+derived; and the natural-corpus results bound usefulness rather than correctness.
+
+\emph{Sentence-level cohesion is outside the model, and readers do not treat it as outside coherence.} The human
+study of \S\ref{sec-human-study} validates the \textsc{control} invariance requirement --- six of eight ratings
+call a \sense{Precedence}$\leftrightarrow$\sense{Succession} swap equal --- and refutes the \textsc{order} one:
+not one of eight ratings called a sentence-shuffled pair equal, and readers named dangling anaphora, a
+referential defect that leaves the claim set and every relation untouched. Because assertion order enters
+Eq.~\ref{eq-joint} only through which pairs are related (Rem.~\ref{rem-order}), this is unrepresentable rather
+than badly estimated, exactly as the $k$-ary case below is. The $20/20$ invariance figure on \textsc{order} is
+therefore a blind spot and not a human-referenced result, and the invariance claim should rest on
+\textsc{control}.
+
+On the natural-corpus point: the factuality sample carries human labels at the \emph{atom} level only, so it
 supports the discriminative-power comparison of \S\ref{sec-factuality-corpora} and the stage-one check, but it
 cannot rank measures by agreement with human coherence judgements, which no corpus we know of supplies at this
 response length. The uniform-prior ($\pi_i\equiv\tfrac12$) condition has been run on that sample under
 \emph{both} miners (Table~\ref{tab:fc-ablation}), which settles the inheritance question; what it cannot
-settle is whether either configuration agrees with human judgement, for the reason just given. The remaining
-gap is therefore an addition to the corpus rather than to the model: coherence labels at the response level,
-which would turn the discriminative-power comparison into a correctness one.
+settle is whether either configuration agrees with human judgement, for the reason just given. The ladder study
+supplies response-level human judgement at small scale --- $56$ ratings over $14$ screens --- which is enough to
+validate the declared orderings and not enough to rank measures: the mined arms reach $3/12$ to $7/12$ against
+the human majority there, below the gold graph's $9/12$ and not above the strongest baseline. The remaining gap
+is therefore an addition to the corpus rather than to the model: response-level coherence labels at scale, which
+would turn the discriminative-power comparison into a correctness one.
 
 \begin{proposition}[Jointly inconsistent, pairwise consistent]
 \label{prop-kary}
@@ -2358,8 +2579,9 @@ enforced. Both defects are expressible as first-order rules in the Markov logic 
 Rem.~\ref{rem-closed}'s closure guarantee is exactly what buys tractability and what costs us this defect. Two constants
 remain hand-set ($\lambda=0.45$ and the resolver heuristic), and production inference is weighted mini-bucket at
 i-bound $6$ against $2^n$ enumeration ($n\le20$), an approximation we have not characterized. At $52\%$ coupling F1 at best roughly half a mined network's factors are wrong or missing, so
-mined-source numbers measure current extraction quality rather than the measure's ceiling; human scoring of the
-invariance rungs, human correlation generally, and judge dependence ($42$ points between judges) remain open,
+mined-source numbers measure current extraction quality rather than the measure's ceiling. Human scoring of the
+invariance rungs is no longer open --- \S\ref{sec-human-study} reports it, and it found one requirement validated
+and one refuted --- but human correlation at scale and judge dependence ($42$ points between judges) remain so,
 and the corpus is LLM-generated throughout.
 
 \section{Conclusion}
@@ -2433,9 +2655,18 @@ own. We take responsibility for the final content of this work.
 
 \subsection*{Ethics statement}
 
-This work involves no human subjects and no personally identifying data. The fixtures include a
-summary of a published appellate judgment, used as a worked example of ordering-dependent coherence;
-it is a matter of public record and no private individual is the subject of analysis. The principal
+The human study of \S\ref{sec-human-study} involved four annotators, who judged which of two
+machine-generated responses was more logically coherent and wrote a free-text reason. No personal data
+was collected and none is released: the study records carry only an annotator label (\textsf{A1} to
+\textsf{A4}), assigned by the import tooling so that no account identifier or email address reaches a
+results file. The material judged was LLM-generated expository prose on neutral technical topics, with
+no content about identifiable people. %% TODO(authors): state the consent and IRB/ethics-review status
+%% of the four annotators, whether they were compensated or are co-authors, and add an
+%% acknowledgement if appropriate. Left as a marker rather than asserted, since the record does not
+%% establish it.
+The fixtures include a summary of a published appellate judgment, used as a worked example of
+ordering-dependent coherence; it is a matter of public record and no private individual is the subject
+of analysis. The principal
 ethical risk is misreading: a coherence score is not a truth score, and a response can be perfectly
 coherent and entirely false. That is precisely why \S\ref{sec-twostage} keeps the two axes
 separable, and we caution against deploying $\LCS$ alone as a factuality filter --- a fluent,
@@ -2478,7 +2709,9 @@ only names.
 
 \paragraph{The problem it solves.} Evaluating a coherence measure requires knowing which of two
 responses is more coherent --- exactly what no natural corpus supplies, since human judgements are
-expensive, disagree, and do not say \emph{why} one text is worse. Perturbing a document and assuming
+expensive, disagree, and do not say \emph{why} one text is worse. Our own study puts numbers on the
+first two: a median of $15.5$ minutes per screen, and $\alpha=0.748$ with two of fourteen screens
+drawing no majority at all (\S\ref{sec-human-study}). Perturbing a document and assuming
 the perturbation hurt is weaker than it looks: the edit lands on raw text and its effect on the thing
 being measured goes unverified. LoCoBench inverts that. Perturbations apply to a \emph{declared
 relation graph} rather than to prose, so each edit's intended effect is known per item before any text
@@ -3317,6 +3550,7 @@ asserted; \S\ref{sec-experiments} reports both.
 
 
 \subsection{Counting failures}
+\label{app-mining-failures}
 
 \paragraph{Failures must be counted, not absorbed.} Mining issues one LLM call per candidate pair for
 Prompt A and one more for each pair that yields an edge, run concurrently under a rate limit. A
@@ -3348,14 +3582,17 @@ mixture.
 \label{app-protocol}
 %% ================================================================
 
-\subsection{The five baseline families}
+\subsection{What each family is diagnostic of}
+\label{app-baseline-families}
 
 A coherence measure should be compared against controls chosen to fail in informative ways. We
 describe five families and state what each is diagnostic of. Four are implemented and share the
 LCS's own decomposition --- each baseline is handed the same atoms the LCS was scored on and, like
 the coherence MRF, consults no retrieved evidence --- so the comparison is an ablation rather than a
 separate experiment. Metrics requiring a source document or a reference are therefore excluded by
-construction, and we say so where the exclusion is not obvious.
+construction, and we say so where the exclusion is not obvious. \S\ref{sec-baselines-what} states
+what each column computes; the subsections after this one state how, in enough detail to
+reimplement.
 
 \begin{enumerate}[leftmargin=1.6em,itemsep=2pt,topsep=3pt]
 \item \emph{Ladder-blind controls}: claim count, relation count, response length, and number of
@@ -3366,41 +3603,40 @@ construction, and we say so where the exclusion is not obvious.
   introduce intra-system correlation and bias matrices to identify measures whose apparent
   performance comes from system-level confounders; we adopt the controls in that spirit. A control
   that \emph{succeeds} is bad news for the item, not good news for the control, and
-  \S\ref{app-protocol} reports one such case.
-\item \emph{Local contradiction detection}: pairwise NLI over claim pairs with no global model, scored
-  as one minus the fraction of pairs labelled contradictory, in the spirit of SelfCheckGPT's NLI
-  variant \citep{selfcheckgpt}. This isolates precisely what joint inference adds over local
-  detection. The prediction is that it does creditably where the defect is a \emph{present}
-  contradiction and poorly where the defect is a \emph{missing} entailment, since a broken chain has
-  no contradictory pair to find. We run it with the same NLI extractor as \S\ref{app-stage1},
-  over the same atoms, so the only differences from the LCS are relation \emph{typing} and
-  \emph{propagation}.
-
-\item \emph{Structured reasoning consistency}: ROSCOE's Self-Consistency \citep{roscoe},
-  $1-\max_{i}\max_{j<i} p_{\mathrm{contr}}(h_i,h_j)$, which is evidence-free like ours but differs
-  in three separable ways --- it is a \emph{maximum}, so a second conflict changes nothing; it is
-  \emph{forward-only}, so a relation running backward in claim order is unreachable (\S\ref{sec-mining}
-  measures $105$ of $603$ gold relations as both directed and backward); and it is \emph{untyped}. We
-  therefore also report a mean-aggregated and a symmetric variant, which turn one baseline into an
-  ablation identifying \emph{which} of the three differences accounts for any gap. ROSCOE targets
-  step-by-step reasoning chains, and a long-form response is not a chain, so we label it adapted.
+  \S\ref{app-baseline-prior} reports one such case.
+\item \emph{Local contradiction detection}: pairwise NLI over claim pairs with no global model, in
+  the spirit of SelfCheckGPT's NLI variant \citep{selfcheckgpt}. This isolates precisely what joint
+  inference adds over local detection. The prediction is that it does creditably where the defect is
+  a \emph{present} contradiction and poorly where the defect is a \emph{missing} entailment, since a
+  broken chain has no contradictory pair to find. We run it with the same NLI extractor as
+  \S\ref{app-stage1}, over the same atoms, so the only differences from the LCS are relation
+  \emph{typing} and \emph{propagation}.
+\item \emph{Structured reasoning consistency}: ROSCOE's Self-Consistency \citep{roscoe}, which is
+  evidence-free like ours but differs in three separable ways --- it is a \emph{maximum}, so a second
+  conflict changes nothing; it is \emph{forward-only}, so a relation running backward in claim order
+  is unreachable (\S\ref{sec-mining} measures $105$ of $603$ gold relations as both directed and
+  backward); and it is \emph{untyped}. We therefore also report a mean-aggregated variant, and
+  implement a symmetric one, which turn one baseline into an ablation identifying \emph{which} of the
+  three differences accounts for any gap. ROSCOE targets step-by-step reasoning chains, and a
+  long-form response is not a chain, so we label it adapted.
 \item \emph{LLM judges}: G-Eval's coherence dimension \citep{geval}, with the SummEval coherence
   rubric \citep{summeval}, and a direct ``rate the logical coherence from 1 to 5'' prompt as the
   no-rubric control. These are the practical incumbent and the comparison reviewers will want. The
   ladder is a demanding test for them, since consecutive rungs differ by a few words, so a judge must
   be sensitive at very small edit distances while remaining flat where meaning is preserved. We report
   each judge as a mean over five runs with its standard deviation, because the determinism of
-  Remark~\ref{rem-order} is only an advantage next to a measurement of the judge's instability, and
-  because a spread wider than the gap being discussed bounds what the comparison can conclude.
+  Rem.~\ref{rem-order} is only an advantage next to a measurement of the judge's instability, and
+  because a spread wider than the gap being discussed bounds what the comparison can conclude ---
+  though \S\ref{app-baseline-judges} reports that how much it bounds depends sharply on the backend.
 \item \emph{Discourse representations}: DiscoScore \citep{discoscore}, with an entity-grid model
   \citep{barzilay} as the classical reference. DiscoScore is presented as reference-based and most of
   its variants consume a reference, which a standalone response does not have; three of them
   (\textsc{rc}, \textsc{lc} and \textsc{EntityGraph}) ignore the reference argument entirely and score
   a single document, and those are the three we use --- the last of which \emph{is} an entity grid,
-  so the classical reference comes from the same implementation. All three reduce to noun-lemma
+  so the classical reference comes from the same definition. All three reduce to noun-lemma
   repetition across sentences, with no representation of entailment or contradiction, which makes
   them a sharp test of whether coherence is separable from \emph{cohesion} rather than a weak
-  competitor: \S\ref{app-protocol} reports a pair of responses with identical nouns and
+  competitor: \S\ref{app-baseline-prior} reports a pair of responses with identical nouns and
   identical repetition structure, one self-consistent and one self-contradictory, on which all three
   are exactly flat.
 \item \emph{Internal ablations}: uniform versus factuality priors (\S\ref{sec-twostage}); the four
@@ -3429,7 +3665,327 @@ probabilistic inference, so a local conflict cannot propagate; it retains only f
 located.
 
 
+\subsection{The shared interface, and what ``the same input'' means}
+\label{app-baseline-interface}
+
+Every baseline implements one method, \texttt{score(atoms, response)}, returning a single scalar in
+$[0,1]$ with higher meaning more coherent, so the ladder scorer reads a baseline column exactly as it
+reads an LCS column. The record it returns carries four fields beyond the score, and two of them are
+load-bearing for the claim that this is an ablation.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt,topsep=3pt]
+\item \texttt{score}: the value, or \emph{nothing at all}. An abstention is represented distinctly
+  from $0.0$ throughout. This is not fastidiousness: $0.0$ is a real score meaning ``maximally
+  incoherent'', so collapsing the two would let an infrastructure failure --- a throttled endpoint, an
+  unparseable generation --- read as a confident verdict of incoherence, and a run against a degraded
+  endpoint would report systematically lower coherence rather than reporting that it failed.
+\item \texttt{atoms\_scored} and \texttt{pairs\_scored}: how many atoms the baseline saw and how many
+  claim pairs it actually evaluated. These are recorded on every row so a report can \emph{prove} the
+  arms shared one decomposition. Without them the comparison is an assertion; with them it is
+  checkable, and a coverage difference --- the thing most likely to differ silently between two
+  quadratic-cost arms --- shows up as a number rather than as a discrepancy nobody looks for.
+\item \texttt{diagnostics}: per-baseline extras (the raw unnormalized quantity, per-pair labels, the
+  argmax pair, the call-failure count, wall-clock). Never required to read the table; the first place
+  to look when a number surprises.
+\end{itemize}
+
+The abstention rules, collected in one place, are: fewer than two atoms, for any pairwise baseline
+(a contradiction rate over zero pairs is undefined, and returning $1.0$ there would score a
+single-claim response as perfectly coherent --- the same vacuity trap \S\ref{app-readouts} identifies
+for the ``all relations satisfied'' readout); every call in the batch failed to parse; no rating found
+in a judge's completion; an empty noun grid; an empty response. In each case the row records a reason
+string, and the report counts abstentions separately rather than imputing a value.
+
+\paragraph{One asymmetry, stated plainly.} The two judges and the three discourse metrics accept the
+atom list and \emph{ignore} it: they read the response prose. So for five of the ten published columns
+the input is not held fixed with the LCS's decomposition, and those comparisons are correspondingly
+less controlled --- a judge could in principle be reading something the atomizer discarded. The five
+NLI-based and count-based columns do consume the atoms, and for those the ablation claim is exact. We
+prefer stating this to quietly describing all ten columns as seeing the same input.
+
+
+\subsection{Ladder-blind controls}
+\label{app-baseline-controls}
+
+Three controls are implemented, computed with no model at all.
+
+\emph{Claim count} is $\min(1,\,n/64)$, where $n$ counts atoms with non-blank text. \emph{Response
+length} is $\min(1,\,|\mathrm{tok}(r)|/1024)$, where $\mathrm{tok}$ splits on runs of non-word
+characters and drops empties. The two saturation constants are set well above the corpus --- the
+ladder items carry sixteen claims and a few hundred tokens --- so that the normalization is never
+clipping in the range where the comparison happens; a sixteen-claim, $646$-token response scores
+$0.250$ and $0.631$ respectively, both comfortably interior. \emph{Edit distance} is Python's
+\texttt{SequenceMatcher} similarity ratio against a reference response, and abstains when no reference
+is supplied.
+
+Edit distance deserves a word because it is the sharpest control available for a perturbation ladder
+and yet is absent from Table~\ref{tab:summary-mined}. A ladder family is built by applying operators
+to a base response, so similarity to that base is very nearly a count of the operators applied, and a
+measure tracking it would reproduce a declared ordering while knowing nothing about coherence. It is
+implemented and exported; the ladder driver instantiates only the two controls that need no reference,
+so the published table carries claim count and length. We report this rather than leaving the reader
+to infer that only two controls exist.
+
+\paragraph{Why these scores carry no direction.} A control has to be mapped into ``higher = more
+coherent'' to sit in the same table as the other columns, and for these quantities no such mapping is
+defensible: there is no reason a longer response should be more coherent, or less. Rather than pick a
+direction and quietly encode a hypothesis, each control reports its raw quantity in diagnostics and a
+normalized score whose only guarantee is \emph{monotonicity} in that quantity. A control's ordering
+cell is therefore a test of whether the control \emph{tracks} the declared ordering, in either
+direction --- not of whether it agrees with it. This is what makes a passing control bad news.
+
+\begin{example}[Controls are blind by construction]
+Take a three-claim, $40$-token response and an expanded paraphrase asserting the same content in six
+claims and $80$ tokens. Claim count moves from $3/64=0.047$ to $6/64=0.094$ and length from
+$40/1024=0.039$ to $80/1024=0.078$: both double. Neither response is more coherent than the other, and
+no operation on the claim set has occurred beyond restating it. Conversely, a perturbation that
+reorders two sentences leaves both controls exactly fixed, whatever it does to the argument. The
+ladder corpus is built so that the second case is the norm: every rung of a family shares one claim
+set, so claim count is flat within a family by construction, which is why it scores $20/20$ on
+invariance and $0/50$ on ordering.
+\end{example}
+
+
+\subsection{Local contradiction detection}
+\label{app-baseline-contradiction}
+
+The score is one minus the fraction of claim pairs the NLI extractor labels contradictory,
+\begin{equation}
+\textsc{contradiction rate} \;=\; 1 \;-\; \frac{\bigl|\{(i,j) : \hat{y}_{ij} = \con\}\bigr|}
+                                               {\bigl|\{(i,j) : \hat{y}_{ij} \ \text{parsed}\}\bigr|},
+\label{eq-contradiction-rate}
+\end{equation}
+taken over all $\binom{n}{2}$ unordered pairs $i<j$. Only one arc per pair is scored: contradiction is
+symmetric in the sense this baseline cares about --- if $a_i$ contradicts $a_j$ then $a_j$ contradicts
+$a_i$ --- so scoring both would double the cost and change nothing. Baselines that are deliberately
+directional do their own enumeration (\S\ref{app-baseline-roscoe}).
+
+Three implementation points determine what the number means.
+
+\emph{The denominator counts parsed verdicts, not issued calls.} A call that failed, or returned a
+verdict with no readable label, is counted in a separate failure tally and \emph{excluded} from both
+numerator and denominator. An unparseable verdict is a missing measurement, not evidence of
+consistency, and \S\ref{app-baseline-cost} explains why the alternative is actively dangerous for this
+particular estimator.
+
+\emph{A soft variant is available and is not the headline.} Accumulating each flagged pair's
+contradiction \emph{probability} instead of counting labels is the obvious refinement, and it is
+implemented, because it separates two different failures: mislabelling pairs, versus labelling them
+correctly but aggregating badly. The label-counting form is what we report, because it is the form the
+literature actually runs, and beating a refinement nobody uses would be a straw man.
+
+\emph{It is ungrounded on purpose.} The extractor can be given the response as context, prepended to
+the premise, matching the relation miner's response-grounded regime (\S\ref{sec-mining}). That switch
+is off. The point of this column is to be the ungrounded \emph{local} comparison; grounding it would
+quietly turn it into a different and better method, and the gap we want to measure is the one
+attributable to typing and propagation alone.
+
+\begin{example}[The rate accumulates; the maximum will not]
+\label{ex-rate-accumulates}
+Four claims give $\binom{4}{2}=6$ pairs. Plant one contradictory pair: the score is
+$1-\tfrac{1}{6}=0.833$. Plant a second, elsewhere in the response: $1-\tfrac{2}{6}=0.667$. The measure
+falls again, as it should --- two independent conflicts are worse than one. Hold this example; the same
+two responses are what separate ROSCOE's two aggregations in Ex.~\ref{ex-max-saturates}. Now suppose
+instead that the defect is a \emph{missing} entailment: claim $a_4$ is asserted but nothing in the
+response supports it, and no pair anywhere contradicts. Every pair is labelled neutral, the rate is
+$0$, and the score is exactly $1.0$ --- a perfect verdict on a response whose support chain is broken.
+This is the predicted failure of \S\ref{app-baseline-families}, and it is structural rather than an
+accuracy problem: there is no contradictory pair to find.
+\end{example}
+
+
+\subsection{ROSCOE Self-Consistency, and its ablation arms}
+\label{app-baseline-roscoe}
+
+The published measure is
+\begin{equation}
+\mathrm{SC} \;=\; 1 \;-\; \max_{i=2..n}\ \max_{j<i}\ p_{\mathrm{contr}}(h_i, h_j),
+\label{eq-roscoe-sc}
+\end{equation}
+with our atoms substituted for ROSCOE's reasoning steps. The arcs are enumerated exactly as written:
+for each $i$ from $1$ to $n-1$ and each $j<i$, one call with $a_i$ as premise and $a_j$ as
+hypothesis --- $\binom{n}{2}$ backward-directed questions. The symmetric arm additionally enqueues
+$(j,i)$, giving $n(n-1)$ calls and removing the structural blindness to backward relations.
+
+\paragraph{Reading a contradiction probability, and why non-contradictions contribute exactly zero.}
+Our extractor reports the probability of \emph{the label it emitted}, not a distribution over all
+three labels (\S\ref{app-stage1}). So when the emitted label is entailment or neutral there is no
+contradiction mass to read, and we take $p_{\mathrm{contr}}=0$ exactly. This is the only sound reading
+available: the model's stated verdict is ``not a contradiction'', and manufacturing a residual such as
+$1-p(\text{entailment})$ would fabricate a number the extractor never produced. A verdict with no
+label at all is a failure, counted and excluded. The consequence matters for interpreting the mean
+arm: it is a mean over a vector that is mostly exact zeros, so it behaves like a contradiction
+\emph{density} rather than like an average severity.
+
+\begin{example}[The maximum saturates where the mean accumulates]
+\label{ex-max-saturates}
+Take the two responses of Ex.~\ref{ex-rate-accumulates}, with $p_{\mathrm{contr}}=0.9$ on each planted
+pair and $0$ on the rest of the six. With one planted pair, $\max = 0.9$ and the score is $0.100$; the
+mean is $0.9/6 = 0.15$ and the score is $0.850$. Add the second planted pair: the maximum is
+\emph{still} $0.9$, so the score is \emph{still} $0.100$, while the mean rises to $1.8/6=0.3$ and the
+score falls to $0.700$. One arrangement of the same evidence registers the second conflict and the
+other cannot. On the seventy ladder items this is not a hypothetical: the published max arm is pinned
+at the floor --- exactly constant at zero under \texttt{llama-3.3-70b}, and under
+\texttt{gpt-oss-120b} taking $18$ distinct values every one of which lies below $5\times10^{-7}$, so
+that at the $10^{-6}$ resolution the ordering axis uses it is a single value there too --- while the
+mean arm, over the \emph{same} pairwise probabilities, takes $57$ and $63$ distinct values at that
+same resolution. The ablation's answer is that aggregation, not direction, accounts for the gap.
+\end{example}
+
+The aggregation and the direction are exposed as options precisely so the three differences can be
+separated rather than merely described. Table~\ref{tab:summary-mined} carries the faithful max arm and
+the mean arm; the symmetric arm is implemented and instantiated by the fixture driver, and is not in
+the published table because the ladder driver builds the two aggregation arms only.
+
+
+\subsection{LLM judges}
+\label{app-baseline-judges}
+
+Both judges read the response as prose and return a $1$--$5$ rating rescaled by $(k-1)/4$. The G-Eval
+prompt reproduces the SummEval coherence rubric rather than paraphrasing it --- a rubric we invented
+would be a judge we tuned --- and the direct prompt differs from it only in carrying no rubric and
+asking for no reasoning, keeping the same scale and the same answer format so that the two differ on
+one axis. Both are reproduced verbatim in App.~\ref{app-prompts}.
+
+\paragraph{Parsing.} The rating is read with the pattern \texttt{\textbackslash[\,([1-5])\,\textbackslash]}
+and the \emph{last} match is taken. This is not a detail: both prompts end by giving an example
+(``\dots\ as a single digit in square brackets, for example [3]''), models on this stack routinely echo
+the instruction before answering, and taking the first match would read the prompt's own example as
+the judgement --- silently returning $3$ for every item. A bare standalone digit is accepted as a
+fallback, and anything else is an abstention rather than a low score.
+
+\paragraph{G-Eval's probability weighting.} Where the backend exposes logprobs we report
+$\sum_{k=1}^{5} k\,p(k)$ rather than the emitted integer. The distribution is read off the rating
+token's alternatives: we walk the per-token logprobs, keep the \emph{last} standalone token in
+$\{1,\dots,5\}$ --- the same last-match rule as the regex, and for the same reason, since
+reasoning-channel tokens precede the answer on this stack --- exponentiate its top-$k$ alternatives,
+keep those that are digits in range, and renormalize over them. Absent a rating token or usable
+alternatives, the judge falls back to the emitted integer and records that the fallback happened, so a
+weighted column cannot be confused with a half-weighted one. The weighting matters more here than in
+G-Eval's original setting: a $1$--$5$ integer scale is coarse, consecutive ladder rungs differ by a few
+words, and an unweighted judge returns the \emph{same} integer for every rung of a family --- its
+ordering agreement would then be decided by tie-breaking rather than by judgement.
+
+\paragraph{What the variance measurement actually found.} Every judge number is a mean over five runs
+(five is the floor; fewer cannot show a spread), with the standard deviation, minimum, maximum and the
+list of emitted integers travelling alongside it; a judge abstains only if all five runs abstain. The
+measurement is worth reporting because it came out differently on the two backends, and the difference
+changes what the spread can be used for. Under \texttt{llama-3.3-70b} the five runs return the
+\emph{same} integer on all seventy items for G-Eval and on sixty-nine of seventy for the direct judge,
+and the median recorded standard deviation is of order $10^{-10}$: what it measures there is jitter in
+the logprob-weighted expectation, not disagreement between runs. Under \texttt{gpt-oss-120b} the same
+judges are genuinely unstable --- only $20$ and $19$ of seventy items return five identical integers,
+and the median standard deviation is $0.100$ on a $[0,1]$ scale, wider than many of the gaps the table
+invites a reader to compare. So the spread bounds the comparison substantially on one backend and
+barely at all on the other, and a single reported standard deviation should not be read as a property
+of judges in general. Either way the determinism argument of Rem.~\ref{rem-order} rests on more than
+instability: a judge cannot say \emph{which} claim is responsible, which is the axis
+\S\ref{app-baseline-families} puts weight on.
+
+
+\subsection{Discourse representations}
+\label{app-baseline-discourse}
+
+\paragraph{Which of DiscoScore's metrics are usable, and why.} DiscoScore's scorer exposes every
+metric as \texttt{(sys, ref)}, but its methods differ in whether the reference is consulted.
+\textsc{rc}, \textsc{lc} and \textsc{EntityGraph} forward only \texttt{sys} and ignore \texttt{ref}
+entirely, so they are genuine single-document coherence measures and are directly comparable to the
+LCS. \textsc{LexicalGraph} requires external word vectors. The \textsc{DS\_Focus\_*} and
+\textsc{DS\_SENT\_*} families consume the reference, which a standalone response does not have. Hence
+three columns, the last of which \emph{is} the Barzilay--Lapata grid projected onto a sentence graph,
+so the classical entity-grid baseline needs no separate reimplementation.
+
+The three definitions, over the noun-lemma-by-sentence grid: \textsc{rc} is repeated noun mentions
+divided by distinct nouns; \textsc{lc} is the count of nouns occurring in more than one sentence
+divided by distinct nouns; \textsc{EntityGraph} is $\bigl(\sum_{\text{lemmas}} \sum_{i<j \in
+S(\ell)} 1/(j-i)\bigr) / |S|$, summing an adjacency weight over every pair of sentences sharing a
+lemma and averaging over sentences. \textsc{rc} and \textsc{EntityGraph} are \emph{not} bounded above
+by one.
+
+\paragraph{Which implementation produced the reported numbers.} Ours. \texttt{disco\_score} is not
+installable as a dependency: it is absent from PyPI, installs from a git URL, and calls
+\texttt{spacy\_udpipe.download("en")} at \emph{import} time, so importing it requires network access
+and makes the module unimportable offline. We therefore import it lazily and compute these three
+metrics from their definitions ourselves, and every reported discourse row records which path
+produced it; all of them record the local implementation. The approximation is in what counts as a
+noun: with no POS tagger, we take alphabetic tokens of at least four characters that are not in a
+$54$-word function-word list, split sentences on punctuation followed by whitespace, and fold plurals
+by stripping a trailing \texttt{s} unless the word ends in \texttt{ss}. This over-counts nouns. It
+over-counts them \emph{equally in both members of any compared pair}, which is what the argument
+needs: the claim being tested is about what these definitions can represent, not about reproducing
+DiscoScore's decimals, and the pair in \S\ref{app-baseline-prior} is noun-matched by construction.
+
+\paragraph{Clamping, and what it does to the entity-graph column.} Scores are clamped into $[0,1]$ for
+reporting, and both the raw value and a clamped flag are recorded so the clamping is visible rather
+than silent. For \textsc{EntityGraph} on the ladder corpus it is not a cosmetic step: the raw metric
+takes $62$ distinct values spanning $1.36$ to $4.93$ across the seventy items, and every one of them
+is clamped to $1.0$. Its perfect invariance score is therefore saturation above the reporting ceiling,
+not an inability to distinguish responses --- the mirror image of a maximum saturated at the floor, and
+a distinction \S\ref{sec-baselines-what} now draws. Because a clamped tie can hide a real ordering, the
+direction checks in our drivers compare on the \emph{raw} value wherever one is recorded; reporting the
+clamped tie instead would understate how wrong a cohesion metric gets the pair in
+\S\ref{sec-example-order}, where all three discourse metrics rank the adversarial summary above the
+faithful one.
+
+\paragraph{Abstention.} \textsc{rc} and \textsc{lc} divide by the number of distinct nouns and
+\textsc{EntityGraph} by the sentence count, so noun-free text divides by zero. That is ``no cohesion
+signal'', not ``incoherent'', and the baseline abstains.
+
+
+\subsection{Cost, throttling, and how failures are counted}
+\label{app-baseline-cost}
+
+The pairwise baselines issue $O(n^2)$ NLI calls per response: $120$ at the ladder's sixteen atoms,
+$528$ at the thirty-three of the longest fixture. That is the cost to keep in mind when comparing
+against the LCS, which issues one call per \emph{candidate pair} under a windowed policy and then
+performs inference over the mined relations only (\S\ref{sec-algo}).
+
+All of them route through one throttled batch path, sharing the pipeline's limiter --- a
+$1500$-requests-per-minute token bucket and a bounded in-flight ceiling --- rather than issuing
+$\binom{n}{2}$ sequential calls. Two properties of that path are worth recording.
+
+\emph{Each call is built from the extractor's own prompt and options, not a fixed prompt.} The NLI
+extractor's prompt varies with the estimation method (\S\ref{app-stage1}), and under the direct
+few-shot prompt it is precisely the prompt that makes the label probability informative rather than
+saturated. Hardcoding one prompt in the batch path would silently score the baselines under a
+different estimator than the LCS they are being compared against, which would invalidate the ablation
+while leaving every number looking plausible.
+
+\emph{A failed call is preserved as a failure.} The extractor's own batch helper maps a failed call
+onto a neutral verdict with probability one --- byte-identical to a genuine neutral. For a
+contradiction-\emph{rate} baseline that substitution is not neutral at all: a throttled call becomes
+evidence of ``no contradiction here'', so Eq.~\ref{eq-contradiction-rate} moves \emph{up} when the
+endpoint degrades, and a rate-limited run reports a \emph{more} coherent response than a healthy one.
+We therefore do not use it. The batch path returns a distinct failure sentinel that no caller can
+mistake for a label, every baseline excludes failures from its denominator and counts them, and a row
+whose calls all failed abstains. This is the same hazard the relation miner documents for mining,
+where a rate-limited call parsed as ``no relation'' costs recall silently, and it is why
+\S\ref{app-mining-failures}'s insistence that failures be counted rather than absorbed applies on the
+baseline side too.
+
+\emph{Verdicts are cached across arms.} The NLI-based columns ask the \emph{same} claim pairs: on a
+$26$-claim response the identical $325$ pairs would otherwise be scored once per arm. A verdict cache
+keyed on the model, the estimation method and the pair text makes the model see each distinct pair
+once. Failures are never written to it --- caching one would promote a transient throttle into a
+permanent stored verdict of ``no contradiction here'', which is the first hazard made durable.
+
+\paragraph{How a baseline column is scored against the ladder.} The corpus states its constraints per
+readout, because the LCS reports several; a baseline has one score, so only the readout-independent
+content transfers. C1 (strict increase between consecutive rungs) and C3 (endpoint separation, rung
+$0$ below rung $4$) apply directly, deduplicated across readouts, over the increase-type families
+\textsc{conflict} and \textsc{chain}: $50$ assertions. The invariance axis takes every declared rung
+pair of the invariance-type families \textsc{order} and \textsc{control}, satisfied when the score does
+not move: $20$ pairs. Two scores closer than $10^{-6}$ count as flat, so floating-point noise cannot
+pass for a strict increase --- and, on the invariance axis, so that jitter beneath that threshold
+counts as unchanged. C2 is \emph{excluded}: it predicts the internal behaviour of a particular readout
+(\S\ref{app-readouts}), which a single-score baseline makes no claim about, and scoring a baseline
+against it would credit or punish it for a property it never asserted. These are the same definitions
+used for the LCS arms, which is what makes the baseline rows and the LCS rows of
+Table~\ref{tab:summary-mined} commensurable.
+
+
 \subsection{What the baselines show before any ladder sweep}
+\label{app-baseline-prior}
 
 Two properties of these baselines are worth establishing before any ladder sweep, because both bear
 on what the comparison in \S\ref{sec-baselines-measured} can support.

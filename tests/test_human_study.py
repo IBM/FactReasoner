@@ -21,6 +21,7 @@ to be. Everything else in these scripts is presentation.
 
 from __future__ import annotations
 
+import collections
 import importlib.util
 import itertools
 import json
@@ -405,3 +406,184 @@ class TestLabelStudioImport:
         path.write_text(json.dumps(self._export()))
         with pytest.raises(SystemExit, match="not in"):
             imp.convert(str(path), str(tmp_path))
+
+
+class TestOneExportPerAnnotator:
+    """Per-project exports all say ``completed_by: 1`` while being different people.
+
+    This is the shape the LoCoBench study actually arrived in: four annotators, each
+    labelling in their own Label Studio project, so each export numbers its users from
+    scratch. Trusting ``completed_by`` there merges all four into one annotator holding
+    one rating per screen -- at which point Krippendorff's alpha is not low, it is
+    *undefined*, and the study looks like it produced no agreement data. So the merge must
+    be impossible to do by accident.
+    """
+
+    @pytest.fixture(scope="class")
+    def imp(self):
+        return _load("import_label_studio")
+
+    def _one_project_export(self, choice: str, screens=("s001", "s002")):
+        """An export from a project whose only user is id 1, as Label Studio emits it."""
+        tasks = []
+        for i, sid in enumerate(screens, 1):
+            tasks.append({
+                "id": i,
+                "data": {"screen_id": sid},
+                "annotations": [{
+                    "completed_by": 1,
+                    "was_cancelled": False,
+                    "lead_time": 120.0,
+                    "result": [{
+                        "from_name": "choice", "to_name": "response_a",
+                        "type": "choices", "value": {"choices": [choice]},
+                    }],
+                }],
+            })
+        return tasks
+
+    def test_force_label_keeps_same_id_exports_distinct(self, imp, tmp_path):
+        """``force_label`` overrides ``completed_by`` so each file is its own annotator."""
+        out = {}
+        for i, choice in enumerate(["A", "B", "equal", "A"], 1):
+            path = tmp_path / f"ann_{i}.json"
+            path.write_text(json.dumps(self._one_project_export(choice)))
+            got = imp.convert(str(path), str(tmp_path), force_label=f"A{i}")
+            assert list(got) == [f"A{i}"], (
+                f"file {i} was attributed to {list(got)}, not A{i}"
+            )
+            out.update(got)
+        assert sorted(out) == ["A1", "A2", "A3", "A4"]
+        # Each annotator rated each screen exactly once: the 4x2 design is intact.
+        for who, rows in out.items():
+            assert sorted(r["screen_id"] for r in rows) == ["s001", "s002"]
+
+    def test_trusting_completed_by_would_have_merged_them(self, imp, tmp_path):
+        """The failure this guards against, asserted so the guard cannot be removed.
+
+        Without ``force_label`` every file resolves to ``A1``, and a caller merging the
+        results gets one annotator with two ratings per screen instead of four with one.
+        """
+        merged: dict[str, list[dict]] = {}
+        shared: dict[str, str] = {}
+        for i, choice in enumerate(["A", "B"], 1):
+            path = tmp_path / f"ann_{i}.json"
+            path.write_text(json.dumps(self._one_project_export(choice)))
+            got = imp.convert(str(path), str(tmp_path), labels=shared)
+            assert list(got) == ["A1"], "per-project exports all report completed_by: 1"
+            for who, rows in got.items():
+                merged.setdefault(who, []).extend(rows)
+        assert list(merged) == ["A1"]
+        dup = [s for s, n in collections.Counter(
+            r["screen_id"] for r in merged["A1"]).items() if n > 1]
+        assert dup == ["s001", "s002"], (
+            "the merge should double-rate every screen under one label; this is what "
+            "main()'s duplicate check refuses"
+        )
+
+    def test_shared_labels_keep_numbering_across_files(self, imp, tmp_path):
+        """With a genuine multi-user project set, ids still map to stable labels."""
+        shared: dict[str, str] = {}
+        p1 = tmp_path / "a.json"
+        p1.write_text(json.dumps([{
+            "id": 1, "data": {"screen_id": "s001"},
+            "annotations": [{
+                "completed_by": 11, "was_cancelled": False,
+                "result": [{"from_name": "choice", "to_name": "response_a",
+                            "type": "choices", "value": {"choices": ["A"]}}],
+            }],
+        }]))
+        p2 = tmp_path / "b.json"
+        p2.write_text(json.dumps([{
+            "id": 2, "data": {"screen_id": "s001"},
+            "annotations": [{
+                "completed_by": 22, "was_cancelled": False,
+                "result": [{"from_name": "choice", "to_name": "response_a",
+                            "type": "choices", "value": {"choices": ["B"]}}],
+            }],
+        }]))
+        a = imp.convert(str(p1), str(tmp_path), labels=shared)
+        b = imp.convert(str(p2), str(tmp_path), labels=shared)
+        assert list(a) == ["A1"] and list(b) == ["A2"], (
+            "a second file's new user must get A2, not restart at A1"
+        )
+
+
+class TestStatisticalHelpers:
+    """The numbers quoted in the paper come from these three functions."""
+
+    @pytest.fixture(scope="class")
+    def mod(self):
+        return _load("analyze_human_study")
+
+    def test_binom_sf_against_hand_values(self, mod):
+        assert mod.binom_sf(0, 5, 0.5) == pytest.approx(1.0)
+        assert mod.binom_sf(5, 5, 0.5) == pytest.approx(1 / 32)
+        assert mod.binom_sf(3, 3, 1 / 3) == pytest.approx(1 / 27)
+        # The study's own figure, checked independently.
+        assert mod.binom_sf(8, 10, 1 / 3) == pytest.approx(0.00340395, abs=1e-8)
+
+    def test_fisher_matches_a_known_table(self, mod):
+        """The study's ORDER-vs-CONTROL table, verified against SciPy.
+
+        SciPy gives 0.006993006993 for [[0,8],[6,2]]. Pinned because an earlier
+        hand-rolled version of this function mishandled the fourth cell and returned the
+        one-sided tail (0.0035), which would have been published as a two-sided p.
+        """
+        assert mod.fisher_exact_two_sided(0, 8, 6, 2) == pytest.approx(
+            0.006993006993, abs=1e-9
+        )
+        # A table with no association sits at p = 1.
+        assert mod.fisher_exact_two_sided(2, 2, 2, 2) == pytest.approx(1.0)
+
+    def test_verdict_maps_score_difference_onto_the_randomized_side(self, mod):
+        """The export randomizes which side holds the higher rung; the map must follow it."""
+        assert mod.verdict_from_scores(0.10, 0.20, "B") == "B"
+        assert mod.verdict_from_scores(0.10, 0.20, "A") == "A"
+        # A lower score on the higher rung means the measure prefers the OTHER side.
+        assert mod.verdict_from_scores(0.20, 0.10, "B") == "A"
+        assert mod.verdict_from_scores(0.20, 0.10, "A") == "B"
+
+    def test_verdict_calls_a_sub_tolerance_difference_equal(self, mod):
+        """Float noise must not be scored as a preference, and "equal" is a real answer."""
+        assert mod.verdict_from_scores(0.5, 0.5 + 1e-9, "A") == "equal"
+        assert mod.verdict_from_scores(0.5, 0.5, "A") == "equal"
+        # Just past the tolerance is a preference. (0.5 + 1e-6 is not exactly 1e-6 away
+        # in binary floating point, so the boundary itself is probed with an exact pair.)
+        assert mod.verdict_from_scores(0.0, 1e-6, "A") == "equal"
+        assert mod.verdict_from_scores(0.5, 0.5 + 2e-6, "A") == "A"
+
+    def test_verdict_abstains_on_a_missing_score(self, mod):
+        assert mod.verdict_from_scores(None, 0.5, "A") is None
+        assert mod.verdict_from_scores(0.5, None, "A") is None
+
+    def test_tie_tolerance_matches_the_ladder_scorer(self, mod):
+        """A human-referenced column and a ladder column must use one tolerance."""
+        assert mod.TIE_TOLERANCE == 1e-6
+
+
+class TestInvarianceSplitIsNotPooled:
+    """The ORDER/CONTROL split is the study's main finding; guard the arithmetic."""
+
+    @pytest.fixture(scope="class")
+    def mod(self):
+        return _load("analyze_human_study")
+
+    def test_the_observed_split_is_significant_and_directional(self, mod):
+        """ORDER 0/8 equal against CONTROL 6/8 equal.
+
+        Pinned as a regression on the finding itself: if a future data or code change
+        makes these two ladders look alike, the paper's claim that one invariance
+        requirement is human-validated and the other is not has stopped being true.
+        """
+        p = mod.fisher_exact_two_sided(0, 8, 6, 2)
+        assert p < 0.05
+        assert p == pytest.approx(0.006993, abs=1e-6)
+
+    def test_pooling_would_have_hidden_it(self, mod):
+        """Pooled, the four invariance screens read as a single unremarkable fraction."""
+        pooled_equal, pooled_n = 0 + 6, 8 + 8
+        assert pooled_equal / pooled_n == pytest.approx(0.375)
+        # Split, the two halves are 0.0 and 0.75 -- nothing near the pooled 0.375.
+        assert 0 / 8 == 0.0
+        assert 6 / 8 == 0.75

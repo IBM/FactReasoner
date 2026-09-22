@@ -29,10 +29,28 @@ integer user id or as a nested object depending on version and export settings; 
 handled. Ids are mapped to stable ``A1``, ``A2``, ... labels in first-seen order so the
 output does not carry anyone's email address into a results file.
 
+ONE EXPORT PER ANNOTATOR IS A DIFFERENT CASE, and getting it wrong is silent. When each
+annotator labels in their own Label Studio *project*, every export numbers its own users
+from scratch, so all of them say ``completed_by: 1`` while being four different people.
+Deriving identity from that field would then collapse every annotator into a single ``A1``
+holding one rating per screen -- and Krippendorff's alpha over units with one rating each
+is not a low agreement score, it is undefined, so the study would appear to have produced
+no agreement data at all. ``--export`` is therefore repeatable, and with more than one
+export the annotator label comes from the FILE rather than from ``completed_by``
+(``--annotator-from`` overrides). Files are labelled in sorted-path order, so
+``annotation_x_1.json`` is ``A1``.
+
 Run::
 
+    # One export holding several annotators (identity from completed_by).
     python scripts/import_label_studio.py \\
         --export label_studio_export.json --study-dir artifacts/human_study
+
+    # One export per annotator (identity from the file).
+    python scripts/import_label_studio.py \\
+        --export annotation_locobench_1.json --export annotation_locobench_2.json \\
+        --export annotation_locobench_3.json --export annotation_locobench_4.json \\
+        --study-dir artifacts/human_study
 """
 
 from __future__ import annotations
@@ -123,13 +141,26 @@ def _flatten_result(result: list[dict]) -> dict:
     return out
 
 
-def convert(export_path: str, study_dir: str) -> dict[str, list[dict]]:
+def convert(
+    export_path: str,
+    study_dir: str,
+    *,
+    force_label: str | None = None,
+    labels: dict[str, str] | None = None,
+) -> dict[str, list[dict]]:
     """Read a Label Studio export and group flattened records by annotator.
 
     Args:
         export_path: The exported JSON file.
         study_dir: The study directory, used to sanity-check screen ids against
             ``answer_key.jsonl`` when that file is present.
+        force_label: When given, every annotation in this file is attributed to this
+            label and ``completed_by`` is ignored. This is the one-export-per-annotator
+            case: separate Label Studio projects each number their users from scratch, so
+            ``completed_by`` is ``1`` in all of them and cannot distinguish anyone.
+        labels: Shared accumulator mapping ``completed_by`` keys to labels, so a
+            multi-file import keeps one numbering across files instead of restarting at
+            ``A1`` in each. Ignored when ``force_label`` is set.
 
     Returns:
         ``{annotator_label: [record, ...]}``.
@@ -153,7 +184,8 @@ def convert(export_path: str, study_dir: str) -> dict[str, list[dict]]:
                     known.add(json.loads(line)["screen_id"])
 
     by_annotator: dict[str, list[dict]] = collections.defaultdict(list)
-    labels: dict[str, str] = {}
+    if labels is None:
+        labels = {}
     n_ann = 0
     for task in payload:
         data = task.get("data") or {}
@@ -186,7 +218,7 @@ def convert(export_path: str, study_dir: str) -> dict[str, list[dict]]:
                 )
             rec.pop("choice_label", None)
             rec["screen_id"] = sid
-            who = _annotator_label(ann.get("completed_by"), labels)
+            who = force_label or _annotator_label(ann.get("completed_by"), labels)
             # Label Studio's own timings, kept because they are free and tell us whether
             # a screen really took the ~5 minutes the design assumed.
             if ann.get("lead_time") is not None:
@@ -196,18 +228,74 @@ def convert(export_path: str, study_dir: str) -> dict[str, list[dict]]:
 
     if not n_ann:
         raise SystemExit(
-            "[label-studio] the export contains no completed annotations."
+            f"[label-studio] {export_path} contains no completed annotations."
         )
     return dict(by_annotator)
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--export", required=True, help="Label Studio JSON export.")
+    p.add_argument(
+        "--export",
+        required=True,
+        action="append",
+        help="Label Studio JSON export. Repeatable: pass it once per file when each "
+        "annotator labelled in their own project.",
+    )
+    p.add_argument(
+        "--annotator-from",
+        default="auto",
+        choices=("auto", "file", "completed_by"),
+        help="Where annotator identity comes from. 'auto' (default) uses the file when "
+        "several exports are given and completed_by when there is one. 'file' forces "
+        "one annotator per export -- needed when per-project exports all say "
+        "completed_by: 1. 'completed_by' forces the in-file id even across several "
+        "exports, for a set of exports from one project.",
+    )
     p.add_argument("--study-dir", default="artifacts/human_study")
     args = p.parse_args()
 
-    by_annotator = convert(args.export, args.study_dir)
+    exports = sorted(args.export)
+    if args.annotator_from == "file":
+        per_file = True
+    elif args.annotator_from == "completed_by":
+        per_file = False
+    else:
+        per_file = len(exports) > 1
+    print(
+        f"[label-studio] {len(exports)} export(s); annotator identity from "
+        f"{'the file' if per_file else 'completed_by'}."
+    )
+
+    by_annotator: dict[str, list[dict]] = collections.defaultdict(list)
+    shared_labels: dict[str, str] = {}
+    for i, path in enumerate(exports, 1):
+        got = convert(
+            path,
+            args.study_dir,
+            force_label=f"A{i}" if per_file else None,
+            labels=None if per_file else shared_labels,
+        )
+        for who, rows in got.items():
+            by_annotator[who].extend(rows)
+        if per_file:
+            print(f"[label-studio]   A{i} <- {os.path.basename(path)}")
+
+    # One label holding several ratings for one screen means two files were attributed to
+    # the same annotator -- the failure this flag exists to prevent. Catch it here rather
+    # than letting it surface as an undefined alpha downstream.
+    for who, rows in by_annotator.items():
+        dup = [s for s, n in collections.Counter(
+            r["screen_id"] for r in rows).items() if n > 1]
+        if dup:
+            raise SystemExit(
+                f"[label-studio] {who} has {len(dup)} screen(s) rated more than once "
+                f"({', '.join(sorted(dup)[:5])}...). Two exports were attributed to one "
+                "annotator. If each file is a different person, pass "
+                "--annotator-from file."
+            )
+
+    by_annotator = dict(by_annotator)
     for who, rows in sorted(by_annotator.items()):
         rows.sort(key=lambda r: r["screen_id"])
         path = os.path.join(args.study_dir, f"responses_{who}.jsonl")
