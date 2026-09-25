@@ -303,7 +303,7 @@ class TestNLIExtractorGetProbability:
         tokens (no trailing EOS element), so these fixtures do not add one.
         """
         out = MagicMock()
-        out._meta = {"oai_chat_response": {"choices": [{"logprobs": {"content": content}}]}}
+        out.raw.response = {"choices": [{"logprobs": {"content": content}}]}
         return out
 
     def _prob(self, content):
@@ -422,21 +422,19 @@ class TestNLIExtractorRun:
 
         mock_result = MagicMock()
         mock_result.__str__ = lambda self: "[entailment]"
-        mock_result._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {"token": "[", "logprob": -0.1},
-                                {"token": "ent", "logprob": -0.2},
-                                {"token": "]", "logprob": -0.1},
-                                {"token": "<eos>", "logprob": -0.1},
-                            ]
-                        }
+        mock_result.raw.response = {
+            "choices": [
+                {
+                    "logprobs": {
+                        "content": [
+                            {"token": "[", "logprob": -0.1},
+                            {"token": "ent", "logprob": -0.2},
+                            {"token": "]", "logprob": -0.1},
+                            {"token": "<eos>", "logprob": -0.1},
+                        ]
                     }
-                ]
-            }
+                }
+            ]
         }
 
         mock_output = MagicMock()
@@ -464,20 +462,18 @@ class TestNLIExtractorRun:
 
         mock_result = MagicMock()
         mock_result.__str__ = lambda self: '{"label": "contradiction"}'
-        mock_result._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {"token": '{"label": "', "logprob": -0.01},
-                                {"token": "contradiction", "logprob": -0.05},
-                                {"token": '"}', "logprob": -0.01},
-                            ]
-                        }
+        mock_result.raw.response = {
+            "choices": [
+                {
+                    "logprobs": {
+                        "content": [
+                            {"token": '{"label": "', "logprob": -0.01},
+                            {"token": "contradiction", "logprob": -0.05},
+                            {"token": '"}', "logprob": -0.01},
+                        ]
                     }
-                ]
-            }
+                }
+            ]
         }
 
         mock_output = MagicMock()
