@@ -15,13 +15,8 @@
 import asyncio
 import logging
 import re
-from concurrent.futures import (
-    ThreadPoolExecutor,
-    as_completed,
-)
-from concurrent.futures import (
-    TimeoutError as FuturesTimeoutError,
-)
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from io import BytesIO
 from itertools import islice
 from typing import Any
@@ -34,15 +29,10 @@ from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pymilvus import MilvusClient
+from pymilvus.model.dense import SentenceTransformerEmbeddingFunction
 from pypdf import PdfReader
 from tqdm import tqdm
-
-# chromadb is one of three retrieval backends (google / wikipedia / chromadb) and is
-# imported lazily inside ChromaReader rather than here. It is not a declared
-# dependency of this project at all: every release up to and including 1.5.9 (the
-# latest) carries unpatched critical advisories (CVE-2026-45829, CVE-2026-45833), so
-# users opt in explicitly with `pip install chromadb`. Importing it eagerly also made
-# every entry point -- including `fact-reasoner --help` -- depend on it.
 
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
@@ -51,13 +41,22 @@ from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.search_api import SearchAPI
 
+# chromadb is one of four retrieval backends (google / wikipedia / chromadb, milvus) and is
+# imported lazily inside ChromaReader rather than here. It is not a declared
+# dependency of this project at all: every release up to and including 1.5.9 (the
+# latest) carries unpatched critical advisories (CVE-2026-45829, CVE-2026-45833), so
+# users opt in explicitly with `pip install chromadb`. Importing it eagerly also made
+# every entry point -- including `fact-reasoner --help` -- depend on it.
+
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
 DEFAULT_COLLECTION_NAME = "lit_agent_demo"
 DEFAULT_DB_PATH = "/tmp/nasa_contrib/accelerated-discovery/chroma_db"
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "ibm-granite/granite-embedding-30m-english"
+
 NEWLINES_RE = re.compile(r"\n{2,}")  # two or more "\n" characters
 
 CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
@@ -220,7 +219,7 @@ def extract_text_from_url(url: str, max_pages: int = 1) -> str:
             response.close()
 
 
-def fetch_text_from_link(link: str, max_size = None) -> str:
+def fetch_text_from_link(link: str, max_size=None) -> str:
     logger.info(f"Fetching text from link: {link}")
     url_text = extract_text_from_url(url=link)
     if max_size is not None and len(url_text) > max_size:
@@ -246,14 +245,15 @@ def make_uniform(text: str) -> str:
     return " ".join(character_split_texts)
 
 
-class ChromaReader:
+class ChromaDBReader:
     def __init__(
         self,
         collection_name: str,
         persist_directory: str,
+        embedding_model: str = EMBEDDING_MODEL,
     ):
         """
-        Initialize the ChromaDB.
+        Initialize the VectorDB.
 
         Args:
             collection_name: str
@@ -261,9 +261,8 @@ class ChromaReader:
             persist_directory: str
                 The directory used for persisting the vector database.
             embedding_model: str
-                The embedding model.
-            collection_metadata: dict
-                A dict containing the collection metadata.
+                Sentence Transformers model used to embed queries. Must match
+                whatever indexed the collection.
         """
 
         try:
@@ -284,14 +283,12 @@ class ChromaReader:
         self.client = chromadb.PersistentClient(
             path=persist_directory, settings=ChromaSettings(anonymized_telemetry=False)
         )
-
         self.collection = self.client.get_collection(
             name=collection_name,
             embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name=EMBEDDING_MODEL
+                model_name=embedding_model
             ),
         )
-
         print(f"[ChromaDB] initialized with {self.collection.count()} items.")
 
     def is_empty(self):
@@ -311,6 +308,66 @@ class ChromaReader:
             The closest result to the given question.
         """
         return self.collection.query(query_texts=query_texts, n_results=n_results)
+
+
+class MilvusDBReader:
+    """
+    Reads a Milvus collection
+
+    Assumes the collection is already indexed with text and metadata fields already populated.
+    """
+
+    def __init__(
+        self,
+        collection_name: str,
+        persist_directory: str,
+        embedding_model: str = EMBEDDING_MODEL,
+    ):
+        """
+        Initialize the VectorDB.
+
+        Args:
+            collection_name: str
+                The collection name in the vector database.
+            persist_directory: str
+                The Milvus connection URI (``http://localhost:19530``) or a local Milvus Lite file path.
+            embedding_model: str
+                Sentence Transformers model used to embed queries. It should match
+                whatever model indexed the collection.
+        """
+        self.collection_name = collection_name
+        self.client = MilvusClient(uri=persist_directory)
+        self.client.load_collection(collection_name=collection_name)
+        self.embedding_fn = SentenceTransformerEmbeddingFunction(
+            model_name=embedding_model
+        )
+
+    def is_empty(self):
+        # Fetch fresh stats to check count
+        stats = self.client.get_collection_stats(collection_name=self.collection_name)
+        return int(stats.get("row_count", 0)) == 0
+
+    def query(self, query_texts: list[str], n_results: int = 5):
+        embedded_question = self.embedding_fn.encode_queries(query_texts)
+        search_results = self.client.search(
+            collection_name=self.collection_name,
+            data=embedded_question,
+            limit=n_results,
+            search_params={"metric_type": "IP", "params": {}},
+            output_fields=["text", "title", "source", "url"],
+        )
+        search_results = search_results[0] if search_results else []
+        documents = [hit["entity"]["text"] for hit in search_results]
+        metadatas = [
+            {
+                "title": hit["entity"].get("title", ""),
+                "source": hit["entity"].get("source", ""),
+                "url": hit["entity"].get("url", ""),
+            }
+            for hit in search_results
+        ]
+
+        return {"documents": [documents], "metadatas": [metadatas]}
 
 
 def is_content_valid(link: str, page_text: str) -> bool:
@@ -382,6 +439,7 @@ class SourceRetriever:
         query_builder: QueryBuilder = None,
         num_workers: int = 4,
         per_url_timeout: int = DEFAULT_PER_URL_TIMEOUT,
+        embedding_model: str | None = None,
     ):
         """
         Initialize the source retriever component.
@@ -411,6 +469,11 @@ class SourceRetriever:
             per_url_timeout: int
                 Wall-clock timeout (seconds) for each link fetch; hung fetches are
                 dropped and recorded as empty text.
+            embedding_model: str | None
+                Sentence Transformers model used to embed queries for
+                service_type in {chromadb, milvus}. Must match whatever
+                indexed the target collection. Defaults to the reader's own
+                default (EMBEDDING_MODEL) when None.
         """
 
         self.top_k = top_k
@@ -424,18 +487,31 @@ class SourceRetriever:
         self.query_builder = query_builder
         self.collection_name = collection_name
 
-        self.chromadb_retriever = None
+        self.vectordb_retriever = None
         self.langchain_retriever = None
         self.google_retriever = None
         self.in_memory_vectorstore = None
 
-        assert self.service_type in ["chromadb", "wikipedia", "google"]
+        assert self.service_type in ["chromadb", "milvus", "wikipedia", "google"]
+
+        # shared across chromadb/milvus so both take the same override
+        vectordb_kwargs = (
+            {} if embedding_model is None else {"embedding_model": embedding_model}
+        )
 
         if self.service_type == "chromadb":
-            self.chromadb_retriever = ChromaReader(
+            self.vectordb_retriever = ChromaDBReader(
                 collection_name=self.collection_name,
                 persist_directory=self.persist_dir,
+                **vectordb_kwargs,
             )
+        elif service_type == "milvus":
+            self.vectordb_retriever = MilvusDBReader(
+                collection_name=self.collection_name,
+                persist_directory=self.persist_dir,
+                **vectordb_kwargs,
+            )
+
         elif self.service_type == "wikipedia":
             # Create the Wikipedia retriever. Note that page content is capped
             # at 4000 chars. The metadata has a `title` and a `summary` of the page.
@@ -472,12 +548,12 @@ class SourceRetriever:
         """
 
         results = []
-        if self.service_type == "chromadb":
+        if self.service_type in ["chromadb", "milvus"]:
             logger.info(
                 f"Retrieving {self.top_k} relevant documents for query: {text} (service: {self.service_type})"
             )
 
-            relevant_chunks = self.chromadb_retriever.query(
+            relevant_chunks = self.vectordb_retriever.query(
                 query_texts=[text],
                 n_results=self.top_k,
             )
@@ -496,7 +572,8 @@ class SourceRetriever:
                     "title": metadata.get("title", "No Title Provided"),
                     "text": make_uniform(cleaned),
                     "snippet": snippet,
-                    "link": metadata.get("source", ""),
+                    # fall back to source if url not present
+                    "link": metadata.get("url") or metadata.get("source", ""),
                 }
                 passages.append(passage)
 
@@ -520,7 +597,12 @@ class SourceRetriever:
                 link = doc.metadata["source"]
                 doc_content = make_uniform(doc.page_content)
                 passages.append(
-                    {"title": title, "text": doc_content, "snippet": summary, "link": link}
+                    {
+                        "title": title,
+                        "text": doc_content,
+                        "snippet": summary,
+                        "link": link,
+                    }
                 )
 
             # Extract the top_k passages
@@ -648,7 +730,12 @@ class SourceRetriever:
                     count_content += 1
 
                 passages.append(
-                    {"title": title, "text": doc_content, "snippet": snippet, "link": link}
+                    {
+                        "title": title,
+                        "text": doc_content,
+                        "snippet": snippet,
+                        "link": link,
+                    }
                 )
 
             # --- Fallback to empty-content entries ---
