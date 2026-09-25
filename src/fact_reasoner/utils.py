@@ -343,14 +343,7 @@ def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
     Extract the per-token log probabilities from the output metadata.
 
     Returns the backend's token-level logprobs as a list of ``{"token", "logprob"}``
-    entries, normalized across the OpenAI / litellm / Bedrock response shapes.
-
-    Note: no tokens are dropped. Earlier versions stripped the last entry as an
-    "EOS" token, but OpenAI/vLLM ``content`` logprob arrays contain only emitted
-    content tokens (the stop is signaled by ``finish_reason``, not an extra
-    element), so blindly dropping the last entry deleted a real content token —
-    for NLI that was the token closing the ``[label]`` whose confidence is being
-    measured. Callers that want to ignore a trailing token must do so explicitly.
+    entries.
 
     Args:
         output: The output object containing the metadata with log probabilities.
@@ -359,51 +352,22 @@ def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
         A list of per-token logprob entries extracted from the output.
     """
 
-    # handle different logprobs formats across backends
+    raw = getattr(output, "raw", None)
+    raw_response = raw.response if raw is not None else None
     logprobs_object = (
-        output._meta.get("logprobs")
-        or output._meta.get("chat_response", {}).get("logprobs")
-        or output._meta.get("oai_chat_response", {})
-        .get("choices", [{}])[0]
-        .get("logprobs")
-        or output._meta.get("litellm_chat_response", {}).get("logprobs")
-        or (
-            output._meta.get("litellm_chat_response", {})
-            if isinstance(output._meta.get("litellm_chat_response"), dict)
-            else {}
-        )
-        .get("choices", [{}])[0]
-        .get("logprobs")
+        raw_response.get("choices", [{}])[0].get("logprobs")
+        if isinstance(raw_response, dict)
+        else None
     )
 
     assert logprobs_object is not None, (
         "logprobs missing from response. Ensure the backend supports logprobs."
     )
-
-    # handle openai/litllm logprobs format (dict with 'content' key) vs other backends (list of logprobs)
-    if isinstance(logprobs_object, dict):
-        if "content" not in logprobs_object:
-            raise ValueError(
-                "logprobs object missing 'content' key. Check backend response format."
-            )
-        logprobs_object = logprobs_object["content"]
-
-    if not isinstance(logprobs_object, list):
-        # If logprobs is not a list, it may be a ChoiceLogprobs object from litellm. Try to extract logprobs from it and massage into the format expected by the _get_probability() functions in Summarizer and NLI extractor  (list of dicts with 'token' and 'logprob' keys).
-        try:
-            from litellm.types.utils import ChoiceLogprobs  # type: ignore
-
-            if isinstance(logprobs_object, ChoiceLogprobs):
-                # logprobs_object = [
-                #     {"token": item.token, "logprob": item.logprob}
-                #     for item in logprobs_object.content  # drop EOS
-                # ]
-                logprobs_object = logprobs_object.content
-        except ImportError:
-            raise ValueError(
-                "Unable to extract logprobs: logprobs is not a recognized format (one of: list, dict with 'content' key) and litellm is not installed to validate possible litellm.types.utils.ChoiceLogprobs format. Check backend response format."
-            )
-    return logprobs_object
+    if "content" not in logprobs_object:
+        raise ValueError(
+            "logprobs object missing 'content' key. Check backend response format."
+        )
+    return logprobs_object["content"]
 
 
 def batcher(iterator, batch_size=4, progress=False):
