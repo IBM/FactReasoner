@@ -17,6 +17,8 @@
 
 import asyncio
 
+import pytest
+
 from fact_reasoner.utils import (
     dotdict,
     strip_string,
@@ -34,6 +36,7 @@ from fact_reasoner.utils import (
     batcher,
     run_throttled,
     gather_with_progress,
+    extract_logprobs_from_output,
 )
 
 
@@ -478,3 +481,53 @@ class TestGatherWithProgress:
 
     def test_empty_is_noop(self):
         assert asyncio.run(gather_with_progress([])) == []
+
+
+class _FakeRaw:
+    """Minimal stand-in for mellea's RawProviderResponse -- only the
+    `.response` attribute extract_logprobs_from_output() reads."""
+
+    def __init__(self, response=None):
+        self.response = response
+
+
+class _FakeOutput:
+    """Minimal stand-in for mellea's ModelOutputThunk, carrying only the
+    attribute extract_logprobs_from_output() reads."""
+
+    def __init__(self, raw_response=None):
+        self.raw = _FakeRaw(raw_response)
+
+
+class TestExtractLogprobsFromOutput:
+    """Tests for extract_logprobs_from_output.
+
+    Covers only `output.raw.response["choices"][0]["logprobs"]` -- the shape
+    mellea's OpenAIBackend produces, which is what all of FactReasoner's
+    rits/vllm/openai backend kinds resolve to (RITSBackend is a subclass of
+    OpenAIBackend, not a separate implementation). See the function's own
+    docstring for why no other shape is handled: none is reachable through
+    `build_backend` today.
+    """
+
+    def test_openai_shape_raw_response(self):
+        output = _FakeOutput(
+            raw_response={
+                "choices": [
+                    {"logprobs": {"content": [{"token": "a", "logprob": -0.1}]}}
+                ]
+            }
+        )
+        assert extract_logprobs_from_output(output) == [{"token": "a", "logprob": -0.1}]
+
+    def test_missing_logprobs_raises(self):
+        output = _FakeOutput()
+        with pytest.raises(AssertionError, match="logprobs missing"):
+            extract_logprobs_from_output(output)
+
+    def test_dict_without_content_key_raises(self):
+        output = _FakeOutput(
+            raw_response={"choices": [{"logprobs": {"unexpected": []}}]}
+        )
+        with pytest.raises(ValueError, match="'content' key"):
+            extract_logprobs_from_output(output)
