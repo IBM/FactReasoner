@@ -82,23 +82,21 @@ class TestContextSummarizerGetProbability:
 
         summarizer = ContextSummarizer(backend=mock_backend)
 
-        # Mirrors the real OpenAI backend shape: mellea stores
-        # ChatCompletion.model_dump() under "oai_chat_response", so logprobs
-        # live at oai_chat_response["choices"][0]["logprobs"]["content"].
+        # Mirrors the real OpenAI backend shape: mellea's OpenAIBackend stores
+        # ChatCompletion.model_dump() at output.raw.response, so logprobs live
+        # at raw.response["choices"][0]["logprobs"]["content"].
         mock_output = MagicMock()
-        mock_output._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {"token": "Test", "logprob": -0.5},
-                                {"token": "summary", "logprob": -0.3},
-                            ]
-                        }
+        mock_output.raw.response = {
+            "choices": [
+                {
+                    "logprobs": {
+                        "content": [
+                            {"token": "Test", "logprob": -0.5},
+                            {"token": "summary", "logprob": -0.3},
+                        ]
                     }
-                ]
-            }
+                }
+            ]
         }
 
         result = summarizer._get_probability(mock_output)
@@ -112,16 +110,14 @@ class TestContextSummarizerGetProbability:
         summarizer = ContextSummarizer(backend=mock_backend)
 
         mock_output = MagicMock()
-        mock_output._meta = {
-            "oai_chat_response": {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [],  # no tokens
-                        }
+        mock_output.raw.response = {
+            "choices": [
+                {
+                    "logprobs": {
+                        "content": [],  # no tokens
                     }
-                ]
-            }
+                }
+            ]
         }
 
         result = summarizer._get_probability(mock_output)

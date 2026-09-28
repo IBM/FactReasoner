@@ -29,6 +29,7 @@ These cover the deterministic parts of the coherence pipeline:
 import itertools
 import math
 import re
+from types import SimpleNamespace
 
 import pytest
 
@@ -754,18 +755,18 @@ class TestConditionalStrength:
 
 
 class _Thunk:
-    def __init__(self, text, meta=None):
+    def __init__(self, text, raw_response=None):
         self._text = text
-        self._meta = meta or {}
+        self.raw = SimpleNamespace(response=raw_response)
 
     def __str__(self):
         return self._text
 
 
 class _Sample:
-    def __init__(self, text, meta=None):
+    def __init__(self, text, raw_response=None):
         self.success = True
-        self.result = _Thunk(text, meta)
+        self.result = _Thunk(text, raw_response)
 
 
 def _is_surrogate_prompt(prompt) -> bool:
@@ -785,7 +786,7 @@ class TestMinerEndToEnd:
             uv = kw["user_variables"]
             if _is_surrogate_prompt(prompt):
                 word = "Yes" if surrogate_p_yes >= 0.5 else "No"
-                return _Sample(word, meta=_yesno_logprob_meta(surrogate_p_yes))
+                return _Sample(word, raw_response=_yesno_logprob_meta(surrogate_p_yes))
             if _is_strength_prompt(prompt):
                 return _Sample("Fairly likely. [p=0.70]")
             b = uv.get("atom_b", "")
@@ -915,7 +916,7 @@ class TestMinerEndToEnd:
         async def fake_ainstruct(prompt, **kw):
             uv = kw["user_variables"]
             if _is_surrogate_prompt(prompt):
-                return _Sample("Yes", meta=_yesno_logprob_meta(0.8))
+                return _Sample("Yes", raw_response=_yesno_logprob_meta(0.8))
             if _is_strength_prompt(prompt):
                 return _Sample("Likely. [p=0.70]")
             a, b = uv.get("atom_a", ""), uv.get("atom_b", "")
