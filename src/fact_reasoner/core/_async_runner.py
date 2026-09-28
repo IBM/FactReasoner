@@ -69,7 +69,13 @@ def run_coroutine(coro) -> object:
     same persistent loop, so they never encounter a closed loop.
     """
     loop = _get_loop()
-    # Make the persistent loop the "current" loop for this thread so that anyio's
-    # asyncio backend picks it up via asyncio.get_event_loop() when binding transports.
-    asyncio.set_event_loop(loop)
+    # Blocking on .result() from the runner's own thread would deadlock.
+    try:
+        running = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
+    if running is loop:
+        raise RuntimeError(
+            "run_coroutine() called from the async-runner loop; await the coroutine instead"
+        )
     return asyncio.run_coroutine_threadsafe(coro, loop).result()
