@@ -455,6 +455,14 @@ class FactReasoner:
 
                     # Set the new syntheric summaries
                     for context_id, result in zip(contexts_ids, results):
+                        if context_id not in self.contexts:
+                            # A context can be shared by several atoms (e.g. once
+                            # `remove_duplicated_contexts` repoints a duplicate's
+                            # owners at the surviving context). An earlier atom in
+                            # this same loop already dropped it; the dangling
+                            # reference left in this atom is swept below by
+                            # `prune_dangling_context_refs`.
+                            continue
                         is_relevant = is_relevant_context(result["summary"])
                         if result["summary"] != "" and is_relevant:
                             self.contexts[context_id].set_synthetic_summary(
