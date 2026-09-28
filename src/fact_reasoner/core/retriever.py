@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import logging
 import re
 from concurrent.futures import (
@@ -717,10 +716,8 @@ class ContextRetriever:
             and atom is not None
             and len(contexts) > 0
         ):
-            results = asyncio.run(
-                self.context_summarizer.run_batch(
-                    [c.get_text() for c in contexts], atom.text
-                )
+            results = self.context_summarizer.run(
+                [c.get_text() for c in contexts], atom.text
             )
             for context, result in zip(contexts, results):
                 if result["summary"]:
