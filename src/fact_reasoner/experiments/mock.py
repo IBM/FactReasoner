@@ -33,6 +33,7 @@
 import itertools
 import math
 from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
@@ -144,7 +145,7 @@ def yesno_logprob_meta(p_yes: float) -> Dict[str, Any]:
         "logprob": lp_yes if p_yes >= 0.5 else lp_no,
         "top_logprobs": top,
     }
-    return {"logprobs": {"content": [first]}}
+    return {"choices": [{"logprobs": {"content": [first]}}]}
 
 
 class _Thunk:
@@ -152,7 +153,7 @@ class _Thunk:
 
     def __init__(self, text: str, meta: Optional[Dict[str, Any]] = None):
         self._text = text
-        self._meta = meta or {}
+        self.raw = SimpleNamespace(response=meta)
 
     def __str__(self) -> str:
         return self._text
