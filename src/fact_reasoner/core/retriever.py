@@ -31,6 +31,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pymilvus import MilvusClient
 from pymilvus.model.dense import SentenceTransformerEmbeddingFunction
 from pypdf import PdfReader
+from tqdm import tqdm
 
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
