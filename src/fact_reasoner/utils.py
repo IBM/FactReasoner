@@ -345,6 +345,13 @@ def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
     Returns the backend's token-level logprobs as a list of ``{"token", "logprob"}``
     entries.
 
+    Note: no tokens are dropped, and whether the list ends with a stop token is
+    backend-dependent. OpenAI/vLLM ``content`` arrays usually hold only emitted
+    content tokens, but some backends (e.g. a Bedrock imported model via litellm)
+    append an end-of-turn token such as ``<|eot_id|>``. Callers that read the last
+    token must handle both; NLI label extraction is unaffected because it locates
+    the label by its brackets.
+
     Args:
         output: The output object containing the metadata with log probabilities.
 
