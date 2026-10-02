@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmark-generation harness.
+"""Benchmark harness.
 
 Builds frozen per-backend datasets so that retrieval backends can be compared on
-identical queries. This is generation tooling, kept separate from the production
-retrieval path::
+identical queries, and evaluates those frozen datasets. This is benchmarking
+tooling, kept separate from the production retrieval path::
 
     python -m fact_reasoner.benchmarks.build_ntrs_benchmark --help
+    python -m fact_reasoner.benchmarks.eval_ntrs_benchmark --help
 """
 
 from fact_reasoner.benchmarks.build_ntrs_benchmark import build_datasets
+from fact_reasoner.benchmarks.eval_ntrs_benchmark import evaluate, summarize
 
-__all__ = ["build_datasets"]
+__all__ = ["build_datasets", "evaluate", "summarize"]
