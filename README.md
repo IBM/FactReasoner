@@ -145,7 +145,7 @@ uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
 > No patched release exists, and an optional extra would not help: `uv lock` pins every
 > extra, so declaring it at all writes a vulnerable version into `uv.lock`.
 >
-> The other two retrievers (`google`, `wikipedia`) need no extra install. If you do want
+> The other retrievers (`google`, `wikipedia`, `ntrs`) need no extra install. If you do want
 > the ChromaDB backend, install it yourself and accept that risk:
 >
 > ```bash
@@ -377,7 +377,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 
 | Option | Meaning |
 |--------|---------|
-| `--service-type {google,wikipedia,chromadb}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`, `chromadb` needs a manual `pip install chromadb` — see the note above). |
+| `--service-type {google,wikipedia,chromadb,ntrs}` | Retrieval backend (default `google`; `google` needs `SERPER_API_KEY`, `chromadb` needs a manual `pip install chromadb` — see the note above; `ntrs` is a public API needing no key). |
 | `--top-k` | Contexts retrieved per atom (default 3). |
 | `--cache-dir` | Retriever cache directory. |
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
@@ -652,7 +652,7 @@ nli_extractor = NLIExtractor(backend)
 # The Retriever fetches evidence; ContextRetriever wraps it for parallel,
 # per-atom retrieval (optionally summarizing each context).
 retriever = SourceRetriever(
-    service_type="google",  # or "wikipedia", "chromadb"
+    service_type="google",  # or "wikipedia", "chromadb", "ntrs"
     top_k=5,
     fetch_text=True,
     query_builder=query_builder,
@@ -805,6 +805,24 @@ retriever = SourceRetriever(
 )
 ```
 
+### NASA Technical Reports Server (NTRS)
+
+A public API, so it needs no API key and no cache directory. Records without an abstract
+are skipped.
+
+```python
+retriever = SourceRetriever(
+    service_type="ntrs",
+    top_k=5
+)
+```
+
+NTRS is a keyword index that AND-matches every term, so natural-language queries match
+almost nothing. For benchmarking, queries are normalized deterministically — see
+[docs/NTRS_KEYWORD_NORMALIZATION.md](docs/NTRS_KEYWORD_NORMALIZATION.md) for the
+methodology and [docs/NTRS_BENCHMARK.md](docs/NTRS_BENCHMARK.md) for the Google-vs-NTRS
+retrieval benchmark.
+
 ### ChromaDB Vector Store
 
 Requires a manual `pip install chromadb`. It is not a dependency of this project and
@@ -927,6 +945,8 @@ FactReasoner/
 │   ├── markov_network.py     # Markov network + UAI serialization
 │   ├── fact_graph.py         # Graph representation
 │   ├── search_api.py         # Google Search API wrapper
+│   ├── ntrs_api.py           # NASA Technical Reports Server API client
+│   ├── ntrs_query.py         # Deterministic NTRS keyword normalization
 │   ├── utils.py              # Utility functions
 │   ├── core/
 │   │   ├── atomizer.py       # Atomic decomposition
@@ -936,10 +956,13 @@ FactReasoner/
 │   │   ├── nli.py            # NLI extraction
 │   │   ├── query_builder.py  # Search query generation
 │   │   └── utils.py          # Core utilities
-│   └── baselines/
-│       ├── factscore.py      # FactScore implementation
-│       ├── factverify.py     # FactVerify implementation
-│       └── veriscore.py      # VeriScore implementation
+│   ├── baselines/
+│   │   ├── factscore.py      # FactScore implementation
+│   │   ├── factverify.py     # FactVerify implementation
+│   │   └── veriscore.py      # VeriScore implementation
+│   └── benchmarks/
+│       ├── build_ntrs_benchmark.py  # Frozen per-backend dataset generation
+│       └── eval_ntrs_benchmark.py   # Frozen-dataset evaluation runner
 ├── scripts/
 │   └── run_vllm.bsub         # LSF template (local vLLM + fact-reasoner)
 ├── docs/
