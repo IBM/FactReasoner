@@ -84,7 +84,7 @@ class FactualityRunner:
         pipeline: Which assessor to run — one of ``PIPELINES``.
         pipeline_version: FactReasoner version (``v1``/``v2``/``v3``);
             ignored by the baselines.
-        service_type: Retrieval service (``google``/``wikipedia``/``chromadb``).
+        service_type: Retrieval service (``google``/``wikipedia``/``chromadb``/``ntrs``).
         cache_dir: Optional retriever cache directory.
         top_k: Top-k contexts retrieved per atom.
         num_workers: Parallelism for context retrieval.

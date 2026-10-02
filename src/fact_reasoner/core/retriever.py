@@ -48,6 +48,7 @@ from fact_reasoner.core.query_builder import QueryBuilder
 
 # Local imports
 from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.ntrs_api import NTRSAPI
 from fact_reasoner.search_api import SearchAPI
 
 logger = logging.getLogger(__name__)
@@ -387,7 +388,7 @@ class SourceRetriever:
 
         Args:
             service_type: str
-                The type of the source retriever (chromadb, wikipedia, google)
+                The type of the source retriever (chromadb, wikipedia, google, ntrs)
             collection_name: str
                 Name of the collection of documents stored in the vectorstore
             persist_directory: str
@@ -426,9 +427,10 @@ class SourceRetriever:
         self.chromadb_retriever = None
         self.langchain_retriever = None
         self.google_retriever = None
+        self.ntrs_retriever = None
         self.in_memory_vectorstore = None
 
-        assert self.service_type in ["chromadb", "wikipedia", "google"]
+        assert self.service_type in ["chromadb", "wikipedia", "google", "ntrs"]
 
         if self.service_type == "chromadb":
             self.chromadb_retriever = ChromaReader(
@@ -450,6 +452,9 @@ class SourceRetriever:
                 self.in_memory_vectorstore = InMemoryVectorStore(
                     HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
                 )
+        elif self.service_type == "ntrs":
+            # NTRS is a public API and does not require an API key or cache_dir.
+            self.ntrs_retriever = NTRSAPI()
         else:
             raise ValueError(f"Unknown retriever service: {self.service_type}")
 
@@ -665,6 +670,44 @@ class SourceRetriever:
                         }
                     )
                     count_content += 1
+
+            results.extend(passages)
+            logger.info(f"Retrieved {len(results)} results for query.")
+        elif self.service_type == "ntrs":
+            logger.info(
+                f"Retrieving {self.top_k} search results for: {text} (service: {self.service_type})"
+            )
+
+            if not text:
+                return results  # empty list
+
+            # Generate the query text if there is a query builder
+            if self.query_builder is not None:
+                query_text = self.query_builder.run(text)
+            else:
+                query_text = text
+
+            # Truncate the text if too long
+            query_text = query_text if len(query_text) < 2048 else query_text[:2048]
+            logger.info(f"Using query text: {query_text}")
+
+            # Get the search results. NTRS records without an abstract are
+            # already filtered out by NTRSAPI.get_snippets, so no fallback
+            # padding of empty-content entries is needed here.
+            search_results = self.ntrs_retriever.get_snippets(
+                [query_text], top_k=self.top_k
+            )
+            search_hits = search_results[query_text]
+
+            passages = [
+                {
+                    "title": hit["title"],
+                    "text": hit["snippet"],
+                    "snippet": hit["snippet"],
+                    "link": hit["link"],
+                }
+                for hit in search_hits[: self.top_k]
+            ]
 
             results.extend(passages)
             logger.info(f"Retrieved {len(results)} results for query.")
