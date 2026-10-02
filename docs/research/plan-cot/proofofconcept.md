@@ -1032,7 +1032,40 @@ hypotheses to validate on LLM continuations. Omitted strategy, wording, or execu
 state can invalidate them. Enrich the state or add shared latent variables when
 necessary. A later correction is a new node, never a backward causal arrow.
 
-### 11.2 Coherence-informed mechanisms
+### 11.2 Kernels: conditional distributions for generating a step
+
+A **probability kernel** is a rule that takes a parent context and returns a
+probability distribution over the next node's possible values. In this discrete
+SCM, $k_{\theta,t}(v\mid h)$ is the probability that step $t$ emits semantic
+state $v$ when its modeled parents have context $h$, under parameters $\theta$.
+For every admissible $h$,
+
+$$
+k_{\theta,t}(v\mid h)\geq0,
+\qquad
+\sum_{v\in\mathcal{V}_t}k_{\theta,t}(v\mid h)=1.
+$$
+
+The entire function is the kernel; one number such as
+$k_{\theta,t}(7\mid h)=0.925$ is one entry. For finite parent configurations,
+the kernel is a **conditional probability table**, with one normalized row per
+configuration. A formula or neural network can parameterize the same object when
+there are too many rows to store explicitly.
+
+Here $h=(x,v_{\operatorname{Pa}(t)})$ contains the fixed problem and the values
+of selected earlier parents; $v$ is a possible output, not an input to generation.
+The distribution concerns what the model **emits**, not whether that emission is
+true. Several sentences can express the same semantic value. A semantic kernel
+must account for their combined probability, and include `other` if its listed
+values do not exhaust the possible outputs.
+
+The kernel specifies a distribution; the structural equation
+$V_t=F_{\theta,t}^{-1}(U_t\mid h)$ turns one uniform noise draw into a value with
+that distribution. A kernel alone does not specify how one run responds across
+hypothetical parent assignments; the shared-noise construction adds that
+counterfactual assumption.
+
+**Constructing a kernel from coherence.**
 
 For each candidate state $v$, use the repository's probabilistic coherence model
 to query the proposition $F_v$ that its claim holds:
@@ -1041,7 +1074,7 @@ $$
 \begin{aligned}
 q_t(v;h)&=P_{\mathrm{coh},t}(F_v=1\mid E_t(h)),\\
 Q_t(v\mid h)&=\frac{q_t(v;h)+\varepsilon}
-{\sum_{v'\in\mathcal{V}_t}[q_t(v';h)+\varepsilon]},\qquad \varepsilon>0,\\
+{\sum_{v'\in\mathcal{V}_t}[q_t(v';h)+\varepsilon]},\qquad \varepsilon\geq0,\\
 k_{\theta,t}(v\mid h)&=\lambda_t Q_t(v\mid h)
  +(1-\lambda_t)b_{\eta,t}(v\mid h),\qquad 0\leq\lambda_t\leq1.
 \end{aligned}
@@ -1054,11 +1087,121 @@ model. Assign documented scores to non-claim states such as `other`; terminal
 rules override the mixture. Use the same construction for $Y$. Fit $\lambda_t$
 and $\eta$ rather than treating coherence marginals as observed emission rates.
 
+Choose $\varepsilon>0$ when smoothing is needed; $\varepsilon=0$ is valid when
+the denominator is positive, as in the numerical toy. The objects have distinct
+roles:
+
+| Object | What it supplies | Is it the modeled emission kernel? |
+|---|---|---|
+| $q_t(v;h)$ | A coherence marginal for each candidate proposition; scores need not sum to one | No |
+| $Q_t(\cdot\mid h)$ | The scores normalized over candidate states | Only if the behavioral model sets $\lambda_t=1$ |
+| $b_{\eta,t}(\cdot\mid h)$ | A separate normalized baseline for behavior not captured by $Q_t$ | It is one component |
+| $k_{\theta,t}(\cdot\mid h)$ | The normalized mixture used to sample the emitted state | Yes |
+
+Normalization of $k$ follows because both components sum to one and their weights
+sum to one. This does not establish that the kernel describes the LLM accurately;
+that requires continuation data. Nor does the mixture imply that the LLM literally
+flips a coin to choose between two internal reasoning strategies.
+
 The evidence construction matters: after an inserted subtotal of 15,
 “$15-5=10$” is compatible with that premise, whereas recomputing
 “$3\times4-5=7$” is supported by the original problem. Calculation and independent
 verification therefore require different coherence queries. This scorer
 parameterizes a proposed behavioral model; it is not assumed to run inside the LLM.
+
+**Numerical example: generating the first subtraction result.**
+
+The question is “three boxes contain four marbles each; remove five.” Let $N$
+be the emitted subtotal and $B$ the next emitted remaining count. For this
+example, restrict $N$ to $\{12,15\}$ and $B$ to $\{7,10\}$. These are the
+synthetic parameters of §4, not estimates from an LLM. Suppress the fixed prompt
+and parameter subscripts, so $k_B(b\mid n)$ denotes the kernel for $B$ under
+$N=n$.
+
+Use the unsmoothed coherence distribution, a prompt-only baseline
+$b_{\eta,B}(7\mid h)=1$, and weight $\lambda_B=0.75$:
+
+| Parent subtotal $n$ | $Q_B(7\mid n)$ | $Q_B(10\mid n)$ | $k_B(7\mid n)$ | $k_B(10\mid n)$ |
+|---|---:|---:|---:|---:|
+| 12 | 0.9 | 0.1 | 0.925 | 0.075 |
+| 15 | 0.1 | 0.9 | 0.325 | 0.675 |
+
+For example, the second row is
+
+$$
+\begin{aligned}
+k_B(7\mid15)&=0.75\times0.1+0.25\times1=0.325,\\
+k_B(10\mid15)&=0.75\times0.9+0.25\times0=0.675.
+\end{aligned}
+$$
+
+Given the wrong subtotal 15, the locally coherent subtraction yields 10, so it
+receives most of the probability. The baseline still allows recovery of 7 from
+the prompt. Across repeated continuations in this synthetic model, 32.5% emit 7
+and 67.5% emit 10 at this boundary. This does not say that 7 is correct with
+probability 32.5%; the task's correct answer is known.
+
+With state ordering $(7,10)$, the structural equation implements that row as
+
+$$
+B=
+\begin{cases}
+7,&U_B<k_B(7\mid N),\\
+10,&U_B\geq k_B(7\mid N).
+\end{cases}
+$$
+
+For $U_B=0.5$, the model emits 7 when $N=12$ and 10 when $N=15$. For
+$U_B=0.2$, it emits 7 under either subtotal. Holding the noise fixed illustrates
+the chosen structural coupling, not an identified fact about an actual model seed.
+
+**Composing kernels and replacing them.**
+
+A later successful-repair node has another kernel:
+$k_R(1\mid B=7)=0.1$ and $k_R(1\mid B=10)=0.8$, with complementary
+probabilities for $R=0$. Here $R=1$ means an accepted verification yielding 7,
+not merely a request to check. To infer repair probability after setting $N=15$,
+sum over possible first results:
+
+$$
+\begin{aligned}
+P(R=1\mid\operatorname{do}(N=15))
+&=\sum_{b\in\{7,10\}}k_R(1\mid b)k_B(b\mid15)\\
+&=0.1\times0.325+0.8\times0.675=0.5725.
+\end{aligned}
+$$
+
+This is how kernels support inference along a longer chain: multiply conditional
+probabilities for a path and sum over unobserved intermediate states. Each node
+has its own kernel and parent set; “kernel” does not require adjacent-step-only
+dependence. Deterministic nodes are included too: if commitment is $C=7$ when
+$R=1$ and $C=B$ otherwise, $k_C(c\mid b,r)$ assigns probability one to that
+prescribed value and zero to the other.
+
+Setting $N=15$ replaces the **subtotal** kernel and selects the second row of
+the unchanged $B$ kernel. By contrast, forcing the first result to 10 replaces
+the **$B$ kernel itself**:
+
+$$
+g_B(b\mid n)=\mathbf{1}\{b=10\}
+\quad\text{for every }n.
+$$
+
+Its rows are now $(0,1)$, so $B$ no longer depends on $N$. The downstream repair
+kernel stays unchanged and gives $P(R=1\mid\operatorname{do}(B=10))=0.8$.
+A randomized replacement that inserts 7 with probability 0.25 and 10 with
+probability 0.75 is another valid kernel, with every row $(0.25,0.75)$.
+Observing $B=10$ instead of forcing it does not replace any kernel; it conditions
+the existing joint distribution and can update beliefs about earlier states.
+
+**Estimating a kernel.** For a small observed state space, a basic estimate of
+$k_B(7\mid n)$ is the fraction of suitably controlled continuations from parent
+setting $n$ whose next state is 7. Retain other outcomes if they occur; do not
+discard them and silently renormalize. Use smoothing or Bayesian estimation for
+sparse rows and pool comparable contexts when necessary. If fitting the mixture,
+estimate its parameters against these outcomes and evaluate on held-out
+interventions. A flexible baseline can make $\lambda_t$ non-unique, so its value
+should not be interpreted as an identified internal mechanism.
 
 ### 11.3 Interventions and causal effects
 
