@@ -1,9 +1,9 @@
-"""Reproduce the synthetic SCM calculations and figures in proofofconcept.md.
+"""Exact, synthetic coherence-informed SCM and long-chain examples.
 
-Numerical checks use only the standard library. Figure generation uses Matplotlib.
-This is a documentation simulator, not an implementation of an LLM intervention.
-The local factor formulas mirror the cited FactReasoner tables at commit 8201253;
-the simulator deliberately does not import the full inference/LLM package.
+See proofofconcept.md for notation and assumptions. All numerical checks use the
+standard library; rendering the seven figures requires Matplotlib. The local factor
+formulas mirror FactReasoner's documented tables, without importing its LLM stack.
+No result in this file is an estimate from a real reasoning model.
 """
 
 from __future__ import annotations
@@ -12,145 +12,332 @@ import argparse
 import itertools
 import json
 import math
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 
-def compatibility(supports: bool, strength: float, prior: float = 0.5) -> float:
-    """Candidate marginal after conditioning a local source on acceptance.
+@dataclass(frozen=True)
+class ToyParameters:
+    """Fixed parameters, not sampled disturbances; names match Section 4."""
 
-    Source=1 row of entailment: [1-p, p]; contradiction: [p, 1-p].
-    Multiply the target unary [1-prior, prior] and normalize.
-    """
-    w0, w1 = (1 - strength, strength) if supports else (strength, 1 - strength)
-    return prior * w1 / ((1 - prior) * w0 + prior * w1)
+    rho_N: float = 0.9
+    pi: float = 0.5
+    s_B: float = 0.9
+    s_X: float = 0.9
+    s_Y: float = 0.95
+    lambda_B: float = 0.75
+    lambda_Y: float = 0.9
+    b_B: float = 1.0
+    b_Y: float = 1.0
+    r_7: float = 0.1
+    r_10: float = 0.8
+
+    def __post_init__(self):
+        for name, value in asdict(self).items():
+            if not math.isfinite(value) or not 0 <= value <= 1:
+                raise ValueError(f"{name} must be a finite probability")
+        if not 0 < self.pi < 1 or not 0 < self.s_X < 1 or self.s_X == .5:
+            raise ValueError("The two-point logistic calibration needs interior, distinct conflict scores")
+        if not 0 < self.s_B < 1 or not 0 < self.s_Y < 1:
+            raise ValueError("Use soft interior coherence strengths")
 
 
-def next_value_probability(n: int) -> float:
-    q7 = compatibility(n == 12, 0.9)
-    q10 = compatibility(n == 15, 0.9)
-    return 0.75 * q7 / (q7 + q10) + 0.25
-
-
-def repair_probability(b: int, wrong_repair: float = 0.8) -> float:
-    return 0.1 if b == 7 else wrong_repair
-
-
-def answer_probability(c: int) -> float:
-    q7 = compatibility(c == 7, 0.95)
-    q10 = compatibility(c == 10, 0.95)
-    return 0.9 * q7 / (q7 + q10) + 0.1
-
-
+DEFAULTS = ToyParameters()
 DOMAINS = {"N": (12, 15), "B": (7, 10), "R": (0, 1), "C": (7, 10), "Y": (7, 10)}
+FAILED_TRACE = dict(N=15, B=10, R=0, C=10, Y=10)
 
 
-def enumerate_scm(do=None, wrong_repair=0.8):
-    """Exact truncated-factor enumeration, preserving outgoing dependencies."""
-    do = dict(do or {})
-    if any(k not in DOMAINS or v not in DOMAINS[k] for k, v in do.items()):
-        raise ValueError(f"Invalid intervention: {do}")
+def compatibility(supports: bool, strength: float, prior: float = 0.5) -> float:
+    """q(v): target marginal given an adopted source in a two-node MRF.
+
+    Source=1 rows: entailment [1-s, s], contradiction [s, 1-s].
+    Multiply by the target unary [1-pi, pi], then normalize.
+    """
+    if not 0 < strength < 1 or not 0 < prior < 1:
+        raise ValueError("Local compatibility requires interior strength and prior")
+    w0, w1 = (1-strength, strength) if supports else (strength, 1-strength)
+    return prior*w1 / ((1-prior)*w0 + prior*w1)
+
+
+def candidate_distribution(parent: int, strength: float, params=DEFAULTS):
+    """Q(v): normalized q scores over candidate values 7 and 10."""
+    if parent not in (7, 10):
+        raise ValueError("Candidate parent must be 7 or 10")
+    scores = {v: compatibility(v == parent, strength, params.pi) for v in (7, 10)}
+    return {v: q/sum(scores.values()) for v, q in scores.items()}
+
+
+def next_value_probability(n: int, params=DEFAULTS) -> float:
+    """p_B(n) = P(B=7 | N=n, X=x0, theta)."""
+    if n not in DOMAINS["N"]:
+        raise ValueError("Subtotal must be 12 or 15")
+    q = candidate_distribution(n-5, params.s_B, params)[7]
+    return params.lambda_B*q + (1-params.lambda_B)*params.b_B
+
+
+def conflict_score(b: int, params=DEFAULTS) -> float:
+    return 1-compatibility(b == 7, params.s_X, params.pi)
+
+
+def repair_coefficients(params=DEFAULTS):
+    """Fit alpha_R,beta_R to chosen endpoints, not to actual observations."""
+    if not 0 < params.r_7 < 1 or not 0 < params.r_10 < 1:
+        return None  # endpoint probabilities are limiting, deterministic cases
+    logit = lambda p: math.log(p/(1-p))
+    d7, d10 = conflict_score(7, params), conflict_score(10, params)
+    beta = (logit(params.r_10)-logit(params.r_7))/(d10-d7)
+    return logit(params.r_7)-beta*d7, beta
+
+
+def repair_probability(b: int, params=DEFAULTS) -> float:
+    """P(R=1 | B=b): successful accepted verification, not mere checking."""
+    if b not in DOMAINS["B"]:
+        raise ValueError("Intermediate value must be 7 or 10")
+    coefficients = repair_coefficients(params)
+    if coefficients is None:
+        return params.r_7 if b == 7 else params.r_10
+    alpha, beta = coefficients
+    z = alpha+beta*conflict_score(b, params)
+    return 1/(1+math.exp(-z)) if z >= 0 else math.exp(z)/(1+math.exp(z))
+
+
+def answer_probability(c: int, params=DEFAULTS) -> float:
+    """p_Y(c) = P(Y=7 | C=c, X=x0, theta)."""
+    q = candidate_distribution(c, params.s_Y, params)[7]
+    return params.lambda_Y*q + (1-params.lambda_Y)*params.b_Y
+
+
+def validate_event(event):
+    if any(k not in DOMAINS or v not in DOMAINS[k] for k, v in event.items()):
+        raise ValueError(f"Invalid variable assignment: {event}")
+
+
+def intervention_kernels(do):
+    """Hard assignments or parent-independent stochastic replacement kernels."""
+    kernels = {}
+    for name, value in (do or {}).items():
+        if name not in DOMAINS:
+            raise ValueError(f"Unknown intervention variable: {name}")
+        if isinstance(value, dict):
+            if any(v not in DOMAINS[name] for v in value):
+                raise ValueError(f"Invalid intervention domain: {value}")
+            kernel = {v: value.get(v, 0.0) for v in DOMAINS[name]}
+            if any(not math.isfinite(p) or p < 0 for p in kernel.values()):
+                raise ValueError("Invalid intervention probability")
+            if not math.isclose(sum(kernel.values()), 1, abs_tol=1e-12):
+                raise ValueError("Intervention kernel must sum to one")
+        else:
+            validate_event({name: value})
+            kernel = {v: float(v == value) for v in DOMAINS[name]}
+        kernels[name] = kernel
+    return kernels
+
+
+def enumerate_scm(do=None, wrong_repair=None, *, params=DEFAULTS):
+    """Exact truncated product: replace native factors, keep outgoing effects."""
+    if wrong_repair is not None:
+        params = replace(params, r_10=wrong_repair)
+    interventions = intervention_kernels(do)
     rows = []
     for values in itertools.product(*DOMAINS.values()):
         state = dict(zip(DOMAINS, values))
         n, b, r, c, y = values
-        probs = {
-            "N": 0.9 if n == 12 else 0.1,
-            "B": next_value_probability(n) if b == 7 else 1 - next_value_probability(n),
-            "R": repair_probability(b, wrong_repair) if r else 1 - repair_probability(b, wrong_repair),
+        native = {
+            "N": params.rho_N if n == 12 else 1-params.rho_N,
+            "B": next_value_probability(n, params) if b == 7 else 1-next_value_probability(n, params),
+            "R": repair_probability(b, params) if r else 1-repair_probability(b, params),
             "C": float(c == (7 if r else b)),
-            "Y": answer_probability(c) if y == 7 else 1 - answer_probability(c),
+            "Y": answer_probability(c, params) if y == 7 else 1-answer_probability(c, params),
         }
-        mass = math.prod(float(state[k] == do[k]) if k in do else probs[k] for k in DOMAINS)
+        mass = math.prod(interventions[k][state[k]] if k in interventions else native[k] for k in DOMAINS)
         if mass:
             rows.append((state, mass))
     assert math.isclose(sum(m for _, m in rows), 1, abs_tol=1e-12)
     return rows
 
 
-def summary(do=None, wrong_repair=0.8):
-    rows = enumerate_scm(do, wrong_repair)
-    return {
-        "p_B7": sum(m for s, m in rows if s["B"] == 7),
-        "p_R1": sum(m for s, m in rows if s["R"] == 1),
-        "p_C7": sum(m for s, m in rows if s["C"] == 7),
-        "p_Y7": sum(m for s, m in rows if s["Y"] == 7),
-    }
+def probability(event, *, do=None, evidence=None, params=DEFAULTS):
+    """P(event | evidence) in the specified interventional world.
+
+    Conditioning on a descendant is allowed mathematically, but does not produce
+    an intention-to-treat effect or a same-unit cross-world counterfactual.
+    """
+    evidence = dict(evidence or {})
+    validate_event(event)
+    validate_event(evidence)
+    denominator = numerator = 0.0
+    for state, mass in enumerate_scm(do, params=params):
+        if all(state[k] == v for k, v in evidence.items()):
+            denominator += mass
+            if all(state[k] == v for k, v in event.items()):
+                numerator += mass
+    if denominator == 0:
+        raise ValueError("Evidence has zero probability in this world")
+    return numerator/denominator
 
 
-def structural_run(noise, do=None):
+def summary(do=None, wrong_repair=None, *, params=DEFAULTS):
+    rows = enumerate_scm(do, wrong_repair, params=params)
+    return {f"p_{name}{value}": sum(m for s, m in rows if s[name] == value)
+            for name, value in (("B", 7), ("R", 1), ("C", 7), ("Y", 7))}
+
+
+def structural_run(noise, do=None, *, params=DEFAULTS):
+    """A deterministic run given U, supporting hard interventions only."""
     do = dict(do or {})
+    validate_event(do)
+    if len(noise) != 4 or any(not 0 <= u < 1 for u in noise):
+        raise ValueError("Supply four uniform-noise values in [0,1)")
     un, ub, ur, uy = noise
-    n = do.get("N", 12 if un < 0.9 else 15)
-    b = do.get("B", 7 if ub < next_value_probability(n) else 10)
-    r = do.get("R", int(ur < repair_probability(b)))
+    n = do.get("N", 12 if un < params.rho_N else 15)
+    b = do.get("B", 7 if ub < next_value_probability(n, params) else 10)
+    r = do.get("R", int(ur < repair_probability(b, params)))
     c = do.get("C", 7 if r else b)
-    y = do.get("Y", 7 if uy < answer_probability(c) else 10)
+    y = do.get("Y", 7 if uy < answer_probability(c, params) else 10)
     return dict(N=n, B=b, R=r, C=c, Y=y)
 
 
-def counterfactual():
-    """Exact abduction/action/prediction under shared independent uniform noise."""
-    cuts = [[0, 0.9, 1], [0, 0.325, 0.925, 1], [0, 0.1, 0.8, 1], [0, 0.145, 0.955, 1]]
-    intervals = [list(zip(c[:-1], c[1:])) for c in cuts]
-    evidence = dict(N=15, B=10, R=0, C=10, Y=10)
+def noise_cells(params=DEFAULTS):
+    """Derive all constant-output noise cells from current mechanism thresholds."""
+    cuts = [
+        [params.rho_N],
+        [next_value_probability(n, params) for n in DOMAINS["N"]],
+        [repair_probability(b, params) for b in DOMAINS["B"]],
+        [answer_probability(c, params) for c in DOMAINS["C"]],
+    ]
+    partitions = []
+    for thresholds in cuts:
+        points = sorted(set([0., 1., *thresholds]))
+        partitions.append(list(zip(points[:-1], points[1:])))
+    for cell in itertools.product(*partitions):
+        yield tuple((a+b)/2 for a, b in cell), math.prod(b-a for a, b in cell)
+
+
+def counterfactual(evidence=None, do=None, event=None, *, params=DEFAULTS):
+    """Abduct factual U, act in another world, predict while sharing that U."""
+    evidence = dict(FAILED_TRACE if evidence is None else evidence)
+    do = dict({"N": 12} if do is None else do)
+    event = dict({"Y": 7} if event is None else event)
+    for assignment in (evidence, do, event):
+        validate_event(assignment)
     denominator = numerator = 0.0
-    for cell in itertools.product(*intervals):
-        noise = [(lo + hi) / 2 for lo, hi in cell]
-        mass = math.prod(hi - lo for lo, hi in cell)
-        if structural_run(noise) == evidence:
+    for noise, mass in noise_cells(params):
+        factual = structural_run(noise, params=params)
+        if all(factual[k] == v for k, v in evidence.items()):
             denominator += mass
-            if structural_run(noise, {"N": 12})["Y"] == 7:
+            alternate = structural_run(noise, do, params=params)
+            if all(alternate[k] == v for k, v in event.items()):
                 numerator += mass
-    return {"evidence_probability": denominator, "p_counterfactual_Y7": numerator / denominator}
+    if denominator == 0:
+        raise ValueError("Factual evidence has zero probability")
+    return {"evidence_probability": denominator, "counterfactual_probability": numerator/denominator}
+
+
+def long_chain_queries(length=12, kappa=.98, recovery=.15, *, params=DEFAULTS):
+    """Exact forward inference in the explicit first-order register-chain extension.
+
+    Local copy distribution Q has fidelity kappa; after that proposal, recovery
+    replaces any wrong value by 7 with probability recovery. S0 is intervened on.
+    This model deliberately excludes skip links, alternate proofs, and recurrence.
+    """
+    if not isinstance(length, int) or length < 0 or not 0 <= kappa <= 1 or not 0 <= recovery <= 1:
+        raise ValueError("Invalid chain length or transition parameters")
+    p7_from7 = recovery+(1-recovery)*kappa
+    p7_from10 = recovery+(1-recovery)*(1-kappa)
+    base, edited = 1., 0.
+    horizon = []
+    retention = p7_from7-p7_from10
+    for t in range(length+1):
+        if t:
+            base = base*p7_from7+(1-base)*p7_from10
+            edited = edited*p7_from7+(1-edited)*p7_from10
+        assert math.isclose(edited-base, -retention**t, abs_tol=1e-12)
+        horizon.append({"t": t, "p_correct_control": base, "p_correct_edited": edited,
+                        "effect_on_state": edited-base})
+    a7, a10 = answer_probability(7, params), answer_probability(10, params)
+    y0, y1 = a10+(a7-a10)*base, a10+(a7-a10)*edited
+    return {"length": length, "kappa": kappa, "recovery": recovery,
+            "retention": retention, "horizons": horizon,
+            "p_Y7_control": y0, "p_Y7_edited": y1, "answer_effect": y1-y0}
+
+
+def verify():
+    """Check both known results and independent structural/CPT computations."""
+    assert math.isclose(compatibility(True, .9, .8), .72/.74, abs_tol=1e-12)
+    expected = {"natural": ({}, .93313), "do_N12": ({"N":12}, .94285),
+                "do_N15": ({"N":15}, .84565), "do_N12_R0": ({"N":12,"R":0}, .89425),
+                "do_N15_R0": ({"N":15,"R":0}, .40825), "do_B7": ({"B":7}, .955),
+                "do_B10": ({"B":10}, .793), "do_N15_R1": ({"N":15,"R":1}, .955),
+                "do_N15_C10": ({"N":15,"C":10}, .145)}
+    for intervention, answer in expected.values():
+        assert math.isclose(probability({"Y":7}, do=intervention), answer, abs_tol=1e-12)
+    for params in (DEFAULTS, replace(DEFAULTS, s_B=.82, pi=.6, lambda_B=.6,
+                                    b_B=.8, lambda_Y=.7, b_Y=.9, r_7=.2, r_10=.65)):
+        for do in ({}, {"N":15}, {"B":7}, {"R":0}, {"N":12,"R":1}, {"C":10}, {"Y":7}):
+            structural = {}
+            for noise, mass in noise_cells(params):
+                state = tuple(structural_run(noise, do, params=params).values())
+                structural[state] = structural.get(state, 0.)+mass
+            factorized = {tuple(s.values()): m for s,m in enumerate_scm(do, params=params)}
+            for state in structural.keys() | factorized.keys():
+                assert math.isclose(structural.get(state,0), factorized.get(state,0), abs_tol=1e-12)
+        # With no factual evidence, a shared-noise query reduces to a do query.
+        cf = counterfactual({}, {"N":12}, params=params)["counterfactual_probability"]
+        assert math.isclose(cf, probability({"Y":7}, do={"N":12}, params=params), abs_tol=1e-12)
+    assert math.isclose(counterfactual()["counterfactual_probability"], 16/19, abs_tol=1e-12)
+    assert counterfactual(FAILED_TRACE, {}, {"Y":10})["counterfactual_probability"] == 1
+    for b in (7,10):
+        assert math.isclose(probability({"Y":7},do={"N":12,"B":b}),
+                            probability({"Y":7},do={"N":15,"B":b}), abs_tol=1e-12)
+    mixture = probability({"Y":7}, do={"N":{12:.75,15:.25}})
+    assert math.isclose(mixture, .91855, abs_tol=1e-12)
+    for r in (0,.2,.5,.8,1):
+        effect = summary({"N":15},r)["p_Y7"]-summary({"N":12},r)["p_Y7"]
+        assert math.isclose(effect,-.486*(1-r),abs_tol=1e-12)
+    for call in (lambda: probability({"Y":7},evidence={"R":1,"C":10}),
+                 lambda: enumerate_scm({"N":{12:.7,15:.7}}),
+                 lambda: structural_run((.1,.2,.3,.4),{"B":12})):
+        try:
+            call()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Invalid input or impossible evidence was accepted")
+    assert math.isclose(long_chain_queries()["answer_effect"], -.07059385912262173, abs_tol=1e-12)
+    assert math.isclose(long_chain_queries(recovery=0.)["answer_effect"], -.49629490343711147, abs_tol=1e-12)
+    p0 = probability({"Y":7}, do={"N":12})
+    p1 = probability({"Y":7}, do={"N":15})
+    joint = probability({"Y":7}, do={"N":15,"R":0})-p1-probability({"Y":7}, do={"N":12,"R":0})+p0
+    assert math.isclose(joint, -.3888, abs_tol=1e-12)
+    assert math.isclose(min(p0, 1-p1), .15435, abs_tol=1e-12)
 
 
 def calculate():
-    assert math.isclose(compatibility(True, .9, .8), .72 / .74, abs_tol=1e-12)
-    beta = math.log(36) / .8
-    alpha = -math.log(9) - .1 * beta
-    assert math.isclose(1 / (1 + math.exp(-(alpha + beta * .1))), .1, abs_tol=1e-12)
-    assert math.isclose(1 / (1 + math.exp(-(alpha + beta * .9))), .8, abs_tol=1e-12)
-    cases = {
-        "natural": {},
-        "do_N12": {"N": 12},
-        "do_N15": {"N": 15},
-        "do_N12_R0": {"N": 12, "R": 0},
-        "do_N15_R0": {"N": 15, "R": 0},
-        "do_B7": {"B": 7},
-        "do_B10": {"B": 10},
-        "do_N15_R1": {"N": 15, "R": 1},
-        "do_N15_C10": {"N": 15, "C": 10},
+    verify()
+    cases = {"natural": {}, "do_N12":{"N":12}, "do_N15":{"N":15},
+             "do_N12_R0":{"N":12,"R":0}, "do_N15_R0":{"N":15,"R":0},
+             "do_B7":{"B":7}, "do_B10":{"B":10},
+             "do_N15_R1":{"N":15,"R":1}, "do_N15_C10":{"N":15,"C":10}}
+    outcomes = {name:summary(do) for name,do in cases.items()}
+    delta = outcomes["do_N15"]["p_Y7"]-outcomes["do_N12"]["p_Y7"]
+    no_repair_delta = outcomes["do_N15_R0"]["p_Y7"]-outcomes["do_N12_R0"]["p_Y7"]
+    alpha,beta = repair_coefficients()
+    return {
+        "status":"Synthetic model predictions, not LLM measurements",
+        "parameters":{**asdict(DEFAULTS),"alpha_R":alpha,"beta_R":beta},
+        "outcomes":outcomes,
+        "answer_effect":delta,"answer_effect_without_repair":no_repair_delta,
+        "p_N12_given_B10":probability({"N":12},evidence={"B":10}),
+        "p_N12_do_B10":probability({"N":12},do={"B":10}),
+        "controlled_direct_effect_at_B":{str(b):probability({"Y":7},do={"N":15,"B":b})-
+                                        probability({"Y":7},do={"N":12,"B":b}) for b in (7,10)},
+        "edit_by_repair_disable_interaction":no_repair_delta-delta,
+        "stochastic_edit_25pct_p_Y7":probability({"Y":7},do={"N":{12:.75,15:.25}}),
+        "harm_bounds_from_marginals":[max(0,-delta),min(outcomes["do_N12"]["p_Y7"],1-outcomes["do_N15"]["p_Y7"])],
+        "counterfactual":counterfactual(),
+        "long_chain":long_chain_queries(),
+        "long_chain_no_recovery":long_chain_queries(recovery=0.),
     }
-    outcomes = {name: summary(do) for name, do in cases.items()}
-    delta = outcomes["do_N15"]["p_Y7"] - outcomes["do_N12"]["p_Y7"]
-    no_repair_delta = outcomes["do_N15_R0"]["p_Y7"] - outcomes["do_N12_R0"]["p_Y7"]
-    # Observing B=10 selects N; intervention on B does not.
-    rows = enumerate_scm()
-    p_n12_given_b10 = sum(m for s, m in rows if s["N"] == 12 and s["B"] == 10) / sum(m for s, m in rows if s["B"] == 10)
-    result = {
-        "status": "Synthetic model predictions, not LLM measurements",
-        "outcomes": outcomes,
-        "answer_effect": delta,
-        "answer_effect_without_repair": no_repair_delta,
-        "p_N12_given_B10": p_n12_given_b10,
-        "p_N12_do_B10": sum(m for s, m in enumerate_scm({"B": 10}) if s["N"] == 12),
-        "counterfactual": counterfactual(),
-    }
-    expected = {"natural": .93313, "do_N12": .94285, "do_N15": .84565,
-                "do_N12_R0": .89425, "do_N15_R0": .40825,
-                "do_B7": .955, "do_B10": .793,
-                "do_N15_R1": .955, "do_N15_C10": .145}
-    for name, val in expected.items():
-        assert math.isclose(outcomes[name]["p_Y7"], val, abs_tol=1e-12), name
-    assert math.isclose(delta, -.0972, abs_tol=1e-12)
-    assert math.isclose(no_repair_delta, -.486, abs_tol=1e-12)
-    assert math.isclose(p_n12_given_b10, .5, abs_tol=1e-12)
-    assert math.isclose(result["counterfactual"]["p_counterfactual_Y7"], 16 / 19, abs_tol=1e-12)
-    assert math.isclose(result["counterfactual"]["evidence_probability"], .0115425, abs_tol=1e-12)
-    for r in (0, .2, .5, .8, 1):
-        effect = summary({"N": 15}, r)["p_Y7"] - summary({"N": 12}, r)["p_Y7"]
-        assert math.isclose(effect, -.486 * (1-r), abs_tol=1e-12)
-    return result
 
 
 def figures(outdir, results):
@@ -160,7 +347,7 @@ def figures(outdir, results):
     from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Rectangle
 
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11,
-                         "svg.fonttype": "none", "axes.spines.top": False,
+                         "svg.fonttype": "none", "svg.hashsalt": "cot-scm-poc", "axes.spines.top": False,
                          "axes.spines.right": False})
     ink, blue, red, green, purple = "#18283b", "#2864aa", "#b44343", "#278260", "#7a52a1"
     gray = "#718096"
@@ -189,7 +376,9 @@ def figures(outdir, results):
 
     def save(fig, name):
         fig.savefig(outdir/f"{name}.png", dpi=170, bbox_inches="tight", facecolor="white")
-        fig.savefig(outdir/f"{name}.svg", bbox_inches="tight", facecolor="white")
+        svg = outdir/f"{name}.svg"
+        fig.savefig(svg, bbox_inches="tight", facecolor="white", metadata={"Date": None})
+        svg.write_text("\n".join(line.rstrip() for line in svg.read_text().splitlines())+"\n")
         plt.close(fig)
 
     # Figure 1: all paths are explicit illustrative examples, not measured runs.
@@ -298,6 +487,78 @@ def figures(outdir, results):
     ax.text(.3,.3,"Green: shared-noise values that switch the outcome. This is model-dependent; randomized arm means alone do not identify it.",color=gray,fontsize=10)
     save(fig,"poc-counterfactual")
 
+    # Figure 6: a separate, explicitly first-order long-chain SCM.
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(14, 5.8))
+    chain = results["long_chain"]
+    for key, label, color in (("long_chain", "Recovery r = 0.15", green),
+                               ("long_chain_no_recovery", "No recovery", red)):
+        data = results[key]
+        ts = [row["t"] for row in data["horizons"]]
+        effects = [-100*row["effect_on_state"] for row in data["horizons"]]
+        ax.plot(ts, effects, "o-", color=color, label=label, markersize=4)
+        ax.scatter([data["length"]+1], [-100*data["answer_effect"]], marker="D", color=color)
+        ax.plot([data["length"], data["length"]+1], [effects[-1], -100*data["answer_effect"]],
+                linestyle="--", color=color)
+    ax.set(xlabel="Subsequent register stage; Y is the final answer",
+           ylabel="Correctness loss from the initial edit (percentage points)", ylim=(0, 104))
+    ax.set_xticks([0, 3, 6, 9, 12, 13], ["0", "3", "6", "9", "12", "Y"])
+    ax.set_title("Total influence at each horizon", loc="left", weight="bold")
+    ax.legend(frameon=False)
+    ts = [row["t"] for row in chain["horizons"]]
+    for field, label, color in (("p_correct_control", "Initial register = 7", blue),
+                                ("p_correct_edited", "Initial register = 10", red)):
+        ax2.plot(ts, [row[field] for row in chain["horizons"]], "o-", label=label, color=color, markersize=4)
+    ax2.set(xlabel="Register stage", ylabel="Probability register equals 7", ylim=(-.03, 1.05))
+    ax2.set_title("Recovery brings the two distributions closer", loc="left", weight="bold")
+    ax2.legend(frameon=False, loc="lower right")
+    fig.suptitle("Twelve-stage synthetic extension: local copy fidelity = 0.98", weight="bold", fontsize=16)
+    fig.tight_layout()
+    save(fig, "poc-long-chain")
+
+    # Figure 7: a proposed richer graph, not another parameterized simulation.
+    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    for ax, fix_b in zip(axes, (False, True)):
+        ax.set(xlim=(0, 7.2), ylim=(0, 6.7))
+        ax.axis("off")
+        ax.set_title("B. Also fix the first result: do(N = n, B = b*)" if fix_b else
+                     "A. Edit the subtotal: do(N = n)",
+                     loc="left", fontsize=13, weight="bold", color=ink, pad=12)
+        # Edges are laid out explicitly so crossings cannot be mistaken for nodes.
+        arrow(ax, (1.34, 5), (1.86, 5), color=red if fix_b else blue,
+              style="--" if fix_b else "-")
+        if fix_b:
+            ax.text(1.6, 5, "×", color=red, ha="center", va="center", fontsize=24,
+                    bbox={"facecolor": "white", "edgecolor": "none", "pad": 0}, zorder=5)
+        arrow(ax, (2.94, 5), (4.71, 5), color=blue)  # B -> C
+        arrow(ax, (2.64, 4.55), (3.57, 3.85), color=blue)  # B -> A
+        arrow(ax, (1.05, 4.55), (3.3, 3.4), color=purple)  # N -> A
+        arrow(ax, (4.25, 3.85), (4.97, 4.55), color=purple)  # A -> C
+        arrow(ax, (5.79, 5), (6.01, 5), color=purple)  # C -> Y
+        arrow(ax, (2.38, 2.1), (3.34, 3.05), color=green)  # D -> A
+        arrow(ax, (2.44, 1.7), (5.25, 4.55), color=green, rad=.35)  # D -> C
+        for x, y, label, color in (
+            (.8, 5, "N = n\nsubtotal", red),
+            (2.4, 5, "B = b*\nfixed result" if fix_b else "B\nfirst result", red if fix_b else blue),
+            (3.85, 3.4, "A\naccept D?", purple),
+            (1.9, 1.7, "D\nrecompute", green),
+            (5.25, 5, "C\ncommit", blue),
+            (6.55, 5, "Y\nanswer", blue),
+        ):
+            box(ax, x, y, .93, .72, label, color=color, fontsize=10)
+        ax.text(.3, 5.95, "Compare n = 15 with n = 12 in each panel.", fontsize=11, color=gray)
+        ax.text(.3, 3.05, "Long-range effect\non acceptance", color=purple, fontsize=10)
+        ax.text(.3, .7, "Purple route survives: N → A → C → Y" if fix_b else
+                "Editing N can change both B and acceptance A.", color=purple, fontsize=11)
+        ax.text(.3, .22, "C = D when A = 1; otherwise C = B.", color=ink, fontsize=11)
+    fig.suptitle("Holding one reasoning step fixed can leave another causal route open",
+                 fontsize=17, weight="bold", color=ink, y=.99)
+    fig.text(.5, .035,
+             "Proposed graph, not measured effects. Prompt X and noise arrows omitted. "
+             "D is assumed to depend only on X; this requires validation.",
+             ha="center", color=gray, fontsize=10)
+    fig.tight_layout(rect=(0, .065, 1, .96), w_pad=2)
+    save(fig, "poc-long-chain-paths")
+
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -310,7 +571,7 @@ def main():
         args.output_dir.mkdir(parents=True,exist_ok=True)
         (args.output_dir/"poc-results.json").write_text(json.dumps(results,indent=2)+"\n")
         figures(args.output_dir,results)
-        print(f"Wrote five PNG/SVG figure pairs and numerical results to {args.output_dir}")
+        print(f"Wrote seven PNG/SVG figure pairs and numerical results to {args.output_dir}")
 
 
 if __name__=="__main__":
