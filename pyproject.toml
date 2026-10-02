@@ -98,6 +98,12 @@ asyncio_mode = "auto"
 # `mellea-ibm` package (the `rits` extra). This metadata is ignored by the built
 # wheel and by pip/PyPI consumers; it only affects uv-based resolution and
 # requires git-ssh access to github.ibm.com.
+[tool.uv]
+# Security floors for transitive dependencies (not imported by fact_reasoner
+# directly). pyjwt arrives via mellea -> mcp; < 2.15.0 is affected by multiple
+# CVEs (see the IBM OSPO security notification, issue #53).
+constraint-dependencies = ["pyjwt>=2.15.0"]
+
 [tool.uv.sources]
 mellea-ibm = { git = "ssh://git@github.ibm.com/generative-computing/mellea-ibm.git" }
 
