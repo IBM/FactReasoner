@@ -2,6 +2,8 @@
 
 **Research plan — 1 October 2026.** Repository reviewed at commit `8201253`.
 This document proposes research; it does not report new experimental results.
+**2 October update:** the supplied AttriCoT manuscript is now included as a close
+baseline; see [the detailed connection assessment](attricot-connection.md).
 
 **Objective.** Determine which steps in a reasoning model's visible chain of thought
 (CoT) influence its subsequent reasoning and final response, how those influences
@@ -40,6 +42,9 @@ closest-prior-work comparison in [literature.md](literature.md).
   illustrated interventions and counterfactuals, and a reproducible simulator.
 - [literature.md](literature.md): literature synthesis, closest-work comparison,
   references, and search provenance.
+- [attricot-connection.md](attricot-connection.md): assessment of the supplied
+  *Local Causal Attribution of Chain-of-Thought Reasoning* manuscript, its overlap
+  with this proposal, and concrete extensions and experiments.
 - [references.bib](references.bib): bibliography with verified arXiv metadata and
   foundational references.
 
@@ -105,7 +110,7 @@ Those capabilities require explicit new code and validation.
 
 ## 3. Literature conclusions that determine the design
 
-The review in [literature.md](literature.md) motivates six decisions:
+The review in [literature.md](literature.md) motivates seven decisions:
 
 1. **Replicate perturbation baselines first.** Lanham et al. (2023) establish
    truncation, mistake insertion, and paraphrase tests. Turpin et al. (2023) and
@@ -133,6 +138,12 @@ The review in [literature.md](literature.md) motivates six decisions:
    importance of task difficulty, target-specific counterfactuals, and the gap
    between judged and rollout-estimated step importance. Their findings are
    reported evidence to replicate, not settled universal properties.
+7. **Separate fixed-text attribution from regenerated trajectory effects.** The
+   supplied AttriCoT manuscript already fits structural equations for unit-to-unit
+   log-probability effects and evaluates both fixed targets and regenerated target
+   units. Reproduce it as a close local baseline. Test whether these inexpensive
+   measurements, together with coherence, improve predictions of full downstream
+   propagation and repair; do not interpret its coefficients as causal CPTs.
 
 ## 4. Research questions and falsifiable hypotheses
 
@@ -464,6 +475,7 @@ Required comparisons, all under explicit token/call budgets:
 | Simple attribution | Position, length, token surprisal where available, random ranking, leave-one-step-out, early forced answer |
 | Text/semantic | NLI consistency, all four LCS readouts, ROSCOE, a blinded LLM judge, process reward model |
 | Strong causal references | Lanham-style interventions; Thought Anchors resampling and masking graphs; Thought Branches recurrence/resampling; Xiong-style intra-draft and draft-to-answer tests |
+| Local structural attribution | AttriCoT-LOO and a costed 2x subset, with matched perturbations; fixed-target log-score/AUPC and target regeneration kept separate from full-suffix effects |
 | Predictive models | Prompt-only, local-history sequence model, independent intervention regression, temporal BN without semantic priors, matched-capacity non-graph predictor |
 | Mechanistic subset | Raw attention as a diagnostic baseline; random and targeted activation patching; span-matched control patches |
 

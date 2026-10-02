@@ -9,6 +9,10 @@ the first arXiv version, not an asserted publication venue.
 
 The [main plan](README.md) specifies experiments and priorities;
 [methods.md](methods.md) gives the proposed inference methods.
+**Local-source update, 2 October 2026:** the supplied anonymous AttriCoT manuscript
+was read at methods and appendix level. Its source and detailed assessment are in
+[attricot-connection.md](attricot-connection.md); no public bibliographic identity
+is inferred from that file.
 
 ## 1. From useful reasoning to faithful reasoning
 
@@ -47,6 +51,30 @@ The initial project should therefore focus on measurement and inference, rather
 than promise that a new score will immediately train faithful models.
 
 ## 2. Closest work: steps, trajectories, and causal graphs
+
+### AttriCoT: local structural attribution
+
+**Anonymous, [Local Causal Attribution of Chain-of-Thought
+Reasoning](papers/Interpretability_and_Steering_of_LRMs.pdf)**, proposes AttriCoT:
+delete units from a fixed trace, measure downstream units' mean token log
+probabilities, and regress them on unit-presence indicators. It obtains a directed
+attribution matrix with a linear number of forward passes. Its main evaluation
+uses perturbation AUPC on four reasoning models and five datasets. The paper
+explicitly characterizes the scores as direct effects with intermediate text
+held fixed (p. 10; Appendix C.3.1), rather than effects of regenerating a suffix.
+
+Appendix D.2.2 also regenerates individual target units from edited prefixes and
+evaluates text similarity. We therefore cannot claim regeneration evaluation is
+absent. Additional joint-deletion samples improve the main fixed-text evaluation
+but do not improve this regenerated-target evaluation in the reported experiment.
+The paper also proposes conjunction features and tests removal versus masking.
+
+This is a close structural baseline, not merely another perturbation score. Our
+extension must demonstrate normalized semantic-state inference for new edits,
+recovery, and full trajectories. Use local scores for candidate screening or
+calibrated mechanism features; do not multiply its coefficients along paths or
+treat them as emission probabilities. The [focused assessment](attricot-connection.md)
+specifies a matched experiment and three possible extensions.
 
 ### Thought Anchors
 
@@ -248,6 +276,7 @@ inference backend itself as a new contribution.
 |---|---|---|
 | Sentence-to-answer importance | Lanham; Thought Anchors; Thinking Drafts | No novelty by itself; replicate as reference |
 | Sentence-to-sentence causal map | Thought Anchors | Predictive generative factor model evaluated on new interventions, not another heatmap |
+| Local linear structural attribution | AttriCoT, supplied anonymous manuscript | Demonstrated transfer from fixed-target measurements to calibrated semantic-state and full-suffix intervention predictions |
 | Recurrence and repair | Thinking Drafts; Thought Branches | Joint calibrated transition/answer inference and better held-out prediction |
 | SCM of visible reasoning | Bao; Ariadne; information-flow work; CASE | Step-level state sufficiency tests, learned mechanisms, and uncertainty-aware queries |
 | CoT mediator experiments | Thought Branches; causal mediation literature | Precisely defined multi-step policy effects integrated with the predictive PGM |
@@ -279,6 +308,12 @@ protocol); Bao et al. (coarse SCM and interventions); Jia et al. (information-fl
 definitions and diagnostics). Remaining linked arXiv papers were reviewed primarily
 through their primary-record abstract and metadata. This review-depth distinction
 limits the strength of claims about absent capabilities in related work.
+
+The 2 October local-source addition, AttriCoT, was examined in the supplied
+43-page PDF: main Sections 3–6, limitations, Appendix B, C.3–C.5, and D.1–D.5.
+References to its methods and findings apply to that anonymous version. Its
+bibliography entry records the local file and access date without inventing an
+arXiv identifier, author list, publication year, or venue.
 
 Robins and Vansteelandt–Daniel bibliographic records were additionally checked
 through Crossref. `references.bib` records first-version arXiv metadata for primary

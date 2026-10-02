@@ -180,6 +180,22 @@ Do not multiply an undirected coherence factor into a causal joint and then assu
 the old intervention semantics survive. Such factors can couple children to
 ancestors and introduce selection-like dependencies.
 
+### 2.4 Connection to local structural attribution
+
+The supplied AttriCoT manuscript fits a local response surface for the log
+probability of fixed target text under unit deletion. Its coefficients describe
+retained intermediate text, rather than transitions among regenerated semantic
+states. They must not be substituted for our normalized kernels or composed as
+path effects. Its target-regeneration evaluation also differs from releasing
+the full downstream suffix.
+
+Use AttriCoT as a close baseline and test its measurements as candidate-screening
+signals or calibrated likelihood features alongside coherence. The
+[connection assessment](attricot-connection.md) gives the precise estimand,
+candidate-probability bridge, ablations, and pilot extension. Any full-trace
+screening remains retrospective; transition predictors may use only information
+available before the state they generate.
+
 ## 3. M1: Semantic-prior causal learning and inference
 
 ### 3.1 Structure and mechanism learning
