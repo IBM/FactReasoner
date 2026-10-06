@@ -208,7 +208,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     r.add_argument(
         "--service-type",
         default="google",
-        choices=["google", "wikipedia", "chromadb"],
+        choices=["google", "wikipedia", "chromadb", "ntrs"],
         help="Retrieval service (default: google).",
     )
     r.add_argument("--cache-dir", default=None, help="Retriever cache directory.")
