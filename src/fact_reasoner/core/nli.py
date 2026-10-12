@@ -18,8 +18,9 @@ import math
 from typing import Any
 
 import mellea.stdlib.functional as mfuncs
-from mellea.backends import Backend
+from mellea.backends import Backend, ModelOption
 from mellea.core import MelleaLogger, ModelOutputThunk
+from mellea.stdlib.components import Message
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
@@ -32,6 +33,8 @@ from fact_reasoner.utils import (
     extract_nli_label_and_span,
     run_throttled,
 )
+
+from ._async_runner import run_coroutine
 
 # Supported methods for estimating the NLI relationship probability.
 NLI_METHODS = ("logprobs", "simbauq")
@@ -93,6 +96,56 @@ PREMISE: {{premise_text}}
 HYPOTHESIS: {{hypothesis_text}}
 """
 
+# The NLI LoRA adapter's instruction, verbatim from its training data. It
+# follows the two texts in the single user message (see `nli_adapter_prompt`);
+# the adapter only behaves as trained when it sees exactly this text.
+INSTRUCTION_NLI_ADAPTER = (
+    "<nli>As a judge agent, your role is to classify the logical relationship "
+    "between the two provided texts according to the given criteria, utilizing "
+    "all available information, including conversations, documents, and tools.\n\n"
+    "### Criteria: Natural language inference judges the logical relationship "
+    "from a premise (text A) to a hypothesis (text B), assuming both describe the "
+    "same situation. The relationship is exactly one of three labels.\n\n"
+    "'entailment': a reader accepting the premise as true must also accept the "
+    "hypothesis as true. The hypothesis adds no unsupported information; it may "
+    "restate the premise, paraphrase it, generalize it, or state part of it.\n\n"
+    "'contradiction': a reader accepting the premise as true must reject the "
+    "hypothesis as false. The premise and hypothesis cannot both hold of the same "
+    "situation, because they conflict over an entity, action, attribute, "
+    "quantity, time, place, or negation.\n\n"
+    "'neutral': the premise neither compels nor rules out the hypothesis. The "
+    "hypothesis could be true or false while the premise stays true \u2014 "
+    "typically because it adds detail the premise never mentions, states a "
+    "plausible but unstated motive, cause, or outcome, or makes a broader claim "
+    "the premise only partly supports.\n\n"
+    "Apply these rules:\n"
+    "- Judge only what the premise states or necessarily implies. Do not rely on "
+    "outside world knowledge, and do not assume unstated details.\n"
+    "- Unmentioned is not the same as false. Information absent from the premise "
+    "makes a hypothesis 'neutral', not 'contradiction'.\n"
+    "- Plausible is not the same as entailed. A likely inference the premise does "
+    "not guarantee is 'neutral', not 'entailment'.\n"
+    "- A hypothesis more specific than the premise is usually 'neutral'; a "
+    "hypothesis more general than the premise is usually 'entailment'.\n"
+    "- Weigh negation, quantifiers ('all', 'some', 'none'), and numbers carefully: "
+    "they often flip the label on their own.\n"
+    "- Choose 'contradiction' only for genuine incompatibility, not mere difference "
+    "in wording, emphasis, or level of detail.\n\n"
+    "### Scoring Schema: Judge the relationship from text A to text B and return "
+    "exactly one of 'entailment', 'contradiction', or 'neutral'. Provide the final "
+    'answer as a JSON dict with the following format: {"label": "entailment" | '
+    '"contradiction" | "neutral"}.'
+)
+
+
+def nli_adapter_prompt(premise: str, hypothesis: str) -> str:
+    """The NLI adapter's user message for one premise/hypothesis pair."""
+    return (
+        f"Text A (premise): {premise}\n\n"
+        f"Text B (hypothesis): {hypothesis}\n\n"
+        f"{INSTRUCTION_NLI_ADAPTER}"
+    )
+
 
 class NLIExtractor:
     """
@@ -104,6 +157,10 @@ class NLIExtractor:
     v2 - more recent (with reasoning)
     v3 - only for Google search results
     """
+
+    #: Which prompt produces this extractor's verdicts; part of the NLI cache key
+    #: (see ``nli_cache.extractor_identity``) so verdicts never mix across prompts.
+    prompt_format = "few_shot"
 
     def __init__(
         self,
@@ -413,6 +470,36 @@ class NLIExtractor:
         label, _ = extract_nli_label_and_span(str(output))
         return label
 
+    @staticmethod
+    def _requirements() -> list:
+        """The label-format check every NLI generation is validated against."""
+        return [
+            check(
+                "The output must contain an NLI label, either as a JSON "
+                'object {"label": "..."} or wrapped in square brackets.',
+                validation_fn=simple_validate(
+                    lambda s: extract_nli_label_and_span(s)[0] != ""
+                ),
+            )
+        ]
+
+    def _model_options(self) -> dict[str, Any] | None:
+        """Model options sent with every NLI request."""
+        return self._logprobs_model_options()
+
+    def _request(self, premise: str, hypothesis: str):
+        """Build the (unawaited) NLI request for one premise/hypothesis pair."""
+        return mfuncs.ainstruct(
+            INSTRUCTION_NLI,
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=self._requirements(),
+            user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
+            strategy=self._strategy,
+            return_sampling_results=True,
+            model_options=self._model_options(),
+        )
+
     def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
         """
         Extract the NLI relationship between premise and hypothesis. The
@@ -436,19 +523,11 @@ class NLIExtractor:
                 INSTRUCTION_NLI,
                 context=SimpleContext(),
                 backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must contain an NLI label, either as a JSON "
-                        'object {"label": "..."} or wrapped in square brackets.',
-                        validation_fn=simple_validate(
-                            lambda s: extract_nli_label_and_span(s)[0] != ""
-                        ),
-                    )
-                ],
+                requirements=self._requirements(),
                 user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
                 strategy=self._strategy,
                 return_sampling_results=True,
-                model_options=self._logprobs_model_options(),
+                model_options=self._model_options(),
             )
         except Exception as e:  # noqa: BLE001
             print(f"[NLI] Generation failed: {e}")
@@ -515,25 +594,7 @@ class NLIExtractor:
         # applies bounded concurrency plus a per-minute rate limit, and captures
         # per-item exceptions so a single backend failure does not drop the rest.
         def factory(pair):
-            premise, hypothesis = pair
-            return mfuncs.ainstruct(
-                INSTRUCTION_NLI,
-                context=SimpleContext(),
-                backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must contain an NLI label, either as a JSON "
-                        'object {"label": "..."} or wrapped in square brackets.',
-                        validation_fn=simple_validate(
-                            lambda s: extract_nli_label_and_span(s)[0] != ""
-                        ),
-                    )
-                ],
-                user_variables={"premise_text": premise, "hypothesis_text": hypothesis},
-                strategy=self._strategy,
-                return_sampling_results=True,
-                model_options=self._logprobs_model_options(),
-            )
+            return self._request(*pair)
 
         pairs = list(zip(premises, hypotheses))
         print(f"[NLI] Running throttled batch of {len(pairs)} requests ...")
@@ -565,3 +626,73 @@ class NLIExtractor:
             results.append(self._parse_output(output))
 
         return results
+
+
+class NLIAdapterExtractor(NLIExtractor):
+    """
+    NLI with the fine-tuned granite-4.2-8b LoRA adapter.
+
+    The adapter is served by vLLM as its own model name next to the base model
+    (``vllm serve ... --enable-lora --lora-modules <name>=<path>``), so
+    ``backend`` is an ordinary vLLM backend whose ``model_id`` is the adapter
+    name. Only the request differs from :class:`NLIExtractor`: the adapter gets
+    its training prompt (:func:`nli_adapter_prompt`) as one plain user message,
+    and answers ``{"label": "..."}`` -- the JSON verdict the base class already
+    parses. Label extraction, the logprobs/SIMBA-UQ probability, validation,
+    fallbacks and ``run_batch`` are inherited unchanged, so the verdicts plug
+    into the FactReasoner pipeline as-is.
+    """
+
+    prompt_format = "adapter"
+
+    def __init__(
+        self,
+        backend: Backend,
+        nli_method: str = "logprobs",
+        *,
+        reasoning: bool | None = False,
+        **kwargs: Any,
+    ):
+        """
+        Initialize the NLIAdapterExtractor.
+
+        Args:
+            backend: Backend
+                A Mellea backend whose model is the adapter.
+            nli_method: str
+                As for :class:`NLIExtractor` ("logprobs" or "simbauq").
+            reasoning: Optional[bool]
+                Whether the model may reason ("think") before answering.
+                Defaults to False, which matches how the adapter was trained
+                (granite-4.2 thinks by default otherwise). None sends no setting
+                and keeps the backend's default.
+            **kwargs:
+                Any other :class:`NLIExtractor` option (``simbauq_*``,
+                ``show_progress``).
+        """
+        # Set before super().__init__, which prints the configuration.
+        self.reasoning = reasoning
+        super().__init__(backend, nli_method, **kwargs)
+
+    def _model_options(self) -> dict[str, Any] | None:
+        options = dict(self._logprobs_model_options() or {})
+        if self.reasoning is not None:
+            options[ModelOption.THINKING] = self.reasoning
+        return options or None
+
+    def _request(self, premise: str, hypothesis: str):
+        # A Message action is sent as-is: no instruction template, and the
+        # requirements are only validated, never rendered into the prompt.
+        return mfuncs.aact(
+            Message("user", nli_adapter_prompt(premise, hypothesis)),
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=self._requirements(),
+            strategy=self._strategy,
+            return_sampling_results=True,
+            model_options=self._model_options(),
+        )
+
+    def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
+        """As :meth:`NLIExtractor.run`, via the adapter (see :meth:`run_batch`)."""
+        return run_coroutine(self.run_batch([premise], [hypothesis]))[0]

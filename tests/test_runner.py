@@ -58,6 +58,37 @@ class TestConstruction:
         r = FactualityRunner(MagicMock(), pipeline="factscore")
         assert r.pipeline == "factscore"
 
+    def test_atomizer_backend_uses_the_adapter(self):
+        from fact_reasoner.core.atomizer import Atomizer
+        from fact_reasoner.core.atomizer_reviser import AtomizerReviser
+
+        adapter_backend = MagicMock()
+        r = FactualityRunner(
+            MagicMock(), pipeline="factscore", atomizer_backend=adapter_backend
+        )
+        assert isinstance(r.atom_extractor, AtomizerReviser)
+        assert r.atom_extractor.backend is adapter_backend
+        plain = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert isinstance(plain.atom_extractor, Atomizer)
+
+    def test_nli_backend_uses_the_adapter_with_the_same_method(self):
+        from fact_reasoner.core.nli import NLIAdapterExtractor
+
+        main, adapter_backend = MagicMock(), MagicMock()
+        r = FactualityRunner(
+            main,
+            pipeline="factscore",
+            nli_method="simbauq",
+            nli_backend=adapter_backend,
+        )
+        assert isinstance(r.nli_extractor, NLIAdapterExtractor)
+        assert r.nli_extractor.backend is adapter_backend
+        assert r.nli_extractor.method == "simbauq"
+        # Everything else stays on the main backend.
+        assert r.context_summarizer.backend is main
+        plain = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert type(plain.nli_extractor).__name__ == "NLIExtractor"
+
     def test_default_nli_method_is_logprobs(self):
         r = FactualityRunner(MagicMock(), pipeline="factscore")
         assert r.nli_method == "logprobs"

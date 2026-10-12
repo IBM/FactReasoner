@@ -32,7 +32,8 @@ from fact_reasoner.baselines.factscore import FactScore
 from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
-from fact_reasoner.core.nli import NLIExtractor
+from fact_reasoner.core.atomizer_reviser import AtomizerReviser
+from fact_reasoner.core.nli import NLIAdapterExtractor, NLIExtractor
 from fact_reasoner.core.nli_config import NLI_MODES, get_pair_config
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
@@ -110,6 +111,18 @@ class FactualityRunner:
             override whichever preset this selects. Has little effect on ``"v1"``,
             whose atom-context pairs are already restricted to each atom's own
             contexts and which runs no context-context phase.
+        atomizer_backend: Optional backend for the one-shot atomizer-reviser LoRA
+            adapter (``vllm serve ... --enable-lora --lora-modules <name>=<path>``,
+            with the adapter name as ``model_id``). When given, atoms are
+            extracted and decontextualized in one call by
+            :class:`~fact_reasoner.core.atomizer_reviser.AtomizerReviser` and the
+            separate Reviser stage is skipped; every other component still uses
+            ``backend``.
+        nli_backend: Optional backend for the NLI LoRA adapter (served like the
+            atomizer adapter). When given, NLI relations are predicted by
+            :class:`~fact_reasoner.core.nli.NLIAdapterExtractor` with the same
+            ``nli_method`` and SIMBA-UQ settings; its verdicts have the format
+            the pipeline already consumes.
     """
 
     def __init__(
@@ -140,6 +153,8 @@ class FactualityRunner:
         nli_merge_phases: bool | None = None,
         nli_cache_dir: str | None = None,
         show_progress: bool = False,
+        atomizer_backend: Backend | None = None,
+        nli_backend: Backend | None = None,
     ) -> None:
         """Initialize the runner and its shared components."""
         if pipeline not in PIPELINES:
@@ -192,10 +207,15 @@ class FactualityRunner:
         self.nli_pair_config = replace(get_pair_config(nli_mode), **_overrides)
 
         # Shared components.
-        self.atom_extractor = Atomizer(backend)
+        self.atom_extractor = (
+            AtomizerReviser(atomizer_backend)
+            if atomizer_backend is not None
+            else Atomizer(backend)
+        )
         self.atom_reviser = Reviser(backend)
-        self.nli_extractor = NLIExtractor(
-            backend,
+        nli_cls = NLIAdapterExtractor if nli_backend is not None else NLIExtractor
+        self.nli_extractor = nli_cls(
+            nli_backend if nli_backend is not None else backend,
             nli_method=self.nli_method,
             simbauq_similarity_metric=self.nli_similarity_metric,
             simbauq_confidence_method=self.nli_confidence_method,
