@@ -19,6 +19,8 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from mellea.backends import ModelOption
+
 from fact_reasoner.core.reviser import INSTRUCTION_REVISER, Reviser
 
 
@@ -269,3 +271,28 @@ class TestReviserRunBatch:
 
         assert [r["revised_unit"] for r in results] == ["A2", "B2", "C2"]
         assert [r["text"] for r in results] == ["A", "B", "C"]
+
+
+class TestReviserReasoning:
+    """Tests for the Reviser reasoning ("thinking") setting."""
+
+    @staticmethod
+    def _model_options(**reviser_kwargs):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: '```json\n{"revised_unit": "X"}\n```'
+        ainstruct = AsyncMock(return_value=out)
+        with patch("src.fact_reasoner.core.reviser.mfuncs.ainstruct", new=ainstruct):
+            Reviser(backend=mock_backend, **reviser_kwargs).run(["x"], "resp")
+        return ainstruct.call_args.kwargs["model_options"]
+
+    def test_reasoning_off_by_default(self):
+        assert self._model_options() == {ModelOption.THINKING: False}
+
+    def test_reasoning_can_be_enabled(self):
+        assert self._model_options(reasoning=True) == {ModelOption.THINKING: True}
+
+    def test_reasoning_none_leaves_backend_default(self):
+        assert self._model_options(reasoning=None) is None

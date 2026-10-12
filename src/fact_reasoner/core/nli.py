@@ -25,6 +25,7 @@ from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
+from fact_reasoner import telemetry
 from fact_reasoner.uncertainty import ProbabilisticClassifier, SIMBAUQSamplingStrategy
 from fact_reasoner.utils import (
     extract_logprobs_from_output,
@@ -366,6 +367,7 @@ class NLIExtractor:
         ]
         if not label_logprobs:
             print("[NLI] Could not align label tokens; using default probability.")
+            telemetry.count_fallback("nli", "label_align")
             return self._UNKNOWN_PROBABILITY
 
         avg_logprob = sum(label_logprobs) / len(label_logprobs)
@@ -450,6 +452,7 @@ class NLIExtractor:
             )
         except Exception as e:  # noqa: BLE001
             print(f"[NLI] Generation failed: {e}")
+            telemetry.count_fallback("nli", "generation_error")
             return self._fallback()
 
         return self._parse_output(output)
@@ -466,6 +469,7 @@ class NLIExtractor:
         label/probability) falls back to a neutral relationship.
         """
         if not getattr(output, "success", False):
+            telemetry.count_fallback("nli", "sampling_failed")
             return self._fallback()
         try:
             label = self._get_label(output.result)
@@ -475,12 +479,14 @@ class NLIExtractor:
                 confidence = self._get_simbauq_confidence(output.result)
                 if confidence is None:
                     # Degraded single-sample case: no reliable confidence.
+                    telemetry.count_fallback("nli", "no_confidence")
                     return self._fallback()
                 probability = float(confidence)
             else:
                 probability = self._get_probability(output.result)
         except Exception as e:  # noqa: BLE001
             print(f"[NLI] Failed to parse output: {e}")
+            telemetry.count_fallback("nli", "parse_error")
             return self._fallback()
 
         if label not in ["entailment", "contradiction", "neutral"]:
@@ -553,6 +559,7 @@ class NLIExtractor:
         for output in outputs:
             if isinstance(output, Exception):
                 print(f"[NLI] Batch item failed: {output}")
+                telemetry.count_fallback("nli", "generation_error")
                 results.append(self._fallback())
                 continue
             results.append(self._parse_output(output))

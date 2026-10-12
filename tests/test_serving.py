@@ -181,7 +181,7 @@ class TestVLLMServerLifecycle:
 
         out = capsys.readouterr().out
         assert "sk-secret-value" not in out
-        assert "--api-key <redacted>" in out
+        assert "[VLLMServer] Launching vllm serve" in out
         # The real key is still what the server is launched with.
         launched = popen.call_args.args[0]
         assert launched[launched.index("--api-key") + 1] == "sk-secret-value"

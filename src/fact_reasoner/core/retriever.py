@@ -33,6 +33,7 @@ from pymilvus.model.dense import SentenceTransformerEmbeddingFunction
 from pypdf import PdfReader
 from tqdm import tqdm
 
+from fact_reasoner import telemetry
 from fact_reasoner.core.base import Atom, Context
 from fact_reasoner.core.query_builder import QueryBuilder
 
@@ -898,12 +899,14 @@ class ContextRetriever:
                         f"Retrieval timed out after {self.per_atom_timeout}s for atom "
                         f"{aid!r}: {label[:120]!r}"
                     )
+                    telemetry.count_fallback("retriever", "timeout")
                     continue
                 except Exception as e:  # noqa: BLE001
                     label = atom.text if atom is not None else "query"
                     logger.warning(
                         f"Retrieval failed for atom {aid!r} ({label[:120]!r}): {e}"
                     )
+                    telemetry.count_fallback("retriever", "retrieval_error")
                     continue
                 for ctx in contexts:
                     all_contexts[ctx.id] = ctx

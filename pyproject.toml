@@ -102,7 +102,12 @@ dependencies = [
 # GPU node: `pip install "vllm>=0.28"` (0.28.0 patches its own known advisories).
 # RITS backends (IBM internal). See README for the mellea-ibm install source.
 rits = ["mellea-ibm"]
-dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine"]
+# OpenTelemetry exporters for traces/metrics (see README, "Telemetry"). Without
+# it, fact_reasoner.telemetry is a no-op. Mellea's extra is used rather than the
+# bare OTel packages because Mellea configures the providers our spans join.
+telemetry = ["mellea[telemetry]"]
+# opentelemetry-sdk lets the test suite assert on spans and metrics in memory.
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine", "opentelemetry-sdk"]
 
 [project.scripts]
 fact-reasoner = "fact_reasoner.cli:main"

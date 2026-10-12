@@ -18,13 +18,14 @@ import json
 from typing import Any
 
 import mellea.stdlib.functional as mfuncs
-from mellea.backends import Backend
+from mellea.backends import Backend, ModelOption
 from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
+from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
     run_throttled,
@@ -130,6 +131,7 @@ class Reviser:
     def __init__(
         self,
         backend: Backend,
+        reasoning: bool | None = False,
     ):
         """
         Initialize the Reviser.
@@ -137,6 +139,15 @@ class Reviser:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
+            reasoning: Optional[bool]
+                Whether the model may reason ("think") before answering.
+                Defaults to False: revision is a small rewrite, and on models
+                that think by default (e.g. granite4.2) the hidden reasoning is
+                most of each call's cost -- hundreds to thousands of tokens for
+                a ~25-token answer. Small models may resolve fewer references
+                without it, so enable it if revision quality drops. None sends
+                no setting and keeps the backend's own default; use it for
+                hosted models that reject a reasoning parameter.
         """
 
         # Safety checks
@@ -147,6 +158,7 @@ class Reviser:
 
         # Initialize the reviser
         self.backend = backend
+        self.reasoning = reasoning
 
         # Print backend info
         print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
@@ -191,6 +203,11 @@ class Reviser:
             user_variables={"atomic_unit": atom_text, "response": response},
             strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
             return_sampling_results=True,
+            model_options=(
+                None
+                if self.reasoning is None
+                else {ModelOption.THINKING: self.reasoning}
+            ),
         )
 
     @staticmethod
@@ -206,6 +223,7 @@ class Reviser:
         ``result[i]["revised_unit"]`` positionally never crash.
         """
         if not getattr(output, "success", False):
+            telemetry.count_fallback("reviser", "sampling_failed")
             return self._fallback(atom_text)
         try:
             revised_unit = json.loads(strip_code_fences(str(output)))
@@ -216,6 +234,7 @@ class Reviser:
             return revised_unit
         except (json.JSONDecodeError, ValueError) as e:
             print(f"[Reviser] Failed to parse output: {e}")
+            telemetry.count_fallback("reviser", "parse_error")
             return self._fallback(atom_text)
 
     async def run_batch(self, units: list[str], response: str) -> list[dict[str, Any]]:
@@ -238,7 +257,15 @@ class Reviser:
             return self._request(atom_text, response)
 
         print(f"[Reviser] Running throttled batch of {len(units)} requests ...")
-        outputs = await run_throttled(factory, units)
+        with telemetry.span(
+            "fact_reasoner.reviser.run_batch",
+            **{
+                "fact_reasoner.atoms": len(units),
+                # str() so the unset (None) case is recorded rather than dropped.
+                "fact_reasoner.reviser.reasoning": str(self.reasoning),
+            },
+        ):
+            outputs = await run_throttled(factory, units)
 
         # Results are positionally aligned with `units`; every atom yields one
         # entry (a no-op revision on failure), so callers can index result[i].
@@ -246,6 +273,7 @@ class Reviser:
         for atom_text, output in zip(units, outputs):
             if isinstance(output, Exception):
                 print(f"[Reviser] Batch item failed: {output}")
+                telemetry.count_fallback("reviser", "generation_error")
                 results.append(self._fallback(atom_text))
                 continue
             results.append(self._parse_output(output, atom_text))

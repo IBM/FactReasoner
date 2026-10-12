@@ -23,6 +23,7 @@ from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
+from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
     extract_logprobs_from_output,
@@ -294,6 +295,9 @@ class ContextSummarizer:
             if isinstance(output, Exception) or not getattr(output, "success", False):
                 if isinstance(output, Exception):
                     print(f"[Summarizer] Batch item failed: {output}")
+                    telemetry.count_fallback("summarizer", "generation_error")
+                else:
+                    telemetry.count_fallback("summarizer", "sampling_failed")
                 results.append({"context": context, "summary": "", "probability": 0.0})
                 continue
 

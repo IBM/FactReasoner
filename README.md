@@ -189,6 +189,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 | vLLM local server | `pip install "vllm>=0.28"` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
 | OpenAI / Claude   | default | Hosted frontier models via `mellea`'s `OpenAIBackend`. **No extra dependency** — Claude is reached over Anthropic's OpenAI-compatible endpoint, so the `anthropic` SDK is not required. Needs `OPENAI_API_KEY`. |
 | RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
+| Telemetry         | `[telemetry]` | OpenTelemetry traces and metrics; see [Telemetry](#telemetry). |
 
 ### Dependencies
 
@@ -526,6 +527,51 @@ request; A100 or H100), waits for readiness, and always cleans up. Without
 `--model`, `--backend vllm` connects as a client to an existing server at
 `--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have
 `vllm` installed (`pip install "vllm>=0.28"`), with GPU drivers/CUDA available.**
+
+### Telemetry
+
+FactReasoner can emit [OpenTelemetry](https://opentelemetry.io/) traces and metrics
+to show where a run spends its time. It is off by default and costs nothing when
+off. Install the extra, then enable it with Mellea's environment variables
+(FactReasoner reuses Mellea's configuration, so its spans and Mellea's LLM-call
+spans land in the same traces):
+
+```bash
+uv pip install "fact_reasoner[telemetry]"
+
+# Print traces and metrics to stdout
+export MELLEA_TRACES_ENABLED=true MELLEA_TRACES_CONSOLE=true
+export MELLEA_METRICS_ENABLED=true MELLEA_METRICS_CONSOLE=true
+export OTEL_SERVICE_NAME=fact-reasoner
+
+# ...or send them to an OTLP collector (e.g. a local Jaeger on :4317)
+export MELLEA_TRACES_OTLP=true MELLEA_METRICS_OTLP=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+```
+
+Each run produces one trace: `fact_reasoner.build` with a span per stage
+(`atom_extraction`, `atom_revision`, `context_retrieval`,
+`context_summarization_*`, `nli_relation_extraction`,
+`graphical_model_construction`), Mellea's spans for every LLM call nested under the
+stage that made them (with token counts and retry attempts), then
+`fact_reasoner.score` and `fact_reasoner.inference`. Metrics:
+
+| Metric | Meaning |
+|--------|---------|
+| `fact_reasoner.stage.duration` | Seconds per pipeline stage (attribute `stage`). |
+| `fact_reasoner.fallbacks` | Results replaced by a default after a failure — e.g. an unrevised atom or a neutral NLI label (attributes `component`, `reason`). |
+| `mellea.llm.request.duration`, `gen_ai.client.token.usage` | Per-LLM-call latency and input/output tokens (from Mellea). |
+
+Leave `MELLEA_TRACES_CONTENT` unset: it records full prompts and responses on spans,
+which include the user's query, response and retrieved documents.
+
+**Reasoning models.** Telemetry is how to spot models that "think" before answering:
+their output token counts are far larger than the answer. The atom `Reviser`
+therefore disables reasoning by default (`Reviser(backend, reasoning=False)`); on
+`granite4.2:3b` this cut each revision call from ~440–2,000 output tokens and
+7–21 s to ~25 tokens and ~0.4 s, though a model that small also resolved fewer
+references. Pass `reasoning=True` to turn it back on, or `reasoning=None` to send
+no setting at all (for hosted models that reject a reasoning parameter).
 
 ## Quick Start
 
