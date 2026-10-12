@@ -16,7 +16,7 @@
 """Shared pytest fixtures for fact_reasoner tests."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from fact_reasoner.core.utils import Atom, Context, Relation
 
@@ -164,10 +164,13 @@ def mock_reviser(mock_backend):
 
     reviser = MagicMock(spec=Reviser)
     reviser.backend = mock_backend
-    reviser.run.return_value = [
-        {"revised_unit": "Revised first unit.", "rationale": "No changes."},
-        {"revised_unit": "Revised second unit.", "rationale": "Resolved pronoun."},
+    revisions = [
+        {"revised_unit": "Revised first unit.", "rationale": ""},
+        {"revised_unit": "Revised second unit.", "rationale": ""},
     ]
+    reviser.run.return_value = revisions
+    # FactReasoner.build() awaits run_batch directly.
+    reviser.run_batch = AsyncMock(return_value=revisions)
     return reviser
 
 

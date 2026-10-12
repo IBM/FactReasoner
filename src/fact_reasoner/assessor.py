@@ -388,7 +388,7 @@ class FactReasoner:
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
             _t = time.perf_counter()
-            result = self.atom_reviser.run(old_atoms, self.response)
+            result = await self.atom_reviser.run_batch(old_atoms, self.response)
             self.timing["atom_revision"] = time.perf_counter() - _t
             print(
                 f"[FactReasoner][TIMING] Atom revision: {self.timing['atom_revision']:.4f}s"

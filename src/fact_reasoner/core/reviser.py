@@ -32,6 +32,8 @@ from fact_reasoner.utils import (
     validate_json_code_block,
 )
 
+from ._async_runner import run_coroutine
+
 INSTRUCTION_REVISER = """
 Instructions:
 You task is to decontextualize a UNIT to make it standalone. Each UNIT is an independent content unit or atomic unit extracted from the broader context of a RESPONSE.   
@@ -46,16 +48,14 @@ Follow the steps below for unit decontextualization:
 1. If the UNIT contains vague references, minimally revise them with respect to the specific subjects they refer to in the RESPONSE.
 2. The decontextualized UNIT should be minimally revised by ONLY resolving vague references. No additional information must be added.
 3. UNIT extraction might decompose a conjunctive statement into multiple units (e.g. Democracy treats citizens as equals regardless of their race or religion -> (1) Democracy treats citizens as equals regardless of their race, (2) Democracy treats citizens as equals regardless of their religion). Avoid adding what is potentially part of another UNIT.
-4. Provide a reasoning of the revisions you made to the UNIT, justifying each decision.
-5. The output must be in the following JSON format with a markdown code block:
+4. Output ONLY the revised UNIT, with no explanation, in the following JSON format with a markdown code block:
 
 ```json
 {
-  "revised_unit": "<REVISED_UNIT>",
-  "rationale": "<YOUR_REASONING>"
+  "revised_unit": "<REVISED_UNIT>"
 }
 ```
-Where <REVISED_UNIT> is the decontextualized UNIT after resolving vague references, and <YOUR_REASONING> is your reasoning for the revisions made.
+Where <REVISED_UNIT> is the decontextualized UNIT after resolving vague references (or the UNIT unchanged if it has none).
 
 Use the provided examples to learn your task.
 
@@ -71,8 +71,7 @@ company is headquartered in Irvine, California.
 OUTPUT:
 ```json
 {
-    "revised_unit": "Acorns is a financial technology company.",
-    "rationale": "This UNIT does not contain any vague references. Thus, the unit does not require any further decontextualization."
+    "revised_unit": "Acorns is a financial technology company."
 }
 ```
 
@@ -90,8 +89,7 @@ investigated by the police, who had interviewed three youths but took no further
 OUTPUT:
 ```json
 {
-    "revised_unit": "The Syrian refugee victim had previously suffered a broken wrist.",
-    "rationale": "The UNIT contains a vague reference, 'the victim.' This is a reference to an unknown entity, since it is unclear who the victim is. From the RESPONSE, we can see that the victim is a Syrian refugee. Thus, the vague reference 'the victim' should be replaced with 'the Syrian refugee victim.'"
+    "revised_unit": "The Syrian refugee victim had previously suffered a broken wrist."
 }
 ```
 
@@ -108,8 +106,7 @@ However, the difference is relatively small and may not be noticeable in real-wo
 OUTPUT:
 ```json
 {
-    "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small.",
-    "rationale": "The UNIT contains a vague reference, 'The difference.' From the RESPONSE, we can see that the difference is in memory bandwidth between the RTX 3060 Ti and RTX 3060. Thus, the vague reference 'The difference' should be replaced with 'The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060'. The sentence from which the UNIT is extracted includes coordinating conjunctions that potentially decompose the statement into multiple units. Thus, adding more context to the UNIT is not necessary."
+    "revised_unit": "The difference in memory bandwidth between the RTX 3060 Ti and RTX 3060 is relatively small."
 }
 ```
 
@@ -161,6 +158,9 @@ class Reviser:
         """
         Decontextualize the input atomic units using the response as context.
 
+        Synchronous wrapper around :meth:`run_batch`: the atoms are still
+        revised concurrently, on the shared background event loop.
+
         Args:
             units: List[str]
                 The atomic units to be decontextualized.
@@ -170,39 +170,28 @@ class Reviser:
             List[str]: A dictionary containing the revised atomic unit.
         """
 
-        # Perform the instruction with validation. A backend/network error is
-        # raised out of mfuncs.instruct (validation failures instead come back
-        # as a result with success=False), so guard the whole generation and
-        # keep the result list positionally aligned with `units`.
-        results = []
-        for atom_text in units:
-            try:
-                output = mfuncs.instruct(
-                    INSTRUCTION_REVISER,
-                    context=SimpleContext(),
-                    backend=self.backend,
-                    requirements=[
-                        check(
-                            "The output must be a valid JSON code block.",
-                            validation_fn=simple_validate(
-                                lambda s: validate_json_code_block(
-                                    s, required_keys=["revised_unit", "rationale"]
-                                )
-                            ),
+        return run_coroutine(self.run_batch(units, response))
+
+    def _request(self, atom_text: str, response: str):
+        """Build the (unawaited) revision request for a single atom."""
+        return mfuncs.ainstruct(
+            INSTRUCTION_REVISER,
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=[
+                check(
+                    "The output must be a valid JSON code block.",
+                    validation_fn=simple_validate(
+                        lambda s: validate_json_code_block(
+                            s, required_keys=["revised_unit"]
                         )
-                    ],
-                    user_variables={"atomic_unit": atom_text, "response": response},
-                    strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                    return_sampling_results=True,
+                    ),
                 )
-            except Exception as e:  # noqa: BLE001
-                print(f"[Reviser] Generation failed: {e}")
-                results.append(self._fallback(atom_text))
-                continue
-
-            results.append(self._parse_output(output, atom_text))
-
-        return results
+            ],
+            user_variables={"atomic_unit": atom_text, "response": response},
+            strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
+            return_sampling_results=True,
+        )
 
     @staticmethod
     def _fallback(atom_text: str) -> dict[str, Any]:
@@ -220,6 +209,9 @@ class Reviser:
             return self._fallback(atom_text)
         try:
             revised_unit = json.loads(strip_code_fences(str(output)))
+            # The prompt no longer asks for a rationale; keep the key so
+            # callers reading the old result shape still work.
+            revised_unit.setdefault("rationale", "")
             revised_unit.update({"text": atom_text})
             return revised_unit
         except (json.JSONDecodeError, ValueError) as e:
@@ -243,24 +235,7 @@ class Reviser:
         # concurrency plus a per-minute rate limit, and captures per-item
         # exceptions so a single backend failure does not drop the rest.
         def factory(atom_text: str):
-            return mfuncs.ainstruct(
-                INSTRUCTION_REVISER,
-                context=SimpleContext(),
-                backend=self.backend,
-                requirements=[
-                    check(
-                        "The output must be a valid JSON code block.",
-                        validation_fn=simple_validate(
-                            lambda s: validate_json_code_block(
-                                s, required_keys=["revised_unit", "rationale"]
-                            )
-                        ),
-                    )
-                ],
-                user_variables={"atomic_unit": atom_text, "response": response},
-                strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
-                return_sampling_results=True,
-            )
+            return self._request(atom_text, response)
 
         print(f"[Reviser] Running throttled batch of {len(units)} requests ...")
         outputs = await run_throttled(factory, units)
