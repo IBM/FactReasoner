@@ -251,7 +251,10 @@ class VLLMServer:
 
         argv = self.argv()
         print(
-            f"[VLLMServer] Launching: {' '.join(self.argv(redact_api_key=True))}",
+            "[VLLMServer] Launching vllm serve "
+            f"(model={self.model}, served_model_name={self.served_model_name}, "
+            f"host={self.host}, port={self.port}, "
+            f"tensor_parallel_size={self.tensor_parallel_size}, dtype={self.dtype})",
             flush=True,
         )
         print(f"[VLLMServer] Logging vLLM output to: {self.log_path}", flush=True)
