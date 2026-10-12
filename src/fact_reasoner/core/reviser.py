@@ -186,7 +186,7 @@ class Reviser:
         self.reasoning = reasoning
 
         # Print backend info
-        print(f"[Reviser] Using Mellea backend: {self.backend.model_id}")
+        print(f"[Reviser] Using Mellea backend: {self.backend}, reasoning={self.reasoning}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)

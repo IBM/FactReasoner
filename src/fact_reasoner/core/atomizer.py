@@ -196,7 +196,7 @@ class Atomizer:
         self.backend = backend
 
         # Print info
-        print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
+        print(f"[Atomizer] Using Mellea backend: {self.backend}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)

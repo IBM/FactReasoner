@@ -261,7 +261,7 @@ class NLIExtractor:
 
         # Print info
         print(
-            f"[NLI] Using Mellea backend: {self.backend.model_id} "
+            f"[NLI] Using Mellea backend: {self.backend} "
             f"(method: {self.method})"
         )
         if self.method == "simbauq":

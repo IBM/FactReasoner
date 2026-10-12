@@ -188,7 +188,7 @@ class ContextSummarizer:
         self.backend = backend
 
         # Print info
-        print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
+        print(f"[Summarizer] Using Mellea backend: {self.backend}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)

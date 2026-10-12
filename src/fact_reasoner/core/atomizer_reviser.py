@@ -109,7 +109,7 @@ class AtomizerReviser:
         self.reasoning = reasoning
 
         # Print backend info
-        print(f"[AtomizerReviser] Using Mellea backend: {self.backend.model_id}")
+        print(f"[AtomizerReviser] Using Mellea backend: {self.backend}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
@@ -159,7 +159,7 @@ class AtomizerReviser:
             ``Atomizer.run``.
         """
 
-        return run_coroutine(self.run_batch([response], [query]))[0]
+        return run_coroutine(self.run_batch([response], [query]))[0] # type: ignore
 
     async def run_batch(
         self, responses: list[str], queries: list[str | None] | None = None
@@ -177,8 +177,8 @@ class AtomizerReviser:
         """
 
         if queries is None:
-            queries = [None] * len(responses)
-        if len(queries) != len(responses):
+            queries = [None] * len(responses) # type: ignore
+        if len(queries) != len(responses): # type: ignore
             raise ValueError("queries must be aligned with responses.")
 
         # run_throttled applies bounded concurrency plus a per-minute rate
