@@ -20,7 +20,7 @@ import pytest
 import json
 import tempfile
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fact_reasoner.assessor import FactReasoner
 from fact_reasoner.fact_graph import FactGraph
@@ -440,6 +440,41 @@ class TestFactReasonerBuildRevision:
         mock_reviser.run.assert_not_called()
         assert pipeline.atoms["a0"].get_text() == "Revised first unit."
         assert pipeline.atoms["a1"].get_text() == "Revised second unit."
+
+    def test_build_skips_reviser_when_extractor_revises(
+        self,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        extractor = MagicMock()
+        extractor.revises_atoms = True
+        extractor.run.return_value = {"0": "Albert Einstein was born in 1879."}
+        pipeline = FactReasoner(
+            atom_extractor=extractor,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+        )
+
+        class _StopAfterRevision(Exception):
+            pass
+
+        with patch(
+            "fact_reasoner.assessor.build_contexts", side_effect=_StopAfterRevision
+        ):
+            with pytest.raises(_StopAfterRevision):
+                asyncio.run(
+                    pipeline.build(query="q", response="resp", revise_atoms=True)
+                )
+
+        # The query reaches the one-shot extractor, and its atoms are kept as-is.
+        extractor.run.assert_called_once_with("resp", query="q")
+        mock_reviser.run_batch.assert_not_called()
+        assert pipeline.atoms["a0"].get_text() == "Albert Einstein was born in 1879."
 
 
 class TestFactReasonerBuildMarkovNetwork:

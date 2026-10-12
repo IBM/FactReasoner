@@ -508,7 +508,10 @@ class RelationMiner:
                 "RelationMiner, or use mine_from_atoms with pre-extracted atoms."
             )
         atoms = build_atoms(response, self.atomizer)
-        if self.reviser is not None and atoms:
+        # An extractor that already decontextualizes (AtomizerReviser) needs no
+        # separate revision pass.
+        already_revised = getattr(self.atomizer, "revises_atoms", False)
+        if self.reviser is not None and atoms and not already_revised:
             units = [atoms[aid].text for aid in sorted(atoms, key=_atom_sort_key)]
             revised = self.reviser.run(units, response)
             for aid, rev in zip(sorted(atoms, key=_atom_sort_key), revised):

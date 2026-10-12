@@ -168,7 +168,9 @@ def predict_nli_relationships(
     return relations
 
 
-def build_atoms(response: str, atom_extractor: Atomizer) -> dict[str, Atom]:
+def build_atoms(
+    response: str, atom_extractor: Atomizer, query: str | None = None
+) -> dict[str, Atom]:
     """
     Decompose the given response into atomic units (i.e., atoms).
 
@@ -176,7 +178,10 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> dict[str, Atom]:
         response: str
             The string representing the LLM response.
         atom_extractor: Atomizer
-            The atom extractor.
+            The atom extractor (an Atomizer, or an AtomizerReviser).
+        query: Optional[str]
+            The user query. Only extractors that also revise the atoms
+            (``revises_atoms``) use it, to resolve references.
 
     Returns:
         Dict[str, Atom]: A dict containing the atoms of the response.
@@ -186,7 +191,10 @@ def build_atoms(response: str, atom_extractor: Atomizer) -> dict[str, Atom]:
         "Please ensure a non empty response."
     )
 
-    result = atom_extractor.run(response)
+    if getattr(atom_extractor, "revises_atoms", False):
+        result = atom_extractor.run(response, query=query)
+    else:
+        result = atom_extractor.run(response)
 
     candidates = [Atom(id="a" + str(i), text=v) for i, v in enumerate(result.values())]
 

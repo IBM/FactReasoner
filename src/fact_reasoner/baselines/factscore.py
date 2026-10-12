@@ -276,9 +276,14 @@ class FactScore:
         # Build the atoms
         if not has_atoms:
             self.atoms = build_atoms(
-                response=self.response, atom_extractor=self.atom_extractor
+                response=self.response,
+                atom_extractor=self.atom_extractor,
+                query=self.query,
             )
-            self.revise_atoms = True  # revise atoms is newly created
+            # Revise newly created atoms, unless the extractor already did.
+            self.revise_atoms = not getattr(
+                self.atom_extractor, "revises_atoms", False
+            )
             print(f"[FactScore] Extracted {len(self.atoms)} atoms.")
             for aid in self.atoms:
                 print(f"[FactScore] {self.atoms[aid]}")

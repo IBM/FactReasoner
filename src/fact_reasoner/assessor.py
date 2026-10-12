@@ -59,6 +59,7 @@ from fact_reasoner.factors import (
     pairwise_prior as _pairwise_prior_shared,
 )
 from fact_reasoner.inference import run_merlin as _run_merlin_shared
+from fact_reasoner.telemetry import stage, traced
 
 # Set logging levels
 logging.getLogger("httpx").setLevel(logging.ERROR)
@@ -291,6 +292,7 @@ class FactReasoner:
             f"[FactReasoner] Pipeline initialized with {len(self.atoms)} atoms and {len(self.contexts)} contexts."
         )
 
+    @traced("fact_reasoner.build")
     async def build(
         self,
         query: str | None = None,
@@ -361,15 +363,20 @@ class FactReasoner:
                 "The atom extractor must be created."
             )
 
-            _t = time.perf_counter()
-            self.atoms = build_atoms(
-                response=self.response, atom_extractor=self.atom_extractor
+            with stage("atom_extraction", self.timing, "Atom extraction") as sp:
+                self.atoms = build_atoms(
+                    response=self.response,
+                    atom_extractor=self.atom_extractor,
+                    query=self.query,
+                )
+                sp.set_attribute("fact_reasoner.atoms", len(self.atoms))
+                sp.set_attribute(
+                    "fact_reasoner.atom_extractor", type(self.atom_extractor).__name__
+                )
+            # Revise newly created atoms, unless the extractor already did.
+            self.revise_atoms = not getattr(
+                self.atom_extractor, "revises_atoms", False
             )
-            self.timing["atom_extraction"] = time.perf_counter() - _t
-            print(
-                f"[FactReasoner][TIMING] Atom extraction: {self.timing['atom_extraction']:.4f}s"
-            )
-            self.revise_atoms = True  # revise the atoms if newly created
             print(f"[FactReasoner] Extracted {len(self.atoms)} atoms.")
             for aid in self.atoms:
                 print(f"[FactReasoner] {self.atoms[aid]}")
@@ -387,12 +394,13 @@ class FactReasoner:
             assert self.response is not None, "The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
-            _t = time.perf_counter()
-            result = await self.atom_reviser.run_batch(old_atoms, self.response)
-            self.timing["atom_revision"] = time.perf_counter() - _t
-            print(
-                f"[FactReasoner][TIMING] Atom revision: {self.timing['atom_revision']:.4f}s"
-            )
+            with stage(
+                "atom_revision",
+                self.timing,
+                "Atom revision",
+                **{"fact_reasoner.atoms": len(old_atoms)},
+            ):
+                result = await self.atom_reviser.run_batch(old_atoms, self.response)
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])
@@ -404,17 +412,14 @@ class FactReasoner:
 
         # Build the contexts (per atom)
         if not has_contexts:  # check if contexts already in file
-            _t = time.perf_counter()
-            self.contexts = build_contexts(
-                atoms=self.atoms,
-                query=self.query,
-                retriever=self.context_retriever,
-                use_fast_retriever=use_fast_retriever,
-            )
-            self.timing["context_retrieval"] = time.perf_counter() - _t
-            print(
-                f"[FactReasoner][TIMING] Context retrieval: {self.timing['context_retrieval']:.4f}s"
-            )
+            with stage("context_retrieval", self.timing, "Context retrieval") as sp:
+                self.contexts = build_contexts(
+                    atoms=self.atoms,
+                    query=self.query,
+                    retriever=self.context_retriever,
+                    use_fast_retriever=use_fast_retriever,
+                )
+                sp.set_attribute("fact_reasoner.contexts", len(self.contexts))
 
         # For tracking purposes
         self.num_retrieved_contexts = len(self.contexts.keys())
@@ -437,115 +442,112 @@ class FactReasoner:
         # Summarize the retrieved contexts (if any)
         if self.summarize_contexts:
             print("[FactReasoner] Summarizing the contexts ...")
-            _t_summarize = time.perf_counter()
-
-            # Summarize contexts for atoms
-            _t = time.perf_counter()
-            for atom_id, atom in self.atoms.items():
-                if len(atom.contexts.keys()) > 0:
-                    contexts_ids, contexts = zip(*atom.contexts.items())
-                    results = await self.context_summarizer.run_batch(
-                        [context.get_text() for context in contexts], atom.text
-                    )
-
-                    # Safety checks
-                    assert len(results) == len(contexts), (
-                        "The number of summaries must be equal to the number of contexts."
-                    )
-
-                    # Set the new syntheric summaries
-                    for context_id, result in zip(contexts_ids, results):
-                        if context_id not in self.contexts:
-                            # A context can be shared by several atoms (e.g. once
-                            # `remove_duplicated_contexts` repoints a duplicate's
-                            # owners at the surviving context). An earlier atom in
-                            # this same loop already dropped it; the dangling
-                            # reference left in this atom is swept below by
-                            # `prune_dangling_context_refs`.
-                            continue
-                        is_relevant = is_relevant_context(result["summary"])
-                        if result["summary"] != "" and is_relevant:
-                            self.contexts[context_id].set_synthetic_summary(
-                                result["summary"]
+            with stage(
+                "context_summarization_total",
+                self.timing,
+                "Context summarization (total)",
+            ):
+                # Summarize contexts for atoms
+                with stage(
+                    "context_summarization_atoms",
+                    self.timing,
+                    "Context summarization (atoms)",
+                ):
+                    for atom_id, atom in self.atoms.items():
+                        if len(atom.contexts.keys()) > 0:
+                            contexts_ids, contexts = zip(*atom.contexts.items())
+                            results = await self.context_summarizer.run_batch(
+                                [context.get_text() for context in contexts], atom.text
                             )
-                            # update prior probability of context based on the confidence estimation of the summary
-                            self.contexts[context_id].set_probability(
-                                result["probability"]
-                                * self.contexts[context_id].get_probability()
+
+                            # Safety checks
+                            assert len(results) == len(contexts), (
+                                "The number of summaries must be equal to the number of contexts."
                             )
-                        else:
-                            # we remove the context because it is not related to the atom
-                            del self.contexts[context_id]
-                            del self.atoms[atom_id].contexts[context_id]
+
+                            # Set the new syntheric summaries
+                            for context_id, result in zip(contexts_ids, results):
+                                if context_id not in self.contexts:
+                                    # A context can be shared by several atoms (e.g. once
+                                    # `remove_duplicated_contexts` repoints a duplicate's
+                                    # owners at the surviving context). An earlier atom in
+                                    # this same loop already dropped it; the dangling
+                                    # reference left in this atom is swept below by
+                                    # `prune_dangling_context_refs`.
+                                    continue
+                                is_relevant = is_relevant_context(result["summary"])
+                                if result["summary"] != "" and is_relevant:
+                                    self.contexts[context_id].set_synthetic_summary(
+                                        result["summary"]
+                                    )
+                                    # update prior probability of context based on the confidence estimation of the summary
+                                    self.contexts[context_id].set_probability(
+                                        result["probability"]
+                                        * self.contexts[context_id].get_probability()
+                                    )
+                                else:
+                                    # we remove the context because it is not related to the atom
+                                    del self.contexts[context_id]
+                                    del self.atoms[atom_id].contexts[context_id]
+                            print(
+                                f"[FactReasoner] Created {len(results)} summarized contexts for atom {atom_id}."
+                            )
+
+                # Summarize contexts for question
+                c_qs = {
+                    c_id: context
+                    for c_id, context in self.contexts.items()
+                    if c_id.startswith("c_q")
+                }
+                if len(c_qs.keys()) > 0:
+                    with stage(
+                        "context_summarization_question",
+                        self.timing,
+                        "Context summarization (question)",
+                    ):
+                        contexts_ids, contexts = zip(*c_qs.items())
+                        results = await self.context_summarizer.run_batch(
+                            [context.get_text() for context in contexts], self.query
+                        )
+
+                        assert len(results) == len(contexts), (
+                            "The number of summaries must be equal to the number of contexts."
+                        )
+
+                        for context_id, result in zip(contexts_ids, results):
+                            is_relevant = is_relevant_context(result["summary"])
+                            if result["summary"] != "" and is_relevant:
+                                self.contexts[context_id].set_synthetic_summary(
+                                    result["summary"]
+                                )
+                                # update prior probability of context based on the confidence estimation of the summary
+                                self.contexts[context_id].set_probability(
+                                    result["probability"]
+                                    * self.contexts[context_id].get_probability()
+                                )
+                            else:
+                                # we remove the context because it is not related to the atom
+                                del self.contexts[context_id]
+                        print(
+                            f"[FactReasoner] Created {len(results)} summarized contexts for the question."
+                        )
+
+                # Contexts judged irrelevant are dropped above, but the atoms that
+                # retrieved them are not all cleaned: the per-atom branch clears only
+                # the one owning atom (so a context shared by several atoms leaves
+                # references behind) and the query branch clears none. Sweep once here
+                # so no atom points at a context that no longer exists.
+                _dangling = prune_dangling_context_refs(self.atoms, self.contexts)
+                if _dangling:
                     print(
-                        f"[FactReasoner] Created {len(results)} summarized contexts for atom {atom_id}."
+                        f"[FactReasoner] Pruned {_dangling} stale context reference(s)."
                     )
-            self.timing["context_summarization_atoms"] = time.perf_counter() - _t
-            print(
-                f"[FactReasoner][TIMING] Context summarization (atoms): {self.timing['context_summarization_atoms']:.4f}s"
-            )
 
-            # Summarize contexts for question
-            c_qs = {
-                c_id: context
-                for c_id, context in self.contexts.items()
-                if c_id.startswith("c_q")
-            }
-            if len(c_qs.keys()) > 0:
-                _t = time.perf_counter()
-                contexts_ids, contexts = zip(*c_qs.items())
-                results = await self.context_summarizer.run_batch(
-                    [context.get_text() for context in contexts], self.query
-                )
-
-                assert len(results) == len(contexts), (
-                    "The number of summaries must be equal to the number of contexts."
-                )
-
-                for context_id, result in zip(contexts_ids, results):
-                    is_relevant = is_relevant_context(result["summary"])
-                    if result["summary"] != "" and is_relevant:
-                        self.contexts[context_id].set_synthetic_summary(
-                            result["summary"]
-                        )
-                        # update prior probability of context based on the confidence estimation of the summary
-                        self.contexts[context_id].set_probability(
-                            result["probability"]
-                            * self.contexts[context_id].get_probability()
-                        )
-                    else:
-                        # we remove the context because it is not related to the atom
-                        del self.contexts[context_id]
+                # For tracking purposes
+                self.num_summarized_contexts = len(self.contexts.keys())
                 print(
-                    f"[FactReasoner] Created {len(results)} summarized contexts for the question."
+                    f"[FactReasoner] Created {self.num_summarized_contexts} summarized contexts."
                 )
-                self.timing["context_summarization_question"] = time.perf_counter() - _t
-                print(
-                    f"[FactReasoner][TIMING] Context summarization (question): {self.timing['context_summarization_question']:.4f}s"
-                )
-
-            # Contexts judged irrelevant are dropped above, but the atoms that
-            # retrieved them are not all cleaned: the per-atom branch clears only
-            # the one owning atom (so a context shared by several atoms leaves
-            # references behind) and the query branch clears none. Sweep once here
-            # so no atom points at a context that no longer exists.
-            _dangling = prune_dangling_context_refs(self.atoms, self.contexts)
-            if _dangling:
-                print(
-                    f"[FactReasoner] Pruned {_dangling} stale context reference(s)."
-                )
-
-            # For tracking purposes
-            self.num_summarized_contexts = len(self.contexts.keys())
-            print(
-                f"[FactReasoner] Created {self.num_summarized_contexts} summarized contexts."
-            )
-            self.timing["context_summarization_total"] = (
-                time.perf_counter() - _t_summarize
-            )
-            print(
-                f"[FactReasoner][TIMING] Context summarization (total): {self.timing['context_summarization_total']:.4f}s"
-            )
 
             # Remove duplicated contexts that have the same summary (if any)
             if remove_duplicates:
@@ -562,16 +564,15 @@ class FactReasoner:
         # NLI cost terms are super-linear in the number of contexts, this has
         # quadratic leverage on the call count.
         if self.nli_pair_config.dedup_near_duplicates and len(self.contexts) > 1:
-            _t = time.perf_counter()
-            self.contexts, self.atoms, dedup_stats = dedup_contexts_near(
-                self.contexts,
-                self.atoms,
-                threshold=self.nli_pair_config.dedup_threshold,
-                use_summary=self.summarize_contexts,
-                embedding_model=self.nli_pair_config.embedding_model,
-            )
+            with stage("context_near_dedup", self.timing):
+                self.contexts, self.atoms, dedup_stats = dedup_contexts_near(
+                    self.contexts,
+                    self.atoms,
+                    threshold=self.nli_pair_config.dedup_threshold,
+                    use_summary=self.summarize_contexts,
+                    embedding_model=self.nli_pair_config.embedding_model,
+                )
             self.nli_stats["dedup"] = dedup_stats
-            self.timing["context_near_dedup"] = time.perf_counter() - _t
             print(
                 f"[FactReasoner] Near-duplicate dedup: "
                 f"{dedup_stats['contexts_before']} -> {dedup_stats['contexts_after']} "
@@ -587,20 +588,16 @@ class FactReasoner:
                     f"The `early_exit_evaluator` must be a callable function that takes in input the context and response and outputs a dict with the key `continue_pipeline_execution` (boolean) and optionally other keys with additional information about the evaluation. Instead got: {type(self.early_exit_evaluator)}"
                 )
             print("[FactReasoner] Evaluating early exit condition ...")
-            _t = time.perf_counter()
-            self.early_exit_evaluation = await self.early_exit_evaluator(
-                context="\n".join(
-                    [
-                        c.summary if hasattr(c, "summary") else c.text
-                        for c in self.contexts.values()
-                    ]
-                ),
-                response=self.response.strip(),
-            )
-            self.timing["early_exit_evaluation"] = time.perf_counter() - _t
-            print(
-                f"[FactReasoner][TIMING] Early exit evaluation: {self.timing['early_exit_evaluation']:.4f}s"
-            )
+            with stage("early_exit_evaluation", self.timing, "Early exit evaluation"):
+                self.early_exit_evaluation = await self.early_exit_evaluator(
+                    context="\n".join(
+                        [
+                            c.summary if hasattr(c, "summary") else c.text
+                            for c in self.contexts.values()
+                        ]
+                    ),
+                    response=self.response.strip(),
+                )
 
             # set default choice to `True` so that full pipeline is executed
             # if `continue_pipeline_execution` is absent from the early exit evaluation dict
@@ -623,23 +620,22 @@ class FactReasoner:
             )
 
         # Build the NLI relationships
-        _t = time.perf_counter()
-        self.relations = build_relations(
-            atoms=self.atoms,
-            contexts=self.contexts,
-            rel_atom_context=rel_atom_context,
-            rel_context_context=rel_context_context,
-            contexts_per_atom_only=contexts_per_atom_only,
-            nli_extractor=self.nli_extractor,
-            use_summarized_contexts=self.summarize_contexts,
-            pair_config=self.nli_pair_config,
-            stats=self.nli_stats,
-            cache=self.nli_cache,
-        )
-        self.timing["nli_relation_extraction"] = time.perf_counter() - _t
-        print(
-            f"[FactReasoner][TIMING] NLI relation extraction: {self.timing['nli_relation_extraction']:.4f}s"
-        )
+        with stage(
+            "nli_relation_extraction", self.timing, "NLI relation extraction"
+        ) as sp:
+            self.relations = build_relations(
+                atoms=self.atoms,
+                contexts=self.contexts,
+                rel_atom_context=rel_atom_context,
+                rel_context_context=rel_context_context,
+                contexts_per_atom_only=contexts_per_atom_only,
+                nli_extractor=self.nli_extractor,
+                use_summarized_contexts=self.summarize_contexts,
+                pair_config=self.nli_pair_config,
+                stats=self.nli_stats,
+                cache=self.nli_cache,
+            )
+            sp.set_attribute("fact_reasoner.relations", len(self.relations))
         # Per-phase sub-timings, so the two phases can be compared directly.
         for _phase in ("atom_context", "context_context"):
             if _phase in self.nli_stats:
@@ -647,13 +643,13 @@ class FactReasoner:
 
         # Build the fact graph and Markov network
         print("[FactReasoner] Building the graphical model ...")
-        _t = time.perf_counter()
-        self._build_fact_graph()
-        self._build_markov_network()
-        self.timing["graphical_model_construction"] = time.perf_counter() - _t
-        print(
-            f"[FactReasoner][TIMING] Graphical model construction: {self.timing['graphical_model_construction']:.4f}s"
-        )
+        with stage(
+            "graphical_model_construction",
+            self.timing,
+            "Graphical model construction",
+        ):
+            self._build_fact_graph()
+            self._build_markov_network()
 
         self.timing["build_total"] = time.perf_counter() - _build_start
         print(
@@ -758,6 +754,7 @@ class FactReasoner:
         )
         logger.debug("Markov network created.")
 
+    @traced("fact_reasoner.inference")
     def run_merlin(self):
         """
         Run inference with merlin (executable).
@@ -777,6 +774,7 @@ class FactReasoner:
         )
         return result["marginals"]
 
+    @traced("fact_reasoner.score")
     def score(self) -> dict[str, Any]:
         """
         Compute the factuality score taking into consideration the contexts

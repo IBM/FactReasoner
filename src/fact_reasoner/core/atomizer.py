@@ -25,6 +25,7 @@ from mellea.stdlib.requirements import check, simple_validate
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
 # Local imports
+from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
     run_throttled,
@@ -195,7 +196,7 @@ class Atomizer:
         self.backend = backend
 
         # Print info
-        print(f"[Atomizer] Using Mellea backend: {self.backend.model_id}")
+        print(f"[Atomizer] Using Mellea backend: {self.backend}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
@@ -233,9 +234,11 @@ class Atomizer:
             )
         except Exception as e:  # noqa: BLE001
             print(f"[Atomizer] Generation failed: {e}")
+            telemetry.count_fallback("atomizer", "generation_error")
             return {}  # empty dict on failure
 
         if not output.success:
+            telemetry.count_fallback("atomizer", "sampling_failed")
             return {}  # empty dict on validation failure
 
         # The output is a validated JSON string; parse it defensively.
@@ -244,6 +247,7 @@ class Atomizer:
             return json.loads(cleaned)
         except (json.JSONDecodeError, ValueError) as e:
             print(f"[Atomizer] Failed to parse output: {e}")
+            telemetry.count_fallback("atomizer", "parse_error")
             return {}
 
     async def run_batch(self, responses: list[str]) -> list[dict[str, str]]:
@@ -288,9 +292,11 @@ class Atomizer:
         for output in outputs:
             if isinstance(output, Exception):
                 print(f"[Atomizer] Batch item failed: {output}")
+                telemetry.count_fallback("atomizer", "generation_error")
                 results.append({})
                 continue
             if not getattr(output, "success", False):
+                telemetry.count_fallback("atomizer", "sampling_failed")
                 results.append({})
                 continue
             try:
@@ -298,6 +304,7 @@ class Atomizer:
                 results.append(json.loads(cleaned))
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"[Atomizer] Failed to parse batch item: {e}")
+                telemetry.count_fallback("atomizer", "parse_error")
                 results.append({})
 
         return results
