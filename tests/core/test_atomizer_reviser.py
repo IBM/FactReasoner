@@ -97,8 +97,13 @@ class TestInstruction:
 
 class TestAtomizerReviser:
     def test_none_backend_raises(self):
-        with pytest.raises(ValueError, match="Mellea session is None"):
+        with pytest.raises(ValueError, match="Mellea backend is None"):
             AtomizerReviser(backend=None)
+
+    @pytest.mark.parametrize("value", ["false", "low", 0, 1])
+    def test_reasoning_rejects_non_bool_values(self, value):
+        with pytest.raises(TypeError, match="reasoning must be True, False or None"):
+            AtomizerReviser(MagicMock(), reasoning=value)
 
     def test_marks_atoms_as_revised(self):
         assert AtomizerReviser.revises_atoms is True

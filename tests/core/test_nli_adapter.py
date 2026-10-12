@@ -127,6 +127,15 @@ class TestRequest:
         nli = NLIAdapterExtractor(_backend(), nli_method="simbauq", reasoning=None)
         assert nli._model_options() is None
 
+    @pytest.mark.parametrize("value", ["false", "low", 0, 1])
+    def test_reasoning_rejects_non_bool_values(self, value):
+        with pytest.raises(TypeError, match="reasoning must be True, False or None"):
+            NLIAdapterExtractor(_backend(), reasoning=value)
+
+    def test_none_backend_raises(self):
+        with pytest.raises(ValueError, match="Mellea backend is None"):
+            NLIAdapterExtractor(None)
+
     def test_failed_sampling_falls_back_to_neutral(self):
         with patch(AACT, new=AsyncMock(return_value=MagicMock(success=False))):
             result = NLIAdapterExtractor(_backend()).run(PREMISE, HYPOTHESIS)

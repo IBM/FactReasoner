@@ -96,7 +96,13 @@ class AtomizerReviser:
         # Safety checks
         if backend is None:
             raise ValueError(
-                "Mellea session is None. Please provide a valid Mellea session."
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
+        # Any other value would be forwarded as a reasoning effort level (e.g.
+        # reasoning="false" -> reasoning_effort="false"), which backends reject.
+        if reasoning is not None and not isinstance(reasoning, bool):
+            raise TypeError(
+                f"reasoning must be True, False or None, not {reasoning!r}."
             )
 
         self.backend = backend
@@ -136,6 +142,10 @@ class AtomizerReviser:
     def run(self, response: str, query: str | None = None) -> dict[str, str]:
         """
         Extract the revised atomic units of a response.
+
+        Synchronous wrapper around :meth:`run_batch`, run on the shared
+        background event loop. Do not call it from async code; ``await``
+        :meth:`run_batch` there instead.
 
         Args:
             response: str

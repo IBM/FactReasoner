@@ -28,7 +28,7 @@ class TestReviserInit:
     """Tests for Reviser initialization."""
 
     def test_reviser_none_backend_raises(self):
-        with pytest.raises(ValueError, match="Mellea session is None"):
+        with pytest.raises(ValueError, match="Mellea backend is None"):
             Reviser(backend=None)
 
     def test_reviser_stores_backend(self):
@@ -199,12 +199,8 @@ class TestReviserRunBatch:
         mock_backend.model_id = "test-model"
 
         outputs = [
-            self._mk_output(
-                True, '```json\n{"revised_unit": "A2"}\n```'
-            ),
-            self._mk_output(
-                True, '```json\n{"revised_unit": "B2"}\n```'
-            ),
+            self._mk_output(True, '```json\n{"revised_unit": "A2"}\n```'),
+            self._mk_output(True, '```json\n{"revised_unit": "B2"}\n```'),
         ]
 
         async def fake_ainstruct(*args, **kwargs):
@@ -226,9 +222,7 @@ class TestReviserRunBatch:
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        good = self._mk_output(
-            True, '```json\n{"revised_unit": "OK"}\n```'
-        )
+        good = self._mk_output(True, '```json\n{"revised_unit": "OK"}\n```')
 
         async def fake_ainstruct(*args, **kwargs):
             if kwargs["user_variables"]["atomic_unit"] == "bad":
@@ -258,9 +252,7 @@ class TestReviserRunBatch:
             atom = kwargs["user_variables"]["atomic_unit"]
             # The first atom is the slowest, so completion order is reversed.
             await asyncio.sleep({"A": 0.03, "B": 0.02, "C": 0.0}[atom])
-            return self._mk_output(
-                True, '```json\n{"revised_unit": "%s2"}\n```' % atom
-            )
+            return self._mk_output(True, '```json\n{"revised_unit": "%s2"}\n```' % atom)
 
         with patch(
             "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
@@ -271,6 +263,60 @@ class TestReviserRunBatch:
 
         assert [r["revised_unit"] for r in results] == ["A2", "B2", "C2"]
         assert [r["text"] for r in results] == ["A", "B", "C"]
+
+
+class TestReviserOutputValidation:
+    """Replies that are valid JSON but not a usable revision."""
+
+    @staticmethod
+    def _run(reply):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: reply
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=out),
+        ):
+            return Reviser(backend=mock_backend).run(["He was born."], "resp")
+
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            '```json\n["Einstein was born."]\n```',  # a list, not an object
+            '```json\n"Einstein was born."\n```',  # a bare string
+            '```json\n{"revised_unit": ""}\n```',  # empty
+            '```json\n{"revised_unit": "   "}\n```',  # blank
+            '```json\n{"revised_unit": 42}\n```',  # not a string
+            '```json\n{"other": "x"}\n```',  # key missing
+        ],
+    )
+    def test_unusable_reply_keeps_the_original_atom(self, reply):
+        # Previously a list/string reply raised AttributeError out of run(),
+        # and an empty or non-string revised_unit replaced the atom's text.
+        (result,) = self._run(reply)
+        assert result == {
+            "revised_unit": "He was born.",
+            "rationale": "",
+            "text": "He was born.",
+        }
+
+    def test_valid_reply_is_trimmed_and_normalized(self):
+        (result,) = self._run('```json\n{"revised_unit": "  Einstein was born. "}\n```')
+        assert result == {
+            "revised_unit": "Einstein was born.",
+            "rationale": "",
+            "text": "He was born.",
+        }
+
+    def test_validator_rejects_unusable_replies_so_sampling_retries(self):
+        # The same check backs the rejection-sampling requirement.
+        from fact_reasoner.core.reviser import _revised_unit
+
+        assert _revised_unit('```json\n{"revised_unit": "A."}\n```') == "A."
+        assert _revised_unit('```json\n["A."]\n```') is None
+        assert _revised_unit("not json") is None
 
 
 class TestReviserReasoning:
@@ -296,3 +342,10 @@ class TestReviserReasoning:
 
     def test_reasoning_none_leaves_backend_default(self):
         assert self._model_options(reasoning=None) is None
+
+    @pytest.mark.parametrize("value", ["false", "low", 0, 1])
+    def test_reasoning_rejects_non_bool_values(self, value):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        with pytest.raises(TypeError, match="reasoning must be True, False or None"):
+            Reviser(backend=mock_backend, reasoning=value)

@@ -30,7 +30,6 @@ from fact_reasoner.utils import (
     LOOP_BUDGET,
     run_throttled,
     strip_code_fences,
-    validate_json_code_block,
 )
 
 from ._async_runner import run_coroutine
@@ -122,6 +121,26 @@ OUTPUT:
 """
 
 
+def _revised_unit(text: str) -> str | None:
+    """The revised unit in a reply, or None if the reply is not usable.
+
+    A usable reply is a JSON object (optionally in a code fence) whose
+    ``revised_unit`` is a non-empty string. ``validate_json_code_block`` alone
+    also accepts JSON lists/strings and any ``revised_unit`` value, which would
+    otherwise reach the pipeline as an atom's text.
+    """
+    try:
+        data = json.loads(strip_code_fences(text))
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    unit = data.get("revised_unit")
+    if not isinstance(unit, str) or not unit.strip():
+        return None
+    return unit.strip()
+
+
 class Reviser:
     """
     Atomic unit decontextualization using LLMs.
@@ -153,7 +172,13 @@ class Reviser:
         # Safety checks
         if backend is None:
             raise ValueError(
-                "Mellea session is None. Please provide a valid Mellea session."
+                "Mellea backend is None. Please provide a valid Mellea backend."
+            )
+        # Any other value would be forwarded as a reasoning effort level (e.g.
+        # reasoning="false" -> reasoning_effort="false"), which backends reject.
+        if reasoning is not None and not isinstance(reasoning, bool):
+            raise TypeError(
+                f"reasoning must be True, False or None, not {reasoning!r}."
             )
 
         # Initialize the reviser
@@ -171,18 +196,21 @@ class Reviser:
         Decontextualize the input atomic units using the response as context.
 
         Synchronous wrapper around :meth:`run_batch`: the atoms are still
-        revised concurrently, on the shared background event loop.
+        revised concurrently, on the shared background event loop. Do not call
+        it from async code; ``await`` :meth:`run_batch` there instead.
 
         Args:
             units: List[str]
                 The atomic units to be decontextualized.
             response: str
-                The response from which the atomic unit is decontextualized.
+                The response from which the atomic units are decontextualized.
         Returns:
-            List[str]: A dictionary containing the revised atomic unit.
+            List[Dict[str, Any]]: One result per unit, in input order, each with
+            the ``revised_unit``, an empty ``rationale`` and the original
+            ``text``. A unit whose revision fails is returned unchanged.
         """
 
-        return run_coroutine(self.run_batch(units, response))
+        return run_coroutine(self.run_batch(units, response)) # type: ignore
 
     def _request(self, atom_text: str, response: str):
         """Build the (unawaited) revision request for a single atom."""
@@ -192,11 +220,10 @@ class Reviser:
             backend=self.backend,
             requirements=[
                 check(
-                    "The output must be a valid JSON code block.",
+                    'The output must be a JSON object {"revised_unit": "..."} '
+                    "with a non-empty revised unit.",
                     validation_fn=simple_validate(
-                        lambda s: validate_json_code_block(
-                            s, required_keys=["revised_unit"]
-                        )
+                        lambda s: _revised_unit(s) is not None
                     ),
                 )
             ],
@@ -225,17 +252,14 @@ class Reviser:
         if not getattr(output, "success", False):
             telemetry.count_fallback("reviser", "sampling_failed")
             return self._fallback(atom_text)
-        try:
-            revised_unit = json.loads(strip_code_fences(str(output)))
-            # The prompt no longer asks for a rationale; keep the key so
-            # callers reading the old result shape still work.
-            revised_unit.setdefault("rationale", "")
-            revised_unit.update({"text": atom_text})
-            return revised_unit
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"[Reviser] Failed to parse output: {e}")
+        revised_unit = _revised_unit(str(output))
+        if revised_unit is None:
+            print("[Reviser] Failed to parse output: no usable revised unit.")
             telemetry.count_fallback("reviser", "parse_error")
             return self._fallback(atom_text)
+        # The prompt no longer asks for a rationale; keep the key so callers
+        # reading the old result shape still work.
+        return {"revised_unit": revised_unit, "rationale": "", "text": atom_text}
 
     async def run_batch(self, units: list[str], response: str) -> list[dict[str, Any]]:
         """
@@ -245,9 +269,10 @@ class Reviser:
             units: List[str]
                 The atomic units to be decontextualized.
             response: str
-                The response from which the atomic unit is decontextualized.
+                The response from which the atomic units are decontextualized.
         Returns:
-            List[str]: A dictionary containing the revised atomic unit.
+            List[Dict[str, Any]]: One result per unit, in input order (see
+            :meth:`run`).
         """
 
         # Build a fresh coroutine per atom. run_throttled applies bounded

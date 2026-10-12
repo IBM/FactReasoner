@@ -670,7 +670,13 @@ class NLIAdapterExtractor(NLIExtractor):
                 Any other :class:`NLIExtractor` option (``simbauq_*``,
                 ``show_progress``).
         """
-        # Set before super().__init__, which prints the configuration.
+        # Any other value would be forwarded as a reasoning effort level (e.g.
+        # reasoning="false" -> reasoning_effort="false"), which backends reject.
+        # Checked first, so a bad value fails before any setup work.
+        if reasoning is not None and not isinstance(reasoning, bool):
+            raise TypeError(
+                f"reasoning must be True, False or None, not {reasoning!r}."
+            )
         self.reasoning = reasoning
         super().__init__(backend, nli_method, **kwargs)
 
