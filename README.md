@@ -133,8 +133,18 @@ extras:
 
 ```bash
 uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
-uv pip install "fact_reasoner[vllm]"   # local vLLM server (GPU node only)
 ```
+
+> **Note on vLLM.** There is no `vllm` extra. The local vLLM server is launched as an
+> external `vllm serve` process and never imported, so `vllm` is not a dependency of this
+> project: declaring it pinned its whole dependency tree into `uv.lock`, and every vllm
+> release caps `setuptools < 81`, below the fix for
+> [CVE-2026-59890](https://github.com/advisories/GHSA-h35f-9h28-mq5c). On the GPU node,
+> install it yourself:
+>
+> ```bash
+> pip install "vllm>=0.28"   # 0.28.0 patches vllm's own known advisories
+> ```
 
 > **Note on ChromaDB.** The `--service-type chromadb` backend is still supported, but
 > `chromadb` is **not** a dependency of this project and there is no `chroma` extra.
@@ -176,7 +186,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 |-------------------|---------|-------|
 | Ollama (local)    | default | Works out of the box via `mellea`. |
 | vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
-| vLLM local server | `[vllm]` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
+| vLLM local server | `pip install "vllm>=0.28"` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
 | OpenAI / Claude   | default | Hosted frontier models via `mellea`'s `OpenAIBackend`. **No extra dependency** — Claude is reached over Anthropic's OpenAI-compatible endpoint, so the `anthropic` SDK is not required. Needs `OPENAI_API_KEY`. |
 | RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 
@@ -514,9 +524,8 @@ When `--backend vllm` is given with `--model`, the server lifecycle is managed b
 tensor-parallel size from `CUDA_VISIBLE_DEVICES` (which LSF sets from the `-gpu`
 request; A100 or H100), waits for readiness, and always cleans up. Without
 `--model`, `--backend vllm` connects as a client to an existing server at
-`--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have the
-`vllm` extra installed (`pip install "fact_reasoner[vllm]"`), with GPU
-drivers/CUDA available.**
+`--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have
+`vllm` installed (`pip install "vllm>=0.28"`), with GPU drivers/CUDA available.**
 
 ## Quick Start
 
