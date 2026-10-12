@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
-version = "0.8.0"
+version = "0.8.2"
 description = "Factuality Assessment for Foundation Models"
 authors = [
     {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
@@ -29,20 +29,32 @@ classifiers = [
 #   * joblib is imported directly by uncertainty.nli_training rather than being
 #     used through scikit-learn, so it is declared here rather than relied on
 #     transitively.
+# Lower bounds are security floors, not preferences: each one is the first
+# release that patches a known advisory against this dependency set (see the
+# repository's security tracking issue). Raise them when new advisories land;
+# do not relax them. `chromadb` is deliberately not declared anywhere in this
+# file -- not even as an optional extra -- see the note below.
 dependencies = [
     "beautifulsoup4",
-    "chromadb",
     "joblib",
-    "langchain-community",
-    "langchain-core",
+    "langchain-community>=0.4.2",
+    "langchain-core>=1.3.3",
     "langchain-huggingface",
     "langchain-text-splitters",
-    "mellea==0.6.0",
+    "mellea==0.8.0",
     "networkx",
-    "nltk",
+    # CVE-2026-81726 (nltk <= 3.10.3, no patched release) is in the
+    # TransitionParser model-file APIs; we only call sent_tokenize. nltk cannot
+    # be dropped -- mellea and rouge-score depend on it -- so the alert is
+    # dismissed as "vulnerable code not used". Raise the floor once a fix ships.
+    "nltk>=3.10.3",
     "numpy",
     "pandas>=2.3.1",
-    "pypdf2",
+    "pymilvus[model,milvus-lite]",
+    # pypdf supersedes the abandoned PyPDF2 (last release 3.0.1, CVE-2023-36464
+    # unpatched). Drop-in for the only API we use: PdfReader(BytesIO(...)),
+    # .pages and .extract_text() in core/retriever.py.
+    "pypdf>=6.1.1",
     "python-dotenv",
     "requests",
     "rouge-score",
@@ -51,19 +63,51 @@ dependencies = [
     "thefuzz",
     "tqdm",
     "wikipedia",
+    # Transitive pins. These are pulled in by langchain / chromadb / vllm rather
+    # than imported here, but the resolver will happily pick a vulnerable version
+    # unless we floor it.
+    "aiohttp>=3.14.3",
+    "anyio>=4.14.2",
+    "idna>=3.15",
+    "langchain-classic>=1.0.7",
+    # langsmith 0.9+ switches to an httpx2 stack; the cap keeps that migration a
+    # deliberate change rather than a silent one.
+    "langsmith>=0.8.18,<0.15",
+    "pillow>=12.3.0",
+    "pydantic-settings>=2.14.2",
+    "soupsieve>=2.8.4",
+    "urllib3>=2.7.0",
 ]
 
 [project.optional-dependencies]
+# There is deliberately no `chroma` extra. The `--service-type chromadb` backend is
+# still supported, but `chromadb` is not declared here in any form, because every
+# release up to and including 1.5.9 -- the latest on PyPI -- carries unpatched
+# critical advisories: CVE-2026-45829 (pre-authentication code injection) and
+# CVE-2026-45833 (code injection). No patched release exists to floor against.
+#
+# An optional extra would not help: `uv lock` pins every extra, so declaring
+# chromadb even optionally writes a vulnerable version into uv.lock and keeps the
+# whole project in scope of those alerts. Users who want the backend install it
+# themselves (`pip install chromadb`), accepting that risk; ChromaReader imports it
+# lazily and raises an actionable ImportError when it is absent. The other two
+# backends (`google`, `wikipedia`) need no extra install.
+#
+# There is likewise no `vllm` extra. vLLM is invoked as an external `vllm serve`
+# process (see fact_reasoner.serving) and never imported, so declaring it only
+# served to pin its dependency tree into uv.lock -- which kept cryptography,
+# diskcache and an old setuptools in scope of their alerts. Every vllm release
+# (through 0.31.0) also caps setuptools < 81, below the CVE-2026-59890 fix
+# (83.0.0), so no vllm version can be locked cleanly. Install it yourself on the
+# GPU node: `pip install "vllm>=0.28"` (0.28.0 patches its own known advisories).
 # RITS backends (IBM internal). See README for the mellea-ibm install source.
 rits = ["mellea-ibm"]
-# Local vLLM server path (GPU node). vLLM is invoked as an external process, not
-# imported, so this only needs to be installed where the server is launched.
-vllm = ["vllm"]
 # `pytest-asyncio` is required, not optional: the pytest config below sets
 # `asyncio_mode = "auto"`, and without the plugin every `async def` test is
 # reported as a failure ("async def functions are not natively supported")
-# rather than run.
-dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine"]
+# rather than run. opentelemetry-sdk lets the test suite assert on spans and
+# metrics in memory.
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine", "opentelemetry-sdk"]
 # DiscoScore, for the discourse-floor coherence baselines
 # (`fact_reasoner.coherence_baselines.discourse`). NOT on PyPI, so it cannot be
 # listed here as a resolvable requirement -- install it explicitly with:
@@ -75,6 +119,10 @@ dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "build", "twine"]
 # noun-repetition implementation when it is absent, so this is genuinely optional;
 # the extra below installs only the pieces that ARE on PyPI.
 discourse = ["spacy-udpipe", "networkx", "nltk"]
+# OpenTelemetry exporters for traces/metrics (see README, "Telemetry"). Without
+# it, fact_reasoner.telemetry is a no-op. Mellea's extra is used rather than the
+# bare OTel packages because Mellea configures the providers our spans join.
+telemetry = ["mellea[telemetry]"]
 
 [project.scripts]
 fact-reasoner = "fact_reasoner.cli:main"
@@ -100,9 +148,13 @@ asyncio_mode = "auto"
 # requires git-ssh access to github.ibm.com.
 [tool.uv]
 # Security floors for transitive dependencies (not imported by fact_reasoner
-# directly). pyjwt arrives via mellea -> mcp; < 2.15.0 is affected by multiple
-# CVEs (see the IBM OSPO security notification, issue #53).
-constraint-dependencies = ["pyjwt>=2.15.0"]
+# directly) that only matter for the lock, not for pip consumers (see the IBM
+# OSPO security notification, issue #53). setuptools arrives via torch;
+# < 83.0.0 is affected by CVE-2026-59890. cryptography arrives via the `dev`
+# extra (twine -> keyring -> secretstorage, Linux only); < 50.0.0 is affected
+# by GHSA-537c-gmf6-5ccf and CVE-2026-69247/69248/69249. pyjwt (< 2.15.0
+# vulnerable) arrives via mcp whenever something in the tree pulls it in.
+constraint-dependencies = ["cryptography>=50.0.0", "pyjwt>=2.15.0", "setuptools>=83.0.0"]
 
 [tool.uv.sources]
 mellea-ibm = { git = "ssh://git@github.ibm.com/generative-computing/mellea-ibm.git" }

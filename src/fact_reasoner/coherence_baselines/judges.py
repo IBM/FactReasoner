@@ -393,11 +393,12 @@ def make_backend_generate(backend: Any):
 
         content = None
         try:
-            meta = out._meta or {}
-            container = meta.get("logprobs") or (
-                meta.get("oai_chat_response", {})
-                .get("choices", [{}])[0]
-                .get("logprobs")
+            raw = getattr(out, "raw", None)
+            response = getattr(raw, "response", None)
+            container = (
+                response.get("choices", [{}])[0].get("logprobs")
+                if isinstance(response, dict)
+                else None
             )
             if isinstance(container, dict):
                 content = container.get("content")

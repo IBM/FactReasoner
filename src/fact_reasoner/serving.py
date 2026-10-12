@@ -43,6 +43,9 @@ DEFAULT_GPU_MEMORY_UTILIZATION = 0.90
 DEFAULT_TERM_GRACE_S = 20.0
 # How much of the vLLM log to include in error messages.
 _LOG_TAIL_CHARS = 4000
+# Stands in for the API key in the launch line we print, so the key never
+# reaches stdout (or the LSF job log that captures it).
+_REDACTED = "<redacted>"
 
 
 def _resolve_tensor_parallel_size(explicit: int | None) -> int:
@@ -104,8 +107,13 @@ def _build_vllm_argv(
     dtype: str,
     api_key: str,
     extra_args: list[str] | None,
+    lora_modules: dict[str, str] | None = None,
+    max_lora_rank: int | None = None,
 ) -> list[str]:
     """Build the ``vllm serve`` command line.
+
+    ``lora_modules`` maps a served adapter name to its weights path; each adapter
+    is then requested by using its name as the model id.
 
     Returns:
         The argv list for launching the vLLM OpenAI-compatible server.
@@ -131,6 +139,11 @@ def _build_vllm_argv(
     ]
     if max_model_len is not None:
         argv += ["--max-model-len", str(max_model_len)]
+    if lora_modules:
+        argv += ["--enable-lora", "--lora-modules"]
+        argv += [f"{name}={path}" for name, path in lora_modules.items()]
+        if max_lora_rank is not None:
+            argv += ["--max-lora-rank", str(max_lora_rank)]
     if extra_args:
         argv += list(extra_args)
     return argv
@@ -159,6 +172,11 @@ class VLLMServer:
             the client must send the same one). Defaults to ``"EMPTY"``.
         extra_args: Additional raw arguments appended to the ``vllm serve``
             command line.
+        lora_modules: LoRA adapters to serve next to the base model, as
+            ``{served name: weights path}`` (enables ``--enable-lora``). Use
+            :meth:`build_backend` with ``model_id=<served name>`` to call one.
+        max_lora_rank: The largest LoRA rank among ``lora_modules``; vLLM
+            rejects adapters above its default (16) unless this is raised.
         startup_timeout_s: Maximum seconds to wait for the server to become
             ready before raising.
         term_grace_s: Seconds to wait after ``SIGTERM`` before ``SIGKILL`` on
@@ -182,6 +200,8 @@ class VLLMServer:
         dtype: str = "auto",
         api_key: str = "EMPTY",
         extra_args: list[str] | None = None,
+        lora_modules: dict[str, str] | None = None,
+        max_lora_rank: int | None = None,
         startup_timeout_s: float = DEFAULT_STARTUP_TIMEOUT_S,
         term_grace_s: float = DEFAULT_TERM_GRACE_S,
         log_path: str | None = None,
@@ -198,6 +218,8 @@ class VLLMServer:
         self.dtype = dtype
         self.api_key = api_key
         self.extra_args = list(extra_args) if extra_args else []
+        self.lora_modules = dict(lora_modules) if lora_modules else {}
+        self.max_lora_rank = max_lora_rank
         self.startup_timeout_s = startup_timeout_s
         self.term_grace_s = term_grace_s
         self.log_path = log_path or f"vllm.{self.port}.log"
@@ -211,8 +233,13 @@ class VLLMServer:
         """OpenAI-compatible base URL for the server (``http://host:port/v1``)."""
         return f"http://{self.host}:{self.port}/v1"
 
-    def argv(self) -> list[str]:
-        """Return the ``vllm serve`` command line this server will launch."""
+    def argv(self, redact_api_key: bool = False) -> list[str]:
+        """Return the ``vllm serve`` command line this server will launch.
+
+        Args:
+            redact_api_key: Replace the ``--api-key`` value with a placeholder,
+                for display. The unredacted argv is what gets executed.
+        """
         return _build_vllm_argv(
             model=self.model,
             served_model_name=self.served_model_name,
@@ -222,8 +249,10 @@ class VLLMServer:
             gpu_memory_utilization=self.gpu_memory_utilization,
             max_model_len=self.max_model_len,
             dtype=self.dtype,
-            api_key=self.api_key,
+            api_key=_REDACTED if redact_api_key else self.api_key,
             extra_args=self.extra_args,
+            lora_modules=self.lora_modules,
+            max_lora_rank=self.max_lora_rank,
         )
 
     def start(self) -> None:
@@ -242,7 +271,13 @@ class VLLMServer:
             proc_env.update(self.env)
 
         argv = self.argv()
-        print(f"[VLLMServer] Launching: {' '.join(argv)}", flush=True)
+        print(
+            "[VLLMServer] Launching vllm serve "
+            f"(model={self.model}, served_model_name={self.served_model_name}, "
+            f"host={self.host}, port={self.port}, "
+            f"tensor_parallel_size={self.tensor_parallel_size}, dtype={self.dtype})",
+            flush=True,
+        )
         print(f"[VLLMServer] Logging vLLM output to: {self.log_path}", flush=True)
 
         self._log_file = open(self.log_path, "w")
@@ -338,10 +373,13 @@ class VLLMServer:
             self._log_file.close()
             self._log_file = None
 
-    def build_backend(self, **backend_options: Any):
+    def build_backend(self, model_id: str | None = None, **backend_options: Any):
         """Create a Mellea backend connected to this server.
 
         Args:
+            model_id: The served model to call. Defaults to the base model
+                (``served_model_name``); pass a ``lora_modules`` name to call
+                that adapter instead.
             **backend_options: Extra keyword arguments forwarded to
                 :func:`fact_reasoner.backends.build_backend` (e.g.
                 ``model_options``).
@@ -349,9 +387,16 @@ class VLLMServer:
         Returns:
             A Mellea ``Backend`` (an ``OpenAIBackend`` pointed at this server).
         """
+        if model_id is not None and model_id != self.served_model_name:
+            if model_id not in self.lora_modules:
+                raise ValueError(
+                    f"{model_id!r} is not served here: expected the base model "
+                    f"{self.served_model_name!r} or one of the LoRA adapters "
+                    f"{sorted(self.lora_modules)}."
+                )
         return build_backend(
             "vllm",
-            model_id=self.served_model_name,
+            model_id=model_id or self.served_model_name,
             base_url=self.base_url,
             api_key=self.api_key,
             **backend_options,

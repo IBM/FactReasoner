@@ -14,7 +14,6 @@
 
 # Context summarization using LLMs
 
-import asyncio
 import math
 from typing import Any
 
@@ -24,6 +23,7 @@ from mellea.core import MelleaLogger, ModelOutputThunk
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.sampling import RejectionSamplingStrategy
 
+from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
     extract_logprobs_from_output,
@@ -188,7 +188,7 @@ class ContextSummarizer:
         self.backend = backend
 
         # Print info
-        print(f"[Summarizer] Using Mellea backend: {self.backend.model_id}")
+        print(f"[Summarizer] Using Mellea backend: {self.backend}")
 
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
@@ -232,11 +232,9 @@ class ContextSummarizer:
             List[Dict[str, Any]]: A list of summarized contexts.
         """
 
-        import concurrent.futures
+        from ._async_runner import run_coroutine
 
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, self.run_batch(contexts, atom_text))
-            return future.result()
+        return run_coroutine(self.run_batch(contexts, atom_text))
 
     async def run_batch(
         self, contexts: list[str], atom_text = None
@@ -297,6 +295,9 @@ class ContextSummarizer:
             if isinstance(output, Exception) or not getattr(output, "success", False):
                 if isinstance(output, Exception):
                     print(f"[Summarizer] Batch item failed: {output}")
+                    telemetry.count_fallback("summarizer", "generation_error")
+                else:
+                    telemetry.count_fallback("summarizer", "sampling_failed")
                 results.append({"context": context, "summary": "", "probability": 0.0})
                 continue
 

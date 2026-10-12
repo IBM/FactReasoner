@@ -184,6 +184,14 @@ class TestSourceRetrieverInit:
             assert retriever.fetch_text is True
             assert retriever.google_retriever is not None
 
+    def test_ntrs_service_type(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        retriever = SourceRetriever(service_type="ntrs", top_k=5)
+        assert retriever.service_type == "ntrs"
+        assert retriever.top_k == 5
+        assert retriever.ntrs_retriever is not None
+
     def test_set_query_builder(self):
         from src.fact_reasoner.core.retriever import SourceRetriever
 
@@ -191,3 +199,77 @@ class TestSourceRetrieverInit:
         mock_query_builder = MagicMock()
         retriever.set_query_builder(mock_query_builder)
         assert retriever.query_builder == mock_query_builder
+
+
+class TestSourceRetrieverNTRSQuery:
+    """Tests for the ``ntrs`` branch of SourceRetriever.query."""
+
+    def _retriever(self, top_k=2):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        return SourceRetriever(service_type="ntrs", top_k=top_k)
+
+    def test_maps_abstract_to_text_and_snippet(self):
+        retriever = self._retriever(top_k=2)
+
+        hits = {
+            "mars rover": [
+                {
+                    "title": "Rover Geology",
+                    "snippet": "Abstract about rover geology.",
+                    "link": "https://ntrs.nasa.gov/citations/1",
+                }
+            ]
+        }
+
+        with patch.object(retriever.ntrs_retriever, "get_snippets", return_value=hits):
+            results = retriever.query("mars rover")
+
+        assert len(results) == 1
+        # NTRS exposes the abstract as the evidence text, so it fills both fields.
+        assert results[0]["text"] == "Abstract about rover geology."
+        assert results[0]["snippet"] == "Abstract about rover geology."
+        assert results[0]["title"] == "Rover Geology"
+        assert results[0]["link"] == "https://ntrs.nasa.gov/citations/1"
+
+    def test_passes_top_k_and_truncates_to_it(self):
+        retriever = self._retriever(top_k=2)
+
+        hits = {
+            "q": [
+                {"title": f"T{i}", "snippet": f"A{i}", "link": f"L{i}"}
+                for i in range(5)
+            ]
+        }
+
+        with patch.object(
+            retriever.ntrs_retriever, "get_snippets", return_value=hits
+        ) as mock_get:
+            results = retriever.query("q")
+
+        mock_get.assert_called_once_with(["q"], top_k=2)
+        assert [r["title"] for r in results] == ["T0", "T1"]
+
+    def test_empty_text_returns_no_results(self):
+        retriever = self._retriever()
+
+        with patch.object(retriever.ntrs_retriever, "get_snippets") as mock_get:
+            assert retriever.query("") == []
+            mock_get.assert_not_called()
+
+    def test_uses_query_builder_when_present(self):
+        retriever = self._retriever(top_k=1)
+        query_builder = MagicMock()
+        query_builder.run.return_value = "built query"
+        retriever.set_query_builder(query_builder)
+
+        hits = {"built query": [{"title": "T", "snippet": "A", "link": "L"}]}
+
+        with patch.object(
+            retriever.ntrs_retriever, "get_snippets", return_value=hits
+        ) as mock_get:
+            results = retriever.query("raw atom text")
+
+        query_builder.run.assert_called_once_with("raw atom text")
+        mock_get.assert_called_once_with(["built query"], top_k=1)
+        assert len(results) == 1

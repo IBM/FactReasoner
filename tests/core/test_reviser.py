@@ -17,15 +17,18 @@
 
 import asyncio
 import pytest
-from unittest.mock import MagicMock, patch
-from fact_reasoner.core.reviser import Reviser, INSTRUCTION_REVISER
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from mellea.backends import ModelOption
+
+from fact_reasoner.core.reviser import INSTRUCTION_REVISER, Reviser
 
 
 class TestReviserInit:
     """Tests for Reviser initialization."""
 
     def test_reviser_none_backend_raises(self):
-        with pytest.raises(ValueError, match="Mellea session is None"):
+        with pytest.raises(ValueError, match="Mellea backend is None"):
             Reviser(backend=None)
 
     def test_reviser_stores_backend(self):
@@ -52,7 +55,8 @@ class TestReviserInstruction:
     def test_instruction_contains_output_format(self):
         assert "```json" in INSTRUCTION_REVISER
         assert "revised_unit" in INSTRUCTION_REVISER
-        assert "rationale" in INSTRUCTION_REVISER
+        # The rationale was dropped to keep the reply (and latency) short.
+        assert "rationale" not in INSTRUCTION_REVISER
 
     def test_instruction_contains_placeholders(self):
         assert "{{atomic_unit}}" in INSTRUCTION_REVISER
@@ -71,14 +75,14 @@ class TestReviserRun:
         mock_output.__str__ = lambda self: (
             """```json
 {
-    "revised_unit": "Albert Einstein was German-born.",
-    "rationale": "No changes needed."
+    "revised_unit": "Albert Einstein was German-born."
 }
 ```"""
         )
 
         with patch(
-            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=mock_output),
         ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(
@@ -90,6 +94,8 @@ class TestReviserRun:
             assert len(result) == 1
             assert "revised_unit" in result[0]
             assert result[0]["revised_unit"] == "Albert Einstein was German-born."
+            # Kept for callers of the old result shape.
+            assert result[0]["rationale"] == ""
 
     def test_run_multiple_units(self):
         mock_backend = MagicMock()
@@ -100,14 +106,14 @@ class TestReviserRun:
         mock_output.__str__ = lambda self: (
             """```json
 {
-    "revised_unit": "Revised atom",
-    "rationale": "Resolved reference."
+    "revised_unit": "Revised atom"
 }
 ```"""
         )
 
         with patch(
-            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=mock_output),
         ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(
@@ -125,7 +131,8 @@ class TestReviserRun:
         mock_output.success = False
 
         with patch(
-            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=mock_output),
         ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(units=["Test unit"], response="Test response")
@@ -145,14 +152,14 @@ class TestReviserRun:
         mock_output.__str__ = lambda self: (
             """```json
 {
-    "revised_unit": "Revised version",
-    "rationale": "Changed pronoun."
+    "revised_unit": "Revised version"
 }
 ```"""
         )
 
         with patch(
-            "src.fact_reasoner.core.reviser.mfuncs.instruct", return_value=mock_output
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=mock_output),
         ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(units=["Original text"], response="Full response")
@@ -166,8 +173,8 @@ class TestReviserRun:
         mock_backend.model_id = "test-model"
 
         with patch(
-            "src.fact_reasoner.core.reviser.mfuncs.instruct",
-            side_effect=RuntimeError("backend exploded"),
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(side_effect=RuntimeError("backend exploded")),
         ):
             reviser = Reviser(backend=mock_backend)
             result = reviser.run(units=["Atom A"], response="resp")
@@ -192,12 +199,8 @@ class TestReviserRunBatch:
         mock_backend.model_id = "test-model"
 
         outputs = [
-            self._mk_output(
-                True, '```json\n{"revised_unit": "A2", "rationale": "r"}\n```'
-            ),
-            self._mk_output(
-                True, '```json\n{"revised_unit": "B2", "rationale": "r"}\n```'
-            ),
+            self._mk_output(True, '```json\n{"revised_unit": "A2"}\n```'),
+            self._mk_output(True, '```json\n{"revised_unit": "B2"}\n```'),
         ]
 
         async def fake_ainstruct(*args, **kwargs):
@@ -219,9 +222,7 @@ class TestReviserRunBatch:
         mock_backend = MagicMock()
         mock_backend.model_id = "test-model"
 
-        good = self._mk_output(
-            True, '```json\n{"revised_unit": "OK", "rationale": "r"}\n```'
-        )
+        good = self._mk_output(True, '```json\n{"revised_unit": "OK"}\n```')
 
         async def fake_ainstruct(*args, **kwargs):
             if kwargs["user_variables"]["atomic_unit"] == "bad":
@@ -241,3 +242,110 @@ class TestReviserRunBatch:
         assert results[1]["revised_unit"] == "bad"
         assert results[1]["text"] == "bad"
         assert results[2]["revised_unit"] == "OK"
+
+    def test_run_batch_aligned_when_calls_finish_out_of_order(self):
+        """Results follow input order even if later atoms finish first."""
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+
+        async def fake_ainstruct(*args, **kwargs):
+            atom = kwargs["user_variables"]["atomic_unit"]
+            # The first atom is the slowest, so completion order is reversed.
+            await asyncio.sleep({"A": 0.03, "B": 0.02, "C": 0.0}[atom])
+            return self._mk_output(True, '```json\n{"revised_unit": "%s2"}\n```' % atom)
+
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            side_effect=fake_ainstruct,
+        ):
+            reviser = Reviser(backend=mock_backend)
+            results = asyncio.run(reviser.run_batch(["A", "B", "C"], "resp"))
+
+        assert [r["revised_unit"] for r in results] == ["A2", "B2", "C2"]
+        assert [r["text"] for r in results] == ["A", "B", "C"]
+
+
+class TestReviserOutputValidation:
+    """Replies that are valid JSON but not a usable revision."""
+
+    @staticmethod
+    def _run(reply):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: reply
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=out),
+        ):
+            return Reviser(backend=mock_backend).run(["He was born."], "resp")
+
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            '```json\n["Einstein was born."]\n```',  # a list, not an object
+            '```json\n"Einstein was born."\n```',  # a bare string
+            '```json\n{"revised_unit": ""}\n```',  # empty
+            '```json\n{"revised_unit": "   "}\n```',  # blank
+            '```json\n{"revised_unit": 42}\n```',  # not a string
+            '```json\n{"other": "x"}\n```',  # key missing
+        ],
+    )
+    def test_unusable_reply_keeps_the_original_atom(self, reply):
+        # Previously a list/string reply raised AttributeError out of run(),
+        # and an empty or non-string revised_unit replaced the atom's text.
+        (result,) = self._run(reply)
+        assert result == {
+            "revised_unit": "He was born.",
+            "rationale": "",
+            "text": "He was born.",
+        }
+
+    def test_valid_reply_is_trimmed_and_normalized(self):
+        (result,) = self._run('```json\n{"revised_unit": "  Einstein was born. "}\n```')
+        assert result == {
+            "revised_unit": "Einstein was born.",
+            "rationale": "",
+            "text": "He was born.",
+        }
+
+    def test_validator_rejects_unusable_replies_so_sampling_retries(self):
+        # The same check backs the rejection-sampling requirement.
+        from fact_reasoner.core.reviser import _revised_unit
+
+        assert _revised_unit('```json\n{"revised_unit": "A."}\n```') == "A."
+        assert _revised_unit('```json\n["A."]\n```') is None
+        assert _revised_unit("not json") is None
+
+
+class TestReviserReasoning:
+    """Tests for the Reviser reasoning ("thinking") setting."""
+
+    @staticmethod
+    def _model_options(**reviser_kwargs):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: '```json\n{"revised_unit": "X"}\n```'
+        ainstruct = AsyncMock(return_value=out)
+        with patch("src.fact_reasoner.core.reviser.mfuncs.ainstruct", new=ainstruct):
+            Reviser(backend=mock_backend, **reviser_kwargs).run(["x"], "resp")
+        return ainstruct.call_args.kwargs["model_options"]
+
+    def test_reasoning_off_by_default(self):
+        assert self._model_options() == {ModelOption.THINKING: False}
+
+    def test_reasoning_can_be_enabled(self):
+        assert self._model_options(reasoning=True) == {ModelOption.THINKING: True}
+
+    def test_reasoning_none_leaves_backend_default(self):
+        assert self._model_options(reasoning=None) is None
+
+    @pytest.mark.parametrize("value", ["false", "low", 0, 1])
+    def test_reasoning_rejects_non_bool_values(self, value):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        with pytest.raises(TypeError, match="reasoning must be True, False or None"):
+            Reviser(backend=mock_backend, reasoning=value)

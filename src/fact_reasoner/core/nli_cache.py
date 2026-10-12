@@ -58,11 +58,18 @@ def extractor_identity(nli_extractor) -> tuple[str, str]:
     """The ``(model_id, nli_method)`` pair identifying an extractor's verdicts.
 
     Read defensively: the model id lives on the Mellea backend, and mocks in tests
-    may expose either shape.
+    may expose either shape. An extractor using a prompt other than the few-shot
+    ``INSTRUCTION_NLI`` (e.g. the NLI adapter's) gets ``+<prompt_format>``
+    appended to its method, so its verdicts never share keys with few-shot ones
+    -- even if both are served under the same model id -- while existing
+    few-shot cache entries keep their keys.
     """
     method = getattr(nli_extractor, "method", None) or getattr(
         nli_extractor, "nli_method", ""
     )
+    prompt_format = getattr(nli_extractor, "prompt_format", "few_shot")
+    if isinstance(prompt_format, str) and prompt_format != "few_shot" and method:
+        method = f"{method}+{prompt_format}"
     model_id = getattr(nli_extractor, "model_id", None)
     if not model_id:
         backend = getattr(nli_extractor, "backend", None)

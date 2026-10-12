@@ -214,7 +214,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     r.add_argument(
         "--service-type",
         default="google",
-        choices=["google", "wikipedia", "chromadb"],
+        choices=["google", "wikipedia", "chromadb", "ntrs"],
         help="Retrieval service (default: google).",
     )
     r.add_argument("--cache-dir", default=None, help="Retriever cache directory.")
@@ -303,11 +303,59 @@ def _add_backend_args(
         "--gpu-memory-utilization", type=float, default=0.90, help="vLLM GPU mem frac."
     )
     b.add_argument("--max-model-len", type=int, default=None, help="vLLM max ctx len.")
+    # One-shot atomizer-reviser LoRA adapter (replaces the Atomizer + Reviser).
+    b.add_argument(
+        "--atomizer-adapter",
+        default=None,
+        help="For --backend vllm: served name of the atomizer-reviser LoRA "
+        "adapter. Atoms are then extracted and decontextualized in one call by "
+        "this adapter, and the separate revision stage is skipped. The adapter "
+        "must be served by the same vLLM server as the base model.",
+    )
+    b.add_argument(
+        "--atomizer-adapter-path",
+        default=None,
+        help="With --model (local vLLM server): the adapter weights to load "
+        "next to the base model, served as --atomizer-adapter.",
+    )
+    # NLI LoRA adapter (replaces the few-shot NLI prompt).
+    b.add_argument(
+        "--nli-adapter",
+        default=None,
+        help="For --backend vllm: served name of the NLI LoRA adapter. NLI "
+        "relations are then predicted by this adapter (with --nli-method as "
+        "usual). The adapter must be served by the same vLLM server as the base "
+        "model.",
+    )
+    b.add_argument(
+        "--nli-adapter-path",
+        default=None,
+        help="With --model (local vLLM server): the NLI adapter weights to load "
+        "next to the base model, served as --nli-adapter.",
+    )
+    b.add_argument(
+        "--max-lora-rank",
+        type=int,
+        default=None,
+        help="With --atomizer-adapter-path / --nli-adapter-path: the largest "
+        "adapter LoRA rank, if above vLLM's default maximum (16).",
+    )
+
+
+def _adapter_names(args) -> dict[str, str]:
+    """The requested LoRA adapters, as ``{role: served name}``."""
+    names = {"atomizer": args.atomizer_adapter, "nli": args.nli_adapter}
+    return {role: name for role, name in names.items() if name}
 
 
 @contextlib.contextmanager
 def _backend_context(args):
-    """Yield a Mellea backend, starting/stopping a local vLLM server if requested.
+    """Yield ``(backend, adapter_backends)``, starting/stopping a local vLLM
+    server if requested.
+
+    ``adapter_backends`` maps a role (``"atomizer"``, ``"nli"``) to a backend for
+    that role's LoRA adapter, served by the same vLLM server as ``backend``; it
+    is empty when no adapter is used.
 
     build_backend resolves a unified friendly --model-id (or alias) to the right
     identifier per backend; a raw provider value or None (backend default) is
@@ -325,7 +373,7 @@ def _backend_context(args):
     if args.backend == "rits":
         # base_url (when set) is the custom RITS endpoint; api_key stays None so
         # RITSBackend falls back to the RITS_API_KEY env var.
-        yield build_backend("rits", model_id=args.model_id, base_url=args.base_url)
+        yield build_backend("rits", model_id=args.model_id, base_url=args.base_url), {}
     elif args.backend == "vllm" and args.model:
         # Import lazily so the vllm-server path is only required when used.
         from fact_reasoner.serving import VLLMServer
@@ -336,20 +384,41 @@ def _backend_context(args):
             tensor_parallel_size=args.tensor_parallel_size,
             gpu_memory_utilization=args.gpu_memory_utilization,
             max_model_len=args.max_model_len,
+            lora_modules={
+                name: path
+                for name, path in (
+                    (args.atomizer_adapter, args.atomizer_adapter_path),
+                    (args.nli_adapter, args.nli_adapter_path),
+                )
+                if path
+            },
+            max_lora_rank=args.max_lora_rank,
         ) as server:
-            yield server.build_backend()
+            adapters = {
+                role: server.build_backend(model_id=name)
+                for role, name in _adapter_names(args).items()
+            }
+            yield server.build_backend(), adapters
     elif args.backend == "vllm":
-        yield build_backend(
+        backend = build_backend(
             "vllm", model_id=args.served_model or args.model_id, base_url=args.base_url
         )
+        adapters = {
+            role: build_backend("vllm", model_id=name, base_url=args.base_url)
+            for role, name in _adapter_names(args).items()
+        }
+        yield backend, adapters
     elif args.backend == "openai":
         # base_url selects the provider (unset -> OpenAI; api.anthropic.com ->
         # Claude via the compatibility endpoint). api_key stays None so
         # OpenAIBackend falls back to the OPENAI_API_KEY env var -- keys are
         # deliberately not CLI flags, since argv is visible to other processes.
-        yield build_backend("openai", model_id=args.model_id, base_url=args.base_url)
+        yield (
+            build_backend("openai", model_id=args.model_id, base_url=args.base_url),
+            {},
+        )
     else:  # ollama
-        yield build_backend("ollama", model_id=args.model_id)
+        yield build_backend("ollama", model_id=args.model_id), {}
 
 
 def main() -> None:
@@ -393,6 +462,30 @@ def main() -> None:
             "Starting a local vLLM server requires --served-model "
             "(the vLLM --served-model-name)."
         )
+    # The adapters are LoRAs served by vLLM next to the base model.
+    for flag, name, path in (
+        ("atomizer", args.atomizer_adapter, args.atomizer_adapter_path),
+        ("nli", args.nli_adapter, args.nli_adapter_path),
+    ):
+        if name and args.backend != "vllm":
+            raise SystemExit(f"--{flag}-adapter requires --backend vllm.")
+        if path and not (args.model and name):
+            raise SystemExit(
+                f"--{flag}-adapter-path requires --model (a local vLLM server) and "
+                f"--{flag}-adapter (the name to serve it under)."
+            )
+    if (
+        args.atomizer_adapter
+        and args.atomizer_adapter == args.nli_adapter
+        and args.atomizer_adapter_path != args.nli_adapter_path
+    ):
+        raise SystemExit("--atomizer-adapter and --nli-adapter need different names.")
+    if args.max_lora_rank is not None and not (
+        args.atomizer_adapter_path or args.nli_adapter_path
+    ):
+        raise SystemExit(
+            "--max-lora-rank requires --atomizer-adapter-path or --nli-adapter-path."
+        )
     # A custom RITS endpoint serves its own model, so it needs an explicit name.
     if args.backend == "rits" and args.base_url and not args.model_id:
         raise SystemExit(
@@ -434,7 +527,7 @@ def main() -> None:
                 "relations. Use --nli-method simbauq instead."
             )
 
-    with _backend_context(args) as backend:
+    with _backend_context(args) as (backend, adapters):
         runner = FactualityRunner(
             backend,
             pipeline=args.pipeline,
@@ -460,6 +553,8 @@ def main() -> None:
             nli_merge_phases=args.nli_merge_phases,
             nli_cache_dir=args.nli_cache_dir,
             show_progress=args.progress_bar,
+            atomizer_backend=adapters.get("atomizer"),
+            nli_backend=adapters.get("nli"),
         )
 
         if file_mode:

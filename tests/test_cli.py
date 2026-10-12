@@ -683,3 +683,196 @@ class TestLCSCliRunnerWiring:
         assert args == (str(data), str(out_dir))
         assert kwargs == {"dataset_name": "demo", "model_id": "granite4"}
         fake_runner.assess.assert_not_called()
+
+
+class TestAtomizerAdapter:
+    _IO = ["--pipeline", "factscore", "--query", "q", "--response", "r"]
+
+    def test_requires_vllm_backend(self):
+        with pytest.raises(SystemExit, match="requires --backend vllm"):
+            _run([*self._IO, "--backend", "ollama", "--atomizer-adapter", "ar"])
+
+    def test_path_requires_local_server_and_name(self):
+        with pytest.raises(SystemExit, match="--atomizer-adapter-path requires"):
+            _run([*self._IO, "--backend", "vllm", "--atomizer-adapter-path", "/a"])
+
+    def test_max_lora_rank_requires_path(self):
+        with pytest.raises(SystemExit, match="--max-lora-rank requires"):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--atomizer-adapter",
+                    "ar",
+                    "--max-lora-rank",
+                    "64",
+                ]
+            )
+
+    def test_client_mode_builds_adapter_backend_on_same_server(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        base, adapter = object(), object()
+        with (
+            patch.object(cli, "build_backend", side_effect=[base, adapter]) as bb,
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--served-model",
+                    "granite",
+                    "--base-url",
+                    "http://gpu:8000/v1",
+                    "--atomizer-adapter",
+                    "ar",
+                ]
+            )
+        adapter_call = bb.call_args_list[1]
+        assert adapter_call.args[0] == "vllm"
+        assert adapter_call.kwargs == {
+            "model_id": "ar",
+            "base_url": "http://gpu:8000/v1",
+        }
+        assert fr.call_args.args[0] is base
+        assert fr.call_args.kwargs["atomizer_backend"] is adapter
+
+    def test_nli_adapter_client_mode(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        base, nli = object(), object()
+        with (
+            patch.object(cli, "build_backend", side_effect=[base, nli]) as bb,
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--served-model",
+                    "granite",
+                    "--base-url",
+                    "http://gpu:8000/v1",
+                    "--nli-adapter",
+                    "fr-nli",
+                ]
+            )
+        assert bb.call_args_list[1].kwargs == {
+            "model_id": "fr-nli",
+            "base_url": "http://gpu:8000/v1",
+        }
+        assert fr.call_args.kwargs["nli_backend"] is nli
+        assert fr.call_args.kwargs["atomizer_backend"] is None
+
+    def test_nli_adapter_requires_vllm_backend(self):
+        with pytest.raises(SystemExit, match="--nli-adapter requires --backend vllm"):
+            _run([*self._IO, "--backend", "ollama", "--nli-adapter", "fr-nli"])
+
+    def test_adapters_need_distinct_names(self):
+        with pytest.raises(SystemExit, match="need different names"):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--model",
+                    "/w",
+                    "--served-model",
+                    "granite",
+                    "--atomizer-adapter",
+                    "same",
+                    "--atomizer-adapter-path",
+                    "/a",
+                    "--nli-adapter",
+                    "same",
+                    "--nli-adapter-path",
+                    "/n",
+                ]
+            )
+
+    def test_local_server_serves_both_adapters(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        fake_server = MagicMock()
+        fake_server.__enter__.return_value = fake_server
+        fake_server.__exit__.return_value = False
+        server_ctor = MagicMock(return_value=fake_server)
+        with (
+            patch("fact_reasoner.serving.VLLMServer", server_ctor),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--model",
+                    "/weights/granite-4.2-8b",
+                    "--served-model",
+                    "granite",
+                    "--atomizer-adapter",
+                    "ar",
+                    "--atomizer-adapter-path",
+                    "/adapters/ar",
+                    "--nli-adapter",
+                    "fr-nli",
+                    "--nli-adapter-path",
+                    "/adapters/nli",
+                ]
+            )
+        assert server_ctor.call_args.kwargs["lora_modules"] == {
+            "ar": "/adapters/ar",
+            "fr-nli": "/adapters/nli",
+        }
+        fake_server.build_backend.assert_any_call(model_id="ar")
+        fake_server.build_backend.assert_any_call(model_id="fr-nli")
+        assert fr.call_args.kwargs["atomizer_backend"] is not None
+        assert fr.call_args.kwargs["nli_backend"] is not None
+
+    def test_without_adapter_runner_gets_none(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run([*self._IO, "--backend", "vllm", "--served-model", "granite"])
+        assert fr.call_args.kwargs["atomizer_backend"] is None
+
+    def test_local_server_loads_and_serves_the_adapter(self):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        fake_server = MagicMock()
+        fake_server.__enter__.return_value = fake_server
+        fake_server.__exit__.return_value = False
+        server_ctor = MagicMock(return_value=fake_server)
+        with (
+            patch("fact_reasoner.serving.VLLMServer", server_ctor),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run(
+                [
+                    *self._IO,
+                    "--backend",
+                    "vllm",
+                    "--model",
+                    "/weights/granite-4.2-8b",
+                    "--served-model",
+                    "granite",
+                    "--atomizer-adapter",
+                    "ar",
+                    "--atomizer-adapter-path",
+                    "/adapters/ar",
+                    "--max-lora-rank",
+                    "64",
+                ]
+            )
+        kwargs = server_ctor.call_args.kwargs
+        assert kwargs["lora_modules"] == {"ar": "/adapters/ar"}
+        assert kwargs["max_lora_rank"] == 64
+        fake_server.build_backend.assert_any_call(model_id="ar")
+        assert fr.call_args.kwargs["atomizer_backend"] is not None

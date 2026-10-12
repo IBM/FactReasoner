@@ -166,6 +166,26 @@ class TestVLLMServerLifecycle:
             server.stop()
             assert server._proc is None
 
+    def test_start_does_not_print_api_key(self, tmp_path, capsys):
+        server = self._server(tmp_path, api_key="sk-secret-value")
+        fake = _FakeProc(exit_codes=[None])
+
+        with (
+            patch("fact_reasoner.serving.subprocess.Popen", return_value=fake) as popen,
+            patch.object(VLLMServer, "_probe_ready", return_value=True),
+            patch("fact_reasoner.serving.os.killpg"),
+            patch("fact_reasoner.serving.os.getpgid", return_value=fake.pid),
+        ):
+            server.start()
+            server.stop()
+
+        out = capsys.readouterr().out
+        assert "sk-secret-value" not in out
+        assert "[VLLMServer] Launching vllm serve" in out
+        # The real key is still what the server is launched with.
+        launched = popen.call_args.args[0]
+        assert launched[launched.index("--api-key") + 1] == "sk-secret-value"
+
     def test_start_fails_fast_if_process_exits(self, tmp_path):
         server = self._server(tmp_path)
         # poll() returns a non-zero exit code -> RuntimeError with log tail.
@@ -218,3 +238,37 @@ class TestVLLMServerLifecycle:
             assert bb.call_args.args[0] == "vllm"
             assert kwargs["model_id"] == "granite-4.1-8b"
             assert kwargs["base_url"] == "http://127.0.0.1:8000/v1"
+
+
+class TestVLLMServerLoRA:
+    def test_argv_enables_lora_modules(self):
+        server = VLLMServer(
+            "/weights/granite-4.2-8b",
+            port=8000,
+            lora_modules={"fr-atomizer-reviser": "/adapters/ar"},
+            max_lora_rank=64,
+        )
+        argv = server.argv()
+        assert "--enable-lora" in argv
+        assert (
+            argv[argv.index("--lora-modules") + 1] == "fr-atomizer-reviser=/adapters/ar"
+        )
+        assert argv[argv.index("--max-lora-rank") + 1] == "64"
+
+    def test_argv_without_lora_has_no_lora_flags(self):
+        argv = VLLMServer("/weights/m", port=8000).argv()
+        assert "--enable-lora" not in argv and "--lora-modules" not in argv
+
+    def test_build_backend_for_adapter_uses_its_name(self):
+        server = VLLMServer(
+            "/weights/m", port=8000, lora_modules={"fr-atomizer-reviser": "/a"}
+        )
+        with patch("fact_reasoner.serving.build_backend") as bb:
+            server.build_backend(model_id="fr-atomizer-reviser")
+        assert bb.call_args.kwargs["model_id"] == "fr-atomizer-reviser"
+        assert bb.call_args.kwargs["base_url"] == server.base_url
+
+    def test_build_backend_rejects_unserved_model(self):
+        server = VLLMServer("/weights/m", port=8000)
+        with pytest.raises(ValueError, match="not served here"):
+            server.build_backend(model_id="fr-atomizer-reviser")

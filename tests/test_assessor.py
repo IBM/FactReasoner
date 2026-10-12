@@ -15,10 +15,12 @@
 
 """Unit tests for fact_reasoner.assessor module (FactReasoner class)."""
 
+import asyncio
 import pytest
 import json
 import tempfile
 import os
+from unittest.mock import MagicMock, patch
 
 from fact_reasoner.assessor import FactReasoner
 from fact_reasoner.fact_graph import FactGraph
@@ -393,6 +395,86 @@ class TestFactReasonerFromFactGraph:
         assert "a0" in pipeline.atoms
         assert "c0" in pipeline.contexts
         assert len(pipeline.relations) == 1
+
+
+class TestFactReasonerBuildRevision:
+    """Tests for the atom-revision stage of FactReasoner.build."""
+
+    def test_build_awaits_parallel_reviser(
+        self,
+        mock_atomizer,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        pipeline = FactReasoner(
+            atom_extractor=mock_atomizer,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+        )
+        pipeline.atoms = {
+            "a0": Atom(id="a0", text="He was born in 1879."),
+            "a1": Atom(id="a1", text="She won the prize."),
+        }
+
+        class _StopAfterRevision(Exception):
+            pass
+
+        # Stop at the next stage: only the revision step is under test.
+        with patch(
+            "fact_reasoner.assessor.build_contexts", side_effect=_StopAfterRevision
+        ):
+            with pytest.raises(_StopAfterRevision):
+                asyncio.run(
+                    pipeline.build(response="resp", has_atoms=True, revise_atoms=True)
+                )
+
+        # The async batch is awaited; the blocking per-atom run() is not used.
+        mock_reviser.run_batch.assert_awaited_once_with(
+            ["He was born in 1879.", "She won the prize."], "resp"
+        )
+        mock_reviser.run.assert_not_called()
+        assert pipeline.atoms["a0"].get_text() == "Revised first unit."
+        assert pipeline.atoms["a1"].get_text() == "Revised second unit."
+
+    def test_build_skips_reviser_when_extractor_revises(
+        self,
+        mock_reviser,
+        mock_retriever,
+        mock_nli_extractor,
+        mock_summarizer,
+    ):
+        extractor = MagicMock()
+        extractor.revises_atoms = True
+        extractor.run.return_value = {"0": "Albert Einstein was born in 1879."}
+        pipeline = FactReasoner(
+            atom_extractor=extractor,
+            atom_reviser=mock_reviser,
+            context_retriever=mock_retriever,
+            context_summarizer=mock_summarizer,
+            nli_extractor=mock_nli_extractor,
+            merlin_path="/path/to/merlin",
+        )
+
+        class _StopAfterRevision(Exception):
+            pass
+
+        with patch(
+            "fact_reasoner.assessor.build_contexts", side_effect=_StopAfterRevision
+        ):
+            with pytest.raises(_StopAfterRevision):
+                asyncio.run(
+                    pipeline.build(query="q", response="resp", revise_atoms=True)
+                )
+
+        # The query reaches the one-shot extractor, and its atoms are kept as-is.
+        extractor.run.assert_called_once_with("resp", query="q")
+        mock_reviser.run_batch.assert_not_called()
+        assert pipeline.atoms["a0"].get_text() == "Albert Einstein was born in 1879."
 
 
 class TestFactReasonerBuildMarkovNetwork:
