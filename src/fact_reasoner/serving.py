@@ -43,6 +43,9 @@ DEFAULT_GPU_MEMORY_UTILIZATION = 0.90
 DEFAULT_TERM_GRACE_S = 20.0
 # How much of the vLLM log to include in error messages.
 _LOG_TAIL_CHARS = 4000
+# Stands in for the API key in the launch line we print, so the key never
+# reaches stdout (or the LSF job log that captures it).
+_REDACTED = "<redacted>"
 
 
 def _resolve_tensor_parallel_size(explicit: int | None) -> int:
@@ -211,8 +214,13 @@ class VLLMServer:
         """OpenAI-compatible base URL for the server (``http://host:port/v1``)."""
         return f"http://{self.host}:{self.port}/v1"
 
-    def argv(self) -> list[str]:
-        """Return the ``vllm serve`` command line this server will launch."""
+    def argv(self, redact_api_key: bool = False) -> list[str]:
+        """Return the ``vllm serve`` command line this server will launch.
+
+        Args:
+            redact_api_key: Replace the ``--api-key`` value with a placeholder,
+                for display. The unredacted argv is what gets executed.
+        """
         return _build_vllm_argv(
             model=self.model,
             served_model_name=self.served_model_name,
@@ -222,7 +230,7 @@ class VLLMServer:
             gpu_memory_utilization=self.gpu_memory_utilization,
             max_model_len=self.max_model_len,
             dtype=self.dtype,
-            api_key=self.api_key,
+            api_key=_REDACTED if redact_api_key else self.api_key,
             extra_args=self.extra_args,
         )
 
@@ -242,7 +250,10 @@ class VLLMServer:
             proc_env.update(self.env)
 
         argv = self.argv()
-        print(f"[VLLMServer] Launching: {' '.join(argv)}", flush=True)
+        print(
+            f"[VLLMServer] Launching: {' '.join(self.argv(redact_api_key=True))}",
+            flush=True,
+        )
         print(f"[VLLMServer] Logging vLLM output to: {self.log_path}", flush=True)
 
         self._log_file = open(self.log_path, "w")
