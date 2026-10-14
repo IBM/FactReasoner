@@ -825,8 +825,14 @@ class ContextRetriever:
         text: str,
         atom: Atom | None = None,
         id_prefix: str = "c",
-    ) -> list[Context]:
-        """Worker function: retrieve contexts (and optionally summarize) for one item."""
+    ) -> list[Context] | Exception:
+        """Worker function: retrieve contexts (and optionally summarize) for one item.
+
+        Returns:
+            list[Context] | Exception: The contexts, or the summarizer's
+            exception when the summarizer was created with ``raise_errors=True``
+            (:meth:`retrieve_all` re-raises it).
+        """
         retrieved = self.retriever.query(text=text)
 
         contexts = []
@@ -847,9 +853,17 @@ class ContextRetriever:
             and atom is not None
             and len(contexts) > 0
         ):
-            results = self.context_summarizer.run(
-                [c.get_text() for c in contexts], atom.text
-            )
+            try:
+                results = self.context_summarizer.run(
+                    [c.get_text() for c in contexts], atom.text
+                )
+            except Exception as e:  # noqa: BLE001
+                # Hand a raise-mode summarizer error back as the result, so
+                # retrieve_all re-raises it instead of logging it as a failed
+                # retrieval. Anything else keeps the existing path.
+                if getattr(self.context_summarizer, "raise_errors", False) is not True:
+                    raise
+                return e
             for context, result in zip(contexts, results):
                 if result["summary"]:
                     context.set_synthetic_summary(result["summary"])
@@ -866,7 +880,13 @@ class ContextRetriever:
         atoms: dict[str, Atom],
         query: str | None = None,
     ) -> dict[str, Context]:
-        """Retrieve contexts for all atoms (and optionally the query) in parallel."""
+        """Retrieve contexts for all atoms (and optionally the query) in parallel.
+
+        An item whose retrieval fails or times out is logged and skipped. If the
+        context summarizer was created with ``raise_errors=True``, the first
+        summarizer error to complete is re-raised here instead, and the items
+        still queued are cancelled.
+        """
         all_contexts: dict[str, Context] = {}
         futures = {}
 
@@ -908,6 +928,11 @@ class ContextRetriever:
                     )
                     telemetry.count_fallback("retriever", "retrieval_error")
                     continue
+                if isinstance(contexts, Exception):
+                    # Stop queued items from making more search and LLM calls;
+                    # items already running finish when the executor exits.
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise contexts
                 for ctx in contexts:
                     all_contexts[ctx.id] = ctx
                 if atom is not None:

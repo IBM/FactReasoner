@@ -261,6 +261,27 @@ class TestConstruction:
         assert r.nli_extractor.show_progress is True
         assert r.context_summarizer.show_progress is True
 
+    def test_raise_errors_defaults_false_on_the_four_stages(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.raise_errors is False
+        assert r.atom_extractor.raise_errors is False
+        assert r.atom_reviser.raise_errors is False
+        assert r.nli_extractor.raise_errors is False
+        assert r.context_summarizer.raise_errors is False
+
+    @pytest.mark.parametrize("adapters", [False, True])
+    def test_raise_errors_forwarded_to_the_four_stages(self, adapters):
+        kwargs = {}
+        if adapters:
+            kwargs = {"atomizer_backend": MagicMock(), "nli_backend": MagicMock()}
+        r = FactualityRunner(
+            MagicMock(), pipeline="factscore", raise_errors=True, **kwargs
+        )
+        assert r.atom_extractor.raise_errors is True
+        assert r.atom_reviser.raise_errors is True
+        assert r.nli_extractor.raise_errors is True
+        assert r.context_summarizer.raise_errors is True
+
 
 class TestContextRetrieverWiring:
     def test_wraps_a_retriever(self):

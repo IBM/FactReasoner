@@ -31,7 +31,7 @@ from mellea.stdlib.components import Message
 from mellea.stdlib.context import ChatContext
 
 from fact_reasoner import telemetry
-from fact_reasoner.utils import run_throttled
+from fact_reasoner.utils import handle_generation_error, run_throttled
 
 from ._async_runner import run_coroutine
 
@@ -78,7 +78,13 @@ class AtomizerReviser:
     #: The atoms this extractor returns are already decontextualized.
     revises_atoms = True
 
-    def __init__(self, backend: Backend, reasoning: bool | None = False):
+    def __init__(
+        self,
+        backend: Backend,
+        reasoning: bool | None = False,
+        *,
+        raise_errors: bool = False,
+    ):
         """
         Initialize the AtomizerReviser.
 
@@ -91,6 +97,10 @@ class AtomizerReviser:
                 Defaults to False, which matches how the adapter was trained
                 (granite-4.2 thinks by default otherwise). None sends no setting
                 and keeps the backend's default.
+            raise_errors: bool
+                If True, an exception raised by the backend (e.g. a connection
+                error) propagates to the caller unchanged. Default False: the
+                error is printed and the response gets no atoms (``{}``).
         """
 
         # Safety checks
@@ -107,6 +117,7 @@ class AtomizerReviser:
 
         self.backend = backend
         self.reasoning = reasoning
+        self.raise_errors = raise_errors
 
         # Print backend info
         print(f"[AtomizerReviser] Using Mellea backend: {self.backend}")
@@ -199,12 +210,15 @@ class AtomizerReviser:
         # Positionally aligned with `responses`; every failure maps to {}.
         return [self._parse_output(output) for output in outputs]
 
-    @staticmethod
-    def _parse_output(output: Any) -> dict[str, str]:
+    def _parse_output(self, output: Any) -> dict[str, str]:
         """Map one ``achat`` result (or captured exception) to a units dict."""
         if isinstance(output, Exception):
-            print(f"[AtomizerReviser] Generation failed: {output}")
-            telemetry.count_fallback("atomizer_reviser", "generation_error")
+            handle_generation_error(
+                output,
+                "atomizer_reviser",
+                "[AtomizerReviser] Generation failed",
+                self.raise_errors,
+            )
             return {}
         message, _ = output
         units = parse_units(str(message.content or ""))

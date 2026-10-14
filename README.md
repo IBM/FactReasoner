@@ -404,6 +404,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
 | `--list-models` | Print the available unified model ids (and aliases) and exit. |
 | `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
+| `--raise-errors` | Stop with the backend's exception when an LLM call fails, instead of printing it and using a fallback result (see [Handling LLM errors](#handling-llm-errors)). |
 
 ### SIMBA-UQ options (`--nli-method simbauq`)
 
@@ -532,6 +533,18 @@ runner = FactualityRunner(
     nli_backend=build_backend("vllm", model_id="fr-nli", base_url=url),
 )
 ```
+
+#### Handling LLM errors
+
+By default a failed LLM call is printed and replaced by a fallback (no atoms, the
+unrevised atom, a neutral relation, an empty summary), so callers cannot tell that
+the results came from fallbacks. With `raise_errors=True` (CLI: `--raise-errors`)
+the backend's own exception propagates instead, with its original type and
+traceback. `FactualityRunner` passes it to the Atomizer, Reviser, NLI and
+Summarizer stages, which also take it directly, as do `AtomizerReviser` and
+`NLIAdapterExtractor`. A stage batch raises once all its calls have finished;
+context retrieval raises on the first summarizer error and cancels the atoms still
+queued. Parsing failures and retrieval errors keep their fallbacks.
 
 ### Serving a local model on a GPU cluster (LSF)
 
