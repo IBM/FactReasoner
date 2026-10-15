@@ -105,6 +105,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Show progress bars during execution (NLI relations, context "
         "summarization, and baseline atom labeling).",
     )
+    p.add_argument(
+        "--raise-errors",
+        action="store_true",
+        help="Stop with the backend's exception when an LLM call fails in atom "
+        "extraction, revision, NLI or summarization, instead of printing it and "
+        "using a fallback result.",
+    )
 
     # --- NLI relation-extraction cost ---
     # One LLM call per candidate pair means A*C calls for the atom-context phase
@@ -526,6 +533,7 @@ def main() -> None:
             show_progress=args.progress_bar,
             atomizer_backend=adapters.get("atomizer"),
             nli_backend=adapters.get("nli"),
+            raise_errors=args.raise_errors,
         )
 
         if file_mode:

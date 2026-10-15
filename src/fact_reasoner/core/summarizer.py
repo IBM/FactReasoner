@@ -27,6 +27,7 @@ from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
     extract_logprobs_from_output,
+    handle_generation_error,
     run_throttled,
 )
 
@@ -165,6 +166,8 @@ class ContextSummarizer:
         self,
         backend: Backend,
         show_progress: bool = False,
+        *,
+        raise_errors: bool = False,
     ):
         """
         Initialize the ContextSummarizer.
@@ -175,6 +178,10 @@ class ContextSummarizer:
             show_progress: bool
                 If True, ``run_batch`` shows a ``tqdm`` progress bar that advances
                 as each context summary completes. Default False.
+            raise_errors: bool
+                If True, an exception raised by the backend (e.g. a connection
+                error) propagates to the caller unchanged. Default False: the
+                error is printed and the context gets an empty summary.
         """
 
         # Safety checks
@@ -183,6 +190,7 @@ class ContextSummarizer:
                 "Mellea backend is None. Please provide a valid Mellea backend."
             )
         self.show_progress = show_progress
+        self.raise_errors = raise_errors
 
         # Initialize the extractor
         self.backend = backend
@@ -294,8 +302,12 @@ class ContextSummarizer:
         for context, output in zip(contexts, outputs):
             if isinstance(output, Exception) or not getattr(output, "success", False):
                 if isinstance(output, Exception):
-                    print(f"[Summarizer] Batch item failed: {output}")
-                    telemetry.count_fallback("summarizer", "generation_error")
+                    handle_generation_error(
+                        output,
+                        "summarizer",
+                        "[Summarizer] Batch item failed",
+                        self.raise_errors,
+                    )
                 else:
                     telemetry.count_fallback("summarizer", "sampling_failed")
                 results.append({"context": context, "summary": "", "probability": 0.0})

@@ -21,6 +21,8 @@ from typing import Any
 import requests
 import tqdm
 
+from fact_reasoner import telemetry
+
 LOOP_BUDGET = 5
 
 # Throttling defaults for batched LLM generation. The rate limit protects
@@ -136,6 +138,35 @@ async def run_throttled(
     tasks = [asyncio.create_task(_one(item)) for item in items]
     # _one never raises, so gather returns one result per item in order.
     return await asyncio.gather(*tasks)
+
+
+def handle_generation_error(
+    error: Exception, component: str, message: str, raise_errors: bool
+) -> None:
+    """Report a failed LLM call, or re-raise it when the caller opted in.
+
+    By default the error is printed as ``"{message}: {error}"`` and counted as a
+    ``generation_error`` fallback; the calling stage then substitutes its
+    default result. With ``raise_errors`` the original exception is re-raised
+    as is (same object, type, traceback and cause), so callers can catch it.
+
+    Args:
+        error: Exception
+            The exception raised by the LLM call.
+        component: str
+            The component name used for telemetry (e.g. ``"atomizer"``).
+        message: str
+            The prefix of the printed line (e.g. ``"[Atomizer] Batch item failed"``).
+        raise_errors: bool
+            If True, re-raise ``error`` instead of reporting it.
+
+    Raises:
+        Exception: ``error`` itself, when ``raise_errors`` is True.
+    """
+    if raise_errors:
+        raise error
+    print(f"{message}: {error}")
+    telemetry.count_fallback(component, "generation_error")
 
 
 async def gather_with_progress(

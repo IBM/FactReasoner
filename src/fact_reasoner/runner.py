@@ -123,6 +123,11 @@ class FactualityRunner:
             :class:`~fact_reasoner.core.nli.NLIAdapterExtractor` with the same
             ``nli_method`` and SIMBA-UQ settings; its verdicts have the format
             the pipeline already consumes.
+        raise_errors: If True, an exception raised by the backend during atom
+            extraction, atom revision, NLI or context summarization propagates
+            to the caller unchanged. Default False: the error is printed and the
+            stage falls back to its default result (no atoms, an unrevised
+            atom, a neutral relation, an empty summary).
     """
 
     def __init__(
@@ -155,6 +160,7 @@ class FactualityRunner:
         show_progress: bool = False,
         atomizer_backend: Backend | None = None,
         nli_backend: Backend | None = None,
+        raise_errors: bool = False,
     ) -> None:
         """Initialize the runner and its shared components."""
         if pipeline not in PIPELINES:
@@ -190,6 +196,7 @@ class FactualityRunner:
         self.nli_classifier_path = nli_classifier_path
         self.nli_cache_dir = nli_cache_dir
         self.show_progress = show_progress
+        self.raise_errors = raise_errors
 
         # `nli_mode` picks the pair-config preset; any explicit override then wins,
         # so a caller can start from a preset and adjust one knob.
@@ -208,11 +215,11 @@ class FactualityRunner:
 
         # Shared components.
         self.atom_extractor = (
-            AtomizerReviser(atomizer_backend)
+            AtomizerReviser(atomizer_backend, raise_errors=raise_errors)
             if atomizer_backend is not None
-            else Atomizer(backend)
+            else Atomizer(backend, raise_errors=raise_errors)
         )
-        self.atom_reviser = Reviser(backend)
+        self.atom_reviser = Reviser(backend, raise_errors=raise_errors)
         nli_cls = NLIAdapterExtractor if nli_backend is not None else NLIExtractor
         self.nli_extractor = nli_cls(
             nli_backend if nli_backend is not None else backend,
@@ -221,9 +228,10 @@ class FactualityRunner:
             simbauq_confidence_method=self.nli_confidence_method,
             simbauq_classifier_path=self.nli_classifier_path,
             show_progress=self.show_progress,
+            raise_errors=raise_errors,
         )
         self.context_summarizer = ContextSummarizer(
-            backend, show_progress=self.show_progress
+            backend, show_progress=self.show_progress, raise_errors=raise_errors
         )
 
     def _build_context_retriever(self) -> ContextRetriever:

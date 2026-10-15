@@ -28,6 +28,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
+    handle_generation_error,
     run_throttled,
     strip_code_fences,
 )
@@ -151,6 +152,8 @@ class Reviser:
         self,
         backend: Backend,
         reasoning: bool | None = False,
+        *,
+        raise_errors: bool = False,
     ):
         """
         Initialize the Reviser.
@@ -167,6 +170,10 @@ class Reviser:
                 without it, so enable it if revision quality drops. None sends
                 no setting and keeps the backend's own default; use it for
                 hosted models that reject a reasoning parameter.
+            raise_errors: bool
+                If True, an exception raised by the backend (e.g. a connection
+                error) propagates to the caller unchanged. Default False: the
+                error is printed and the atom is returned unrevised.
         """
 
         # Safety checks
@@ -184,6 +191,7 @@ class Reviser:
         # Initialize the reviser
         self.backend = backend
         self.reasoning = reasoning
+        self.raise_errors = raise_errors
 
         # Print backend info
         print(f"[Reviser] Using Mellea backend: {self.backend}, reasoning={self.reasoning}")
@@ -297,8 +305,9 @@ class Reviser:
         results: list[dict[str, Any]] = []
         for atom_text, output in zip(units, outputs):
             if isinstance(output, Exception):
-                print(f"[Reviser] Batch item failed: {output}")
-                telemetry.count_fallback("reviser", "generation_error")
+                handle_generation_error(
+                    output, "reviser", "[Reviser] Batch item failed", self.raise_errors
+                )
                 results.append(self._fallback(atom_text))
                 continue
             results.append(self._parse_output(output, atom_text))
