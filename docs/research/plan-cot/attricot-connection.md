@@ -1,5 +1,12 @@
 # AttriCoT and the causal CoT research plan
 
+**Scope update, 16 October 2026.** The revised core study tests held-out
+intervention prediction, then the incremental value of coherence. AttriCoT is a
+costed local-attribution baseline, not a prerequisite for the numerical PoC.
+This update preserves the manuscript assessment below; it adds no new literature
+search or paper replication. Sections 3–4 explain the connection; section 6 gives
+the core comparison. The broader directions in section 5 are optional extensions.
+
 **Assessment: 2 October 2026.** Source: [*Local Causal Attribution of
 Chain-of-Thought Reasoning*](papers/Interpretability_and_Steering_of_LRMs.pdf),
 an anonymous, 43-page manuscript marked “under double-blind review.” The filename
@@ -120,7 +127,7 @@ $$
 
 An edit replaces a selected kernel. Other states are sampled using their new
 parents. This supplies the distributions needed for total effects and policy
-evaluation. See [the self-contained SCM](proofofconcept.md#11-an-scm-for-long-chains-of-thought).
+evaluation. See [the self-contained SCM](proofofconcept.md#2-complete-scm).
 
 AttriCoT can instead be represented as an **experimental measurement layer**:
 mask settings determine a reassembled prefix, which the frozen model maps to
@@ -183,7 +190,7 @@ from this toy: it has no text-deletion mechanism or token likelihoods. Conversel
 local score effects alone do not determine its repair probability. High local
 influence and weak final-answer influence can coexist without contradiction.
 
-## 5. Three research directions worth pursuing
+## 5. Optional extensions after the core comparison
 
 ### A. Use local measurements to guide expensive causal experiments
 
@@ -239,15 +246,18 @@ correctness and cost rather than on an attribution score alone.
 
 ## 6. Recommended first experiment and revised positioning
 
-Extend the existing 30-template, two-trace pilot rather than introduce a new large
-benchmark. On the same traces:
+Use the planned 30-template, two-trace pilot; it has not yet been run. First
+complete the [synthetic fit-and-predict experiment](proofofconcept.md#5-learn-mechanisms-and-predict-unseen-combinations)
+and the native-prefix continuation checks. On a prespecified, costed subset of
+the pilot traces:
 
-1. Reproduce AttriCoT-LOO and TA-KL with matched deletion; add 2x on a costed
-   subset. Retain exact segmentation, token offsets, and both score signs.
+1. Reproduce AttriCoT-LOO with matched deletion. Retain exact segmentation,
+   token offsets, and both score signs. TA-KL and AttriCoT-2x are subsequent
+   comparisons if the initial baseline and budget justify them.
 2. Run the planned correct/wrong/paraphrase prefix continuations. Add fixed-target
    scoring for those **same** replacements; deletion and corruption remain separate
    intervention families. Keep all continuations from a problem in one split.
-3. On a small prespecified subset, cross subtotal and first-result edits. Record
+3. On held-out prefixes, cross subtotal and first-result edits. Record
    recomputation, acceptance, commitment, answer, and token use. Do not silently
    equate a verification instruction with successful repair.
 4. Compare local-score predictors, semantic-only SCMs, and the combined SCM on

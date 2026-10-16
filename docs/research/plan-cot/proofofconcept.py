@@ -1,9 +1,10 @@
-"""Exact, synthetic coherence-informed SCM and long-chain examples.
+"""Synthetic CoT SCM: exact interventions and finite-sample mechanism fitting.
 
 See proofofconcept.md for notation and assumptions. All numerical checks use the
 standard library; rendering the seven figures requires Matplotlib. The local factor
 formulas mirror FactReasoner's documented tables, without importing its LLM stack.
-No result in this file is an estimate from a real reasoning model.
+No result in this file is an estimate from a real reasoning model. The optional
+counterfactual and long-chain examples are separate from the core learning study.
 """
 
 from __future__ import annotations
@@ -12,13 +13,14 @@ import argparse
 import itertools
 import json
 import math
+import random
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class ToyParameters:
-    """Fixed parameters, not sampled disturbances; names match Section 4."""
+    """Fixed simulator parameters; coherence construction is optional."""
 
     rho_N: float = 0.9
     pi: float = 0.5
@@ -261,6 +263,161 @@ def long_chain_queries(length=12, kappa=.98, recovery=.15, *, params=DEFAULTS):
             "p_Y7_control": y0, "p_Y7_edited": y1, "answer_effect": y1-y0}
 
 
+# The fitted model receives only sampled records and the declared graph/domains.
+# C is the known deterministic commitment rule; every stochastic row is learned.
+LEARNED_PARENTS = {"N": None, "B": "N", "R": "B", "Y": "C"}
+SUCCESS = {"N": 12, "B": 7, "R": 1, "Y": 7}
+
+
+def fit_mechanisms(records):
+    """Beta(1,1)-smoothed CPTs, excluding a node's intervened observations."""
+    counts = {
+        node: {str(value): [0, 0] for value in (DOMAINS[parent] if parent else (None,))}
+        for node, parent in LEARNED_PARENTS.items()
+    }
+    for intervention, state in records:
+        for node, parent in LEARNED_PARENTS.items():
+            if node in intervention:
+                continue
+            row = counts[node][str(state[parent] if parent else None)]
+            row[0] += int(state[node] == SUCCESS[node])
+            row[1] += 1
+    cpts = {node: {key: (s+1)/(n+2) for key, (s, n) in rows.items()}
+            for node, rows in counts.items()}
+    return cpts, counts
+
+
+def learned_distribution(cpts, do=None):
+    """Truncated factorization using fitted rows, never simulator parameters."""
+    interventions = intervention_kernels(do)
+    rows = []
+    for values in itertools.product(*DOMAINS.values()):
+        state = dict(zip(DOMAINS, values))
+        mass = 1.0
+        for node in DOMAINS:
+            if node in interventions:
+                factor = interventions[node][state[node]]
+            elif node == "C":
+                factor = float(state[node] == (7 if state["R"] else state["B"]))
+            else:
+                parent = LEARNED_PARENTS[node]
+                p = cpts[node][str(state[parent] if parent else None)]
+                if not math.isfinite(p) or not 0 <= p <= 1:
+                    raise ValueError("Fitted probabilities must be in [0,1]")
+                factor = p if state[node] == SUCCESS[node] else 1-p
+            mass *= factor
+        if mass:
+            rows.append((state, mass))
+    assert math.isclose(sum(mass for _, mass in rows), 1, abs_tol=1e-12)
+    return rows
+
+
+def learned_summary(cpts, do=None):
+    rows = learned_distribution(cpts, do)
+    return {f"p_{node}{value}": sum(m for s, m in rows if s[node] == value)
+            for node, value in (("B", 7), ("R", 1), ("C", 7), ("Y", 7))}
+
+
+def binary_log_loss(p, outcome):
+    # Declared numerical clipping also makes out-of-support predictions scoreable.
+    p = min(1-1e-12, max(1e-12, p))
+    return -math.log(p if outcome else 1-p)
+
+
+def learning_experiment(seed=7, train_per_arm=256, test_per_arm=1024, *, params=DEFAULTS):
+    """Learn from single edits; predict unseen crosses and independently sample them."""
+    if any(not isinstance(n, int) or isinstance(n, bool) or n < 1
+           for n in (train_per_arm, test_per_arm)):
+        raise ValueError("Sample counts must be positive integers")
+    train_rng, test_rng = random.Random(seed), random.Random(seed+1)
+    training = {"natural": {}, "N12": {"N": 12}, "N15": {"N": 15},
+                "B7": {"B": 7}, "B10": {"B": 10},
+                "C7": {"C": 7}, "C10": {"C": 10}}
+    held_out = {"N12_R0": {"N": 12, "R": 0}, "N15_R0": {"N": 15, "R": 0},
+                "N12_C7": {"N": 12, "C": 7}, "N15_C7": {"N": 15, "C": 7},
+                "N12_B10": {"N": 12, "B": 10}, "N15_B10": {"N": 15, "B": 10}}
+    records = [(do, structural_run(tuple(train_rng.random() for _ in range(4)), do, params=params))
+               for do in training.values() for _ in range(train_per_arm)]
+    cpts, counts = fit_mechanisms(records)
+    constant_p = (1+sum(s["Y"] == 7 for _, s in records))/(len(records)+2)
+    arms = {}
+    losses, briers, baseline_losses, baseline_briers, state_losses = [], [], [], [], []
+    for name, do in held_out.items():
+        predicted = learned_summary(cpts, do)
+        exact = summary(do, params=params)
+        test_states = [structural_run(tuple(test_rng.random() for _ in range(4)), do, params=params)
+                       for _ in range(test_per_arm)]
+        empirical = {f"p_{node}{value}": sum(s[node] == value for s in test_states)/test_per_arm
+                     for node, value in (("B", 7), ("R", 1), ("C", 7), ("Y", 7))}
+        p = predicted["p_Y7"]
+        for state in test_states:
+            outcome = int(state["Y"] == 7)
+            losses.append(binary_log_loss(p, outcome))
+            briers.append((p-outcome)**2)
+            baseline_losses.append(binary_log_loss(constant_p, outcome))
+            baseline_briers.append((constant_p-outcome)**2)
+            for node, value in (("B", 7), ("R", 1), ("C", 7)):
+                if node not in do:
+                    state_losses.append(binary_log_loss(predicted[f"p_{node}{value}"], state[node] == value))
+        arms[name] = {"do": do, "predicted": predicted, "exact": exact, "empirical": empirical}
+    effects = {}
+    for name, control, edited in (("verification_disabled", "N12_R0", "N15_R0"),
+                                  ("commitment_fixed", "N12_C7", "N15_C7"),
+                                  ("first_result_fixed", "N12_B10", "N15_B10")):
+        effects[name] = {kind: arms[edited][kind]["p_Y7"]-arms[control][kind]["p_Y7"]
+                         for kind in ("predicted", "exact", "empirical")}
+    mean = lambda values: sum(values)/len(values)
+    return {
+        "status": "Synthetic estimation with a known graph; not LLM evidence or a coherence comparison",
+        "seed": seed, "test_seed": seed+1,
+        "train_per_arm": train_per_arm, "test_per_arm": test_per_arm,
+        "training_count": len(records), "test_count": len(held_out)*test_per_arm,
+        "training_design": training, "held_out_design": held_out,
+        "estimator": "Independent Beta(1,1) posterior means; intervened node terms omitted; C rule known",
+        "counts_success_total": counts, "fitted_cpts": cpts,
+        "constant_baseline_p_Y7": constant_p, "arms": arms, "effects": effects,
+        "metrics": {
+            "answer_log_loss": mean(losses), "answer_brier": mean(briers),
+            "constant_baseline_log_loss": mean(baseline_losses),
+            "constant_baseline_brier": mean(baseline_briers),
+            "intermediate_marginal_log_loss": mean(state_losses),
+            "answer_probability_mae_vs_exact": mean([abs(a["predicted"]["p_Y7"]-a["exact"]["p_Y7"])
+                                                      for a in arms.values()]),
+            "effect_mae_vs_exact": mean([abs(e["predicted"]-e["exact"]) for e in effects.values()]),
+        },
+        "limitations": "One seed; no interval-coverage estimate. Held-out combinations only, not unseen tasks or graphs.",
+    }
+
+
+def verify_learning():
+    """Test intervention exclusion and fitted inference against independent oracles."""
+    # Deliberately unbalanced forced values must not train their own mechanisms.
+    state = dict(N=15, B=10, R=0, C=10, Y=10)
+    fitted, counts = fit_mechanisms([({"N": 15, "B": 10}, state)]*10)
+    assert counts["N"]["None"] == [0, 0]
+    assert counts["B"]["15"] == [0, 0]
+    assert counts["R"]["10"] == [0, 10]
+    assert fitted["N"]["None"] == .5
+    for params in (DEFAULTS, replace(DEFAULTS, rho_N=.4, lambda_B=.3, r_10=.25, b_Y=.7)):
+        oracle_cpts = {"N": {"None": params.rho_N},
+                       "B": {str(n): next_value_probability(n, params) for n in (12, 15)},
+                       "R": {str(b): repair_probability(b, params) for b in (7, 10)},
+                       "Y": {str(c): answer_probability(c, params) for c in (7, 10)}}
+        # Check all hard interventions (including no intervention) and every state.
+        options = [[None, *domain] for domain in DOMAINS.values()]
+        for assignments in itertools.product(*options):
+            do = {k: v for k, v in zip(DOMAINS, assignments) if v is not None}
+            expected = {tuple(s.values()): m for s, m in enumerate_scm(do, params=params)}
+            actual = {tuple(s.values()): m for s, m in learned_distribution(oracle_cpts, do)}
+            for state_key in expected.keys() | actual.keys():
+                assert math.isclose(expected.get(state_key, 0), actual.get(state_key, 0), abs_tol=1e-12)
+    experiment = learning_experiment(train_per_arm=16, test_per_arm=16)
+    assert experiment["training_count"] == 112 and experiment["test_count"] == 96
+    training_sets = [set(do.items()) for do in experiment["training_design"].values()]
+    assert all(set(do.items()) not in training_sets for do in experiment["held_out_design"].values())
+    assert all(math.isfinite(value) for value in experiment["metrics"].values())
+
+
 def verify():
     """Check both known results and independent structural/CPT computations."""
     assert math.isclose(compatibility(True, .9, .8), .72/.74, abs_tol=1e-12)
@@ -314,10 +471,12 @@ def verify():
 
 def calculate():
     verify()
+    verify_learning()
     cases = {"natural": {}, "do_N12":{"N":12}, "do_N15":{"N":15},
              "do_N12_R0":{"N":12,"R":0}, "do_N15_R0":{"N":15,"R":0},
              "do_B7":{"B":7}, "do_B10":{"B":10},
-             "do_N15_R1":{"N":15,"R":1}, "do_N15_C10":{"N":15,"C":10}}
+             "do_N15_R1":{"N":15,"R":1}, "do_N15_C10":{"N":15,"C":10},
+             "do_N12_C7":{"N":12,"C":7}, "do_N15_C7":{"N":15,"C":7}}
     outcomes = {name:summary(do) for name,do in cases.items()}
     delta = outcomes["do_N15"]["p_Y7"]-outcomes["do_N12"]["p_Y7"]
     no_repair_delta = outcomes["do_N15_R0"]["p_Y7"]-outcomes["do_N12_R0"]["p_Y7"]
@@ -327,6 +486,8 @@ def calculate():
         "parameters":{**asdict(DEFAULTS),"alpha_R":alpha,"beta_R":beta},
         "outcomes":outcomes,
         "answer_effect":delta,"answer_effect_without_repair":no_repair_delta,
+        "immediate_propagation_effect":outcomes["do_N15"]["p_B7"]-outcomes["do_N12"]["p_B7"],
+        "repair_rate_do_B10":outcomes["do_B10"]["p_R1"],
         "p_N12_given_B10":probability({"N":12},evidence={"B":10}),
         "p_N12_do_B10":probability({"N":12},do={"B":10}),
         "controlled_direct_effect_at_B":{str(b):probability({"Y":7},do={"N":15,"B":b})-
@@ -563,11 +724,21 @@ def figures(outdir, results):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-only",action="store_true")
+    parser.add_argument("--fit-experiment", action="store_true",
+                        help="Print the synthetic fit-and-predict report; render no figures")
+    parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--train-per-arm", type=int, default=256)
+    parser.add_argument("--test-per-arm", type=int, default=1024)
+    parser.add_argument("--json-output", type=Path, help="Also save the selected numerical report")
     parser.add_argument("--output-dir",type=Path,default=Path(__file__).resolve().parent/"figures")
     args=parser.parse_args()
     results=calculate()
+    if args.fit_experiment:
+        results = learning_experiment(args.seed, args.train_per_arm, args.test_per_arm)
     print(json.dumps(results,indent=2))
-    if not args.check_only:
+    if args.json_output:
+        args.json_output.write_text(json.dumps(results, indent=2)+"\n")
+    if not args.check_only and not args.fit_experiment:
         args.output_dir.mkdir(parents=True,exist_ok=True)
         (args.output_dir/"poc-results.json").write_text(json.dumps(results,indent=2)+"\n")
         figures(args.output_dir,results)

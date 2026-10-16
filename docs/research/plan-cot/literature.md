@@ -1,5 +1,23 @@
 # Literature review and positioning
 
+**Organization update, 16 October 2026.** The core study now has two hypotheses:
+predict held-out intervention outcomes with a temporal SCM, and test whether
+coherence improves those predictions. The priority table below maps related work
+to that study. The broader review is retained as background for optional extensions;
+this revision does not claim a new literature search or newly verified records.
+
+| Priority | Work | Required use in the revised plan |
+|---|---|---|
+| Core experimental design | Lanham et al.; Thought Anchors | Corruption/paraphrase controls and same-prefix resampling. |
+| Core outcome definitions | Thought Branches; Thinking Drafts | Distinguish propagation, accepted verification, commitment, and final answer. |
+| Core local baseline | Supplied AttriCoT manuscript | Costed LOO comparison; calibrate local scores before predicting full-suffix effects. |
+| Core causal foundations | Pearl; Geiger et al.; Bao et al. | Specify SCM assumptions and validate abstractions through interventions; acknowledge prior SCM analysis. |
+| Motivation and interpretation | Turpin et al.; Arcuschin et al. | Separate behavioral influence from complete explanatory faithfulness. |
+| Optional extensions | Mechanistic, credal, mediation, training, and active-design literature below | Revisit only when the corresponding extension has a defined experiment. |
+
+The minimal PoC demonstrates estimation under a supplied graph. It does not
+establish novelty or reproduce the empirical baselines in this review.
+
 **Review date: 1 October 2026.** This is a targeted research review, not an
 exhaustive systematic review. Linked papers were checked against primary arXiv
 records; selected closest papers were also read at the methods-section level.
