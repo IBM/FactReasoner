@@ -16,7 +16,7 @@ causal graph or a benefit from coherence features.
 > There are three boxes containing four marbles each. Five marbles are removed.
 > How many marbles remain?
 
-The correct answer is `3 × 4 − 5 = 7`. An illustrative trace is:
+The correct answer is $3 \times 4 - 5 = 7$. An illustrative trace is:
 
 1. “Three boxes with four marbles each give 12 marbles.”
 2. “After removing five, 7 marbles remain.”
@@ -28,9 +28,9 @@ marbles,” then regenerate everything after it. The question stays fixed.
 
 | Path | Subtotal | First result | Verification and commitment | Answer |
 |---|---|---|---|---|
-| Correct | 12 | 12 − 5 = 7 | Keep 7 | 7 |
-| Corruption propagates | 15 | 15 − 5 = 10 | Keep 10 | 10 |
-| Corruption is repaired | 15 | 15 − 5 = 10 | Recheck: 3 × 4 = 12, hence 7; accept 7 | 7 |
+| Correct | 12 | $12-5=7$ | Keep 7 | 7 |
+| Corruption propagates | 15 | $15-5=10$ | Keep 10 | 10 |
+| Corruption is repaired | 15 | $15-5=10$ | Recheck: $3 \times 4=12$, hence 7; accept 7 | 7 |
 
 These are constructed examples, not sampled transcripts. The second path is
 locally consistent with an incorrect premise. The third path shows that an edit
@@ -40,20 +40,20 @@ can change intermediate reasoning even when the final answer returns to 7.
 
 ## 2. Complete SCM
 
-Fix X to the question, model configuration, and decoding settings. The endogenous
+Fix $X$ to the question, model configuration, and decoding settings. The endogenous
 variables describe semantic content in a continuation:
 
 | Variable | Domain | Observation rule |
 |---|---|---|
-| N | {12, 15} | Subtotal explicitly asserted at the first landmark. |
-| B | {7, 10} | Remaining count first asserted after the subtotal. |
-| R | {0, 1} | 1 only when an explicit successful verification is accepted at the checking landmark. |
-| C | {7, 10} | Remaining count committed to after that landmark. |
-| Y | {7, 10} | Canonical number in the final answer. |
+| $N$ | $\{12, 15\}$ | Subtotal explicitly asserted at the first landmark. |
+| $B$ | $\{7, 10\}$ | Remaining count first asserted after the subtotal. |
+| $R$ | $\{0, 1\}$ | 1 only when an explicit successful verification is accepted at the checking landmark. |
+| $C$ | $\{7, 10\}$ | Remaining count committed to after that landmark. |
+| $Y$ | $\{7, 10\}$ | Canonical number in the final answer. |
 
-R=1 repairs an error when B=10 and verifies an already correct result when B=7.
+$R=1$ repairs an error when $B=10$ and verifies an already correct result when $B=7$.
 “Let me check” alone is not successful verification. The correctness outcome is
-`1{Y=7}`; N, B, C, and Y are asserted values, not truth probabilities.
+$\mathbf{1}\{Y=7\}$; $N$, $B$, $C$, and $Y$ are asserted values, not truth probabilities.
 
 ```mermaid
 flowchart LR
@@ -64,57 +64,67 @@ flowchart LR
     C --> Y[Answer Y]
 ```
 
-The graph is conditional on fixed X. Exogenous noise arrows are omitted from the
-figure. Let `U_N, U_B, U_R, U_Y` be independent Uniform(0,1) variables. The SCM is
-`M=(U,V,F,P_U)`, where `V=(N,B,R,C,Y)` and F contains these structural equations:
+The graph is conditional on fixed $X$. Exogenous noise arrows are omitted from the
+figure. Let $U_N,U_B,U_R,U_Y$ be independent $\operatorname{Uniform}(0,1)$ variables.
+The SCM is $\mathcal{M}=(U,V,\mathcal{F},P_U)$, where $V=(N,B,R,C,Y)$ and
+$\mathcal{F}$ contains these structural equations. The indicator $\mathbf{1}\{E\}$
+equals 1 when event $E$ holds and 0 otherwise.
 
 | Variable | Structural equation |
 |---|---|
-| N | 12 if `U_N < 0.9`, otherwise 15. |
-| B | 7 if `U_B < p_B(N)`, otherwise 10. |
-| R | `1{U_R < p_R(B)}`. |
-| C | 7 if R=1, otherwise B. |
-| Y | 7 if `U_Y < p_Y(C)`, otherwise 10. |
+| $N$ | 12 if $U_N < 0.9$, otherwise 15. |
+| $B$ | 7 if $U_B < p_B(N)$, otherwise 10. |
+| $R$ | $\mathbf{1}\{U_R < p_R(B)\}$. |
+| $C$ | 7 if $R=1$, otherwise $B$. |
+| $Y$ | 7 if $U_Y < p_Y(C)$, otherwise 10. |
 
 All mechanism probabilities are specified here:
 
 | Mechanism | Parent state | Probability |
 |---|---|---:|
-| P(N=12) | None | 0.900 |
-| p_B(N) = P(B=7 given N) | N=12 | 0.925 |
-| p_B(N) | N=15 | 0.325 |
-| p_R(B) = P(R=1 given B) | B=7 | 0.100 |
-| p_R(B) | B=10 | 0.800 |
-| p_Y(C) = P(Y=7 given C) | C=7 | 0.955 |
-| p_Y(C) | C=10 | 0.145 |
+| $P(N=12)$ | None | 0.900 |
+| $p_B(N)=P(B=7\mid N)$ | $N=12$ | 0.925 |
+| $p_B(N)$ | $N=15$ | 0.325 |
+| $p_R(B)=P(R=1\mid B)$ | $B=7$ | 0.100 |
+| $p_R(B)$ | $B=10$ | 0.800 |
+| $p_Y(C)=P(Y=7\mid C)$ | $C=7$ | 0.955 |
+| $p_Y(C)$ | $C=10$ | 0.145 |
 
-The other probability in each binary row is its complement. C has no independent
-noise. Together these tables, equations, and noise distribution fully specify
-both sampling and intervention calculations.
+The other probability in each binary row is its complement. Define the
+deterministic commitment function as
+
+$$
+f_C(b,r)=\begin{cases}
+7, & r=1, \\
+b, & r=0.
+\end{cases}
+$$
+
+$C$ has no independent noise. Together these tables, equations, and noise
+distribution fully specify both sampling and intervention calculations.
 
 The joint distribution factorizes as
 
 $$
 p(n,b,r,c,y)=p(n)p(b\mid n)p(r\mid b)
-\mathbf1\{c=7\text{ if }r=1\text{ else }b\}\,p(y\mid c).
+\mathbf{1}\{c=f_C(b,r)\}\,p(y\mid c).
 $$
 
 The graph and commitment rule are assumptions. In particular, this model excludes
-silent recomputation at commitment, failed checks that alter C, other numbers,
-and additional dependence of Y on earlier states after C is known. Since R denotes
-successful accepted verification, R=1 implying C=7 is partly definitional. It is
+silent recomputation at commitment, failed checks that alter $C$, other numbers,
+and additional dependence of $Y$ on earlier states after $C$ is known. Since $R$ denotes
+successful accepted verification, $R=1$ implying $C=7$ is partly definitional. It is
 not evidence that merely asking for a check causes correctness. Real-model data
 must retain out-of-domain and missing outcomes, then test or expand this abstraction.
 
 ## 3. Interventions and their implementation
 
-A hard intervention `do(V=v)` **replaces V's structural equation with the constant
-v**. Keep all other equations and their noise distributions, and generate their
+A hard intervention $\operatorname{do}(V=v)$ **replaces $V$'s structural equation with the constant $v$**. Keep all other equations and their noise distributions, and generate their
 outputs in temporal order. For example,
 
 $$
-p^{do(N=15)}(b,r,c,y)=p(b\mid15)p(r\mid b)
-\mathbf1\{c=7\text{ if }r=1\text{ else }b\}\,p(y\mid c).
+p^{\operatorname{do}(N=15)}(b,r,c,y)=p(b\mid15)p(r\mid b)
+\mathbf{1}\{c=f_C(b,r)\}\,p(y\mid c).
 $$
 
 For a joint intervention, replace every selected equation. The executable
@@ -123,11 +133,11 @@ probabilities. The normalization must remain one.
 
 | Experiment | Simulator assignments | Quantity tested |
 |---|---|---|
-| Subtotal corruption | do(N=12) versus do(N=15) | Immediate propagation and total answer effect. |
-| Intermediate error | do(B=7) versus do(B=10) | Verification and recovery after a wrong first result. |
-| Disable successful verification | Cross each N assignment with do(R=0) | How the subtotal effect changes without successful verification. |
-| Fix commitment | Cross each N assignment with do(C=7) | Whether any subtotal effect on Y remains outside C in this model. |
-| Fix first result | Cross each N assignment with do(B=10) | Whether any subtotal effect remains when the first result is fixed. |
+| Subtotal corruption | $\operatorname{do}(N=12)$ versus $\operatorname{do}(N=15)$ | Immediate propagation and total answer effect. |
+| Intermediate error | $\operatorname{do}(B=7)$ versus $\operatorname{do}(B=10)$ | Verification and recovery after a wrong first result. |
+| Disable successful verification | Cross each $N$ assignment with $\operatorname{do}(R=0)$ | How the subtotal effect changes without successful verification. |
+| Fix commitment | Cross each $N$ assignment with $\operatorname{do}(C=7)$ | Whether any subtotal effect on $Y$ remains outside $C$ in this model. |
+| Fix first result | Cross each $N$ assignment with $\operatorname{do}(B=10)$ | Whether any subtotal effect remains when the first result is fixed. |
 
 For the real-model study, implement subtotal/result/commitment assignments as
 precisely specified replacements at named text landmarks and regenerate the suffix.
@@ -136,85 +146,144 @@ Identity replay reinserts the original tokens; meaning-preserving paraphrases
 retain the semantic value while varying wording. The simulator has no wording or
 cache model, so it cannot quantify these controls.
 
-`do(R=0)` is an ideal intervention available in the simulator. A text instruction
+$\operatorname{do}(R=0)$ is an ideal intervention available in the simulator. A text instruction
 requesting no checking is a distinct policy, not a guaranteed way to suppress
 successful verification. Report that policy's actual effects and compliance.
 Likewise, forcing a commitment text is a test of the abstraction, not proof that
 all internal answer pathways have been fixed.
 
 Observation is different from intervention. In this model,
-`P(N=12 | B=10)=0.5`, whereas `P(N=12 | do(B=10))=0.9`.
-Seeing B=10 updates beliefs about its upstream subtotal; forcing B=10 leaves the
+$P(N=12\mid B=10)=0.5$, whereas $P(N=12\mid\operatorname{do}(B=10))=0.9$.
+Seeing $B=10$ updates beliefs about its upstream subtotal; forcing $B=10$ leaves the
 subtotal mechanism intact. This checks that inference does not substitute ordinary
 conditioning for intervention surgery.
 
 ## 4. Metrics and exact results
 
-Let arm a denote a specified intervention. For n_a independent continuations,
-define the sample proportion for event E as
+There are two kinds of metrics. **Behavioral metrics** describe what happens to
+reasoning and answers under an intervention. **Predictive metrics** measure how
+well the fitted SCM forecasts that behavior. A large intervention effect can be
+predicted accurately or inaccurately; the size of the effect and the quality of
+its prediction answer different questions.
+
+### 4.1 What changes when we intervene?
+
+Let arm $a$ denote a specified intervention. For $n_a$ independent continuations,
+define the sample proportion for event $E$ as
 
 $$
-\widehat p_a(E)=\frac{1}{n_a}\sum_{k=1}^{n_a}\mathbf1\{E\text{ occurs in run }k\}.
+\widehat{p}_a(E)=\frac{1}{n_a}\sum_{k=1}^{n_a}\mathbf{1}\{E\text{ occurs in run }k\}.
 $$
 
 Exact simulator probabilities use the same event definitions, summed over all
-assignments instead of sampled. Define arm 0 as do(N=12), arm 1 as do(N=15), and
-`p_a=P(Y=7 | do(a))`.
+assignments instead of sampled. Define arm 0 as $\operatorname{do}(N=12)$ and arm 1
+as $\operatorname{do}(N=15)$, with $p_a=P(Y=7\mid\operatorname{do}(a))$.
 
 | Metric | Definition | Interpretation |
 |---|---|---|
-| Answer correctness | p_a | Probability of final answer 7 in each arm. |
-| Answer effect | Δ_Y = p_1 − p_0 | Signed effect of corrupting the subtotal. |
-| Immediate propagation | Δ_B = P(B=7 given do(N=15)) − P(B=7 given do(N=12)) | Change in the next result before verification. |
-| Repair rate | P(R=1 given do(B=10)) | Successful accepted verification after a forced incorrect result. |
-| Verification frequency | P(R=1 given do(a)) | Includes verification of already correct results; not always repair. |
-| Edit–verification interaction | I = Δ_Y with do(R=0) − Δ_Y | Change in the corruption effect when successful verification is disabled. |
-| Controlled commitment effect | P(Y=7 given do(N=15,C=7)) − P(Y=7 given do(N=12,C=7)) | Residual effect when commitment is fixed. |
+| Answer correctness | $p_a$ | Probability of final answer 7 in each arm. |
+| Answer effect | $\Delta_Y=p_1-p_0$ | Signed effect of corrupting the subtotal. |
+| Immediate propagation | $\Delta_B=P(B=7\mid\operatorname{do}(N=15))-P(B=7\mid\operatorname{do}(N=12))$ | Change in the next result before verification. |
+| Repair rate | $P(R=1\mid\operatorname{do}(B=10))$ | Successful accepted verification after a forced incorrect result. |
+| Verification frequency | $P(R=1\mid\operatorname{do}(a))$ | Includes verification of already correct results; not always repair. |
+| Edit–verification interaction | $I=\Delta_Y^{R=0}-\Delta_Y$ | Change in the corruption effect when successful verification is disabled. |
+| Controlled commitment effect | $P(Y=7\mid\operatorname{do}(N=15,C=7))-P(Y=7\mid\operatorname{do}(N=12,C=7))$ | Residual effect when commitment is fixed. |
+
+Here $\Delta_Y^{R=0}$ denotes the subtotal-corruption effect with successful
+verification disabled in both arms. Read these quantities as follows:
+
+- **Answer correctness** is the expected fraction of correct final answers if we
+  repeat an arm many times. For example, 0.84565 means about 84.6% correct answers
+  under the corrupted-subtotal intervention. Higher is better task performance,
+  but correctness alone does not establish whether the written reasoning was used.
+- **Answer effect** measures the change caused by the specified edit. A value of
+  −0.09720 means that corrupting the subtotal reduces correctness by **9.72
+  percentage points**, from 94.285% to 84.565%. Negative means harm, positive means
+  improvement, and zero means no change in this endpoint. Zero does not imply that
+  the intermediate reasoning was unchanged.
+- **Immediate propagation** measures how strongly the edit affects the next
+  result, before a later check can repair it. Here −0.60000 means a **60-point
+  drop** in the probability of initially computing 7. Comparing this with the
+  smaller final-answer effect reveals that much of the error is later recovered.
+- **Repair rate** asks how often a deliberately incorrect first result is
+  successfully checked and corrected. Here 0.8 means repair in **80% of runs with
+  $B$ forced to 10**. It is not the fraction of all runs that contain an error, or
+  the final-answer accuracy: even after commitment is corrected, the answer
+  mechanism can still output the wrong number.
+- **Verification frequency** counts accepted successful checks in an arm,
+  including checks of already correct results. It rises from 0.1525 to 0.5725
+  after subtotal corruption: **42 percentage points more verification**. More
+  checking is not automatically better performance; it may reflect more errors
+  to address. Unlike the repair-rate experiment, this arm does not force every
+  first result to be wrong.
+- **Edit–verification interaction** asks whether disabling successful verification
+  changes the damage caused by the edit. Here −0.38880 means the edit becomes
+  **38.88 percentage points more harmful** when verification is disabled: its
+  effect changes from −9.72 to −48.6 points. Under this coding, a negative value
+  indicates that natural verification buffers the corruption effect. This is a
+  comparison of two effects, not a probability of repair.
+- **Controlled commitment effect** asks whether the subtotal still changes final
+  correctness when both arms force the same commitment. Here it is zero because
+  $Y$ depends only on $C$ in the stipulated graph. A nonzero result in a real-model
+  experiment could indicate another pathway or a text intervention that did not
+  successfully fix the intended semantic state.
+
+Rates lie between 0 and 1, and differences between two rates lie between −1 and
+1. The interaction is a difference of differences and can lie between −2 and 2.
+Effects are descriptive: larger absolute values mean greater sensitivity to the
+specified intervention, not necessarily better reasoning or greater faithfulness.
 
 Estimate each contrast by subtracting the corresponding sample proportions.
 Use percentage points when converting probability differences to percentages.
 For independent Bernoulli arms, an approximate standard error of an effect is
-`sqrt(p_hat_1(1-p_hat_1)/n_1 + p_hat_0(1-p_hat_0)/n_0)`; use binomial intervals
-for small samples and retain template clustering in the real study.
+
+$$
+\widehat{\operatorname{SE}}(\widehat{\Delta}_Y)=
+\sqrt{\frac{\widehat{p}_1(1-\widehat{p}_1)}{n_1}
+     +\frac{\widehat{p}_0(1-\widehat{p}_0)}{n_0}}.
+$$
+
+Use binomial intervals for small samples and retain template clustering in the
+real study.
 
 The exact arm table is generated by [proofofconcept.py](proofofconcept.py) and
 stored in [poc-results.json](figures/poc-results.json):
 
-| Assignment | P(B=7) | P(R=1) | P(C=7) | P(Y=7) |
+| Assignment | $P(B=7)$ | $P(R=1)$ | $P(C=7)$ | $P(Y=7)$ |
 |---|---:|---:|---:|---:|
 | No intervention | 0.86500 | 0.19450 | 0.97300 | 0.93313 |
-| do(N=12) | 0.92500 | 0.15250 | 0.98500 | 0.94285 |
-| do(N=15) | 0.32500 | 0.57250 | 0.86500 | 0.84565 |
-| do(B=7) | 1.00000 | 0.10000 | 1.00000 | 0.95500 |
-| do(B=10) | 0.00000 | 0.80000 | 0.80000 | 0.79300 |
-| do(N=12,R=0) | 0.92500 | 0.00000 | 0.92500 | 0.89425 |
-| do(N=15,R=0) | 0.32500 | 0.00000 | 0.32500 | 0.40825 |
-| do(N=12,C=7) | 0.92500 | 0.15250 | 1.00000 | 0.95500 |
-| do(N=15,C=7) | 0.32500 | 0.57250 | 1.00000 | 0.95500 |
+| $\operatorname{do}(N=12)$ | 0.92500 | 0.15250 | 0.98500 | 0.94285 |
+| $\operatorname{do}(N=15)$ | 0.32500 | 0.57250 | 0.86500 | 0.84565 |
+| $\operatorname{do}(B=7)$ | 1.00000 | 0.10000 | 1.00000 | 0.95500 |
+| $\operatorname{do}(B=10)$ | 0.00000 | 0.80000 | 0.80000 | 0.79300 |
+| $\operatorname{do}(N=12,R=0)$ | 0.92500 | 0.00000 | 0.92500 | 0.89425 |
+| $\operatorname{do}(N=15,R=0)$ | 0.32500 | 0.00000 | 0.32500 | 0.40825 |
+| $\operatorname{do}(N=12,C=7)$ | 0.92500 | 0.15250 | 1.00000 | 0.95500 |
+| $\operatorname{do}(N=15,C=7)$ | 0.32500 | 0.57250 | 1.00000 | 0.95500 |
 
-A calculation by hand shows exactly where repair enters. If B=10, then C becomes
+A calculation by hand shows exactly where repair enters. If $B=10$, then $C$ becomes
 7 with probability 0.8; otherwise it remains 10. Consequently,
 
 $$
-P(Y=7\mid do(B=10))=0.8(0.955)+0.2(0.145)=0.793.
+P(Y=7\mid \operatorname{do}(B=10))=0.8(0.955)+0.2(0.145)=0.793.
 $$
 
-Under do(N=15), B is initially correct with probability 0.325:
+Under $\operatorname{do}(N=15)$, $B$ is initially correct with probability 0.325:
 
 $$
-P(Y=7\mid do(N=15))=0.325(0.955)+0.675(0.793)=0.84565.
+P(Y=7\mid \operatorname{do}(N=15))=0.325(0.955)+0.675(0.793)=0.84565.
 $$
 
 Without successful verification this becomes
-`0.325 × 0.955 + 0.675 × 0.145 = 0.40825`.
+$0.325 \times 0.955 + 0.675 \times 0.145 = 0.40825$.
 The resulting contrasts are:
 
 | Metric | Exact value |
 |---|---:|
-| Δ_B | −0.60000 |
-| Δ_Y | −0.09720 |
-| Repair rate under do(B=10) | 0.80000 |
-| Δ_Y with verification disabled | −0.48600 |
+| $\Delta_B$ | −0.60000 |
+| $\Delta_Y$ | −0.09720 |
+| Repair rate under $\operatorname{do}(B=10)$ | 0.80000 |
+| $\Delta_Y$ with verification disabled | −0.48600 |
 | Edit–verification interaction | −0.38880 |
 | Controlled commitment effect | 0.00000 |
 
@@ -224,39 +293,98 @@ controlled effect is built into the graph: it verifies inference but does not
 independently establish a causal fact about LLMs. The interaction is not a natural
 indirect effect or a unique measure of mediation.
 
-For a fitted model, let q_a be its predicted correctness probability and
-z_k=1{Y_k=7}. Use these predictive metrics on held-out data:
+### 4.2 How well does the fitted SCM predict these changes?
 
-- **Answer log loss:** mean `−z_k log(q_a) − (1−z_k) log(1−q_a)`.
-- **Answer Brier score:** mean `(q_a−z_k)^2`.
-- **Intermediate marginal log loss:** the same binary loss for B=7, R=1, and C=7,
-  averaged over unforced variable/run pairs. These are marginal predictions from
-  the pre-continuation intervention, not predictions given realized downstream states.
-- **Answer probability MAE:** mean `|q_a−p_a|` across evaluation arms.
-- **Effect MAE:** mean `|predicted contrast−reference contrast|` across declared
-  arm pairs. The exact simulator supplies p_a; real rollouts supply an uncertain estimate.
+Let $q_a$ be the fitted model's predicted correctness probability, $p_a$ the reference
+probability, and $z_k=\mathbf{1}\{Y_k=7\}$ the observed outcome of a held-out run. **Lower is
+better for all five predictive metrics below.** Evaluate competing predictors on
+the same arms and outcomes so that differences reflect prediction quality.
 
-Use natural logarithms; the implementation clips probabilities to [10^-12, 1−10^-12]
-for log scoring only. Log loss and Brier score score observed outcomes, so even a
-perfect probabilistic model generally has nonzero loss. Probability/effect MAE
-compare distributions and effects. Report interval widths and repeated-dataset
-coverage when uncertainty estimation is added; one seeded run does not estimate
-coverage. Record generated tokens, forward passes, and annotation cost in the LLM study.
+- **Answer log loss:** mean $-z_k\log(q_a)-(1-z_k)\log(1-q_a)$.
+  This asks whether the model assigns high probability to the answers that actually
+  occur. It penalizes confident mistakes strongly: predicting a 90% chance of
+  correctness gives loss about 0.105 when the answer is correct, but 2.303 when it
+  is wrong. The unclipped loss ranges from 0 to infinity and uses natural-log units
+  (nats), not percentages. A constant 50% prediction gives loss about 0.693 on every
+  run. The reported 0.388490 is an average probabilistic loss, not a 38.8% error rate.
+- **Answer Brier score:** mean $(q_a-z_k)^2$.
+  This measures squared distance between predicted correctness and the observed
+  binary outcome. Predicting 0.9 gives a score of 0.01 for a correct answer and
+  0.81 for a wrong answer. The score lies between 0 and 1; a constant 0.5 gives
+  0.25. It is a bounded alternative to log loss, with less extreme penalties for
+  confident errors. A score of 0.120849 is not a 12.1% classification error rate.
+- **Intermediate marginal log loss:** apply the binary log-loss formula to $B=7$,
+  $R=1$, and $C=7$, averaging over unforced variable/run pairs.
+  This asks whether the SCM predicts the first result, successful verification,
+  and commitment, even when the final answer alone hides those changes. Exclude
+  forced variables because the experiment supplies their values. Predictions are
+  made from the intervention before seeing the continuation; they are not given
+  realized downstream states. This score evaluates individual event probabilities,
+  not the entire joint trajectory or recovery of the true graph. Its absolute
+  value need not be below answer log loss because the events differ in uncertainty.
+- **Answer probability MAE:** mean $\lvert q_a-p_a\rvert$ across evaluation arms.
+  MAE means *mean absolute error*. This asks how far predicted arm probabilities
+  are from their reference values, ignoring the direction of each error. If the
+  true probability is 0.8 and the prediction is 0.7, the error is 0.1, or 10
+  percentage points. The range is 0 to 1. Here 0.009395 means an average error of
+  about **0.94 percentage points** across the six held-out arms.
+- **Effect MAE:** mean $\lvert\widehat{\Delta}_j-\Delta_j\rvert$ across the
+  declared arm pairs, where $\widehat{\Delta}_j$ is the fitted prediction and
+  $\Delta_j$ the reference effect for pair $j$.
+  This asks whether the model predicts **how much an intervention changes
+  correctness**. Predicting an effect of −0.05 when the true effect is −0.10 gives
+  an error of 0.05, or 5 percentage points. For the differences of probabilities
+  used here, its range is 0 to 2. The reported 0.016190 means an average effect
+  error of about **1.62 percentage points**. Inspect signed contrasts as well:
+  MAE alone does not reveal whether the model understates harm or reverses its sign.
+
+Probability MAE and effect MAE provide complementary checks. For example, predicting
+0.8 and 0.7 for two arms whose true probabilities are 0.9 and 0.8 gives probability
+MAE 0.1 but effect MAE zero: the errors cancel when subtracting the arms. Conversely,
+oppositely directed arm errors can compound in an effect estimate.
+
+Log loss and Brier score use individual outcomes. Even a model that knows the
+true probability generally has nonzero average loss because outcomes remain
+random: for true correctness $p$, the optimal expected Brier score is $p(1-p)$.
+Probability/effect MAE instead compare predictions with reference probabilities
+and effects; zero means exact agreement. In this simulator the references are
+known exactly. For LLM experiments they must be estimated from independent
+rollouts, and their sampling uncertainty must accompany the reported errors.
+
+The implementation clips probabilities to $[10^{-12},\,1-10^{-12}]$ for log scoring only,
+so impossible predictions receive a large finite penalty. All runs are equally
+weighted in the outcome scores; each arm has the same number of test runs here.
+Probability MAE weights the six arms equally, while effect MAE weights the three
+specified contrasts equally.
+
+### 4.3 How certain and expensive are the estimates?
+
+These quantities are planned for the uncertainty and real-model studies; the
+current seeded learning report contains point estimates only.
+
+| Quantity | Meaning | How to read it |
+|---|---|---|
+| Interval width | Upper minus lower endpoint of an uncertainty interval for a probability or effect. | Narrower intervals give greater precision, provided their coverage is adequate. A width of 0.10 spans 10 percentage points. |
+| Repeated-dataset coverage | Fraction of independently generated datasets whose fitted interval contains the known reference quantity. | A procedure targeting 95% coverage should contain the truth in about 95% of repeated experiments; one interval or one seed cannot establish this. |
+| Computation cost | Generated tokens, model forward passes, and annotation effort used to obtain predictions and reference estimates. | Compare prediction quality at a matched budget, including candidate rejection and feature scoring. Fewer rollouts alone need not imply lower total cost. |
+
+High coverage obtained using very wide intervals is not informative by itself;
+report coverage and width together. Neither is a measure of causal effect size.
 
 ## 5. Learn mechanisms and predict unseen combinations
 
-The executable learning experiment uses the graph and domains above, with the C
+The executable learning experiment uses the graph and domains above, with the $C$
 rule known. It estimates all seven stochastic CPT rows from sampled records;
 it does not read the simulator's probabilities during fitting.
 
 1. Generate 256 training continuations in each of seven arms: no intervention,
-   N=12, N=15, B=7, B=10, C=7, and C=10. Total: 1,792 records.
-2. For each stochastic variable and parent state, count successes s and eligible
-   observations n. Exclude records that force that variable. Fit `(s+1)/(n+2)`,
-   the posterior mean under an independent Beta(1,1) prior. A forced parent still
+   $N=12$, $N=15$, $B=7$, $B=10$, $C=7$, and $C=10$. Total: 1,792 records.
+2. For each stochastic variable and parent state, count successes $s$ and eligible
+   observations $n$. Exclude records that force that variable. Fit $\frac{s+1}{n+2}$,
+   the posterior mean under an independent $\operatorname{Beta}(1,1)$ prior. A forced parent still
    supplies valid observations of its unforced child under the assumed SCM.
-3. Predict six combinations absent from training: N in {12,15} crossed separately
-   with R=0, C=7, and B=10. Replace the relevant fitted equations and sum the joint.
+3. Predict six combinations absent from training: $N\in\{12,15\}$ crossed separately
+   with $R=0$, $C=7$, and $B=10$. Replace the relevant fitted equations and sum the joint.
 4. Evaluate against exact probabilities and 1,024 independently sampled test
    continuations per combination (6,144 records). Training uses seed 7; testing
    uses seed 8. No test outcomes are used to fit the CPTs.
@@ -266,14 +394,14 @@ it does not read the simulator's probabilities during fitting.
 
 The default run is saved in [poc-learning-results.json](figures/poc-learning-results.json):
 
-| Held-out assignment | Fitted P(Y=7) | Exact P(Y=7) |
+| Held-out assignment | Fitted $P(Y=7)$ | Exact $P(Y=7)$ |
 |---|---:|---:|
-| do(N=12,R=0) | 0.888633 | 0.894250 |
-| do(N=15,R=0) | 0.451204 | 0.408250 |
-| do(N=12,C=7) | 0.957093 | 0.955000 |
-| do(N=15,C=7) | 0.957093 | 0.955000 |
-| do(N=12,B=10) | 0.791193 | 0.793000 |
-| do(N=15,B=10) | 0.791193 | 0.793000 |
+| $\operatorname{do}(N=12,R=0)$ | 0.888633 | 0.894250 |
+| $\operatorname{do}(N=15,R=0)$ | 0.451204 | 0.408250 |
+| $\operatorname{do}(N=12,C=7)$ | 0.957093 | 0.955000 |
+| $\operatorname{do}(N=15,C=7)$ | 0.957093 | 0.955000 |
+| $\operatorname{do}(N=12,B=10)$ | 0.791193 | 0.793000 |
+| $\operatorname{do}(N=15,B=10)$ | 0.791193 | 0.793000 |
 
 | Metric | Default fitted-model result |
 |---|---:|
@@ -285,7 +413,7 @@ The default run is saved in [poc-learning-results.json](figures/poc-learning-res
 | Answer probability MAE versus exact | 0.009395 |
 | Effect MAE versus exact | 0.016190 |
 
-Effect MAE averages the N=15 minus N=12 contrasts within each of the three crossed
+Effect MAE averages the $N=15$ minus $N=12$ contrasts within each of the three crossed
 settings. Two effects are structurally zero, so also inspect the individual errors:
 the verification-disabled contrast is predicted as −0.437429, versus −0.486000
 exactly. Empirical test proportions vary around the exact probabilities.
@@ -298,15 +426,15 @@ The null contrasts are consequences of the chosen graph.
 
 ## 6. Where coherence enters the later study
 
-A candidate consistent with N=15 can still be wrong relative to the question.
+A candidate consistent with $N=15$ can still be wrong relative to the question.
 Use separate features for compatibility with the adopted subtotal and with the
 solver-verified task constraints. Coherence produces features or priors; randomized
 continuations estimate behavioral probabilities.
 
-For continuity with the existing implementation, the stipulated B rows can be
-constructed as `p_B(N)=0.75 Q_B(7|N)+0.25`, with Q_B(7|12)=0.9 and
-Q_B(7|15)=0.1. The Y rows use `p_Y(C)=0.9 Q_Y(7|C)+0.1`, with Q_Y(7|7)=0.95
-and Q_Y(7|10)=0.05. The two verification probabilities can be represented by a
+For continuity with the existing implementation, the stipulated $B$ rows can be
+constructed as $p_B(N)=0.75\,Q_B(7\mid N)+0.25$, with $Q_B(7\mid12)=0.9$ and
+$Q_B(7\mid15)=0.1$. The $Y$ rows use $p_Y(C)=0.9\,Q_Y(7\mid C)+0.1$, with $Q_Y(7\mid7)=0.95$
+and $Q_Y(7\mid10)=0.05$. The two verification probabilities can be represented by a
 logistic function of conflict. These are chosen simulator mechanisms, not fitted
 LLM behavior or evidence for this particular mixture.
 
@@ -316,7 +444,7 @@ these features and compare against the same model without them. Include candidat
 `other` mass and all feature-computation costs. No comparison can establish H2 by
 merely reproducing synthetic probabilities that were constructed from coherence.
 
-## 7. Real-model pilot and reproducibility
+## 7. Controlled real-model pilot
 
 The next study uses one pinned open-weight model, 30 arithmetic templates, and two
 original traces per template. At a subtotal boundary compare identity, correct,
@@ -333,7 +461,7 @@ than forcing every trace into the marble example's literal two-number domains.
 Split 18/6/6 templates for training/validation/testing, grouping number variants
 and all descendants together. Add separately budgeted first-result and commitment
 experiments to fit later mechanisms. Reserve crossed edits for testing. The ideal
-R=0 intervention stays a simulator reference unless an actual policy is specified.
+$R=0$ intervention stays a simulator reference unless an actual policy is specified.
 Report its policy effects separately from semantic assignments.
 
 Fit an SCM with and without coherence and a predictor without graph factorization.
@@ -342,6 +470,232 @@ combinations using the metrics above, with fresh reference continuations and
 uncertainty clustered by template. Six test templates and 16 draws per arm are
 screening data; use pilot variance for confirmation sample sizes. The harness and
 these empirical comparisons are proposed work.
+
+## 8. Applying the analysis to GSM8K and Qwen models
+
+This section specifies a concrete benchmark study after the synthetic and
+30-template checks. **It is an experiment design, not a report of GSM8K results.**
+The existing script does not download models, generate Qwen traces, or fit an SCM
+to benchmark data.
+
+### 8.1 Benchmark, models, and sampling configuration
+
+Use the standard GSM8K question/answer dataset from the
+[official repository](https://github.com/openai/grade-school-math), described by
+Cobbe et al. in [Training Verifiers to Solve Math Word Problems](https://arxiv.org/abs/2110.14168).
+Each record contains a question and a worked reference solution ending in `####`
+followed by the numeric answer. Give the model **only the question and a fixed
+answer-format instruction**. The reference solution is for annotation and scoring;
+its particular reasoning path is not a required model trajectory.
+
+Start with the original hybrid checkpoints below. The linked model cards were
+checked for this design on 16 October 2026; pin exact model, tokenizer, dataset,
+and software revisions when executing the experiment.
+
+| Choice | Proposed configuration | Purpose |
+|---|---|---|
+| Initial model | [Qwen/Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B) with `enable_thinking=True` | Develop native-prefix continuation and measure intervention effects. |
+| Replication model | [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) with the same mode | Test whether findings persist at a second model size; fit its mechanisms separately. |
+| Sampling | `do_sample=True`, `temperature=0.6`, `top_p=0.95`, `top_k=20`, `min_p=0` | Follow the cards' thinking-mode sampling recommendation and obtain outcome distributions. |
+| Initial output cap | 8,192 new tokens for each original trace and each continuation | Study-specific cost cap; count truncations and missing answers explicitly. |
+| Answer format | Ask for a final answer inside `\boxed{...}` | Separate the final numerical answer from intermediate numbers. |
+| Initial backend | Direct Hugging Face Transformers generation | Retain raw token IDs and control continuation of an unfinished assistant message. |
+
+The 8,192-token cap is below the cards' recommended 32,768-token output allowance.
+Check truncation on 20 separate GSM8K training questions before fixing the protocol;
+if it is material, increase the cap and revise the cost estimate before evaluation.
+Do not extend the budget selectively after seeing a treatment's answer. Stay within
+that checkpoint's context limit and record the remaining allowance at each edit.
+Use a compatible, pinned Transformers release: the cards identify versions below
+4.51.0 as lacking Qwen3 support. Record precision, quantization, hardware, and
+backend settings as part of the experimental configuration.
+
+Qwen3 exposes thinking content through its native reasoning delimiters. Resolve
+those delimiters from the pinned tokenizer/template and retain them in the raw
+trace. A server returning only final text or a reasoning summary is insufficient
+for this experiment. An optional `enable_thinking=False` comparison is a different
+mode with a different intervention surface; do not pool its mechanisms with the
+thinking-mode SCM or assume every Qwen-family checkpoint uses the same template.
+
+### 8.2 A concrete GSM8K example and its SCM variables
+
+The [first record of the official test file](https://github.com/openai/grade-school-math/blob/master/grade_school_math/data/test.jsonl)
+asks about Janet's ducks: they lay 16 eggs each day, she eats 3 and uses 4 for
+muffins, and she sells the remainder for 2 dollars per egg. Her daily revenue is
+
+$$
+(16-3-4)\times 2=9\times 2=18.
+$$
+
+This public item illustrates the protocol; exclude it from the held-out evaluation
+sample because it was used to design the example. The paths below are constructed,
+not actual Qwen outputs:
+
+| Path | Intermediate count | First revenue calculation | Commitment and answer |
+|---|---|---|---|
+| Correct | 9 eggs to sell | $9\times2=18$ | 18 dollars |
+| Corruption propagates | Replace the asserted count with 11 eggs | $11\times2=22$ | 22 dollars |
+| Corruption is repaired | Replace the asserted count with 11 eggs | Initially 22; recheck $16-3-4=9$ | Correct the revenue to 18 dollars |
+
+The marble SCM transfers by changing the semantic labels, not by copying its
+probabilities:
+
+| Variable | GSM8K interpretation for this item | Initial states |
+|---|---|---|
+| $N$ | Asserted count of eggs available for sale | 9, 11, other, absent/ambiguous |
+| $B$ | First asserted daily revenue after that count | 18, 22, other, not reached/ambiguous |
+| $R$ | Explicit successful verification of the targeted calculation, accepted in the trace | yes, no, ambiguous |
+| $C$ | Revenue committed to at the last explicit commitment before the final response | 18, 22, other, absent/ambiguous |
+| $Y$ | Parsed final revenue | 18, 22, another numeric answer, invalid/missing |
+
+Here the core subtotal contrast becomes
+
+$$
+\Delta_Y^{\mathrm{Janet}}=
+P(Y=18\mid\operatorname{do}(N=11))
+-P(Y=18\mid\operatorname{do}(N=9)).
+$$
+
+This is the target semantic contrast. Actual text experiments estimate effects
+of specified replacements intended to implement those assignments; their validity
+as hard semantic interventions must be checked. There is no reason for this
+contrast to equal the marble simulator's value.
+
+Across questions, map values to roles such as correct intermediate value,
+injected alternative, correct answer, and answer implied by following the
+injection. Preserve the numeric values, operations, and spans as additional data.
+A solver can validate an extracted arithmetic expression, but it cannot by itself
+determine that the expression represents the word problem correctly. Audit the
+semantic alignment as well as the arithmetic, and allow valid alternative solutions.
+
+Start from the candidate factorization
+
+$$
+p(N,B,R,C,Y\mid X)=p(N\mid X)p(B\mid N,X)p(R\mid B,X)
+ p(C\mid B,R,X)p(Y\mid C,X),
+$$
+
+where $X$ includes question features and the fixed prefix before the selected
+landmark. **Learn the commitment mechanism too.** A Qwen trace may silently
+recompute the right value without an explicit successful check, so the toy rule
+$C=f_C(B,R)$ must not be imposed on benchmark data. Do not copy the final answer
+into an absent commitment field: that would make a predictor of $Y$ circular.
+Test expanded parents, for example $N$ as an additional parent of $R$ or $B$ as an
+additional parent of $Y$, using training/validation data. Retain a policy/uptake
+variable if replacement wording has effects beyond the assigned semantic value.
+
+### 8.3 Generate traces, intervene, and extract outcomes
+
+1. **Sample questions before observing intervention outcomes.** Use 100 questions
+   from the official training split for fitting, another 50 for validation, and
+   100 from the official test split for evaluation. Select IDs with a fixed seed;
+   exclude the 20 calibration questions and the worked example. Group any detected
+   near-duplicate problem templates across splits. Keep all traces, wordings, and
+   continuations of a question together, and save the question IDs and data hash.
+2. **Generate two original traces per question and model.** Apply the pinned chat
+   template with `add_generation_prompt=True` and `enable_thinking=True`. Save
+   the full input, emitted token IDs, reasoning/final-response boundaries, decoding
+   settings, seed, and stop reason. Score original answers on every sampled question,
+   including those without an editable reasoning landmark.
+3. **Select one target by a fixed rule.** For the primary corruption experiment,
+   choose the first complete, correctly valued intermediate arithmetic statement
+   with a downstream computation identified before assigning treatment. Exclude
+   the final answer itself. If no target qualifies, record `no_eligible_target`;
+   do not replace the question until a favorable trace is found. Include eligible
+   traces even if their original final answer is wrong. Incorrect intermediate
+   statements can enter a separately reported targeted-repair experiment.
+4. **Branch into three primary arms.** Reinsert the exact original statement,
+   replace its intermediate value with a plausible incorrect value, or paraphrase
+   it while preserving the original value. Fix the corruption rule and validated
+   wording set using training/validation data. For Janet, the intervention changes
+   the asserted sale count from 9 to 11 while leaving the question unchanged.
+   Sample 16 suffixes per arm, with independent draws and randomized arm order.
+5. **Continue the same assistant stream.** Retain the original tokens before the
+   edit, insert the replacement at the recorded boundary, and call generation on
+   that unfinished prefix. Do not repackage it as a new user message or a completed
+   assistant turn: templating history can remove thinking text. Verify replacement
+   tokenization at the boundary, recompute the edited prefix, and discard cached
+   states and original suffix tokens after the edit. Identity replay checks this
+   path against unedited continuation at the same boundary.
+6. **Extract semantic landmarks and the final answer.** Track the first dependent
+   result, any accepted verification, and the last explicit commitment by meaning,
+   not by original sentence number. Record absent or ambiguous states. Parse the
+   last well-formed boxed numeric answer in the final-response segment and compare
+   it with the gold number after `####`, using exact numeric normalization for
+   equivalent fractions/decimals and thousands separators. Define ambiguous,
+   malformed, and missing answers as failures under this protocol. Do not select
+   an intermediate number merely because it matches the gold answer.
+
+The primary effects are conditional on eligible original prefixes. Report target
+eligibility, extraction ambiguity, and truncation rates alongside the effects;
+otherwise an apparently strong result may describe a small selected subset of
+GSM8K. Report model-specific coverage and a comparison on common eligible questions.
+Because the prefixes are model-generated, two model sizes need not induce the
+same distribution of experimental units. GSM8K may also overlap model pretraining;
+these results concern behavior on the benchmark, not evidence of unseen-task learning.
+
+### 8.4 Fit, test combinations, and report the result
+
+Fit normalized categorical mechanisms on the training continuations, omitting
+likelihood terms for successfully forced nodes under a justified hard-intervention
+model. Keep missing/other outcomes; use explicit policy variables when uptake or
+surface form violates that model. Fit Qwen3-4B and Qwen3-8B separately. Compare the
+SCM with and without coherence, a prompt/prefix predictor, and a calibrated local
+attribution baseline on matched data and compute budgets. Features for an early
+transition cannot include the future correction, final answer, or gold solution.
+
+The three primary arms estimate subtotal-policy effects but do not identify every
+possible later intervention. Collect separately budgeted first-result and commitment
+replacements on training prefixes before testing their compositions. On 20
+prespecified test questions, cross original/corrupted subtotal with correct/wrong
+first result. When the first-result landmark is emitted, replace that span and
+regenerate from the new boundary. Record `not_reached` if it never occurs, retain
+that run in the assigned policy arm, and report uptake. Do not silently score these
+attempted text policies as perfect hard assignments. Reserve all four crossed
+policies from fitting; single-site data train the corresponding mechanisms.
+
+Report the following per model, with confidence intervals clustered by question:
+
+| Result | How it applies to GSM8K/Qwen |
+|---|---|
+| Unperturbed correctness | Numeric accuracy on all sampled questions, plus eligibility and missing-answer rates. |
+| Primary answer effect | Corruption minus identity correctness on eligible prefixes; compare paraphrase minus identity as a surface-form control. |
+| Propagation and repair | Changes in the first dependent result and explicit accepted verification. A repair rate under a forced wrong $B$ requires the separate first-result experiment. |
+| Held-out prediction | Answer log loss, binary correctness Brier score, and categorical intermediate-state log loss, retaining other/missing states. |
+| Effect prediction error | Predicted versus independently estimated corruption and crossed-policy contrasts, with uncertainty in the rollout reference. |
+| Computational cost | Actual generated tokens, prefill/scoring passes, rejected candidates, annotation, and wall time. |
+
+For each GSM8K question, replace the toy event $Y=7$ by the event that $Y$ equals
+that question's reference answer. For a multicategory outcome, categorical log
+loss is $-\log q(y)$ for the observed category $y$; the binary correctness Brier
+score retains the definition in section 4. Bootstrap questions while retaining
+all nested traces and arms. The ideal $\operatorname{do}(R=0)$ interaction remains
+a simulator diagnostic unless a real verification policy is specified and tested.
+High exact-match accuracy does not establish correct prediction of these effects.
+
+The primary upper allocation is
+
+$$
+250\text{ questions}\times2\text{ traces}\times3\text{ arms}
+\times16\text{ suffixes}=24{,}000\text{ continuations per model}.
+$$
+
+That is 48,000 for both models, before later-site training and crossed-policy
+experiments. At an illustrative average of 1,000 generated tokens per suffix,
+continuations alone cost about 48 million output tokens. The crossed evaluation
+adds at most $20\times2\times4\times16=2{,}560$ trajectories per model, including
+any generation needed to reach the second landmark. Charge that generation to its
+budget. Ineligible traces reduce counts; original generation, the calibration set,
+annotation, and candidate validation add costs. These allocations are screening
+budgets, not power calculations or guarantees of precise individual-step effects.
+
+A concrete deliverable is a table with each held-out question, target span,
+replacement, predicted and observed answer probabilities, propagation/repair
+outcomes, uncertainty, and cost. The study supports the proposal only if it
+predicts new-question and new-combination outcomes better than the declared
+baselines. The current synthetic results establish none of those empirical claims.
+
+## 9. Reproducing the synthetic calculations
 
 Run from the repository root; numerical commands require only Python's standard
 library:
