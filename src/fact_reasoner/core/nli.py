@@ -825,11 +825,15 @@ DECISION_MAX_QUESTIONS_PER_REQUEST = 32
 class _DecisionClient:
     """What the shared throttle and NLI cache key on: one decision model."""
 
-    def __init__(self, model_id: str, host: str | None):
+    def __init__(self, model_id: str, host: str | None, api_key: str | None = None):
         import weakref
 
         self.model_id = model_id
         self.host = host
+        # Sent as a bearer token on this client only (kev.serve checks it against
+        # KEV_API_KEY), rather than through OLLAMA_API_KEY, which would reach
+        # every Ollama client in the process.
+        self._headers = {"authorization": f"Bearer {api_key}"} if api_key else None
         # Keyed by the loop object, weakly: a closed asyncio.run loop can be
         # collected and its id() reused by the next one, which must not inherit
         # a client bound to the dead loop.
@@ -849,7 +853,7 @@ class _DecisionClient:
         loop = asyncio.get_running_loop()
         client = self._clients.get(loop)
         if client is None:
-            client = ollama.AsyncClient(host=self.host)
+            client = ollama.AsyncClient(host=self.host, headers=self._headers)
             self._clients[loop] = client
         return client
 
@@ -881,6 +885,7 @@ class DecisionNLIExtractor(NLIExtractor):
         model_id: str = "kev",
         *,
         host: str | None = None,
+        api_key: str | None = None,
         max_questions_per_request: int = DECISION_MAX_QUESTIONS_PER_REQUEST,
         show_progress: bool = False,
         raise_errors: bool = False,
@@ -894,7 +899,12 @@ class DecisionNLIExtractor(NLIExtractor):
             host: str
                 The Ollama server URL. None uses the ``ollama`` package default
                 (the ``OLLAMA_HOST`` environment variable, else
-                ``http://localhost:11434``).
+                ``http://localhost:11434``). A ``kev.serve`` server (see
+                :class:`~fact_reasoner.serving.KevServer`) speaks the same API.
+            api_key: str
+                Bearer token for a server that requires one (``kev.serve`` with
+                ``KEV_API_KEY`` set). None sends none, unless ``OLLAMA_API_KEY``
+                is set.
             max_questions_per_request: int
                 Most hypotheses asked about one premise in a single request.
             show_progress: bool
@@ -909,7 +919,7 @@ class DecisionNLIExtractor(NLIExtractor):
         # The base __init__ wants a Mellea backend and a sampling strategy, which
         # a decision model has neither of; set what the shared code reads instead.
         self.method = "decision"
-        self.backend = _DecisionClient(model_id, host)
+        self.backend = _DecisionClient(model_id, host, api_key)
         self.max_questions_per_request = max_questions_per_request
         self.show_progress = show_progress
         self.raise_errors = raise_errors

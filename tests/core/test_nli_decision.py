@@ -217,3 +217,23 @@ class TestRunnerSelection:
             FactualityRunner(
                 MagicMock(), pipeline="factscore", nli_decision_model="kev", **kwargs
             )
+
+
+def test_api_key_is_sent_as_a_bearer_header_on_this_client_only(monkeypatch):
+    import asyncio
+
+    from fact_reasoner.core.nli import DecisionNLIExtractor
+
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    ex = DecisionNLIExtractor("kev-latest", host="http://127.0.0.1:1", api_key="s3cret")
+
+    async def headers():
+        return ex.backend.client()._client.headers.get("authorization")
+
+    assert asyncio.run(headers()) == "Bearer s3cret"
+    plain = DecisionNLIExtractor("kev", host="http://127.0.0.1:1")
+
+    async def plain_headers():
+        return plain.backend.client()._client.headers.get("authorization")
+
+    assert asyncio.run(plain_headers()) is None

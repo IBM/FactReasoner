@@ -400,3 +400,192 @@ class TestAssessFile:
         # An output jsonl was written.
         written = list(out_dir.glob("*.jsonl"))
         assert len(written) == 1
+
+
+class TestAssessFileConcurrency:
+    """item_concurrency > 1: items overlap, results keep input order."""
+
+    @staticmethod
+    def _dataset(tmp_path, n):
+        data = [{"input": f"q{i}", "output": "o", "atoms": [], "contexts": []} for i in range(n)]
+        path = tmp_path / "in.jsonl"
+        path.write_text("\n".join(json.dumps(d) for d in data))
+        return path
+
+    def test_items_overlap_and_keep_input_order(self, tmp_path):
+        import threading
+        import time
+
+        r = FactualityRunner(MagicMock(), pipeline="factscore", item_concurrency=4)
+        in_flight, peak, lock = [0], [0], threading.Lock()
+
+        def make_pipeline(_retriever):
+            pipe = MagicMock()
+            state = {}
+            pipe.from_dict_with_contexts.side_effect = lambda d: state.update(d)
+
+            def build(**_):
+                with lock:
+                    in_flight[0] += 1
+                    peak[0] = max(peak[0], in_flight[0])
+                # Later items finish first, so order must come from the runner.
+                time.sleep(0.05 * (10 - int(state["input"][1:])) / 10)
+                with lock:
+                    in_flight[0] -= 1
+
+            pipe.build.side_effect = build
+            pipe.score.side_effect = lambda: {"input": state["input"]}
+            return pipe
+
+        with (
+            patch.object(r, "_build_context_retriever", return_value=MagicMock()),
+            patch.object(r, "_make_pipeline", side_effect=make_pipeline),
+        ):
+            results = r.assess_file(
+                str(self._dataset(tmp_path, 8)), str(tmp_path / "out"),
+                dataset_name="d", model_id="m",
+            )
+
+        assert [res["input"] for res in results] == [f"q{i}" for i in range(8)]
+        assert peak[0] > 1
+        lines = next((tmp_path / "out").glob("*.jsonl")).read_text().splitlines()
+        assert [json.loads(line)["input"] for line in lines] == [f"q{i}" for i in range(8)]
+
+    def test_resume_skips_done_inputs(self, tmp_path):
+        r = FactualityRunner(MagicMock(), pipeline="factscore", item_concurrency=2)
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        (out_dir / "eval_factscore_google_d_m.jsonl").write_text(
+            json.dumps({"input": "q0"}) + "\n"
+        )
+        seen = []
+
+        def make_pipeline(_retriever):
+            pipe = MagicMock()
+            pipe.from_dict_with_contexts.side_effect = lambda d: seen.append(d["input"])
+            pipe.score.return_value = {"input": "x"}
+            return pipe
+
+        with (
+            patch.object(r, "_build_context_retriever", return_value=MagicMock()),
+            patch.object(r, "_make_pipeline", side_effect=make_pipeline),
+        ):
+            results = r.assess_file(
+                str(self._dataset(tmp_path, 3)), str(out_dir), dataset_name="d", model_id="m"
+            )
+        assert sorted(seen) == ["q1", "q2"]
+        assert len(results) == 3
+
+    def test_rejects_non_positive(self):
+        with pytest.raises(ValueError, match="item_concurrency"):
+            FactualityRunner(MagicMock(), pipeline="factscore", item_concurrency=0)
+
+
+class TestClientCacheSizing:
+    def test_item_concurrency_widens_mellea_client_cache(self):
+        from mellea.helpers.async_helpers import ClientCache
+
+        backend = MagicMock()
+        backend._client_cache = ClientCache(2)
+        FactualityRunner(backend, pipeline="factscore", item_concurrency=8)
+        assert backend._client_cache.capacity == 18
+
+    def test_sequential_runs_leave_it_alone(self):
+        from mellea.helpers.async_helpers import ClientCache
+
+        backend = MagicMock()
+        backend._client_cache = ClientCache(2)
+        FactualityRunner(backend, pipeline="factscore")
+        assert backend._client_cache.capacity == 2
+
+    def test_concurrent_loops_keep_their_clients(self):
+        """The failure seen on the GPU node: N loops share a backend's cache."""
+        import asyncio
+        import threading
+
+        from mellea.helpers.async_helpers import ClientCache
+
+        backend = MagicMock()
+        backend._client_cache = ClientCache(2, aclose=lambda c: c.aclose())
+        FactualityRunner(backend, pipeline="factscore", item_concurrency=8)
+        closed, barrier = [], threading.Barrier(8)
+
+        class Client:
+            async def aclose(self):
+                closed.append(self)
+
+        def item():
+            async def work():
+                c = backend._client_cache.get_or_create(asyncio.get_running_loop(), Client)
+                await asyncio.sleep(0)
+                barrier.wait()  # every loop holds its client at once
+                return c
+
+            return asyncio.run(work())
+
+        threads = [threading.Thread(target=item) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert closed == []
+
+
+class TestLoopClientRelease:
+    """A finished item's client is closed on its own loop, not after it ends."""
+
+    def test_client_closed_before_loop_ends(self):
+        import asyncio
+
+        from mellea.helpers.async_helpers import ClientCache
+
+        from fact_reasoner.runner import _run_build
+
+        closed_on = []
+
+        class Client:
+            async def aclose(self):
+                closed_on.append(asyncio.get_running_loop().is_closed())
+
+        backend = MagicMock()
+        backend._client_cache = ClientCache(2, aclose=lambda c: c.aclose())
+
+        class Pipe:
+            async def build(self, **_):
+                backend._client_cache.get_or_create(asyncio.get_running_loop(), Client)
+
+        _run_build(Pipe(), release_clients_of=(backend,))
+        assert closed_on == [False]  # closed while its loop was still running
+        assert backend._client_cache.current_size() == 0
+
+    def test_released_even_if_build_raises(self):
+        import asyncio
+
+        from mellea.helpers.async_helpers import ClientCache
+
+        from fact_reasoner.runner import _run_build
+
+        backend = MagicMock()
+        backend._client_cache = ClientCache(2, aclose=lambda c: c.aclose())
+
+        class Client:
+            async def aclose(self):
+                pass
+
+        class Pipe:
+            async def build(self, **_):
+                backend._client_cache.get_or_create(asyncio.get_running_loop(), Client)
+                raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            _run_build(Pipe(), release_clients_of=(backend,))
+        assert backend._client_cache.current_size() == 0
+
+    def test_non_mellea_backends_are_skipped(self):
+        from fact_reasoner.runner import _run_build
+
+        class Pipe:
+            async def build(self, **_):
+                return None
+
+        _run_build(Pipe(), release_clients_of=(object(), MagicMock()))

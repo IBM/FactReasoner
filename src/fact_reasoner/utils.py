@@ -165,12 +165,39 @@ _backend_throttles: "weakref.WeakKeyDictionary[Any, BackendThrottle]" = (
 _backend_throttles_lock = threading.Lock()
 
 
+def set_throttle(
+    backend: Any,
+    *,
+    max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+    rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+) -> BackendThrottle | None:
+    """Give ``backend`` a shared throttle with non-default limits.
+
+    The defaults protect a remote provider (RITS levels off near 9 requests/s,
+    and returns 429s past its quota). A server running inside the same job has
+    no quota and batches better the more it is sent, so the caller that started
+    it raises both limits here, before the first batch.
+
+    Returns:
+        The throttle now shared by every batch sent to ``backend``, or None for
+        a backend that cannot be weakly referenced (as in :func:`throttle_for`).
+    """
+    throttle = BackendThrottle(max_concurrency, rate_per_minute)
+    with _backend_throttles_lock:
+        try:
+            _backend_throttles[backend] = throttle
+        except TypeError:
+            return None
+    return throttle
+
+
 def throttle_for(backend: Any) -> BackendThrottle | None:
     """Return the shared :class:`BackendThrottle` for ``backend``.
 
-    Created with the module defaults on first use. Returns None for a backend
-    that cannot be weakly referenced (plain stand-ins in tests), in which case
-    callers fall back to per-batch throttling.
+    Created with the module defaults on first use (unless :func:`set_throttle`
+    configured it). Returns None for a backend that cannot be weakly referenced
+    (plain stand-ins in tests), in which case callers fall back to per-batch
+    throttling.
     """
     with _backend_throttles_lock:
         try:
@@ -260,7 +287,8 @@ def handle_generation_error(
 ) -> None:
     """Report a failed LLM call, or re-raise it when the caller opted in.
 
-    By default the error is printed as ``"{message}: {error}"`` and counted as a
+    By default the error is printed as ``"{message}: {type}: {error}"`` (the
+    type, because many transport errors have an empty message) and counted as a
     ``generation_error`` fallback; the calling stage then substitutes its
     default result. With ``raise_errors`` the original exception is re-raised
     as is (same object, type, traceback and cause), so callers can catch it.
@@ -280,7 +308,7 @@ def handle_generation_error(
     """
     if raise_errors:
         raise error
-    print(f"{message}: {error}")
+    print(f"{message}: {type(error).__name__}: {error}")
     telemetry.count_fallback(component, "generation_error")
 
 

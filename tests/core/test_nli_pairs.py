@@ -316,6 +316,10 @@ class TestGateFallback:
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", fake_import)
+        # A model an earlier test loaded would be reused without importing.
+        from fact_reasoner.lcs import candidate_pairs
+
+        monkeypatch.setattr(candidate_pairs, "_embedding_models", {})
 
         atoms = make_atoms(3)
         contexts = make_contexts(atoms, per_atom=2)

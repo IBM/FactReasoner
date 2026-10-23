@@ -1,0 +1,76 @@
+#!/bin/bash
+# ---------------------------------------------------------------------------
+# LSF job template: FactReasoner with kev.serve for NLI and vLLM for every
+# other LLM stage, one server per GPU.
+#
+#   GPU 0: vLLM serving granite-4.1-8b -- atomization, revision, context
+#          summarization, query building
+#   GPU 1: kev.serve serving jaredpalmer/kev-9b -- NLI (System One API)
+#
+# The CLI launches kev.serve first and waits for it last, so both models load at
+# the same time; both servers stop when the Python process exits (success,
+# error, `bkill` or walltime). `--item-concurrency` keeps several dataset items in
+# flight, so the LLM, the NLI model and retrieval work at the same time instead
+# of taking turns. Local servers get high throttle ceilings and no rate limit.
+#
+# Three environments, because their pins conflict:
+#   FR_ENV   -- fact_reasoner (pip install -e .)
+#   VLLM_ENV -- vllm (pins its own torch)
+#   KEV_ENV  -- kev[serve] + flash-linear-attention==0.5.2 + causal-conv1d
+#               (see README, "kev.serve on a GPU cluster")
+#
+# Pre-download both models from a login node (the job runs offline):
+#     python -c "from huggingface_hub import snapshot_download as d; \
+#       d('ibm-granite/granite-4.1-8b'); \
+#       d('jaredpalmer/kev-9b', revision='b5d8c18e', \
+#         allow_patterns=['*.json','*.safetensors','*.pt','*.txt','*.jinja']); \
+#       d('Qwen/Qwen3.5-9B-Base', revision='68c46c4b3498877f3ef123c856ecfde50c39f404', \
+#         allow_patterns=['*.json','*.safetensors','*.pt','*.txt','*.jinja'])"
+#
+# Submit (BlueVela):
+#     bsub -G grp_big_job_lease -q normal < scripts/run_kev_vllm.bsub
+# ---------------------------------------------------------------------------
+
+#BSUB -J factreasoner-kev-vllm
+#BSUB -gpu "num=2:mode=exclusive_process"
+#BSUB -n 16                       # retrieval threads, Merlin, item workers
+#BSUB -R "rusage[mem=128G] span[hosts=1]"
+#BSUB -W 4:00
+#BSUB -o factreasoner-kev-vllm.%J.out
+#BSUB -e factreasoner-kev-vllm.%J.err
+
+set -euo pipefail
+
+# --- Environments (edit these) ---------------------------------------------
+FR_ENV=/path/to/envs/fr
+VLLM_ENV=/path/to/envs/vllm
+KEV_ENV=/path/to/envs/kev
+
+# --- Paths (edit these) ----------------------------------------------------
+INPUT=/path/to/dataset.jsonl
+OUTPUT=/path/to/results
+MERLIN=/path/to/merlin/build/merlin
+GRANITE=ibm-granite/granite-4.1-8b          # HF id (cached) or a local weights dir
+KEV_RUN=jaredpalmer/kev-9b@b5d8c18e         # pinned: the revision this was validated on
+ITEMS_IN_FLIGHT=8
+mkdir -p "$OUTPUT"
+
+export HF_HUB_OFFLINE=1
+# vLLM's environment may need its own libstdc++ ahead of the system one.
+export LD_LIBRARY_PATH="$VLLM_ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# kev's Triton kernels compile on first use; keep them across jobs.
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$HOME/.cache/triton-kev}"
+# Retrieval key (only for --service-type google).
+# export SERPER_API_KEY=...
+
+# --- Run -------------------------------------------------------------------
+"$FR_ENV/bin/fact-reasoner" \
+    --backend vllm --model "$GRANITE" --served-model granite-4.1-8b \
+    --vllm-binary "$VLLM_ENV/bin/vllm" --vllm-gpus 0 \
+    --max-model-len 32768 \
+    --nli-decision-serve --nli-decision-server kev \
+    --kev-python "$KEV_ENV/bin/python" --kev-run "$KEV_RUN" --kev-gpus 1 \
+    --pipeline factreasoner --pipeline-version v2 --merlin-path "$MERLIN" \
+    --use-priors \
+    --item-concurrency "$ITEMS_IN_FLIGHT" \
+    --input-file "$INPUT" --output-dir "$OUTPUT" --dataset-name my-dataset

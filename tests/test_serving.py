@@ -473,3 +473,149 @@ class TestStopOnSigterm:
                 with server:
                     os.kill(os.getpid(), signal.SIGTERM)
         assert stopped == [True]
+
+
+class TestVisibleDevices:
+    def test_indexes_the_jobs_gpus(self, monkeypatch):
+        from fact_reasoner.serving import _visible_devices
+
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "3,5")
+        assert _visible_devices("1") == "5"
+        assert _visible_devices("0,1") == "3,5"
+
+    def test_without_a_job_restriction_uses_indices_as_given(self, monkeypatch):
+        from fact_reasoner.serving import _visible_devices
+
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+        assert _visible_devices("1") == "1"
+
+    def test_out_of_range_is_an_error(self, monkeypatch):
+        from fact_reasoner.serving import _visible_devices
+
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "3")
+        with pytest.raises(ValueError, match="does not index"):
+            _visible_devices("1")
+
+    def test_vllm_gpus_set_env_and_tensor_parallel(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "6,7")
+        server = VLLMServer("/w/m", port=1, gpus="0", log_path=str(tmp_path / "v.log"))
+        assert server.tensor_parallel_size == 1
+        proc = _FakeProc(exit_codes=[None])
+        with (
+            patch("fact_reasoner.serving.subprocess.Popen", return_value=proc) as popen,
+            patch.object(VLLMServer, "_probe_ready", return_value=True),
+            patch("fact_reasoner.serving.os.killpg"),
+            patch("fact_reasoner.serving.os.getpgid", return_value=proc.pid),
+        ):
+            server.start()
+            server.stop()
+        assert popen.call_args.kwargs["env"]["CUDA_VISIBLE_DEVICES"] == "6"
+
+
+class TestKevServer:
+    @staticmethod
+    def _server(tmp_path, **kwargs):
+        from fact_reasoner.serving import KevServer
+
+        kwargs.setdefault("port", 23457)
+        kwargs.setdefault("api_key", "k")
+        return KevServer(
+            "jaredpalmer/kev-9b@b5d8c18e", python="/envs/kev/bin/python",
+            log_path=str(tmp_path / "kev.log"), **kwargs,
+        )
+
+    def _start(self, server, systemone, proc=None):
+        proc = proc or _FakeProc(exit_codes=[None])
+        with (
+            patch("fact_reasoner.serving.subprocess.Popen", return_value=proc) as popen,
+            patch.object(type(server), "_systemone", side_effect=systemone) as call,
+            patch("fact_reasoner.serving.os.killpg"),
+            patch("fact_reasoner.serving.os.getpgid", return_value=proc.pid),
+            patch("fact_reasoner.serving.time.sleep"),
+        ):
+            try:
+                server.start()
+            finally:
+                server.stop()
+        return popen, call
+
+    def test_argv_and_environment(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,4")
+        server = self._server(tmp_path, gpus="1")
+        assert server.argv() == [
+            "/envs/kev/bin/python", "-m", "kev.serve", "--run",
+            "jaredpalmer/kev-9b@b5d8c18e", "--host", "127.0.0.1", "--port", "23457",
+            "--device", "cuda",
+        ]
+        env = server.server_env()
+        assert env["KEV_API_KEY"] == "k"
+        assert env["CUDA_VISIBLE_DEVICES"] == "4"
+        assert server.base_url == "http://127.0.0.1:23457"
+
+    def test_random_key_and_port_by_default(self, tmp_path):
+        from fact_reasoner.serving import KevServer
+
+        a = KevServer(log_path=str(tmp_path / "a.log"))
+        b = KevServer(log_path=str(tmp_path / "b.log"))
+        assert a.api_key and a.api_key != b.api_key
+        assert a.port > 0
+
+    def test_start_retries_until_the_model_is_loaded(self, tmp_path):
+        import urllib.error
+
+        server = self._server(tmp_path)
+        errors = [urllib.error.URLError("refused"), ConnectionResetError(), {"answers": {}}]
+
+        def systemone(payload, timeout):
+            out = errors.pop(0)
+            if isinstance(out, Exception):
+                raise out
+            return out
+
+        popen, call = self._start(server, systemone)
+        assert call.call_count == 3
+        assert call.call_args.args[0]["questions"]["ready"]["type"] == "noul"
+        assert popen.call_args.kwargs["start_new_session"] is True
+
+    def test_rejected_warm_up_fails_fast(self, tmp_path):
+        import io
+        import urllib.error
+
+        server = self._server(tmp_path)
+
+        def systemone(payload, timeout):
+            raise urllib.error.HTTPError("u", 401, "no", {}, io.BytesIO(b"bad key"))
+
+        with pytest.raises(RuntimeError, match="rejected the warm-up request \\(401\\)"):
+            self._start(server, systemone)
+
+    def test_server_dying_during_startup_reports_its_log(self, tmp_path):
+        server = self._server(tmp_path)
+        (tmp_path / "kev.log").write_text("CUDA out of memory")
+        with pytest.raises(RuntimeError, match="exited with code 1"):
+            self._start(server, lambda p, t: {}, proc=_FakeProc(exit_codes=[1]))
+
+    def test_launch_then_wait_ready(self, tmp_path):
+        server = self._server(tmp_path)
+        proc = _FakeProc(exit_codes=[None])
+        with (
+            patch("fact_reasoner.serving.subprocess.Popen", return_value=proc),
+            patch.object(type(server), "_systemone", return_value={}) as call,
+            patch("fact_reasoner.serving.os.killpg"),
+            patch("fact_reasoner.serving.os.getpgid", return_value=proc.pid),
+        ):
+            server.launch()
+            call.assert_not_called()  # launch does not wait
+            server.wait_ready()
+            call.assert_called_once()
+            server.stop()
+
+    def test_wait_ready_before_launch(self, tmp_path):
+        with pytest.raises(RuntimeError, match="not launched"):
+            self._server(tmp_path).wait_ready()
+
+    def test_missing_python(self, tmp_path):
+        server = self._server(tmp_path)
+        with patch("fact_reasoner.serving.subprocess.Popen", side_effect=FileNotFoundError):
+            with pytest.raises(FileNotFoundError, match="kev environment's Python"):
+                server.start()

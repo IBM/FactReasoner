@@ -660,6 +660,90 @@ Startup fails fast, with the server log, when the binary is missing, the server
 exits, the model is not in the store and pulling is disabled, or the model is not a
 decision model.
 
+#### kev.serve + vLLM on a two-GPU job (fastest)
+
+`--nli-decision-server kev` runs NLI on kev's own server,
+[`kev.serve`](https://github.com/jaredpalmer/kev), instead of Ollama. It serves the
+published `jaredpalmer/kev-9b` checkpoint in bf16 with fused DeltaNet kernels and
+CUDA graphs, batches concurrent requests, and reuses each premise's prefill for all
+of its questions. It speaks the same System One API, so the NLI extractor is
+unchanged. `fact_reasoner.KevServer` starts it on a free port with a random API key,
+warms it up, and stops it with the run. Everything else stays on vLLM; one GPU per
+server:
+
+```bash
+fact-reasoner \
+    --backend vllm --model ibm-granite/granite-4.1-8b --served-model granite-4.1-8b \
+    --vllm-binary /envs/vllm/bin/vllm --vllm-gpus 0 --max-model-len 32768 \
+    --nli-decision-serve --nli-decision-server kev \
+    --kev-python /envs/kev/bin/python --kev-run jaredpalmer/kev-9b@b5d8c18e --kev-gpus 1 \
+    --pipeline factreasoner --merlin-path /path/to/merlin --use-priors \
+    --item-concurrency 8 --input-file data.jsonl --output-dir out/
+```
+
+What makes it fast:
+
+- **One GPU per server.** vLLM keeps its default memory share, and kev.serve is
+  launched before vLLM and waited for after it, so the two models load at once.
+  `--vllm-gpus` / `--kev-gpus` index the job's GPUs (LSF's `CUDA_VISIBLE_DEVICES`).
+- **Items in flight at once** (`--item-concurrency`). One item at a time leaves a
+  server idle whenever the item is on the other's stage; 8 at once keeps both busy.
+  Results are still written in input order, and a resumed run skips done items.
+- **No client-side limits on local servers.** The shared throttle protects remote
+  providers (32 in flight, 1500/min). For servers the job started, vLLM gets 256 in
+  flight and kev.serve 64 (its batch size), with no rate limit. `--max-concurrency`
+  overrides the vLLM ceiling.
+- **The embedding gate loads once per process, on CPU.** It used to reload the model
+  (~20 s) for every item, and on a GPU node held by the job's servers its CUDA
+  context failed, so it fell back to token Jaccard without saying why.
+
+Setup, once (kev pins `torch<2.9` and exact kernels, so it gets its own environment):
+
+```bash
+git clone https://github.com/jaredpalmer/kev.git && cd kev
+UV_PROJECT_ENVIRONMENT=/envs/kev uv sync --python-preference only-managed --python 3.13 --extra serve --no-dev
+VIRTUAL_ENV=/envs/kev uv pip install "flash-linear-attention==0.5.2" "triton>=3.7.1"
+VIRTUAL_ENV=/envs/kev uv pip install --no-deps \
+  "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu12torch2.8cxx11abiTRUE-cp313-cp313-linux_x86_64.whl"
+```
+
+Use a uv-managed Python (`--python-preference only-managed`, on shared storage): a
+venv on the login node's system Python does not exist on compute nodes. Pre-download
+`ibm-granite/granite-4.1-8b`, `jaredpalmer/kev-9b@b5d8c18e` and its base
+`Qwen/Qwen3.5-9B-Base@68c46c4b` from a login node (see `scripts/run_kev_vllm.bsub`,
+the job template); jobs run with `HF_HUB_OFFLINE=1`.
+`scripts/submit_kev_vllm_smoke.sh submit|status|check` runs the smoke jobs below.
+
+Measured on BlueVela H100s, 10 items (248 human-labelled atoms) of
+`data/bio-labeled_wikipedia.jsonl`, v2, `--nli-mode fast`, `--use-priors
+--use-summarizer`, granite-4.1-8b for summarization:
+
+| | Servers ready | Pipeline | Atom accuracy | Factuality error |
+|-|---------------|----------|---------------|------------------|
+| `--item-concurrency 1` | 72 s | 124 s | 73.0% | 0.160 |
+| `--item-concurrency 8` | 46 s | 60 s | 74.6% | 0.154 |
+
+Server startup is 50–200 s, depending on how warm the node's file and Triton caches
+are. kev.serve alone answered 298 NLI pairs/s (6 labelled sanity cases: 6/6).
+Per item, NLI and summarization now take similar time (4–9 s each), so neither
+server is the bottleneck.
+
+On all 157 items (4,859 atoms; ~139k NLI pairs), same settings:
+
+| | Pipeline | Atom accuracy | Factuality error |
+|-|----------|---------------|------------------|
+| `--item-concurrency 8` | 635 s (4.0 s/item) | 66.5% | 0.226 |
+| `--item-concurrency 16` (3 runs) | 565–585 s (3.6–3.7 s/item) | 66.3–67.0% | 0.225–0.232 |
+
+The full set is harder than its first 10 items. Going from 8 to 16 items in flight
+gains ~11%, so past 8 the servers are near saturation; more throughput needs more
+granite GPUs or a job array over slices of the dataset.
+
+> **Run-to-run variation.** Per-item scores differ between runs (mean |Δ| ≈ 0.06)
+> even at the same concurrency, because no stage sets a temperature: vLLM samples
+> granite at its default temperature 1.0, so summarization keeps or drops different
+> contexts each run. Aggregate accuracy is stable (±0.5 points).
+
 ### LoRA adapters (atomization and NLI)
 
 Two LoRA adapters fine-tuned on `granite-4.2-8b` can replace prompted stages:
@@ -1300,7 +1384,9 @@ FactReasoner/
 │       ├── build_ntrs_benchmark.py  # Frozen per-backend dataset generation
 │       └── eval_ntrs_benchmark.py   # Frozen-dataset evaluation runner
 ├── scripts/
-│   └── run_kev.bsub          # LSF template (Ollama decision model + vLLM)
+│   ├── run_kev.bsub          # LSF template (Ollama decision model + vLLM)
+│   ├── run_kev_vllm.bsub     # LSF template (kev.serve + vLLM, one GPU each)
+│   └── submit_kev_vllm_smoke.sh  # BlueVela smoke jobs for the kev.serve setup
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples

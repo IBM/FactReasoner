@@ -531,3 +531,22 @@ class TestExtractLogprobsFromOutput:
         )
         with pytest.raises(ValueError, match="'content' key"):
             extract_logprobs_from_output(output)
+
+
+class TestSetThrottle:
+    def test_replaces_the_shared_throttle(self):
+        from fact_reasoner.utils import set_throttle, throttle_for
+
+        class Backend:
+            pass
+
+        b = Backend()
+        default = throttle_for(b)
+        t = set_throttle(b, max_concurrency=256, rate_per_minute=10_000)
+        assert t is throttle_for(b) and t is not default
+        assert (t.max_concurrency, t.rate_per_minute) == (256, 10_000)
+
+    def test_unweakrefable_backend_is_ignored(self):
+        from fact_reasoner.utils import set_throttle
+
+        assert set_throttle(object(), max_concurrency=2) is None

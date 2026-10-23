@@ -22,6 +22,7 @@ import asyncio
 import inspect
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
 
@@ -63,15 +64,73 @@ _FR_VERSIONS = {
 }
 
 
-def _run_build(pipeline_obj, /, **kwargs) -> None:
+def _run_build(pipeline_obj, /, *, release_clients_of=(), **kwargs) -> None:
     """Call a pipeline's ``build`` correctly whether it is sync or async.
 
     ``FactReasoner.build`` is a coroutine; the baseline pipelines' ``build`` is a
     plain method. This drives either uniformly.
+
+    ``release_clients_of`` names backends whose HTTP client for this call's event
+    loop is closed before the loop ends (see :func:`_release_loop_clients`).
     """
     result = pipeline_obj.build(**kwargs)
     if inspect.isawaitable(result):
-        asyncio.run(result)
+        if release_clients_of:
+
+            async def build_then_release():
+                try:
+                    return await result
+                finally:
+                    await _release_loop_clients(release_clients_of)
+
+            asyncio.run(build_then_release())
+        else:
+            asyncio.run(result)
+
+
+async def _release_loop_clients(backends) -> None:
+    """Close and forget each backend's cached client for the running loop.
+
+    Each item ``assess_file`` runs concurrently gets its own ``asyncio.run`` loop,
+    and Mellea caches one client per loop. Left in the cache, a finished item's
+    client is closed later by LRU eviction on its loop, which is closed by then:
+    nothing fails, but every eviction logs a "Task exception was never
+    retrieved ... Event loop is closed" traceback. Closing it here, while its
+    loop still runs, is the close the cache would have done, done in time.
+    """
+    loop = asyncio.get_running_loop()
+    for backend in backends:
+        cache = getattr(backend, "_client_cache", None)
+        entries = getattr(cache, "cache", None)
+        lock = getattr(cache, "_lock", None)
+        if entries is None or lock is None or not hasattr(cache, "aclose"):
+            continue  # not a Mellea client cache
+        with lock:
+            client = entries.pop(loop, None)
+        if client is not None and cache.aclose is not None:
+            try:
+                await cache.aclose(client)
+            except Exception:  # noqa: BLE001  best-effort cleanup at item end
+                pass
+
+
+def _fit_client_cache(backend: Any, item_concurrency: int) -> None:
+    """Let a Mellea backend keep one HTTP client per event loop in use at once.
+
+    Mellea caches one async client per event loop and closes the least recently
+    used one when its cache (2 entries) is full. ``assess_file`` with
+    ``item_concurrency`` workers drives a backend from that many ``asyncio.run``
+    loops plus the shared background loop, so a cache of 2 closes clients that
+    other items are still using ("Cannot send a request, as the client has been
+    closed"), and their requests fail. A cache with room for every live loop only
+    evicts the clients of items that have finished.
+    """
+    cache = getattr(backend, "_client_cache", None)
+    if not isinstance(getattr(cache, "capacity", None), int):
+        return  # not a Mellea client cache (another backend type, or a mock)
+    # The workers' loops, the background loop, and a finished item's loop that
+    # LRU has not yet evicted while its successor starts.
+    cache.capacity = max(cache.capacity, 2 * item_concurrency + 2)
 
 
 class FactualityRunner:
@@ -118,8 +177,11 @@ class FactualityRunner:
             Its probabilities come from the model itself, so it cannot be
             combined with ``nli_backend``, ``nli_prompt="label_only"`` or
             ``nli_method="simbauq"``.
-        nli_decision_host: The Ollama server for ``nli_decision_model``; None
-            uses ``OLLAMA_HOST`` or ``http://localhost:11434``.
+        nli_decision_host: The System One server for ``nli_decision_model``
+            (Ollama, or ``kev.serve``); None uses ``OLLAMA_HOST`` or
+            ``http://localhost:11434``.
+        nli_decision_api_key: Bearer token for that server, if it requires one
+            (``kev.serve`` started by :class:`~fact_reasoner.serving.KevServer`).
         nli_mode: Which NLI candidate-pair preset to start from — ``"fast"``
             (default) applies the provenance preset (atom-context pairs
             restricted to the atoms that retrieved each context, gated
@@ -148,6 +210,11 @@ class FactualityRunner:
             to the caller unchanged. Default False: the error is printed and the
             stage falls back to its default result (no atoms, an unrevised
             atom, a neutral relation, an empty summary).
+        item_concurrency: How many dataset items :meth:`assess_file` works on
+            at once. Default 1 (one after another). Raise it with local servers,
+            so the LLM and NLI servers are both busy instead of taking turns;
+            raise the backends' shared throttles with it (see
+            :func:`fact_reasoner.utils.set_throttle`).
     """
 
     def __init__(
@@ -168,6 +235,7 @@ class FactualityRunner:
         nli_prompt: str = "few_shot",
         nli_decision_model: str | None = None,
         nli_decision_host: str | None = None,
+        nli_decision_api_key: str | None = None,
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: str | None = None,
@@ -184,8 +252,11 @@ class FactualityRunner:
         atomizer_backend: Backend | None = None,
         nli_backend: Backend | None = None,
         raise_errors: bool = False,
+        item_concurrency: int = 1,
     ) -> None:
         """Initialize the runner and its shared components."""
+        if item_concurrency < 1:
+            raise ValueError(f"item_concurrency must be at least 1, got {item_concurrency}.")
         if pipeline not in PIPELINES:
             raise ValueError(
                 f"Unknown pipeline: {pipeline!r} (expected one of {list(PIPELINES)})."
@@ -241,6 +312,14 @@ class FactualityRunner:
         self.nli_cache_dir = nli_cache_dir
         self.show_progress = show_progress
         self.raise_errors = raise_errors
+        self.item_concurrency = item_concurrency
+        # Distinct, so a backend shared by two roles is released once.
+        self._llm_backends = list(
+            {id(b): b for b in (backend, atomizer_backend, nli_backend) if b is not None}.values()
+        )
+        if item_concurrency > 1:
+            for b in self._llm_backends:
+                _fit_client_cache(b, item_concurrency)
 
         # `nli_mode` picks the pair-config preset; any explicit override then wins,
         # so a caller can start from a preset and adjust one knob.
@@ -269,6 +348,7 @@ class FactualityRunner:
             self.nli_extractor = DecisionNLIExtractor(
                 nli_decision_model,
                 host=nli_decision_host,
+                api_key=nli_decision_api_key,
                 show_progress=self.show_progress,
                 raise_errors=raise_errors,
             )
@@ -468,11 +548,14 @@ class FactualityRunner:
         done_inputs = {e.get("input") for e in evaluation_data}
         print(f"[FactualityRunner] Found {len(evaluation_data)} existing results")
 
-        for input_data in dataset:
-            if input_data.get("input") in done_inputs:
-                print("[FactualityRunner] Skipping already-processed input.")
-                continue
+        todo = [d for d in dataset if d.get("input") not in done_inputs]
+        if len(todo) < len(dataset):
+            print(
+                f"[FactualityRunner] Skipping {len(dataset) - len(todo)} "
+                "already-processed inputs."
+            )
 
+        def assess_item(input_data: dict[str, Any]) -> dict[str, Any]:
             context_retriever = self._build_context_retriever()
             pipeline_obj = self._make_pipeline(context_retriever)
             pipeline_obj.from_dict_with_contexts(input_data)
@@ -486,15 +569,36 @@ class FactualityRunner:
                     rel_context_context=rel_ctx_ctx,
                     summarize_contexts=self.use_summarizer,
                 )
-            _run_build(pipeline_obj, **build_kwargs)
+            release = (
+                tuple(self._llm_backends) if self.item_concurrency > 1 else ()
+            )
+            _run_build(pipeline_obj, release_clients_of=release, **build_kwargs)
 
             results = self._normalize_results(pipeline_obj.score())
             results["model_name"] = model_id
-            evaluation_data.append(results)
+            return results
 
+        def save(results: dict[str, Any]) -> None:
+            evaluation_data.append(results)
             # Write incrementally so a crash keeps completed work.
             with open(output_filename, "w") as f:
                 f.writelines(f"{json.dumps(res)}\n" for res in evaluation_data)
+
+        if self.item_concurrency == 1:
+            for input_data in todo:
+                save(assess_item(input_data))
+        else:
+            # Items in flight at once keep every server busy: while one item's
+            # atoms are being revised on the LLM, another's relations are scored
+            # by the NLI server and a third waits on retrieval. Each item has its
+            # own pipeline object and event loop (asyncio.run in its thread);
+            # the backends' shared throttles bound the total load. Results are
+            # saved in input order, so a resumed run skips a prefix as before.
+            with ThreadPoolExecutor(
+                max_workers=self.item_concurrency, thread_name_prefix="item"
+            ) as pool:
+                for results in pool.map(assess_item, todo):
+                    save(results)
 
         print(f"[FactualityRunner] Results written to: {output_filename}")
         return evaluation_data

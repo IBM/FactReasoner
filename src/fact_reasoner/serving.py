@@ -108,6 +108,27 @@ class _StopOnSigterm:
             self._installed = False
 
 
+def _visible_devices(gpus: str) -> str:
+    """Map job-relative GPU indices to ``CUDA_VISIBLE_DEVICES`` for a server.
+
+    LSF already restricts a job to its GPUs through ``CUDA_VISIBLE_DEVICES``
+    (e.g. ``"3,5"``), so a server pinned to the job's GPU ``"1"`` must get the
+    job's second entry (``"5"``), not physical GPU 1, which may be another job's.
+    Without a job-level restriction the indices are used as they are.
+    """
+    wanted = [g.strip() for g in gpus.split(",") if g.strip()]
+    visible = [d.strip() for d in os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if d.strip()]
+    if not visible:
+        return ",".join(wanted)
+    try:
+        return ",".join(visible[int(g)] for g in wanted)
+    except (ValueError, IndexError):
+        raise ValueError(
+            f"gpus={gpus!r} does not index the job's GPUs "
+            f"(CUDA_VISIBLE_DEVICES={','.join(visible)!r})."
+        ) from None
+
+
 def _pick_free_port(host: str = DEFAULT_HOST) -> int:
     """Return an ephemeral free TCP port on ``host``.
 
@@ -147,6 +168,7 @@ def _build_vllm_argv(
     extra_args: list[str] | None,
     lora_modules: dict[str, str] | None = None,
     max_lora_rank: int | None = None,
+    vllm_binary: str = "vllm",
 ) -> list[str]:
     """Build the ``vllm serve`` command line.
 
@@ -157,7 +179,7 @@ def _build_vllm_argv(
         The argv list for launching the vLLM OpenAI-compatible server.
     """
     argv = [
-        "vllm",
+        vllm_binary,
         "serve",
         model,
         "--served-model-name",
@@ -223,6 +245,12 @@ class VLLMServer:
             ``vllm.<port>.log`` in the current working directory.
         env: Extra environment variables merged onto the current environment for
             the vLLM subprocess.
+        vllm_binary: The ``vllm`` executable, e.g. from a separate environment
+            (vLLM pins its own torch). Defaults to ``vllm`` on ``PATH``.
+        gpus: GPUs the server may use, as ``CUDA_VISIBLE_DEVICES`` indices (e.g.
+            ``"0"``), so it can share a job with another server on its own GPU.
+            ``None`` uses every GPU the job was given. Also sets the default
+            ``tensor_parallel_size``.
     """
 
     def __init__(
@@ -244,8 +272,14 @@ class VLLMServer:
         term_grace_s: float = DEFAULT_TERM_GRACE_S,
         log_path: str | None = None,
         env: dict[str, str] | None = None,
+        gpus: str | None = None,
+        vllm_binary: str = "vllm",
     ) -> None:
         """Initialize the server manager (does not start vLLM yet)."""
+        self.gpus = gpus
+        self.vllm_binary = vllm_binary
+        if gpus is not None and tensor_parallel_size is None:
+            tensor_parallel_size = len([g for g in gpus.split(",") if g.strip()]) or 1
         self.model = model
         self.served_model_name = served_model_name or _default_served_model_name(model)
         self.host = host
@@ -291,6 +325,7 @@ class VLLMServer:
             extra_args=self.extra_args,
             lora_modules=self.lora_modules,
             max_lora_rank=self.max_lora_rank,
+            vllm_binary=self.vllm_binary,
         )
 
     def start(self) -> None:
@@ -305,6 +340,8 @@ class VLLMServer:
             raise RuntimeError("vLLM server is already started.")
 
         proc_env = dict(os.environ)
+        if self.gpus is not None:
+            proc_env["CUDA_VISIBLE_DEVICES"] = _visible_devices(self.gpus)
         if self.env:
             proc_env.update(self.env)
 
@@ -724,6 +761,302 @@ class OllamaServer:
             self._log_file = None
 
     def __enter__(self) -> "OllamaServer":  # noqa: PYI034
+        """Start the server and return self."""
+        self._sigterm = _StopOnSigterm().__enter__()
+        try:
+            self.start()
+        except BaseException:
+            self._sigterm.__exit__(None, None, None)
+            raise
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Stop the server on context exit (including on exception or SIGTERM)."""
+        try:
+            self.stop()
+        finally:
+            self._sigterm.__exit__(exc_type, exc_val, exc_tb)
+
+
+# kev.serve defaults. Loading kev-9b onto an H100 and compiling its DeltaNet
+# kernels takes a few minutes the first time (Triton caches them afterwards).
+DEFAULT_KEV_RUN = "jaredpalmer/kev-9b"
+DEFAULT_KEV_STARTUP_TIMEOUT_S = 1200.0
+# What kev.serve answers to; it echoes any model name, so this is a label.
+KEV_SERVED_MODEL = "kev-latest"
+
+
+class KevServer:
+    """Manage the lifecycle of a local ``kev.serve`` decision-model server.
+
+    ``kev.serve`` is kev's own server (https://github.com/jaredpalmer/kev): on
+    CUDA it runs the published kev-9b checkpoint in bf16 with fused DeltaNet
+    kernels and CUDA graphs, batches concurrent requests, and caches each state
+    so the questions asked about it reuse one prefill. It implements the same
+    System One API as Ollama (``POST /v1/systemone``), so
+    :class:`~fact_reasoner.core.nli.DecisionNLIExtractor` talks to it unchanged.
+
+    kev pins ``torch<2.9`` and exact kernel versions, which conflict with vLLM's,
+    so it runs from its own environment: ``python`` is that environment's
+    interpreter, with the ``kev`` package installed. Entering spawns it on a free
+    loopback port with a fresh API key, and blocks until one System One request
+    has succeeded, so the model is on the GPU before the pipeline's first batch;
+    exiting terminates it.
+
+    Args:
+        run: The kev checkpoint: a Hub id, optionally pinned (``repo@revision``),
+            or a local run directory. Jobs on nodes without internet need it in
+            the HF cache already (``HF_HUB_OFFLINE=1``).
+        python: The kev environment's Python interpreter.
+        gpus: GPU(s) for the server, as job-relative ``CUDA_VISIBLE_DEVICES``
+            indices (see :class:`VLLMServer`). ``None`` uses the job's default.
+        host: Interface to bind. Defaults to loopback.
+        port: TCP port. ``None`` picks a free ephemeral port.
+        api_key: The key the server requires (``KEV_API_KEY``). ``None`` makes a
+            random one, so another job on the node cannot use this server.
+        startup_timeout_s: Maximum seconds to wait for the model to load and
+            answer the warm-up request.
+        term_grace_s: Seconds to wait after ``SIGTERM`` before ``SIGKILL``.
+        log_path: Path for the server's stdout/stderr. Defaults to
+            ``kev.<port>.log`` in the current working directory.
+        env: Extra environment variables for the server (e.g. ``KEV_DTYPE``,
+            ``KEV_PREFIX_CACHE``, ``TRITON_CACHE_DIR``).
+    """
+
+    def __init__(
+        self,
+        run: str = DEFAULT_KEV_RUN,
+        *,
+        python: str = "python",
+        gpus: str | None = None,
+        host: str = DEFAULT_HOST,
+        port: int | None = None,
+        api_key: str | None = None,
+        startup_timeout_s: float = DEFAULT_KEV_STARTUP_TIMEOUT_S,
+        term_grace_s: float = DEFAULT_TERM_GRACE_S,
+        log_path: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        """Initialize the server manager (does not start kev yet)."""
+        import secrets
+
+        self.run = run
+        self.python = python
+        self.gpus = gpus
+        self.host = host
+        self.port = port if port is not None else _pick_free_port(host)
+        self.api_key = api_key if api_key is not None else secrets.token_urlsafe(24)
+        self.startup_timeout_s = startup_timeout_s
+        self.term_grace_s = term_grace_s
+        self.log_path = log_path or f"kev.{self.port}.log"
+        self.env = env
+
+        self._proc: subprocess.Popen | None = None
+        self._log_file = None
+
+    @property
+    def base_url(self) -> str:
+        """The server URL to pass as the decision extractor's ``host``."""
+        return f"http://{self.host}:{self.port}"
+
+    def argv(self) -> list[str]:
+        """The command line that starts the server."""
+        return [
+            self.python,
+            "-m",
+            "kev.serve",
+            "--run",
+            self.run,
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
+            "--device",
+            "cuda",
+        ]
+
+    def server_env(self) -> dict[str, str]:
+        """The environment ``kev.serve`` is launched with."""
+        env = dict(os.environ)
+        env["KEV_API_KEY"] = self.api_key
+        env.setdefault("TOKENIZERS_PARALLELISM", "false")
+        env.setdefault("PYTHONUNBUFFERED", "1")
+        if self.gpus is not None:
+            env["CUDA_VISIBLE_DEVICES"] = _visible_devices(self.gpus)
+        if self.env:
+            env.update(self.env)
+        return env
+
+    def client_env(self) -> dict[str, str]:
+        """What the ``ollama`` client needs in its environment to call the server.
+
+        The client sends ``Authorization: Bearer $OLLAMA_API_KEY``, which is the
+        header ``kev.serve`` checks against ``KEV_API_KEY``.
+        """
+        return {"OLLAMA_API_KEY": self.api_key}
+
+    def start(self) -> None:
+        """Spawn ``kev.serve`` and block until it has answered one request.
+
+        Equivalent to :meth:`launch` followed by :meth:`wait_ready`.
+
+        Raises:
+            FileNotFoundError: If ``python`` cannot be found.
+            RuntimeError: If the server exits during startup, or rejects the
+                warm-up request.
+            TimeoutError: If startup does not finish within ``startup_timeout_s``.
+        """
+        self.launch()
+        self.wait_ready()
+
+    def launch(self) -> None:
+        """Spawn ``kev.serve`` and return at once, while the model loads.
+
+        Lets the caller start another server (e.g. vLLM on the job's other GPU)
+        while this one loads, then call :meth:`wait_ready`. Call :meth:`stop` if
+        anything in between fails.
+        """
+        if self._proc is not None:
+            raise RuntimeError("kev server is already started.")
+
+        print(
+            f"[KevServer] Launching kev.serve (run={self.run}, url={self.base_url}, "
+            f"gpus={self.gpus if self.gpus is not None else 'job default'})",
+            flush=True,
+        )
+        print(f"[KevServer] Logging kev output to: {self.log_path}", flush=True)
+
+        self._log_file = open(self.log_path, "w")
+        try:
+            self._proc = subprocess.Popen(
+                self.argv(),
+                stdout=self._log_file,
+                stderr=subprocess.STDOUT,
+                env=self.server_env(),
+                start_new_session=True,
+            )
+        except FileNotFoundError:
+            self._log_file.close()
+            self._log_file = None
+            raise FileNotFoundError(
+                f"kev environment's Python not found: {self.python!r}. Create the "
+                "environment (see README, 'kev.serve on a GPU cluster') or pass "
+                "its interpreter."
+            ) from None
+        self._launched_at = time.monotonic()
+
+    def wait_ready(self) -> None:
+        """Block until the launched server has answered one request.
+
+        The startup budget counts from :meth:`launch`. On failure the server is
+        stopped before the error propagates.
+        """
+        if self._proc is None:
+            raise RuntimeError("kev server is not launched.")
+        try:
+            self._warm_up(self._launched_at + self.startup_timeout_s)
+        except BaseException:
+            # Never leave a half-started server running.
+            self.stop()
+            raise
+
+        print(
+            f"[KevServer] Ready: {self.base_url} (run: {self.run}, "
+            f"{time.monotonic() - self._launched_at:.0f}s after launch)",
+            flush=True,
+        )
+
+    def _read_log_tail(self) -> str:
+        """Return the tail of the kev log for diagnostics."""
+        try:
+            with open(self.log_path, "r") as f:
+                return f.read()[-_LOG_TAIL_CHARS:]
+        except OSError:
+            return "<no kev log available>"
+
+    def _check_alive(self) -> None:
+        assert self._proc is not None
+        exit_code = self._proc.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                f"kev server exited with code {exit_code} during startup.\n"
+                f"--- {self.log_path} (tail) ---\n{self._read_log_tail()}"
+            )
+
+    def _systemone(self, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
+        """POST one System One request; raises ``urllib.error.HTTPError`` on 4xx/5xx."""
+        import json
+
+        req = urllib.request.Request(
+            f"{self.base_url}/v1/systemone",
+            data=json.dumps(payload).encode(),
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read())
+
+    def _warm_up(self, deadline: float) -> None:
+        """Wait for the server, then send one request so the model is ready.
+
+        The server only binds its port once the model is loaded, so connection
+        errors are retried until the deadline; an HTTP 4xx is the server
+        rejecting the request, which retrying cannot fix.
+        """
+        payload = {
+            "model": KEV_SERVED_MODEL,
+            "state": "Warm-up.",
+            "questions": {"ready": {"type": "noul", "instructions": "Is this a warm-up?"}},
+        }
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            self._check_alive()
+            try:
+                self._systemone(payload, timeout=120.0)
+                return
+            except urllib.error.HTTPError as e:
+                if 400 <= e.code < 500:
+                    raise RuntimeError(
+                        f"kev server rejected the warm-up request ({e.code}): "
+                        f"{e.read().decode(errors='replace')[:500]}"
+                    ) from e
+                last_error = e
+            except (urllib.error.URLError, OSError) as e:
+                last_error = e
+            time.sleep(2.0)
+        raise TimeoutError(
+            f"kev server did not answer a warm-up request within "
+            f"{self.startup_timeout_s:.0f}s (last error: {last_error}).\n"
+            f"--- {self.log_path} (tail) ---\n{self._read_log_tail()}"
+        )
+
+    def stop(self) -> None:
+        """Terminate the kev server."""
+        proc = self._proc
+        if proc is not None and proc.poll() is None:
+            print("[KevServer] Stopping kev server ...", flush=True)
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, OSError):
+                proc.terminate()
+            try:
+                proc.wait(timeout=self.term_grace_s)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    proc.kill()
+                proc.wait()
+
+        self._proc = None
+        if self._log_file is not None:
+            self._log_file.close()
+            self._log_file = None
+
+    def __enter__(self) -> "KevServer":  # noqa: PYI034
         """Start the server and return self."""
         self._sigterm = _StopOnSigterm().__enter__()
         try:
