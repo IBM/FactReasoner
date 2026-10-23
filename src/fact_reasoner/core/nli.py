@@ -33,6 +33,7 @@ from fact_reasoner.utils import (
     extract_nli_label_and_span,
     handle_generation_error,
     run_throttled,
+    throttle_for,
 )
 
 from ._async_runner import run_coroutine
@@ -137,6 +138,44 @@ INSTRUCTION_NLI_ADAPTER = (
     'answer as a JSON dict with the following format: {"label": "entailment" | '
     '"contradiction" | "neutral"}.'
 )
+
+
+# Label-only variant of INSTRUCTION_NLI for base models: the same label
+# definitions and examples, but the model answers with the bracketed label alone.
+# The reasoning the few-shot prompt asks for is most of an NLI call's latency.
+INSTRUCTION_NLI_LABEL_ONLY = """\
+You are provided with a PREMISE and a HYPOTHESIS. Classify the relationship between them.
+Answer with exactly one label wrapped in square brackets and nothing else -- no explanation:
+- [entailment] if the PREMISE strongly implies, directly supports or entails the HYPOTHESIS
+- [contradiction] if the PREMISE contradicts the HYPOTHESIS
+- [neutral] if the PREMISE and the HYPOTHESIS neither entail nor contradict each other
+
+Example 1:
+PREMISE: Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. Smith was knighted in 1999, appointed to the House of Lords as an independent crossbench peer in 2008, and appointed Knight of the Thistle in the 2014 New Year Honours.
+HYPOTHESIS: Robert Smith holds the title of Baron Smith of Kelvin.
+ANSWER: [entailment]
+
+Example 2:
+PREMISE: In 2022, Passover begins in Israel at sunset on Friday, 15 April, and ends at sunset on Friday, 22 April 2022.
+HYPOTHESIS: Passover in 2022 begins at sundown on March 27.
+ANSWER: [contradiction]
+
+Example 3:
+PREMISE: Little India in the East Village: Two restaurants ablaze with tiny colored lights stand at the top of a steep staircase.
+HYPOTHESIS: The village had colorful decorations on every street corner.
+ANSWER: [neutral]
+
+Your task:
+PREMISE: {premise}
+HYPOTHESIS: {hypothesis}
+ANSWER:"""
+
+# Enough for "[contradiction]" with room for tokenizer differences; the label is
+# all that is wanted, so anything longer is the model ignoring the instruction.
+LABEL_ONLY_MAX_NEW_TOKENS = 16
+
+#: NLI prompt formats selectable by name (``--nli-prompt``).
+NLI_PROMPTS = ("few_shot", "label_only")
 
 
 def nli_adapter_prompt(premise: str, hypothesis: str) -> str:
@@ -617,7 +656,12 @@ class NLIExtractor:
             bar = tqdm(total=len(pairs), desc="NLI relations", unit="rel")
             on_progress = bar.update  # update() advances by 1 when called with no args
         try:
-            outputs = await run_throttled(factory, pairs, on_progress=on_progress)
+            outputs = await run_throttled(
+                factory,
+                pairs,
+                on_progress=on_progress,
+                throttle=throttle_for(self.backend),
+            )
         finally:
             if bar is not None:
                 bar.close()
@@ -710,4 +754,46 @@ class NLIAdapterExtractor(NLIExtractor):
 
     def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
         """As :meth:`NLIExtractor.run`, via the adapter (see :meth:`run_batch`)."""
+        return run_coroutine(self.run_batch([premise], [hypothesis]))[0]
+
+
+class LabelOnlyNLIExtractor(NLIExtractor):
+    """
+    NLI with a base model that answers with the label alone (no reasoning).
+
+    Sends :data:`INSTRUCTION_NLI_LABEL_ONLY` -- the few-shot prompt's label
+    definitions and examples, minus the step-by-step reasoning -- as one plain
+    user message, and caps generation at :data:`LABEL_ONLY_MAX_NEW_TOKENS`. The
+    bracketed answer is what the base class already parses, so label
+    extraction, the logprobs/SIMBA-UQ probability, validation, fallbacks and
+    ``run_batch`` are inherited unchanged.
+    """
+
+    prompt_format = "label_only"
+
+    def _model_options(self) -> dict[str, Any] | None:
+        options = dict(self._logprobs_model_options() or {})
+        options[ModelOption.MAX_NEW_TOKENS] = LABEL_ONLY_MAX_NEW_TOKENS
+        return options
+
+    def _request(self, premise: str, hypothesis: str):
+        # A Message action is sent as-is, so no instruction template wraps the
+        # prompt (and invites the model to explain itself first).
+        return mfuncs.aact(
+            Message(
+                "user",
+                INSTRUCTION_NLI_LABEL_ONLY.format(
+                    premise=premise, hypothesis=hypothesis
+                ),
+            ),
+            context=SimpleContext(),
+            backend=self.backend,
+            requirements=self._requirements(),
+            strategy=self._strategy,
+            return_sampling_results=True,
+            model_options=self._model_options(),
+        )
+
+    def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
+        """As :meth:`NLIExtractor.run`, with the label-only prompt."""
         return run_coroutine(self.run_batch([premise], [hypothesis]))[0]

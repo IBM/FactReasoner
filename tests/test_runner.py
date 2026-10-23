@@ -120,13 +120,15 @@ class TestConstruction:
 
     @pytest.mark.parametrize("version", ["v1", "v2", "v3"])
     def test_published_versions_use_the_faithful_config(self, version):
-        """v1/v2/v3 must reproduce the original behavior with no flags.
+        """v1/v2/v3 reproduce the original behavior with nli_mode="all_pairs".
 
-        This is the default-preservation guard: nli_mode defaults to "all_pairs",
-        so no version scores fewer pairs unless asked to.
+        The default is "fast", so the published numbers need the explicit mode.
         """
         r = FactualityRunner(
-            MagicMock(), pipeline="factscore", pipeline_version=version
+            MagicMock(),
+            pipeline="factscore",
+            pipeline_version=version,
+            nli_mode="all_pairs",
         )
         assert r.nli_mode == "all_pairs"
         assert r.nli_pair_config.is_faithful
@@ -148,10 +150,11 @@ class TestConstruction:
         with pytest.raises(ValueError, match="Unknown nli_mode"):
             FactualityRunner(MagicMock(), pipeline="factscore", nli_mode="bogus")
 
-    def test_default_nli_mode_is_all_pairs(self):
+    def test_default_nli_mode_is_fast(self):
         r = FactualityRunner(MagicMock(), pipeline="factscore")
-        assert r.nli_mode == "all_pairs"
-        assert r.nli_pair_config.is_faithful
+        assert r.nli_mode == "fast"
+        assert not r.nli_pair_config.is_faithful
+        assert r.nli_pair_config.policy == "provenance"
 
     @pytest.mark.parametrize("version", ["v2-cheap", "v3-cheap"])
     def test_cheap_version_names_are_rejected(self, version):

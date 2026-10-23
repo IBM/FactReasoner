@@ -15,6 +15,9 @@
 import asyncio
 import json
 import re
+import threading
+import time
+import weakref
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -85,6 +88,101 @@ class AsyncRateLimiter:
                 self._allowance -= 1.0
 
 
+class BackendThrottle:
+    """Concurrency ceiling and rate limit shared by every batch sent to a backend.
+
+    :func:`run_throttled` on its own bounds only the batch it is given, so two
+    stages (or two dataset items) running at the same time each get the full
+    budget and together overload the server. Passing the same throttle to every
+    batch makes the budget global to the backend.
+
+    Pipeline stages run on more than one event loop (``asyncio.run`` for
+    ``build()``, the background loop of ``run_coroutine`` for the rest), and
+    asyncio primitives are bound to one loop. The state here is guarded by a
+    ``threading.Lock`` instead, and waiters poll with ``asyncio.sleep``, so one
+    throttle is safe to share across loops and threads.
+    """
+
+    # How long a waiter sleeps between checks for a free slot or token.
+    _POLL_SECONDS = 0.01
+
+    def __init__(
+        self,
+        max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+        rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+    ):
+        """
+        Args:
+            max_concurrency: int
+                Maximum number of items in flight at once, across all batches.
+            rate_per_minute: int
+                Maximum number of items started per minute, across all batches.
+        """
+        if max_concurrency <= 0:
+            raise ValueError("max_concurrency must be a positive integer")
+        if rate_per_minute <= 0:
+            raise ValueError("rate_per_minute must be a positive integer")
+
+        self.max_concurrency = max_concurrency
+        self.rate_per_minute = rate_per_minute
+        self._in_flight = 0
+        self._tokens = float(rate_per_minute)
+        self._last = time.monotonic()
+        self._lock = threading.Lock()
+
+    def _try_acquire(self) -> bool:
+        """Take a slot and a token if both are available, without blocking."""
+        with self._lock:
+            now = time.monotonic()
+            self._tokens = min(
+                float(self.rate_per_minute),
+                self._tokens + (now - self._last) * self.rate_per_minute / 60.0,
+            )
+            self._last = now
+            if self._in_flight >= self.max_concurrency or self._tokens < 1.0:
+                return False
+            self._in_flight += 1
+            self._tokens -= 1.0
+            return True
+
+    async def acquire(self) -> None:
+        """Wait until a slot and a rate token are free, then take both."""
+        while not self._try_acquire():
+            await asyncio.sleep(self._POLL_SECONDS)
+
+    def release(self) -> None:
+        """Return the slot taken by :meth:`acquire`."""
+        with self._lock:
+            self._in_flight -= 1
+
+
+# One throttle per backend object, so every component built on the same backend
+# shares a single budget. Weak keys let a discarded backend take its throttle
+# with it.
+_backend_throttles: "weakref.WeakKeyDictionary[Any, BackendThrottle]" = (
+    weakref.WeakKeyDictionary()
+)
+_backend_throttles_lock = threading.Lock()
+
+
+def throttle_for(backend: Any) -> BackendThrottle | None:
+    """Return the shared :class:`BackendThrottle` for ``backend``.
+
+    Created with the module defaults on first use. Returns None for a backend
+    that cannot be weakly referenced (plain stand-ins in tests), in which case
+    callers fall back to per-batch throttling.
+    """
+    with _backend_throttles_lock:
+        try:
+            throttle = _backend_throttles.get(backend)
+            if throttle is None:
+                throttle = BackendThrottle()
+                _backend_throttles[backend] = throttle
+        except TypeError:
+            return None
+        return throttle
+
+
 async def run_throttled(
     factory: Callable[[Any], Awaitable[Any]],
     items: list[Any],
@@ -92,6 +190,7 @@ async def run_throttled(
     max_concurrency: int = MAX_CONCURRENT_REQUESTS,
     rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
     on_progress: Callable[[], None] | None = None,
+    throttle: BackendThrottle | None = None,
 ) -> list[Any]:
     """Run one coroutine per item with bounded concurrency and rate limiting.
 
@@ -115,25 +214,41 @@ async def run_throttled(
             coroutine completes — succeeds or fails. Fires in completion order,
             not input order, so it is suitable for driving a progress bar. Must
             not block.
+        throttle: Optional[BackendThrottle]
+            A budget shared with every other batch sent to the same backend
+            (see :func:`throttle_for`). When given, it replaces the per-batch
+            ``max_concurrency`` / ``rate_per_minute`` limits. Both count items,
+            not requests: an item that issues several generations (SIMBA-UQ)
+            holds one slot.
 
     Returns:
         List[Any]: Results positionally aligned with ``items``. For any item
         whose coroutine raised, the corresponding entry is the ``Exception``
         object (never reordered, never dropped).
     """
-    limiter = AsyncRateLimiter(rate_per_minute)
-    sem = asyncio.Semaphore(max_concurrency)
+    if throttle is None:
+        limiter = AsyncRateLimiter(rate_per_minute)
+        sem = asyncio.Semaphore(max_concurrency)
+
+    async def _call(item: Any) -> Any:
+        try:
+            return await factory(item)
+        except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
+            return e
+        finally:
+            if on_progress is not None:
+                on_progress()
 
     async def _one(item: Any) -> Any:
+        if throttle is not None:
+            await throttle.acquire()
+            try:
+                return await _call(item)
+            finally:
+                throttle.release()
         async with sem:
             await limiter.acquire()
-            try:
-                return await factory(item)
-            except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
-                return e
-            finally:
-                if on_progress is not None:
-                    on_progress()
+            return await _call(item)
 
     tasks = [asyncio.create_task(_one(item)) for item in items]
     # _one never raises, so gather returns one result per item in order.

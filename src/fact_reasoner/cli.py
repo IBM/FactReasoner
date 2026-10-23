@@ -25,6 +25,7 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend, is_anthropic_compat_endpoint
+from fact_reasoner.core.nli import NLI_PROMPTS
 from fact_reasoner.core.nli_config import NLI_MODES, NLI_PAIR_POLICIES
 from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 
@@ -77,6 +78,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "neither of which exposes logprobs). Default: logprobs.",
     )
     p.add_argument(
+        "--nli-prompt",
+        default="few_shot",
+        choices=list(NLI_PROMPTS),
+        help="The NLI prompt for the base model. 'few_shot' (default) has the "
+        "model reason step by step before its label; 'label_only' asks for the "
+        "label alone, which is several times faster. Ignored with --nli-adapter, "
+        "which has its own prompt.",
+    )
+    p.add_argument(
         "--nli-similarity-metric",
         default="rouge",
         choices=["rouge", "jaccard", "sbert", "difflib", "levenshtein"],
@@ -117,15 +127,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     # One LLM call per candidate pair means A*C calls for the atom-context phase
     # and C*(C-1) for context-context. Since contexts are retrieved per atom
     # (C ~ A*top_k), that is quadratic in atoms for v2 and cubic-ish for v3.
-    # Every flag here defaults to the original behavior.
+    # --nli-mode defaults to 'fast'; pass --nli-mode all_pairs for the original
+    # behavior. Every other flag here defaults to its preset's value.
     n = parser.add_argument_group("nli relation extraction (cost control)")
     n.add_argument(
         "--nli-mode",
-        default="all_pairs",
+        default="fast",
         # Read from the shared tuple so the two can never drift apart.
         choices=list(NLI_MODES),
         help=(
-            "Which NLI candidate-pair preset to start from (default: all_pairs). "
+            "Which NLI candidate-pair preset to start from (default: fast). "
             "'all_pairs' scores every enumerated pair and reproduces published "
             "numbers. 'fast' restricts atom-context pairs to the atoms that "
             "actually retrieved each context, gates context-context pairs, "
@@ -518,6 +529,7 @@ def main() -> None:
             use_query_builder=args.use_query_builder,
             merlin_path=args.merlin_path,
             nli_method=args.nli_method,
+            nli_prompt=args.nli_prompt,
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,

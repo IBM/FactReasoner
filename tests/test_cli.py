@@ -432,8 +432,11 @@ class TestNliModeAndVersion:
             )
         return ctor.call_args.kwargs
 
-    def test_nli_mode_defaults_to_all_pairs(self):
-        assert self._run_and_capture([])["nli_mode"] == "all_pairs"
+    def test_nli_mode_defaults_to_fast(self):
+        assert self._run_and_capture([])["nli_mode"] == "fast"
+
+    def test_nli_mode_all_pairs_reaches_runner(self):
+        assert self._run_and_capture(["--nli-mode", "all_pairs"])["nli_mode"] == "all_pairs"
 
     def test_nli_mode_fast_reaches_runner(self):
         kwargs = self._run_and_capture(["--nli-mode", "fast"])

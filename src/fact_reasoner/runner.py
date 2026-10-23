@@ -33,7 +33,12 @@ from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.atomizer_reviser import AtomizerReviser
-from fact_reasoner.core.nli import NLIAdapterExtractor, NLIExtractor
+from fact_reasoner.core.nli import (
+    NLI_PROMPTS,
+    LabelOnlyNLIExtractor,
+    NLIAdapterExtractor,
+    NLIExtractor,
+)
 from fact_reasoner.core.nli_config import NLI_MODES, get_pair_config
 from fact_reasoner.core.query_builder import QueryBuilder
 from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
@@ -88,7 +93,9 @@ class FactualityRunner:
         service_type: Retrieval service (``google``/``wikipedia``/``chromadb``/``ntrs``).
         cache_dir: Optional retriever cache directory.
         top_k: Top-k contexts retrieved per atom.
-        num_workers: Parallelism for context retrieval.
+        num_workers: Threads fetching each search's result pages in parallel.
+            Items (atoms and the query) are always retrieved concurrently, one
+            worker each.
         use_priors: Use atom/context priors (FactReasoner only).
         use_summarizer: Summarize contexts (FactReasoner only).
         use_query_builder: Use the QueryBuilder for search queries.
@@ -100,12 +107,16 @@ class FactualityRunner:
             Ollama which does not expose logprobs).
         nli_similarity_metric: Similarity metric for the SIMBA-UQ NLI method
             (only used when ``nli_method='simbauq'``).
-        nli_mode: Which NLI candidate-pair preset to start from — ``"all_pairs"``
-            (default) scores every enumerated pair and reproduces the published
-            numbers, while ``"fast"`` applies the provenance preset (atom-context
-            pairs restricted to the atoms that retrieved each context, gated
+        nli_prompt: The NLI prompt for the base model — ``"few_shot"``
+            (default) has the model reason before its label, ``"label_only"``
+            asks for the label alone, which is several times faster. Ignored
+            when ``nli_backend`` is given: the adapter has its own prompt.
+        nli_mode: Which NLI candidate-pair preset to start from — ``"fast"``
+            (default) applies the provenance preset (atom-context pairs
+            restricted to the atoms that retrieved each context, gated
             context-context pairs, near-duplicate contexts collapsed, and
-            one-direction context-pair scoring). Orthogonal to
+            one-direction context-pair scoring), while ``"all_pairs"`` scores
+            every enumerated pair and reproduces the published numbers. Orthogonal to
             ``pipeline_version``: the version fixes the graph shape, this fixes how
             many pairs are scored within it. Individual ``nli_*`` arguments below
             override whichever preset this selects. Has little effect on ``"v1"``,
@@ -145,10 +156,11 @@ class FactualityRunner:
         use_query_builder: bool = False,
         merlin_path: str | None = None,
         nli_method: str = "logprobs",
+        nli_prompt: str = "few_shot",
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: str | None = None,
-        nli_mode: str = "all_pairs",
+        nli_mode: str = "fast",
         nli_pair_policy: str | None = None,
         nli_gate_threshold: float | None = None,
         nli_neighbor_window: int | None = None,
@@ -176,6 +188,11 @@ class FactualityRunner:
             raise ValueError(
                 f"Unknown nli_mode: {nli_mode!r} (expected one of {list(NLI_MODES)})."
             )
+        if nli_prompt not in NLI_PROMPTS:
+            raise ValueError(
+                f"Unknown nli_prompt: {nli_prompt!r} "
+                f"(expected one of {list(NLI_PROMPTS)})."
+            )
         if pipeline == "factreasoner" and not merlin_path:
             raise ValueError("The 'factreasoner' pipeline requires a merlin_path.")
 
@@ -191,6 +208,7 @@ class FactualityRunner:
         self.use_query_builder = use_query_builder
         self.merlin_path = merlin_path
         self.nli_method = nli_method
+        self.nli_prompt = nli_prompt
         self.nli_similarity_metric = nli_similarity_metric
         self.nli_confidence_method = nli_confidence_method
         self.nli_classifier_path = nli_classifier_path
@@ -220,7 +238,12 @@ class FactualityRunner:
             else Atomizer(backend, raise_errors=raise_errors)
         )
         self.atom_reviser = Reviser(backend, raise_errors=raise_errors)
-        nli_cls = NLIAdapterExtractor if nli_backend is not None else NLIExtractor
+        if nli_backend is not None:
+            nli_cls = NLIAdapterExtractor
+        elif nli_prompt == "label_only":
+            nli_cls = LabelOnlyNLIExtractor
+        else:
+            nli_cls = NLIExtractor
         self.nli_extractor = nli_cls(
             nli_backend if nli_backend is not None else backend,
             nli_method=self.nli_method,
@@ -254,7 +277,6 @@ class FactualityRunner:
         return ContextRetriever(
             retriever=retriever,
             context_summarizer=self.context_summarizer,
-            num_workers=self.num_workers,
         )
 
     def _make_pipeline(self, context_retriever: ContextRetriever):

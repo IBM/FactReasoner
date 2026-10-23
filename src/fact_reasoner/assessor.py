@@ -447,90 +447,79 @@ class FactReasoner:
                 self.timing,
                 "Context summarization (total)",
             ):
-                # Summarize contexts for atoms
-                with stage(
-                    "context_summarization_atoms",
-                    self.timing,
-                    "Context summarization (atoms)",
-                ):
-                    for atom_id, atom in self.atoms.items():
-                        if len(atom.contexts.keys()) > 0:
-                            contexts_ids, contexts = zip(*atom.contexts.items())
-                            results = await self.context_summarizer.run_batch(
-                                [context.get_text() for context in contexts], atom.text
-                            )
-
-                            # Safety checks
-                            assert len(results) == len(contexts), (
-                                "The number of summaries must be equal to the number of contexts."
-                            )
-
-                            # Set the new syntheric summaries
-                            for context_id, result in zip(contexts_ids, results):
-                                if context_id not in self.contexts:
-                                    # A context can be shared by several atoms (e.g. once
-                                    # `remove_duplicated_contexts` repoints a duplicate's
-                                    # owners at the surviving context). An earlier atom in
-                                    # this same loop already dropped it; the dangling
-                                    # reference left in this atom is swept below by
-                                    # `prune_dangling_context_refs`.
-                                    continue
-                                is_relevant = is_relevant_context(result["summary"])
-                                if result["summary"] != "" and is_relevant:
-                                    self.contexts[context_id].set_synthetic_summary(
-                                        result["summary"]
-                                    )
-                                    # update prior probability of context based on the confidence estimation of the summary
-                                    self.contexts[context_id].set_probability(
-                                        result["probability"]
-                                        * self.contexts[context_id].get_probability()
-                                    )
-                                else:
-                                    # we remove the context because it is not related to the atom
-                                    del self.contexts[context_id]
-                                    del self.atoms[atom_id].contexts[context_id]
-                            print(
-                                f"[FactReasoner] Created {len(results)} summarized contexts for atom {atom_id}."
-                            )
-
-                # Summarize contexts for question
-                c_qs = {
-                    c_id: context
-                    for c_id, context in self.contexts.items()
-                    if c_id.startswith("c_q")
-                }
-                if len(c_qs.keys()) > 0:
-                    with stage(
-                        "context_summarization_question",
-                        self.timing,
-                        "Context summarization (question)",
+                # Every (context, reference) pair still to summarize, in one batch:
+                # each atom's contexts against the atom, and the question's
+                # contexts against the query. Contexts the retriever already
+                # summarized (it does so as it retrieves them) are only checked
+                # for relevance, not summarized again -- that would repeat the
+                # same call and discount the context's prior a second time.
+                jobs = []  # (context_id, owning atom id or None, reference text)
+                for atom_id, atom in self.atoms.items():
+                    for context_id, context in atom.contexts.items():
+                        if context.get_summary() == "":
+                            jobs.append((context_id, atom_id, atom.text))
+                for context_id in self.contexts:
+                    if context_id.startswith("c_q") and (
+                        self.contexts[context_id].get_summary() == ""
                     ):
-                        contexts_ids, contexts = zip(*c_qs.items())
-                        results = await self.context_summarizer.run_batch(
-                            [context.get_text() for context in contexts], self.query
-                        )
+                        jobs.append((context_id, None, self.query))
 
-                        assert len(results) == len(contexts), (
-                            "The number of summaries must be equal to the number of contexts."
-                        )
+                with stage(
+                    "context_summarization_batch",
+                    self.timing,
+                    "Context summarization (batch)",
+                    **{"fact_reasoner.contexts": len(jobs)},
+                ):
+                    results = await self.context_summarizer.run_batch_pairs(
+                        [self.contexts[cid].get_text() for cid, _, _ in jobs],
+                        [ref for _, _, ref in jobs],
+                    )
+                assert len(results) == len(jobs), (
+                    "The number of summaries must be equal to the number of contexts."
+                )
 
-                        for context_id, result in zip(contexts_ids, results):
-                            is_relevant = is_relevant_context(result["summary"])
-                            if result["summary"] != "" and is_relevant:
-                                self.contexts[context_id].set_synthetic_summary(
-                                    result["summary"]
-                                )
-                                # update prior probability of context based on the confidence estimation of the summary
-                                self.contexts[context_id].set_probability(
-                                    result["probability"]
-                                    * self.contexts[context_id].get_probability()
-                                )
-                            else:
-                                # we remove the context because it is not related to the atom
-                                del self.contexts[context_id]
-                        print(
-                            f"[FactReasoner] Created {len(results)} summarized contexts for the question."
-                        )
+                summaries = {}
+                for (context_id, atom_id, _), result in zip(jobs, results):
+                    summaries.setdefault(context_id, []).append((atom_id, result))
+
+                for context_id, entries in summaries.items():
+                    for atom_id, result in entries:
+                        if context_id not in self.contexts:
+                            # A context can be shared by several atoms (e.g. once
+                            # `remove_duplicated_contexts` repoints a duplicate's
+                            # owners at the surviving context). An earlier atom
+                            # already dropped it; the dangling reference left in
+                            # this atom is swept below by
+                            # `prune_dangling_context_refs`.
+                            continue
+                        is_relevant = is_relevant_context(result["summary"])
+                        if result["summary"] != "" and is_relevant:
+                            self.contexts[context_id].set_synthetic_summary(
+                                result["summary"]
+                            )
+                            # update prior probability of context based on the confidence estimation of the summary
+                            self.contexts[context_id].set_probability(
+                                result["probability"]
+                                * self.contexts[context_id].get_probability()
+                            )
+                        else:
+                            # we remove the context because it is not related to the atom
+                            del self.contexts[context_id]
+                            if atom_id is not None:
+                                del self.atoms[atom_id].contexts[context_id]
+
+                # Contexts the retriever summarized still go through the same
+                # relevance filter the batch above applies.
+                for context_id in list(self.contexts):
+                    if context_id in summaries:
+                        continue
+                    summary = self.contexts[context_id].get_summary()
+                    if summary != "" and not is_relevant_context(summary):
+                        del self.contexts[context_id]
+                print(
+                    f"[FactReasoner] Summarized {len(jobs)} contexts in one batch "
+                    f"({len(self.contexts)} kept)."
+                )
 
                 # Contexts judged irrelevant are dropped above, but the atoms that
                 # retrieved them are not all cleaned: the per-atom branch clears only

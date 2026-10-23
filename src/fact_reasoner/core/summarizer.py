@@ -29,6 +29,7 @@ from fact_reasoner.utils import (
     extract_logprobs_from_output,
     handle_generation_error,
     run_throttled,
+    throttle_for,
 )
 
 INSTRUCTION_WITHOUT_REF = """
@@ -258,16 +259,40 @@ class ContextSummarizer:
         Returns:
             List[Dict[str, Any]]: A list of summarized contexts.
         """
+        return await self.run_batch_pairs(contexts, [atom_text] * len(contexts))
 
-        # Initialize the instruction
-        instruction = (
-            INSTRUCTION_WITH_REF if atom_text is not None else INSTRUCTION_WITHOUT_REF
+    async def run_batch_pairs(
+        self, contexts: list[str], atom_texts: list[str | None]
+    ) -> list[dict[str, Any]]:
+        """
+        Summarize each context with respect to its own reference text.
+
+        Lets one batch cover contexts that belong to different atoms (and to the
+        query), instead of one batch per reference.
+
+        Args:
+            contexts: List[str]
+                The list of contexts to be summarized.
+            atom_texts: List[Optional[str]]
+                The reference text for each context, positionally aligned with
+                ``contexts``. None summarizes that context without a reference.
+        Returns:
+            List[Dict[str, Any]]: A list of summarized contexts.
+        """
+        assert len(contexts) == len(atom_texts), (
+            "Each context needs exactly one reference text."
         )
 
         # Build a fresh coroutine per context. run_throttled applies bounded
         # concurrency plus a per-minute rate limit, and captures per-item
         # exceptions so a single backend failure does not drop the rest.
-        def factory(context: str):
+        def factory(pair: tuple[str, str | None]):
+            context, atom_text = pair
+            instruction = (
+                INSTRUCTION_WITH_REF
+                if atom_text is not None
+                else INSTRUCTION_WITHOUT_REF
+            )
             return mfuncs.ainstruct(
                 instruction,
                 context=SimpleContext(),
@@ -291,7 +316,12 @@ class ContextSummarizer:
             bar = tqdm(total=len(contexts), desc="Summarizing", unit="ctx")
             on_progress = bar.update
         try:
-            outputs = await run_throttled(factory, contexts, on_progress=on_progress)
+            outputs = await run_throttled(
+                factory,
+                list(zip(contexts, atom_texts)),
+                on_progress=on_progress,
+                throttle=throttle_for(self.backend),
+            )
         finally:
             if bar is not None:
                 bar.close()

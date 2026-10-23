@@ -76,9 +76,13 @@ FactReasoner addresses hallucination detection through a principled five-stage p
    - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM / OpenAI).
    - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama** and for **Claude via Anthropic's OpenAI-compatible endpoint**, neither of which exposes logprobs. No extra install needed.
 
-   The relations can also be predicted by a fine-tuned **NLI LoRA adapter** for `granite-4.2-8b` in place of the few-shot prompt; both probability methods work with it unchanged (see [LoRA adapters](#lora-adapters-atomization-and-nli)).
+   Two prompts are available for the base model (`--nli-prompt`):
+   - **`few_shot`** (default): the model reasons step by step before giving its label. Most accurate; the reasoning is most of an NLI call's latency.
+   - **`label_only`**: the same label definitions and examples, but the model answers with the label alone (capped at 16 tokens). About 3× faster end to end, for a small accuracy cost — see [Performance](#performance).
 
-   The number of NLI calls is the dominant cost of a run; see [`--nli-mode fast`](#nli-cost-control-advanced) for how to reduce it.
+   The relations can also be predicted by a fine-tuned **NLI LoRA adapter** for `granite-4.2-8b` in place of either prompt; both probability methods work with it unchanged (see [LoRA adapters](#lora-adapters-atomization-and-nli)).
+
+   The number of NLI calls is the dominant cost of a run; `--nli-mode fast` (the default) reduces it — see [NLI cost control](#nli-cost-control-advanced).
 
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
    - **Nodes** represent atoms and contexts as binary random variables
@@ -401,6 +405,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
 | `--use-priors` | Use atom/context priors (FactReasoner only). |
 | `--use-query-builder` | Generate search queries with the QueryBuilder. |
+| `--nli-prompt {few_shot,label_only}` | NLI prompt for the base model (default `few_shot`). `label_only` asks for the label without reasoning: ~3× faster, slightly less accurate (see [Performance](#performance)). Ignored with `--nli-adapter`. |
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
 | `--list-models` | Print the available unified model ids (and aliases) and exit. |
 | `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
@@ -436,7 +441,7 @@ from a mode and adjust one feature at a time.
 
 | Option | Meaning |
 |--------|---------|
-| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `all_pairs`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
+| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `fast`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
 | `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score — **one knob**, where `--nli-mode` is a bundle. `all_pairs` scores every enumerated pair; `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. So `--nli-pair-policy provenance` is *weaker* than `--nli-mode fast`, which also turns on dedup, cascade and merged phases. |
 | `--nli-gate-threshold` | Similarity at or above which a pair survives the gate (default `0.20`, calibrated for the embedding backend). Deliberately low: a false prune silently weakens an atom's evidence, a false keep only costs money. |
 | `--nli-neighbor-window` | For `provenance`, how many atoms either side of an owning atom are also compared against a context (default `1`). |
@@ -504,7 +509,8 @@ runner = FactualityRunner(
     backend,
     pipeline="factreasoner",
     pipeline_version="v3",         # "v1" / "v2" / "v3" -- graph shape
-    nli_mode="fast",               # "all_pairs" (default) or "fast" -- pair cost
+    nli_mode="fast",               # "fast" (default) or "all_pairs" -- pair cost
+    nli_prompt="few_shot",         # "few_shot" (default) or "label_only" -- NLI speed
     merlin_path="/path/to/merlin",
     nli_cache_dir=".cache/nli",    # score-neutral; re-runs cost no LLM calls
 )
@@ -653,6 +659,53 @@ get their own `--nli-cache-dir` keys, so they never mix with few-shot verdicts.
   flattens the evidence strengths the Markov network relies on. `simbauq` derives
   confidence from agreement across samples instead.
 
+### Performance
+
+The pipeline runs everything that does not depend on an earlier result
+concurrently, under one request budget per backend:
+
+- **Retrieval.** Every atom (and the query) is retrieved in its own worker, so
+  searches, page fetches and context summaries for all atoms overlap.
+  `per_atom_timeout` (default 180 s) caps the whole batch, and an atom still
+  running at the deadline is logged and skipped instead of holding up the rest.
+- **Page cache.** Searches for different atoms of one response return many of the
+  same pages, so each page is fetched once per assessment; concurrent requests for
+  the same page wait for the first download. A failed fetch is not retried.
+- **One summarization pass.** Contexts are summarized as they are retrieved. With
+  `--use-summarizer`, `build()` summarizes only what is left (the question's
+  contexts), in a single batch, instead of summarizing every context again.
+- **Shared throttle.** All LLM calls to a backend share one concurrency ceiling (32
+  in flight) and rate limit (1500/min) — `fact_reasoner.utils.throttle_for(backend)`
+  — whichever stage or thread issues them, so overlapping stages cannot overload
+  the server. Raising the ceiling buys little: RITS throughput was measured to
+  level off near 9 requests/s, with latency growing instead.
+
+What still dominates is NLI (75–85% of a run), which is why `--nli-mode fast` is
+the default and `--nli-prompt label_only` is available. Measured on RITS
+(`llama-3-3-70b-instruct`, Google retrieval, a 16-atom biography):
+
+| Change | Before | After |
+|--------|--------|-------|
+| Retrieval stage (v2, top-k 3 / top-k 5) | 32 s / 43 s | 14 s / 14 s |
+| Page fetches per assessment | ~180 | ~70 |
+| `build()` summarization with `--use-summarizer` | 17 s, 31 calls | 3 s, 4 calls |
+| v3 end to end, `--nli-mode fast` vs `all_pairs` | 343 s, 1066 NLI calls | 122 s, 256 NLI calls (same predictions) |
+
+And the two NLI prompts, on 10 items (248 human-labelled atoms) of
+`data/bio-labeled_wikipedia.jsonl`, v2 with `--nli-mode fast`:
+
+| `--nli-prompt` | Atom accuracy | Factuality error | Brier | Wall time |
+|----------------|---------------|------------------|-------|-----------|
+| `few_shot` (default) | 79.8% | 0.123 | 0.231 | 965 s |
+| `label_only` | 78.6% | 0.134 | 0.255 | 321 s |
+
+The prompts agreed on 237 of the 248 atoms. A 10-item sample cannot separate a
+one-point accuracy difference from noise, so use `few_shot` for published numbers.
+
+> **Behavior change with `--use-summarizer`.** A context summarized twice used to
+> have its prior multiplied by both summaries' confidences; it is now discounted
+> once. Context priors, and so scores, can shift slightly in that mode.
+
 ### Telemetry
 
 FactReasoner can emit [OpenTelemetry](https://opentelemetry.io/) traces and metrics
@@ -710,7 +763,7 @@ Two things to pick before you run anything:
 
 - **`--pipeline-version {v1,v2,v3}`** — the graph shape (default `v2`).
 - **`--nli-mode {all_pairs,fast}`** — how many NLI candidate pairs get scored
-  (default `all_pairs`). This is the main cost dial: NLI is the dominant expense of a
+  (default `fast`). This is the main cost dial: NLI is the dominant expense of a
   run, and `fast` prunes the pairs it scores while keeping the same graph. How much it
   saves depends on the workload (measured between ~1.2× and ~5×).
 
@@ -718,8 +771,8 @@ They are independent, so any version pairs with either mode.
 
 #### 1. The CLI (easiest)
 
-**`all_pairs` — score every candidate pair.** The default: highest fidelity, and what
-reproduces the published numbers.
+**`all_pairs` — score every candidate pair.** Highest fidelity, and what reproduces
+the published numbers; pass it explicitly, since the default is `fast`.
 
 ```bash
 fact-reasoner \
@@ -731,7 +784,7 @@ fact-reasoner \
     --topic "Albert Einstein"
 ```
 
-**`fast` — same assessment, far fewer LLM calls.** Only one line differs:
+**`fast` — same assessment, far fewer LLM calls.** The default. Only one line differs:
 
 ```bash
 fact-reasoner \
@@ -743,8 +796,8 @@ fact-reasoner \
     --topic "Albert Einstein"
 ```
 
-Since `all_pairs` is the default, you can simply omit `--nli-mode` to get it — the
-first command above is explicit for contrast, not because the flag is required.
+Since `fast` is the default, you can simply omit `--nli-mode` to get it — the
+second command above is explicit for contrast, not because the flag is required.
 
 **How to confirm `fast` took effect.** On `--pipeline factreasoner` it prints a
 one-line banner at startup:
@@ -753,7 +806,7 @@ one-line banner at startup:
 [FactReasoner] NLI pair policy: provenance (cascade=True, near-dup dedup=True)
 ```
 
-`all_pairs` prints nothing, since it is the default behavior.
+`all_pairs` prints nothing, since it is the original, unpruned behavior.
 
 > `--nli-mode` applies to `--pipeline factreasoner` only. The baseline pipelines
 > (`factscore`, `veriscore`, `factverify`) do not build a pair-scored NLI graph, so
@@ -787,8 +840,8 @@ print(f"Factuality score: {results['factuality_score']:.2%}")
 
 | Mode | Use it when | Trade-off |
 |------|-------------|-----------|
-| `all_pairs` *(default)* | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
-| `fast` | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
+| `all_pairs` | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
+| `fast` *(default)* | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
 
 Start with `fast` while developing, then confirm final numbers with `all_pairs`.
 
@@ -844,7 +897,9 @@ nli_extractor = NLIExtractor(backend)
 #       build_backend("vllm", model_id="fr-nli", base_url=url))
 
 # The Retriever fetches evidence; ContextRetriever wraps it for parallel,
-# per-atom retrieval (optionally summarizing each context).
+# per-atom retrieval (optionally summarizing each context). SourceRetriever's
+# num_workers is the page-fetch threads per search; ContextRetriever runs one
+# worker per atom by default (pass num_workers only to cap it).
 retriever = SourceRetriever(
     service_type="google",  # or "wikipedia", "chromadb", "ntrs"
     top_k=5,
@@ -855,7 +910,6 @@ retriever = SourceRetriever(
 context_retriever = ContextRetriever(
     retriever=retriever,
     context_summarizer=context_summarizer,
-    num_workers=4,
 )
 
 # Create the FactReasoner pipeline.
@@ -957,7 +1011,7 @@ LLM Response
     ▼
 ┌─────────────┐
 │     NLI     │ ──► Entailment/Contradiction relationships
-└─────────────┘     (few-shot prompt, or the NLI LoRA adapter)
+└─────────────┘     (few-shot or label-only prompt, or the NLI LoRA adapter)
     │
     ▼
 ┌─────────────┐
