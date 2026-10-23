@@ -797,3 +797,224 @@ class LabelOnlyNLIExtractor(NLIExtractor):
     def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
         """As :meth:`NLIExtractor.run`, with the label-only prompt."""
         return run_coroutine(self.run_batch([premise], [hypothesis]))[0]
+
+
+# The System One question asked once per hypothesis. A "choice" question returns
+# the model's probability for every label, so the verdict's confidence comes
+# straight from the model instead of from token logprobs or sampling.
+DECISION_NLI_INSTRUCTIONS = (
+    "What is the logical relationship between the state text (the premise) and "
+    "this hypothesis: {hypothesis}"
+)
+DECISION_NLI_CRITERIA = {
+    "entailment": (
+        "The premise strongly implies, directly supports or entails the hypothesis."
+    ),
+    "contradiction": "The premise contradicts the hypothesis.",
+    "neutral": "The premise neither entails nor contradicts the hypothesis.",
+}
+
+# Hypotheses sharing a premise are asked as questions of one request, which
+# measured ~40% faster than one request each. Questions in a request are scored
+# independently (identical probabilities alone, grouped or reordered), so this
+# never changes a verdict; the cap only keeps a request well inside the model's
+# context window.
+DECISION_MAX_QUESTIONS_PER_REQUEST = 32
+
+
+class _DecisionClient:
+    """What the shared throttle and NLI cache key on: one decision model."""
+
+    def __init__(self, model_id: str, host: str | None):
+        import weakref
+
+        self.model_id = model_id
+        self.host = host
+        # Keyed by the loop object, weakly: a closed asyncio.run loop can be
+        # collected and its id() reused by the next one, which must not inherit
+        # a client bound to the dead loop.
+        self._clients: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+
+    def client(self) -> Any:
+        """An ``ollama.AsyncClient`` for the running event loop.
+
+        httpx clients are bound to the loop they were created on, and the
+        pipeline runs on more than one (``asyncio.run`` and the background loop
+        of ``run_coroutine``), so keep one per loop.
+        """
+        import asyncio
+
+        import ollama
+
+        loop = asyncio.get_running_loop()
+        client = self._clients.get(loop)
+        if client is None:
+            client = ollama.AsyncClient(host=self.host)
+            self._clients[loop] = client
+        return client
+
+    def __str__(self) -> str:
+        return f"DecisionModel(model_id={self.model_id!r}, host={self.host!r})"
+
+
+class DecisionNLIExtractor(NLIExtractor):
+    """
+    NLI with a decision model (e.g. ``kev``) through Ollama's System One API.
+
+    A decision model scores questions instead of generating text: for a premise
+    (the *state*) and a three-way ``choice`` question per hypothesis, it returns
+    a probability for each of entailment, contradiction and neutral, and
+    generates no tokens. That makes it much faster than prompting an LLM, and
+    its probabilities are the model's own distribution rather than the
+    near-certain token logprobs of a generated label.
+
+    ``run_batch`` groups the pairs by premise and sends one request per premise,
+    with one question per hypothesis. Results are positionally aligned with the
+    input, and a failed request falls back to neutral (or raises, with
+    ``raise_errors``), as for the other extractors.
+    """
+
+    prompt_format = "decision"
+
+    def __init__(
+        self,
+        model_id: str = "kev",
+        *,
+        host: str | None = None,
+        max_questions_per_request: int = DECISION_MAX_QUESTIONS_PER_REQUEST,
+        show_progress: bool = False,
+        raise_errors: bool = False,
+    ):
+        """
+        Initialize the DecisionNLIExtractor.
+
+        Args:
+            model_id: str
+                The Ollama decision model, e.g. ``"kev"``.
+            host: str
+                The Ollama server URL. None uses the ``ollama`` package default
+                (the ``OLLAMA_HOST`` environment variable, else
+                ``http://localhost:11434``).
+            max_questions_per_request: int
+                Most hypotheses asked about one premise in a single request.
+            show_progress: bool
+                If True, ``run_batch`` shows a ``tqdm`` progress bar.
+            raise_errors: bool
+                If True, an exception raised by the server propagates to the
+                caller unchanged. Default False: the error is printed and the
+                affected pairs get a neutral relationship.
+        """
+        if max_questions_per_request < 1:
+            raise ValueError("max_questions_per_request must be at least 1.")
+        # The base __init__ wants a Mellea backend and a sampling strategy, which
+        # a decision model has neither of; set what the shared code reads instead.
+        self.method = "decision"
+        self.backend = _DecisionClient(model_id, host)
+        self.max_questions_per_request = max_questions_per_request
+        self.show_progress = show_progress
+        self.raise_errors = raise_errors
+        self._classifier_path = None
+        print(f"[NLI] Using decision model: {self.backend}")
+
+    @staticmethod
+    def _question(hypothesis: str) -> dict[str, Any]:
+        return {
+            "type": "choice",
+            "instructions": DECISION_NLI_INSTRUCTIONS.format(hypothesis=hypothesis),
+            "criteria": DECISION_NLI_CRITERIA,
+        }
+
+    @staticmethod
+    def _parse_answer(answer: Any) -> dict[str, Any]:
+        """Map one ``choice`` answer to a label/probability dict."""
+        label = getattr(answer, "choice", None)
+        probabilities = getattr(answer, "probabilities", None) or {}
+        if label not in DECISION_NLI_CRITERIA or label not in probabilities:
+            telemetry.count_fallback("nli", "parse_error")
+            return NLIExtractor._fallback()
+        return {"label": label, "probability": float(probabilities[label])}
+
+    async def _request_group(
+        self, group: tuple[str, list[tuple[int, str]]]
+    ) -> list[tuple[int, dict[str, Any]]]:
+        """Ask every hypothesis of one premise in a single request."""
+        premise, items = group
+        response = await self.backend.client().systemone(
+            model=self.backend.model_id,
+            state=premise,
+            questions={
+                f"h{j}": self._question(hypothesis)
+                for j, (_, hypothesis) in enumerate(items)
+            },
+        )
+        return [
+            (slot, self._parse_answer(response.answers.get(f"h{j}")))
+            for j, (slot, _) in enumerate(items)
+        ]
+
+    async def run_batch(
+        self, premises: list[str], hypotheses: list[str]
+    ) -> list[dict[str, Any]]:
+        """
+        Extract the NLI relationships between premises and hypotheses.
+
+        Args:
+            premises: List[str]
+                The list of premise texts (e.g., context).
+            hypotheses: List[str]
+                The list of hypothesis texts (e.g., atom).
+
+        Returns:
+            List[Dict[str, Any]]: Label/probability dicts, positionally aligned
+            with the input pairs.
+        """
+        assert len(premises) == len(hypotheses)
+
+        # One request per distinct premise (split if it has many hypotheses),
+        # remembering each pair's slot so results come back in input order.
+        by_premise: dict[str, list[tuple[int, str]]] = {}
+        for slot, (premise, hypothesis) in enumerate(zip(premises, hypotheses)):
+            by_premise.setdefault(premise, []).append((slot, hypothesis))
+        size = self.max_questions_per_request
+        groups = [
+            (premise, items[i : i + size])
+            for premise, items in by_premise.items()
+            for i in range(0, len(items), size)
+        ]
+        print(
+            f"[NLI] Running throttled batch of {len(premises)} relations "
+            f"in {len(groups)} decision requests ..."
+        )
+
+        bar = None
+        on_progress = None
+        if self.show_progress and groups:
+            from tqdm import tqdm
+
+            bar = tqdm(total=len(groups), desc="NLI requests", unit="req")
+            on_progress = bar.update
+        try:
+            outputs = await run_throttled(
+                self._request_group,
+                groups,
+                on_progress=on_progress,
+                throttle=throttle_for(self.backend),
+            )
+        finally:
+            if bar is not None:
+                bar.close()
+
+        results: list[dict[str, Any]] = [self._fallback()] * len(premises)
+        for group, output in zip(groups, outputs):
+            if isinstance(output, Exception):
+                handle_generation_error(
+                    output, "nli", "[NLI] Decision request failed", self.raise_errors
+                )
+                continue  # the group's slots keep the neutral fallback
+            for slot, result in output:
+                results[slot] = result
+        return results
+
+    def run(self, premise: str, hypothesis: str) -> dict[str, Any]:
+        """Extract the NLI relationship for one pair (see :meth:`run_batch`)."""
+        return run_coroutine(self.run_batch([premise], [hypothesis]))[0]

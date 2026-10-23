@@ -87,6 +87,53 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "which has its own prompt.",
     )
     p.add_argument(
+        "--nli-decision-model",
+        default=None,
+        help="Predict NLI relations with an Ollama decision model (e.g. 'kev') "
+        "through the System One API, instead of an LLM. Much faster, and its "
+        "probabilities come from the model; the rest of the pipeline still uses "
+        "--backend. Cannot be combined with --nli-adapter, --nli-prompt "
+        "label_only or --nli-method simbauq.",
+    )
+    p.add_argument(
+        "--nli-decision-host",
+        default=None,
+        help="Ollama server for --nli-decision-model (default: OLLAMA_HOST, else "
+        "http://localhost:11434).",
+    )
+    p.add_argument(
+        "--nli-decision-serve",
+        action="store_true",
+        help="Start a private Ollama server for --nli-decision-model for the "
+        "duration of the run (on a free port, pulling the model if needed) and "
+        "stop it afterwards -- for a GPU node in an LSF job. See the --ollama-* "
+        "options.",
+    )
+    p.add_argument(
+        "--ollama-binary",
+        default="ollama",
+        help="With --nli-decision-serve: the ollama executable (default: on PATH).",
+    )
+    p.add_argument(
+        "--ollama-models-dir",
+        default=None,
+        help="With --nli-decision-serve: the model store (OLLAMA_MODELS). Point it "
+        "at shared storage, so the model is pulled once for every job.",
+    )
+    p.add_argument(
+        "--ollama-num-parallel",
+        type=int,
+        default=None,
+        help="With --nli-decision-serve: requests the server answers at once "
+        "(OLLAMA_NUM_PARALLEL; default 8, sized for an H100).",
+    )
+    p.add_argument(
+        "--no-ollama-pull",
+        action="store_true",
+        help="With --nli-decision-serve: fail instead of pulling a missing model "
+        "(for nodes without internet access).",
+    )
+    p.add_argument(
         "--nli-similarity-metric",
         default="rouge",
         choices=["rouge", "jaccard", "sbert", "difflib", "levenshtein"],
@@ -416,6 +463,29 @@ def _backend_context(args):
         yield build_backend("ollama", model_id=args.model_id), {}
 
 
+@contextlib.contextmanager
+def _decision_server(args):
+    """Yield the Ollama URL for the decision model, starting a server if asked.
+
+    With ``--nli-decision-serve`` an :class:`~fact_reasoner.serving.OllamaServer`
+    runs for the duration of the block; otherwise this yields
+    ``--nli-decision-host`` (None means the ollama package default).
+    """
+    if not args.nli_decision_serve:
+        yield args.nli_decision_host
+        return
+    from fact_reasoner.serving import DEFAULT_OLLAMA_NUM_PARALLEL, OllamaServer
+
+    with OllamaServer(
+        args.nli_decision_model,
+        binary=args.ollama_binary,
+        models_dir=args.ollama_models_dir,
+        num_parallel=args.ollama_num_parallel or DEFAULT_OLLAMA_NUM_PARALLEL,
+        pull=not args.no_ollama_pull,
+    ) as server:
+        yield server.base_url
+
+
 def main() -> None:
     args = _build_arg_parser().parse_args()
 
@@ -482,6 +552,25 @@ def main() -> None:
             "(the RITS model name)."
         )
     # The SIMBA-UQ classifier confidence method needs a trained classifier.
+    serve_flags = [
+        flag
+        for flag, used in (
+            ("--ollama-binary", args.ollama_binary != "ollama"),
+            ("--ollama-models-dir", args.ollama_models_dir is not None),
+            ("--ollama-num-parallel", args.ollama_num_parallel is not None),
+            ("--no-ollama-pull", args.no_ollama_pull),
+        )
+        if used
+    ]
+    if args.nli_decision_serve:
+        if not args.nli_decision_model:
+            raise SystemExit("--nli-decision-serve requires --nli-decision-model.")
+        if args.nli_decision_host:
+            raise SystemExit(
+                "--nli-decision-serve starts its own server; drop --nli-decision-host."
+            )
+    elif serve_flags:
+        raise SystemExit(f"{', '.join(serve_flags)} require --nli-decision-serve.")
     if args.nli_confidence_method == "classifier":
         if args.nli_method != "simbauq":
             raise SystemExit(
@@ -498,8 +587,9 @@ def main() -> None:
             )
     # Some backends do not expose token logprobs, so the default NLI method
     # degrades to all-neutral relations. Steer the user to the SIMBA-UQ method.
-    # One if/elif so a run never prints two overlapping warnings.
-    if args.nli_method == "logprobs":
+    # One if/elif so a run never prints two overlapping warnings. A decision
+    # model does the NLI without logprobs, so it needs no warning.
+    if args.nli_method == "logprobs" and args.nli_decision_model is None:
         if args.backend == "ollama":
             print(
                 "[warning] The 'ollama' backend does not expose logprobs, so "
@@ -516,7 +606,9 @@ def main() -> None:
                 "relations. Use --nli-method simbauq instead."
             )
 
-    with _backend_context(args) as (backend, adapters):
+    with _backend_context(args) as (backend, adapters), _decision_server(
+        args
+    ) as decision_host:
         runner = FactualityRunner(
             backend,
             pipeline=args.pipeline,
@@ -530,6 +622,8 @@ def main() -> None:
             merlin_path=args.merlin_path,
             nli_method=args.nli_method,
             nli_prompt=args.nli_prompt,
+            nli_decision_model=args.nli_decision_model,
+            nli_decision_host=decision_host,
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,

@@ -672,3 +672,57 @@ class TestAtomizerAdapter:
         assert kwargs["max_lora_rank"] == 64
         fake_server.build_backend.assert_any_call(model_id="ar")
         assert fr.call_args.kwargs["atomizer_backend"] is not None
+
+
+class TestDecisionServe:
+    """--nli-decision-serve: the CLI owns an Ollama server for the run."""
+
+    def _run_and_capture(self, extra_argv, server_url="http://127.0.0.1:5555"):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        server = MagicMock()
+        server.__enter__.return_value.base_url = server_url
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+            patch("fact_reasoner.serving.OllamaServer", return_value=server) as srv,
+        ):
+            _run(
+                ["--pipeline", "factscore", "--backend", "ollama", *extra_argv,
+                 "--query", "q", "--response", "r"]
+            )
+        return ctor.call_args.kwargs, srv
+
+    def test_serve_passes_the_private_server_url(self):
+        kwargs, srv = self._run_and_capture(
+            ["--nli-decision-model", "kev", "--nli-decision-serve",
+             "--ollama-models-dir", "/shared/ollama", "--ollama-num-parallel", "4",
+             "--no-ollama-pull"]
+        )
+        assert kwargs["nli_decision_model"] == "kev"
+        assert kwargs["nli_decision_host"] == "http://127.0.0.1:5555"
+        srv.assert_called_once_with(
+            "kev", binary="ollama", models_dir="/shared/ollama", num_parallel=4,
+            pull=False,
+        )
+
+    def test_without_serve_the_host_is_passed_through(self):
+        kwargs, srv = self._run_and_capture(
+            ["--nli-decision-model", "kev", "--nli-decision-host", "http://gpu:11434"]
+        )
+        assert kwargs["nli_decision_host"] == "http://gpu:11434"
+        srv.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "argv, message",
+        [
+            (["--nli-decision-serve"], "requires --nli-decision-model"),
+            (["--nli-decision-model", "kev", "--nli-decision-serve",
+              "--nli-decision-host", "http://x:1"], "drop --nli-decision-host"),
+            (["--nli-decision-model", "kev", "--ollama-models-dir", "/m"],
+             "require --nli-decision-serve"),
+        ],
+    )
+    def test_invalid_combinations(self, argv, message):
+        with pytest.raises(SystemExit, match=message):
+            self._run_and_capture(argv)

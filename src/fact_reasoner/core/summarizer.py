@@ -192,6 +192,7 @@ class ContextSummarizer:
             )
         self.show_progress = show_progress
         self.raise_errors = raise_errors
+        self._warned_no_logprobs = False
 
         # Initialize the extractor
         self.backend = backend
@@ -204,29 +205,38 @@ class ContextSummarizer:
 
     def _get_probability(self, output: ModelOutputThunk) -> float:
         """
-        Compute the average log probability of the generated tokens.
+        Compute the summary's confidence: the mean token probability.
+
+        The confidence multiplies the context's prior, so when the backend gives
+        no logprobs (Ollama, Anthropic's OpenAI-compatible endpoint) there is no
+        information and the result is 1.0, which leaves the prior unchanged.
+        Returning 0.0 instead would zero every context prior, and a context with
+        prior 0 supports nothing, leaving every atom at 0.5.
 
         Args:
             output: ModelOutputThunk
                 The model raw output (via Mellea).
 
         Returns:
-            float: The average log probability of the generated tokens.
+            float: exp(mean token logprob), or 1.0 without logprobs.
         """
 
         try:
             logprobs = extract_logprobs_from_output(output)
         except Exception as e:  # noqa: BLE001
-            print(f"[Summarizer] Failed to extract logprobs: {e}")
-            return 0.0
+            logprobs = []
+            if not self._warned_no_logprobs:
+                print(
+                    f"[Summarizer] No logprobs ({e}); context priors are left "
+                    "unchanged by the summaries."
+                )
+                self._warned_no_logprobs = True
 
-        avg_logprob = (
-            sum(lp["logprob"] for lp in logprobs) / len(logprobs)
-            if len(logprobs) > 0
-            else math.inf
-        )
+        if not logprobs:
+            return 1.0
 
-        return math.exp(avg_logprob) if not math.isinf(avg_logprob) else 0.0
+        avg_logprob = sum(lp["logprob"] for lp in logprobs) / len(logprobs)
+        return math.exp(avg_logprob)
 
     def run(self, contexts: list[str], atom_text = None) -> list[dict[str, Any]]:
         """

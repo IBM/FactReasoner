@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fact_reasoner"
-version = "0.8.2"
+version = "0.9.0"
 description = "Factuality Assessment for Foundation Models"
 authors = [
     {name = "Radu Marinescu", email = "radu.marinescu@ie.ibm.com"},
@@ -49,6 +49,9 @@ dependencies = [
     # dismissed as "vulnerable code not used". Raise the floor once a fix ships.
     "nltk>=3.10.3",
     "numpy",
+    # 0.6.3 adds the System One client (AsyncClient.systemone) that
+    # DecisionNLIExtractor uses to query decision models such as kev.
+    "ollama>=0.6.3",
     "pandas>=2.3.1",
     "pymilvus[model,milvus-lite]",
     # pypdf supersedes the abandoned PyPDF2 (last release 3.0.1, CVE-2023-36464

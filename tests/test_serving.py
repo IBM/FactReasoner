@@ -272,3 +272,204 @@ class TestVLLMServerLoRA:
         server = VLLMServer("/weights/m", port=8000)
         with pytest.raises(ValueError, match="not served here"):
             server.build_backend(model_id="fr-atomizer-reviser")
+
+
+class TestOllamaServer:
+    """OllamaServer: launch environment, model checks, warm-up and teardown."""
+
+    @staticmethod
+    def _server(tmp_path, **kwargs):
+        from fact_reasoner.serving import OllamaServer
+
+        kwargs.setdefault("port", 23456)
+        return OllamaServer("kev", log_path=str(tmp_path / "ollama.log"), **kwargs)
+
+    @staticmethod
+    def _client(models=("kev:latest",), systemone=None):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        client = MagicMock()
+        client.list.return_value = SimpleNamespace(
+            models=[SimpleNamespace(model=m) for m in models]
+        )
+        client.pull.return_value = iter([SimpleNamespace(status="success")])
+        if systemone is not None:
+            client.systemone.side_effect = systemone
+        return client
+
+    def _start(self, server, client, proc=None):
+        proc = proc or _FakeProc(exit_codes=[None])
+        with (
+            patch("fact_reasoner.serving.subprocess.Popen", return_value=proc) as popen,
+            patch.object(type(server), "_probe_ready", return_value=True),
+            patch.object(type(server), "_client", return_value=client),
+            patch("fact_reasoner.serving.os.killpg"),
+            patch("fact_reasoner.serving.os.getpgid", return_value=proc.pid),
+            patch("fact_reasoner.serving.time.sleep"),
+        ):
+            server.start()
+            server.stop()
+        return popen
+
+    def test_launch_environment(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("OLLAMA_NO_CLOUD", raising=False)
+        server = self._server(tmp_path, models_dir="/shared/ollama", num_parallel=4)
+        env = server.server_env()
+        assert env["OLLAMA_HOST"] == "127.0.0.1:23456"
+        assert env["OLLAMA_MODELS"] == "/shared/ollama"
+        assert env["OLLAMA_NUM_PARALLEL"] == "4"
+        assert env["OLLAMA_NO_CLOUD"] == "1"
+        assert server.base_url == "http://127.0.0.1:23456"
+
+    def test_models_dir_none_keeps_the_environment(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("OLLAMA_MODELS", "/from/env")
+        assert self._server(tmp_path).server_env()["OLLAMA_MODELS"] == "/from/env"
+
+    def test_free_port_by_default(self, tmp_path):
+        from fact_reasoner.serving import OllamaServer
+
+        server = OllamaServer("kev", log_path=str(tmp_path / "o.log"))
+        assert server.port != 11434 and server.port > 0
+
+    def test_start_launches_serve_and_warms_up(self, tmp_path):
+        server = self._server(tmp_path)
+        client = self._client()
+        popen = self._start(server, client)
+
+        argv = popen.call_args.args[0]
+        assert argv == ["ollama", "serve"]
+        assert popen.call_args.kwargs["start_new_session"] is True
+        client.pull.assert_not_called()  # already present
+        client.systemone.assert_called_once()
+        assert client.systemone.call_args.kwargs["model"] == "kev"
+
+    def test_missing_model_is_pulled(self, tmp_path):
+        server = self._server(tmp_path)
+        client = self._client(models=())
+        listed = iter([[], ["kev:latest"]])
+
+        def list_models():
+            from types import SimpleNamespace
+
+            return SimpleNamespace(
+                models=[SimpleNamespace(model=m) for m in next(listed)]
+            )
+
+        client.list.side_effect = list_models
+        self._start(server, client)
+        client.pull.assert_called_once_with("kev", stream=True)
+
+    def test_missing_model_without_pull_fails_and_stops(self, tmp_path):
+        server = self._server(tmp_path, pull=False)
+        proc = _FakeProc(exit_codes=[None])
+        with pytest.raises(RuntimeError, match="pulling is disabled"):
+            self._start(server, self._client(models=()), proc)
+        assert server._proc is None  # never left half-started
+
+    def test_rejected_warm_up_fails_fast(self, tmp_path):
+        class Rejected(Exception):
+            status_code = 400
+
+        server = self._server(tmp_path)
+        client = self._client(systemone=Rejected("not a llama.cpp decision model"))
+        with pytest.raises(RuntimeError, match="cannot answer System One"):
+            self._start(server, client)
+        assert client.systemone.call_count == 1  # not retried
+
+    def test_transient_warm_up_errors_are_retried(self, tmp_path):
+        server = self._server(tmp_path)
+        attempts = iter([ConnectionError("loading"), ConnectionError("loading"), None])
+
+        def systemone(**kwargs):
+            error = next(attempts)
+            if error is not None:
+                raise error
+
+        client = self._client(systemone=systemone)
+        self._start(server, client)
+        assert client.systemone.call_count == 3
+
+    def test_server_dying_during_startup_reports_its_log(self, tmp_path):
+        server = self._server(tmp_path)
+        (tmp_path / "ollama.log").write_text("Error: could not bind")
+        proc = _FakeProc(exit_codes=[1])
+        with pytest.raises(RuntimeError, match="exited with code 1"):
+            self._start(server, self._client(), proc)
+
+    def test_missing_binary(self, tmp_path):
+        server = self._server(tmp_path, binary=str(tmp_path / "no-ollama"))
+        with pytest.raises(FileNotFoundError, match="Ollama binary not found"):
+            server.start()
+
+    def test_rejects_invalid_parallelism(self, tmp_path):
+        with pytest.raises(ValueError):
+            self._server(tmp_path, num_parallel=0)
+
+
+class TestStopOnSigterm:
+    """SIGTERM (LSF bkill / walltime) must unwind the server context managers."""
+
+    def test_sigterm_raises_system_exit_while_active(self):
+        import os
+        import signal
+
+        from fact_reasoner.serving import _StopOnSigterm
+
+        before = signal.getsignal(signal.SIGTERM)
+        with pytest.raises(SystemExit) as excinfo:
+            with _StopOnSigterm():
+                os.kill(os.getpid(), signal.SIGTERM)
+        assert excinfo.value.code == 128 + signal.SIGTERM
+        assert signal.getsignal(signal.SIGTERM) == before  # restored
+
+    def test_custom_handler_is_left_in_charge(self):
+        import signal
+
+        from fact_reasoner.serving import _StopOnSigterm
+
+        def mine(signum, frame):
+            pass
+
+        previous = signal.signal(signal.SIGTERM, mine)
+        try:
+            with _StopOnSigterm():
+                assert signal.getsignal(signal.SIGTERM) is mine
+            assert signal.getsignal(signal.SIGTERM) is mine
+        finally:
+            signal.signal(signal.SIGTERM, previous)
+
+    def test_no_op_off_the_main_thread(self):
+        import signal
+        import threading
+
+        from fact_reasoner.serving import _StopOnSigterm
+
+        seen = []
+
+        def worker():
+            with _StopOnSigterm():
+                seen.append(signal.getsignal(signal.SIGTERM))
+
+        before = signal.getsignal(signal.SIGTERM)
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join()
+        assert seen == [before]
+
+    def test_server_stops_when_sigterm_arrives(self, tmp_path):
+        import os
+        import signal
+
+        from fact_reasoner.serving import OllamaServer
+
+        server = OllamaServer("kev", port=1, log_path=str(tmp_path / "o.log"))
+        stopped = []
+        with (
+            patch.object(OllamaServer, "start"),
+            patch.object(OllamaServer, "stop", lambda self: stopped.append(True)),
+        ):
+            with pytest.raises(SystemExit):
+                with server:
+                    os.kill(os.getpid(), signal.SIGTERM)
+        assert stopped == [True]

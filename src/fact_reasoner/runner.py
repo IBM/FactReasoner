@@ -35,6 +35,7 @@ from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.atomizer_reviser import AtomizerReviser
 from fact_reasoner.core.nli import (
     NLI_PROMPTS,
+    DecisionNLIExtractor,
     LabelOnlyNLIExtractor,
     NLIAdapterExtractor,
     NLIExtractor,
@@ -111,6 +112,14 @@ class FactualityRunner:
             (default) has the model reason before its label, ``"label_only"``
             asks for the label alone, which is several times faster. Ignored
             when ``nli_backend`` is given: the adapter has its own prompt.
+        nli_decision_model: An Ollama decision model (e.g. ``"kev"``) to
+            predict the NLI relations instead of an LLM, through the System One
+            API (see :class:`~fact_reasoner.core.nli.DecisionNLIExtractor`).
+            Its probabilities come from the model itself, so it cannot be
+            combined with ``nli_backend``, ``nli_prompt="label_only"`` or
+            ``nli_method="simbauq"``.
+        nli_decision_host: The Ollama server for ``nli_decision_model``; None
+            uses ``OLLAMA_HOST`` or ``http://localhost:11434``.
         nli_mode: Which NLI candidate-pair preset to start from — ``"fast"``
             (default) applies the provenance preset (atom-context pairs
             restricted to the atoms that retrieved each context, gated
@@ -157,6 +166,8 @@ class FactualityRunner:
         merlin_path: str | None = None,
         nli_method: str = "logprobs",
         nli_prompt: str = "few_shot",
+        nli_decision_model: str | None = None,
+        nli_decision_host: str | None = None,
         nli_similarity_metric: str = "rouge",
         nli_confidence_method: str = "aggregation",
         nli_classifier_path: str | None = None,
@@ -193,6 +204,21 @@ class FactualityRunner:
                 f"Unknown nli_prompt: {nli_prompt!r} "
                 f"(expected one of {list(NLI_PROMPTS)})."
             )
+        if nli_decision_model is not None:
+            conflicts = [
+                name
+                for name, used in (
+                    ("nli_backend", nli_backend is not None),
+                    ("nli_prompt='label_only'", nli_prompt != "few_shot"),
+                    ("nli_method='simbauq'", nli_method != "logprobs"),
+                )
+                if used
+            ]
+            if conflicts:
+                raise ValueError(
+                    "nli_decision_model replaces the LLM NLI extractor, so it "
+                    f"cannot be combined with {', '.join(conflicts)}."
+                )
         if pipeline == "factreasoner" and not merlin_path:
             raise ValueError("The 'factreasoner' pipeline requires a merlin_path.")
 
@@ -238,21 +264,30 @@ class FactualityRunner:
             else Atomizer(backend, raise_errors=raise_errors)
         )
         self.atom_reviser = Reviser(backend, raise_errors=raise_errors)
-        if nli_backend is not None:
-            nli_cls = NLIAdapterExtractor
-        elif nli_prompt == "label_only":
-            nli_cls = LabelOnlyNLIExtractor
+        self.nli_decision_model = nli_decision_model
+        if nli_decision_model is not None:
+            self.nli_extractor = DecisionNLIExtractor(
+                nli_decision_model,
+                host=nli_decision_host,
+                show_progress=self.show_progress,
+                raise_errors=raise_errors,
+            )
         else:
-            nli_cls = NLIExtractor
-        self.nli_extractor = nli_cls(
-            nli_backend if nli_backend is not None else backend,
-            nli_method=self.nli_method,
-            simbauq_similarity_metric=self.nli_similarity_metric,
-            simbauq_confidence_method=self.nli_confidence_method,
-            simbauq_classifier_path=self.nli_classifier_path,
-            show_progress=self.show_progress,
-            raise_errors=raise_errors,
-        )
+            if nli_backend is not None:
+                nli_cls = NLIAdapterExtractor
+            elif nli_prompt == "label_only":
+                nli_cls = LabelOnlyNLIExtractor
+            else:
+                nli_cls = NLIExtractor
+            self.nli_extractor = nli_cls(
+                nli_backend if nli_backend is not None else backend,
+                nli_method=self.nli_method,
+                simbauq_similarity_metric=self.nli_similarity_metric,
+                simbauq_confidence_method=self.nli_confidence_method,
+                simbauq_classifier_path=self.nli_classifier_path,
+                show_progress=self.show_progress,
+                raise_errors=raise_errors,
+            )
         self.context_summarizer = ContextSummarizer(
             backend, show_progress=self.show_progress, raise_errors=raise_errors
         )

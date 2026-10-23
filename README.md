@@ -82,6 +82,8 @@ FactReasoner addresses hallucination detection through a principled five-stage p
 
    The relations can also be predicted by a fine-tuned **NLI LoRA adapter** for `granite-4.2-8b` in place of either prompt; both probability methods work with it unchanged (see [LoRA adapters](#lora-adapters-atomization-and-nli)).
 
+   Or by a **decision model** such as `kev`, served by Ollama, which scores each relation directly instead of generating text (see [Decision models](#decision-models-for-nli-kev)).
+
    The number of NLI calls is the dominant cost of a run; `--nli-mode fast` (the default) reduces it — see [NLI cost control](#nli-cost-control-advanced).
 
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
@@ -405,6 +407,8 @@ cheaper pair set without giving up `v3`'s richer graph.
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
 | `--use-priors` | Use atom/context priors (FactReasoner only). |
 | `--use-query-builder` | Generate search queries with the QueryBuilder. |
+| `--nli-decision-model NAME` | Predict NLI relations with an Ollama decision model (e.g. `kev`) instead of an LLM; the other stages still use `--backend`. See [Decision models](#decision-models-for-nli-kev). |
+| `--nli-decision-host URL` / `--nli-decision-serve` | Use an existing Ollama server, or start a private one for the run (with `--ollama-binary`, `--ollama-models-dir`, `--ollama-num-parallel`, `--no-ollama-pull`). |
 | `--nli-prompt {few_shot,label_only}` | NLI prompt for the base model (default `few_shot`). `label_only` asks for the label without reasoning: ~3× faster, slightly less accurate (see [Performance](#performance)). Ignored with `--nli-adapter`. |
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
 | `--list-models` | Print the available unified model ids (and aliases) and exit. |
@@ -557,7 +561,7 @@ queued. Parsing failures and retrieval errors keep their fallbacks.
 To run everything inside a single LSF job — start a local vLLM server from
 locally-available (or HuggingFace) weights, run a factuality assessor against
 it, then tear the server down — pass `--backend vllm` together with `--model`
-(a weights path or HF id). The `scripts/run_vllm.bsub` template does this:
+(a weights path or HF id):
 
 ```bash
 fact-reasoner --backend vllm \
@@ -576,6 +580,85 @@ request; A100 or H100), waits for readiness, and always cleans up. Without
 `--model`, `--backend vllm` connects as a client to an existing server at
 `--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have
 `vllm` installed (`pip install "vllm>=0.28"`), with GPU drivers/CUDA available.**
+
+Both server managers stop their servers when the job is killed: an LSF `bkill` or
+walltime limit sends SIGTERM, which unwinds the run so no vLLM or Ollama process is
+left holding the GPU. The job then exits with code 143.
+
+`scripts/run_kev.bsub` is a complete template for a job that serves a decision model
+for NLI next to vLLM on one H100 — see below.
+
+### Decision models for NLI (kev)
+
+A **decision model** answers scored questions rather than generating text. Through
+Ollama's System One API, FactReasoner gives it each premise as the *state* and asks
+one three-way `choice` question per hypothesis; the model returns a probability for
+each of entailment, contradiction and neutral, and the chosen label's probability
+becomes the edge strength. It generates no tokens, so it is fast, and its
+probabilities are the model's own rather than near-certain token logprobs.
+
+```bash
+fact-reasoner --pipeline factreasoner --merlin-path /path/to/merlin --use-priors \
+    --backend rits \
+    --nli-decision-model kev \
+    --query "..." --response "..."
+```
+
+`--backend` still runs atomization, revision and summarization; only NLI moves to the
+decision model. Requests are grouped by premise (one request, many questions), which
+is ~40% faster and never changes a verdict: questions in a request are scored
+independently. It cannot be combined with `--nli-adapter`, `--nli-prompt label_only`
+or `--nli-method simbauq`. Needs the `ollama` Python package ≥ 0.6.3 (a dependency).
+
+> **Accuracy caveat.** On 10 items (248 human-labelled atoms) of
+> `data/bio-labeled_wikipedia.jsonl`, v2 with `--nli-mode fast`, `kev` reached
+> **69.8%** atom accuracy against 79.8% for the RITS few-shot prompt. Most of the gap
+> is one behavior: `kev` labels a premise about a *different* subject (e.g. a
+> namesake returned by search) as a **contradiction** where an LLM says neutral, and
+> those contradictions cancel genuine support. It reads the right page correctly.
+> These numbers come from kev's Apple-silicon (MLX) build; a CUDA node runs its
+> separate llama.cpp (GGUF) build, so re-measure on your hardware before relying on it.
+
+#### Decision models on a GPU cluster (LSF)
+
+`--nli-decision-serve` makes the run own a private Ollama server
+(`fact_reasoner.OllamaServer`): it starts `ollama serve` on a free loopback port (so
+jobs sharing a node never collide on 11434), makes sure the model is present, sends
+one warm-up request so the model is on the GPU before the first batch, and stops the
+server when the run ends. No root, system service or desktop app is needed.
+`scripts/run_kev.bsub` is a ready-to-edit template. Setup, once:
+
+1. **Install Ollama without root** — download the Linux release archive (amd64, with
+   CUDA support) from the [Ollama releases](https://github.com/ollama/ollama/releases)
+   and unpack it under your home or project space; pass its `bin/ollama` as
+   `--ollama-binary`. Use a release recent enough to serve decision models.
+2. **Pull the model into a shared store**, from a login node with internet access,
+   so every job reuses one copy instead of downloading several GB:
+   ```bash
+   export OLLAMA_MODELS=/shared/ollama-models
+   /path/to/ollama serve &  /path/to/ollama pull kev ; kill %1
+   ```
+   On a CUDA node this fetches kev's llama.cpp (GGUF) variant.
+3. In the job, pass `--ollama-models-dir /shared/ollama-models --no-ollama-pull`.
+   Without `--no-ollama-pull` a missing model is pulled at startup (within a 30-minute
+   budget); with it, the job fails at once with instructions instead.
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-decision-serve` | Start and stop a private Ollama server for `--nli-decision-model`. |
+| `--ollama-binary PATH` | The `ollama` executable (default: on `PATH`). |
+| `--ollama-models-dir DIR` | Model store (`OLLAMA_MODELS`); use shared storage. |
+| `--ollama-num-parallel N` | Requests answered at once (`OLLAMA_NUM_PARALLEL`, default 8 — sized for an H100; a laptop serves one at a time). |
+| `--no-ollama-pull` | Fail instead of pulling a missing model (nodes without internet). |
+
+**Sharing one H100 with vLLM.** vLLM claims 90% of GPU memory by default, leaving too
+little for the decision model. When both run in one job, lower it, e.g.
+`--gpu-memory-utilization 0.70` (the template's default), which keeps ~24 GB of an
+80 GB H100 for kev and its parallel request slots.
+
+Startup fails fast, with the server log, when the binary is missing, the server
+exits, the model is not in the store and pulling is disabled, or the model is not a
+decision model.
 
 ### LoRA adapters (atomization and NLI)
 
@@ -1217,7 +1300,7 @@ FactReasoner/
 │       ├── build_ntrs_benchmark.py  # Frozen per-backend dataset generation
 │       └── eval_ntrs_benchmark.py   # Frozen-dataset evaluation runner
 ├── scripts/
-│   └── run_vllm.bsub         # LSF template (local vLLM + fact-reasoner)
+│   └── run_kev.bsub          # LSF template (Ollama decision model + vLLM)
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples
