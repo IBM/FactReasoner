@@ -54,7 +54,7 @@ dependencies = [
     # pypdf supersedes the abandoned PyPDF2 (last release 3.0.1, CVE-2023-36464
     # unpatched). Drop-in for the only API we use: PdfReader(BytesIO(...)),
     # .pages and .extract_text() in core/retriever.py.
-    "pypdf>=6.1.1",
+    "pypdf>=6.21.1",
     "python-dotenv",
     "requests",
     "rouge-score",
@@ -66,14 +66,17 @@ dependencies = [
     # Transitive pins. These are pulled in by langchain / chromadb / vllm rather
     # than imported here, but the resolver will happily pick a vulnerable version
     # unless we floor it.
-    "aiohttp>=3.14.3",
+    "aiohttp>=3.14.4",
     "anyio>=4.14.2",
+    "certifi>=2026.10.19",
+    "fsspec>=2026.6.0",
     "idna>=3.15",
     "langchain-classic>=1.0.7",
     # langsmith 0.9+ switches to an httpx2 stack; the cap keeps that migration a
     # deliberate change rather than a silent one.
     "langsmith>=0.8.18,<0.15",
-    "pillow>=12.3.0",
+    "multidict>=6.9.1",
+    "pillow>=13.0.0",
     "pydantic-settings>=2.14.2",
     "soupsieve>=2.8.4",
     "urllib3>=2.7.0",
