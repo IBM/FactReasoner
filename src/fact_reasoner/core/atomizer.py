@@ -28,6 +28,7 @@ from mellea.stdlib.sampling import RejectionSamplingStrategy
 from fact_reasoner import telemetry
 from fact_reasoner.utils import (
     LOOP_BUDGET,
+    handle_generation_error,
     run_throttled,
     strip_code_fences,
     validate_json_code_block,
@@ -177,6 +178,8 @@ class Atomizer:
     def __init__(
         self,
         backend: Backend,
+        *,
+        raise_errors: bool = False,
     ):
         """
         Initialize the Atomizer.
@@ -184,6 +187,10 @@ class Atomizer:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
+            raise_errors: bool
+                If True, an exception raised by the backend (e.g. a connection
+                error) propagates to the caller unchanged. Default False: the
+                error is printed and the response gets no atoms (``{}``).
         """
 
         # Safety checks
@@ -194,6 +201,7 @@ class Atomizer:
 
         # Initialize the extractor
         self.backend = backend
+        self.raise_errors = raise_errors
 
         # Print info
         print(f"[Atomizer] Using Mellea backend: {self.backend}")
@@ -233,8 +241,9 @@ class Atomizer:
                 return_sampling_results=True,
             )
         except Exception as e:  # noqa: BLE001
-            print(f"[Atomizer] Generation failed: {e}")
-            telemetry.count_fallback("atomizer", "generation_error")
+            handle_generation_error(
+                e, "atomizer", "[Atomizer] Generation failed", self.raise_errors
+            )
             return {}  # empty dict on failure
 
         if not output.success:
@@ -291,8 +300,12 @@ class Atomizer:
         results: list[dict[str, str]] = []
         for output in outputs:
             if isinstance(output, Exception):
-                print(f"[Atomizer] Batch item failed: {output}")
-                telemetry.count_fallback("atomizer", "generation_error")
+                handle_generation_error(
+                    output,
+                    "atomizer",
+                    "[Atomizer] Batch item failed",
+                    self.raise_errors,
+                )
                 results.append({})
                 continue
             if not getattr(output, "success", False):

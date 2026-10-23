@@ -167,6 +167,31 @@ class TestDispatch:
             )
         assert ctor.call_args.kwargs["show_progress"] is False
 
+    @pytest.mark.parametrize(
+        "flag, expected", [([], False), (["--raise-errors"], True)]
+    )
+    def test_raise_errors_flag_reaches_runner(self, flag, expected):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+        ):
+            _run(
+                [
+                    "--pipeline",
+                    "factscore",
+                    "--backend",
+                    "ollama",
+                    *flag,
+                    "--query",
+                    "q",
+                    "--response",
+                    "r",
+                ]
+            )
+        assert ctor.call_args.kwargs["raise_errors"] is expected
+
     def test_rits_custom_endpoint_passes_base_url(self):
         fake_runner = MagicMock()
         fake_runner.assess.return_value = {"factuality_score": 0.5}

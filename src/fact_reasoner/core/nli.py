@@ -31,6 +31,7 @@ from fact_reasoner.uncertainty import ProbabilisticClassifier, SIMBAUQSamplingSt
 from fact_reasoner.utils import (
     extract_logprobs_from_output,
     extract_nli_label_and_span,
+    handle_generation_error,
     run_throttled,
 )
 
@@ -266,6 +267,7 @@ class NLIExtractor:
         simbauq_training_samples: list[list[str]] | None = None,
         simbauq_training_labels: list[list[int]] | None = None,
         show_progress: bool = False,
+        raise_errors: bool = False,
     ):
         """
         Initialize the NLIExtractor.
@@ -308,6 +310,10 @@ class NLIExtractor:
             show_progress: bool
                 If True, ``run_batch`` shows a ``tqdm`` progress bar that
                 advances as each NLI relation is resolved. Default False.
+            raise_errors: bool
+                If True, an exception raised by the backend (e.g. a connection
+                error) propagates to the caller unchanged. Default False: the
+                error is printed and the pair gets a neutral relationship.
         """
 
         # Safety checks
@@ -323,6 +329,7 @@ class NLIExtractor:
         self.method = nli_method
         self.backend = backend
         self.show_progress = show_progress
+        self.raise_errors = raise_errors
         # Recorded for the preamble when a classifier is loaded from disk.
         self._classifier_path: str | None = None
 
@@ -738,8 +745,9 @@ class NLIExtractor:
                 model_options=self._model_options(),
             )
         except Exception as e:  # noqa: BLE001
-            print(f"[NLI] Generation failed: {e}")
-            telemetry.count_fallback("nli", "generation_error")
+            handle_generation_error(
+                e, "nli", "[NLI] Generation failed", self.raise_errors
+            )
             return self._fallback()
 
         return self._parse_output(output)
@@ -829,8 +837,9 @@ class NLIExtractor:
         results: list[dict[str, Any]] = []
         for output in outputs:
             if isinstance(output, Exception):
-                print(f"[NLI] Batch item failed: {output}")
-                telemetry.count_fallback("nli", "generation_error")
+                handle_generation_error(
+                    output, "nli", "[NLI] Batch item failed", self.raise_errors
+                )
                 results.append(self._fallback())
                 continue
             results.append(self._parse_output(output))
@@ -878,7 +887,7 @@ class NLIAdapterExtractor(NLIExtractor):
                 and keeps the backend's default.
             **kwargs:
                 Any other :class:`NLIExtractor` option (``simbauq_*``,
-                ``show_progress``).
+                ``show_progress``, ``raise_errors``).
         """
         # Any other value would be forwarded as a reasoning effort level (e.g.
         # reasoning="false" -> reasoning_effort="false"), which backends reject.
