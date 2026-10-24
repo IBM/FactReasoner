@@ -142,7 +142,15 @@ asyncio_mode = "auto"
 # extra (twine -> keyring -> secretstorage, Linux only); < 50.0.0 is affected
 # by GHSA-537c-gmf6-5ccf and CVE-2026-69247/69248/69249. pyjwt (< 2.15.0
 # vulnerable) arrives via mcp whenever something in the tree pulls it in.
-constraint-dependencies = ["cryptography>=50.0.0", "pyjwt>=2.15.0", "setuptools>=83.0.0"]
+# filelock arrives via huggingface-hub and torch; < 4.2.1 is affected by
+# CVE-2026-112940 (high) and CVE-2026-112907/112913. setuptools < 84.1.0 is also
+# affected by GHSA-xmj3-9gf7-h52w (Windows-only legacy wheel install).
+constraint-dependencies = [
+    "cryptography>=50.0.0",
+    "filelock>=4.2.1",
+    "pyjwt>=2.15.0",
+    "setuptools>=84.1.0",
+]
 
 [tool.uv.sources]
 mellea-ibm = { git = "ssh://git@github.ibm.com/generative-computing/mellea-ibm.git" }
