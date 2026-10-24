@@ -678,7 +678,7 @@ fact-reasoner \
     --nli-decision-serve --nli-decision-server kev \
     --kev-python /envs/kev/bin/python --kev-run jaredpalmer/kev-9b@b5d8c18e --kev-gpus 1 \
     --pipeline factreasoner --merlin-path /path/to/merlin --use-priors \
-    --item-concurrency 8 --input-file data.jsonl --output-dir out/
+    --item-concurrency 16 --input-file data.jsonl --output-dir out/
 ```
 
 What makes it fast:
@@ -687,8 +687,17 @@ What makes it fast:
   launched before vLLM and waited for after it, so the two models load at once.
   `--vllm-gpus` / `--kev-gpus` index the job's GPUs (LSF's `CUDA_VISIBLE_DEVICES`).
 - **Items in flight at once** (`--item-concurrency`). One item at a time leaves a
-  server idle whenever the item is on the other's stage; 8 at once keeps both busy.
-  Results are still written in input order, and a resumed run skips done items.
+  server idle whenever the item is on the other's stage. 16 was fastest on stored
+  contexts; with retrieval use 32, because each item first waits on the network
+  (the GPUs were ~40% utilised at 16). Results are still written in input order,
+  and a resumed run skips done items.
+- **Pages fetched only as needed.** Google retrieval keeps the first 3 usable
+  pages of ~15 search results. It used to download all of them and wait for the
+  slowest; it now fetches in rank order, a few at a time, and stops once the first
+  3 usable pages are known. It keeps exactly the same pages.
+- **Transient failures are retried.** A request that fails in transport
+  (connection reset, read error, client-side timeout) is sent again up to twice,
+  with backoff, before its stage falls back. Server errors are not retried.
 - **No client-side limits on local servers.** The shared throttle protects remote
   providers (32 in flight, 1500/min). For servers the job started, vLLM gets 256 in
   flight and kev.serve 64 (its batch size), with no rate limit. `--max-concurrency`
@@ -756,10 +765,15 @@ Both servers were busy for 385 s at once; granite alone for 120 s, kev alone for
 21 s summed over all items. Both servers ran at their in-flight ceiling, so they,
 not the client, set the pace.
 
-> **Run-to-run variation.** Per-item scores differ between runs (mean |Δ| ≈ 0.06)
-> even at the same concurrency, because no stage sets a temperature: vLLM samples
-> granite at its default temperature 1.0, so summarization keeps or drops different
-> contexts each run. Aggregate accuracy is stable (±0.5 points).
+> **Run-to-run variation.** In the runs above, per-item scores differed between
+> runs (mean |Δ| ≈ 0.06) even at the same concurrency, because no stage set a
+> temperature: vLLM sampled granite at its default temperature 1.0, so
+> summarization kept or dropped different contexts each run. Aggregate accuracy
+> was stable (±0.5 points). Every backend now defaults to temperature 0
+> (`fact_reasoner.backends.DEFAULT_TEMPERATURE`), so runs are reproducible and
+> `--nli-cache-dir` can hit across them; scores will shift once against these
+> numbers. Pass `model_options={ModelOption.TEMPERATURE: ...}` to
+> `build_backend` to sample instead.
 
 ### LoRA adapters (atomization and NLI)
 

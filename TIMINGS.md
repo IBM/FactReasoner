@@ -60,7 +60,7 @@ Submitted with `ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S4`.
 
 | Model | Revision | Precision | Serving details |
 |-------|----------|-----------|-----------------|
-| `ibm-granite/granite-4.1-8b` (`GraniteForCausalLM`) | `1504002f650e656a0a3789d99574df12e3e94ed0` | bf16 | 15.7 GiB weights; `--max-model-len 32768`; `gpu_memory_utilization` 0.90; 53.2 GiB KV cache (348,560 tokens, 10.6× concurrency at 32k tokens); prefix caching on; `max_num_batched_tokens` 8192; CUDA graphs on; no temperature set, so vLLM samples at its default 1.0 |
+| `ibm-granite/granite-4.1-8b` (`GraniteForCausalLM`) | `1504002f650e656a0a3789d99574df12e3e94ed0` | bf16 | 15.7 GiB weights; `--max-model-len 32768`; `gpu_memory_utilization` 0.90; 53.2 GiB KV cache (348,560 tokens, 10.6× concurrency at 32k tokens); prefix caching on; `max_num_batched_tokens` 8192; CUDA graphs on; no temperature set, so vLLM sampled at its default 1.0 (FactReasoner now defaults to 0; see *Other runs*) |
 | `jaredpalmer/kev-9b` (LoRA r16 + pointer head on `Qwen/Qwen3.5-9B-Base`) | `b5d8c18e44c60888d138b65cb6507ff0a5a448a0`; base `68c46c4b3498877f3ef123c856ecfde50c39f404` | bf16 (head fp32) | kev.serve defaults on CUDA: adapter merged at load, fused Qwen3.5 DeltaNet kernels (flash-linear-attention 0.5.2), CUDA graphs, calibrated temperature T = 2.19, state prefix cache of 4; 29.9 GiB peak on its GPU |
 | `sentence-transformers/all-MiniLM-L6-v2` | HF cache | fp32, CPU | loaded once per process |
 
@@ -200,9 +200,12 @@ All on two H100s, the full 157 items, same flags apart from item concurrency.
 
 Startup ranges from 50 to 200 s depending on how warm the node's file and Triton
 caches are; on the first, cold run kev.serve took 127 s. Per-item scores differ
-between runs (mean |Δ| ≈ 0.06) because granite is sampled at temperature 1.0 and the
-summarizer keeps or drops different contexts; aggregate accuracy stays within
-±0.5 points. Going from 8 to 16 items in flight saves about 11%.
+between these runs (mean |Δ| ≈ 0.06) because granite was sampled at temperature
+1.0 and the summarizer kept or dropped different contexts; aggregate accuracy
+stayed within ±0.5 points. All runs in this file predate the temperature-0 default
+(`fact_reasoner.backends.DEFAULT_TEMPERATURE`), which makes later runs
+reproducible and will shift their scores once. Going from 8 to 16 items in flight
+saves about 11%.
 
 kev.serve on its own (LSF job 471210, one H100, 128 premises × 18 hypotheses at 64
 in flight) scored 298 pairs/s, consistent with the 326 pairs per busy second above.
