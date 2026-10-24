@@ -138,7 +138,8 @@ def format_timing_report(report: dict[str, Any]) -> str:
     for role, s in report["servers"].items():
         line = (
             f"  {role:3s} busy {s['busy_s']:7.0f} s ({100 * s['busy_s'] / wall if wall else 0:3.0f}% of wall), "
-            f"{s['requests']} requests, mean {s['mean_concurrency']:.1f} in flight "
+            f"{s['requests']} requests ({s.get('retries', 0)} retried), "
+            f"mean {s['mean_concurrency']:.1f} in flight "
             f"(peak {s['peak_in_flight']}/{s['max_concurrency']}), "
             f"queued here {s['wait_s']:.0f} s"
         )

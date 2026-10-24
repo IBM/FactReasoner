@@ -28,6 +28,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from mellea.backends.dummy import DummyBackend
 
+
+@pytest.fixture(autouse=True)
+def _no_transient_retries(monkeypatch):
+    """These tests are about one failed call's fallback, not about retries.
+
+    Their stub backends raise ``ConnectionError``, which ``run_throttled`` would
+    otherwise retry (see ``fact_reasoner.utils.TRANSIENT_RETRIES``).
+    """
+    monkeypatch.setattr("fact_reasoner.utils.TRANSIENT_RETRIES", 0)
+
 from fact_reasoner import telemetry
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.atomizer_reviser import AtomizerReviser

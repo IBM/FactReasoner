@@ -31,6 +31,16 @@ from fact_reasoner.core.utils import predict_nli_relationships
 from fact_reasoner.runner import FactualityRunner
 
 
+@pytest.fixture(autouse=True)
+def _no_transient_retries(monkeypatch):
+    """These tests are about one failed call's fallback, not about retries.
+
+    Their stub backends raise ``ConnectionError``, which ``run_throttled`` would
+    otherwise retry (see ``fact_reasoner.utils.TRANSIENT_RETRIES``).
+    """
+    monkeypatch.setattr("fact_reasoner.utils.TRANSIENT_RETRIES", 0)
+
+
 def _answer(label: str, p: float = 0.9):
     rest = (1.0 - p) / 2
     probabilities = {k: (p if k == label else rest) for k in DECISION_NLI_CRITERIA}

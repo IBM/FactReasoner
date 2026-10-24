@@ -14,6 +14,7 @@
 
 import asyncio
 import json
+import random
 import re
 import threading
 import time
@@ -33,6 +34,40 @@ LOOP_BUDGET = 5
 # the number of in-flight requests (and thus open sockets) at any given time.
 MAX_REQUESTS_PER_MINUTE = 1500
 MAX_CONCURRENT_REQUESTS = 32
+
+# Retries for a request that failed in transport (connection reset, read error,
+# client-side timeout), as opposed to one the server answered with an error. On a
+# busy GPU node a few in ten thousand loopback requests fail this way and succeed
+# when sent again; each would otherwise drop a summary or a whole NLI group.
+TRANSIENT_RETRIES = 2
+TRANSIENT_BACKOFF_S = 1.0
+
+
+def is_transient_error(error: BaseException) -> bool:
+    """Whether ``error`` is a transport failure worth sending the request again for.
+
+    True for connection, read and timeout errors from the OpenAI client (used by
+    the vLLM and RITS backends) and from httpx (the System One client), and for
+    the built-in ``ConnectionError`` / ``TimeoutError``. False for errors the
+    server returned (4xx/5xx) and for anything raised while handling a response.
+    """
+    try:
+        import openai
+
+        if isinstance(error, openai.APIStatusError):
+            return False
+        if isinstance(error, openai.APIConnectionError):  # includes APITimeoutError
+            return True
+    except ImportError:  # pragma: no cover - openai is a dependency
+        pass
+    try:
+        import httpx
+
+        if isinstance(error, httpx.TransportError):  # Read/Connect/Timeout errors
+            return True
+    except ImportError:  # pragma: no cover - httpx is a dependency
+        pass
+    return isinstance(error, (ConnectionError, TimeoutError))
 
 
 class AsyncRateLimiter:
@@ -140,6 +175,7 @@ class BackendThrottle:
         self._first_start: float | None = None
         self._last_end: float | None = None
         self._requests = 0
+        self._retries = 0
         self._service_s = 0.0
         self._wait_s = 0.0
         self._peak_in_flight = 0
@@ -198,6 +234,11 @@ class BackendThrottle:
                 self._busy_intervals.append((self._busy_since, now))
                 self._busy_since = None
 
+    def count_retry(self) -> None:
+        """Count one request sent again after a transient transport failure."""
+        with self._lock:
+            self._retries += 1
+
     def stats(self) -> dict[str, float | int]:
         """How busy the backend has been, as seen by the requests sent to it.
 
@@ -221,6 +262,7 @@ class BackendThrottle:
             )
             return {
                 "requests": self._requests,
+                "retries": self._retries,
                 "busy_s": busy,
                 "span_s": span,
                 "service_s": self._service_s,
@@ -359,9 +401,21 @@ async def run_throttled(
 
     async def _call(item: Any) -> Any:
         try:
-            return await factory(item)
-        except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
-            return e
+            for attempt in range(TRANSIENT_RETRIES + 1):
+                try:
+                    return await factory(item)
+                except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
+                    if attempt == TRANSIENT_RETRIES or not is_transient_error(e):
+                        return e
+                    telemetry.count_retry(type(e).__name__)
+                    if throttle is not None:
+                        throttle.count_retry()
+                    # Back off, with jitter so a burst of failures does not
+                    # return in lockstep. The item keeps its slot meanwhile.
+                    await asyncio.sleep(
+                        TRANSIENT_BACKOFF_S * (2**attempt) * (0.5 + random.random())
+                    )
+            raise AssertionError("unreachable")  # pragma: no cover
         finally:
             if on_progress is not None:
                 on_progress()

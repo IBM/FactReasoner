@@ -608,3 +608,91 @@ class TestThrottleActivity:
         monkeypatch.setattr(a, "busy_intervals", lambda: [(0, 10), (20, 30)])
         monkeypatch.setattr(b, "busy_intervals", lambda: [(5, 25)])
         assert busy_overlap_s(a, b) == pytest.approx(5 + 5)
+
+
+class TestTransientRetry:
+    @staticmethod
+    def _no_sleep(monkeypatch):
+        import asyncio
+
+        from fact_reasoner import utils
+
+        real = asyncio.sleep
+
+        async def fast(_):
+            await real(0)
+
+        monkeypatch.setattr(utils.asyncio, "sleep", fast)
+
+    def test_transport_errors_are_retried_then_succeed(self, monkeypatch):
+        import asyncio
+
+        import httpx
+
+        from fact_reasoner.utils import run_throttled
+
+        self._no_sleep(monkeypatch)
+        attempts = {}
+
+        async def factory(item):
+            attempts[item] = attempts.get(item, 0) + 1
+            if attempts[item] == 1:
+                raise httpx.ReadError("", request=httpx.Request("POST", "http://x"))
+            return item * 10
+
+        assert asyncio.run(run_throttled(factory, [1, 2])) == [10, 20]
+        assert attempts == {1: 2, 2: 2}
+
+    def test_gives_up_after_the_retry_budget(self, monkeypatch):
+        import asyncio
+
+        from fact_reasoner.utils import TRANSIENT_RETRIES, run_throttled
+
+        self._no_sleep(monkeypatch)
+        calls = []
+
+        async def factory(item):
+            calls.append(item)
+            raise ConnectionError("down")
+
+        (out,) = asyncio.run(run_throttled(factory, ["x"]))
+        assert isinstance(out, ConnectionError)
+        assert len(calls) == TRANSIENT_RETRIES + 1
+
+    def test_non_transient_errors_are_not_retried(self, monkeypatch):
+        import asyncio
+
+        import httpx
+        import openai
+
+        from fact_reasoner.utils import run_throttled
+
+        self._no_sleep(monkeypatch)
+        req = httpx.Request("POST", "http://x")
+        errors = [
+            ValueError("bad output"),
+            openai.BadRequestError("x", response=httpx.Response(400, request=req), body=None),
+            openai.InternalServerError("x", response=httpx.Response(500, request=req), body=None),
+        ]
+        for error in errors:
+            calls = []
+
+            async def factory(item, error=error, calls=calls):
+                calls.append(item)
+                raise error
+
+            (out,) = asyncio.run(run_throttled(factory, ["x"]))
+            assert out is error and calls == ["x"], type(error)
+
+    def test_classification(self):
+        import httpx
+        import openai
+
+        from fact_reasoner.utils import is_transient_error
+
+        req = httpx.Request("POST", "http://x")
+        assert is_transient_error(openai.APITimeoutError(request=req))
+        assert is_transient_error(openai.APIConnectionError(request=req))
+        assert is_transient_error(httpx.ReadError("", request=req))
+        assert is_transient_error(TimeoutError())
+        assert not is_transient_error(KeyError("x"))
