@@ -739,7 +739,8 @@ The full set is harder than its first 10 items. Going from 8 to 16 items in flig
 gains ~11%, so past 8 the servers are near saturation; more throughput needs more
 granite GPUs or a job array over slices of the dataset.
 
-**Where the time goes.** `assess_file` ends with a timing report (printed, and
+**Where the time goes.** [TIMINGS.md](TIMINGS.md) has the full report for this run,
+with the job, GPU and model setup. `assess_file` ends with a timing report (printed, and
 written as `timing_<results>.json` next to the results). Its server rows come from
 each backend's shared throttle, which sees every request, so concurrent items are
 counted once: `busy_s` is wall time with a request in flight. On the 553 s run
@@ -1367,6 +1368,7 @@ The `score()` method returns a results dictionary:
 
 ```
 FactReasoner/
+├── TIMINGS.md                # Measured timings: kev.serve NLI + vLLM granite, 2 H100s
 ├── src/fact_reasoner/
 │   ├── __init__.py           # Package exports
 │   ├── assessor.py           # Main FactReasoner class
