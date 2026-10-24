@@ -3,9 +3,11 @@
 This file records how long FactReasoner takes on the full labelled biography
 dataset when NLI runs on kev-9b (served by `kev.serve`) and every other LLM stage
 runs on granite-4.1-8b (served by vLLM), one server per GPU. It covers the job
-setup, the hardware and models, and a detailed timing report for one reference
-run. The README's *kev.serve + vLLM on a two-GPU job* section explains the
-architecture; this file is the measurement.
+setup, the hardware and models, and detailed timing reports for two reference
+runs: one on the dataset's stored contexts (the sections up to *Other runs*), and
+one that retrieves fresh contexts with Google search (*Run 2*, below). The
+README's *kev.serve + vLLM on a two-GPU job* section explains the architecture;
+this file is the measurement.
 
 ## Summary
 
@@ -205,14 +207,178 @@ summarizer keeps or drops different contexts; aggregate accuracy stays within
 kev.serve on its own (LSF job 471210, one H100, 128 premises × 18 hypotheses at 64
 in flight) scored 298 pairs/s, consistent with the 326 pairs per busy second above.
 
+## Run 2: contexts retrieved with Google search
+
+The same 157 items and models, but the dataset's stored contexts are ignored
+(`--retrieve-contexts`): every atom and every question is searched on Google
+through the Serper API, the result pages are fetched and summarized by granite as
+they arrive, and NLI then runs on those contexts. The atoms and their gold labels
+are kept, so accuracy is measured the same way.
+
+### Summary
+
+| | Stored contexts (above) | **Retrieved contexts** |
+|-|-------------------------|------------------------|
+| Processing time, all items | 553 s (3.53 s/item) | **1,823 s** (30 min 23 s), 11.61 s/item |
+| Total job, including startup | 654 s | 1,930 s (32 min 10 s) |
+| Contexts kept per item (after summarization) | 35.1 | 63.7 |
+| NLI pairs scored by kev | 139,829 | **284,092** |
+| kev busy time | 429 s | **1,568 s** (26 min 8 s), 181 pairs per busy second |
+| granite (vLLM) busy time | 505 s | 1,569 s |
+| Mean per-item retrieval (searches + page fetches) | — | 71.2 s (16 items hit the 180 s cap) |
+| Atom accuracy / factuality error | 66.3% / 0.228 | **78.2% / 0.165** |
+
+Fresh retrieval makes the run 3.3× longer, and its accuracy is 12 points higher:
+it finds about twice as many relevant contexts per item as the stored ones, so
+kev scores twice as many pairs. Retrieval is now the critical path: each item
+waits about a minute for its searches and pages before granite and kev can work
+on it, so both servers are idle or lightly loaded for much of their "busy" time.
+
+### Job setup
+
+Everything not listed here is as in *Job setup* above: same models and
+revisions, serving settings, environments, item concurrency (16) and in-flight
+ceilings.
+
+| | |
+|-|-|
+| LSF job | 478897, `kev-smoke-S5-c16`, 2026-10-24 10:28:06 – 11:00:25 |
+| Host | `p6-r18-n2`, one node |
+| GPUs | 2 × NVIDIA H100 80GB HBM3, `exclusive_process` |
+| CPU cores / host memory | 16 / 128 GB requested, 29.2 GB peak used |
+| Peak threads | 2,980 (16 items × up to 32 retrieval threads, page-fetch pools, servers) |
+| FactReasoner | commit `8dcc487` (adds `--retrieve-contexts` and the search-cache fix) |
+| Retrieval | `--service-type google`: Serper (`https://google.serper.dev/search`, 15 results per search), `SERPER_API_KEY` from the repo's `.env`; top-3 results per atom kept, pages fetched (4,000 characters each, 60 s per page, 180 s per atom batch) and summarized by granite |
+| Search cache | fresh, empty SQLite cache per run under `--cache-dir` (on GPFS), so every search was a real Serper call; it ended with 5,008 entries and 0 cache hits |
+| Serper usage | about 5,000 searches: one per atom (4,886) and question (157), less repeated texts, plus a retry without quotes for searches with no hits; the cache holds 5,008 distinct queries |
+
+```bash
+fact-reasoner \
+    --backend vllm --model ibm-granite/granite-4.1-8b --served-model granite-4.1-8b \
+    --vllm-binary /u/radu/envs/evals/bin/vllm --vllm-gpus 0 --max-model-len 32768 \
+    --nli-decision-serve --nli-decision-server kev \
+    --kev-python /u/radu/envs/kev/bin/python --kev-run jaredpalmer/kev-9b@b5d8c18e --kev-gpus 1 \
+    --pipeline factreasoner --pipeline-version v2 --merlin-path /u/radu/git/merlin/build/merlin \
+    --use-priors --use-summarizer --item-concurrency 16 \
+    --retrieve-contexts --service-type google --cache-dir artifacts/smoke/S5-c16/search-cache \
+    --input-file data/bio-labeled_wikipedia.jsonl --output-dir artifacts/smoke/S5-c16 \
+    --dataset-name bio
+```
+
+Submitted with `ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S5`.
+
+### Detailed timing report
+
+Measured as for the first run: server rows from the backends' shared throttles
+(busy = wall-clock time with at least one request in flight), GPU utilisation
+sampled once a second.
+
+#### 1. Job phases
+
+| Phase | Time |
+|-------|------|
+| Server startup (parallel) | 76 s |
+| Processing 157 items | **1,823 s** |
+| Other overhead | ~31 s |
+| **Total job (START → END)** | **1,930 s**; LSF `Run time` 1,940 s |
+
+#### 2. Server activity during the 1,823 s
+
+| | vLLM — granite-4.1-8b | kev.serve — kev-9b |
+|-|-----------------------|--------------------|
+| Busy (≥ 1 request in flight) | **1,569 s (86%)** | **1,568 s (86%)** |
+| Requests | 15,445 summarization calls | 13,514 System One requests |
+| NLI pairs | — | 284,092 (21.0 per request) |
+| Throughput while busy | 9.8 requests/s | **181 pairs/s** (8.6 requests/s) |
+| Mean requests in flight | 151 of 256 | 60 of 64 |
+| Mean time in flight per request | 15.3 s | 7.0 s |
+| Mean wait for a client slot per request | 8.0 s | 42.1 s |
+| GPU utilisation, mean over the job | 39% | 40% |
+| Seconds with GPU > 0% / > 50% | 781 s / 745 s | 833 s / 765 s |
+| Peak GPU memory | 72.7 GiB | 32.7 GiB |
+
+In this job LSF listed the GPUs in a different order from `nvidia-smi`, so vLLM
+ran on the device `nvidia-smi` calls 1 and kev on 0; the GPU rows above are
+matched to the servers by their memory footprint.
+
+Unlike the first run, busy time here is not mostly GPU work: each server's GPU was
+over 50% utilised for under half of its busy time (vLLM 47%, kev 49%). Requests
+arrive in bursts as items finish retrieving, so a server is often holding a few
+requests at low load rather than a full batch. kev's lower rate (181 vs 326 pairs
+per busy second) comes from that, and from longer premises: retrieved pages are
+longer than the stored passages. Its long client-side wait (42 s per request) is
+the opposite case: when a retrieval burst ends, many items reach NLI at once and
+queue behind the 64-request ceiling.
+
+#### 3. How the two servers overlapped
+
+| | Time | Share of 1,823 s |
+|-|------|------------------|
+| Both busy | 1,321 s | 72% |
+| Only granite busy | 248 s | 14% |
+| Only kev busy | 247 s | 14% |
+| Neither busy | 6 s | 0.3% |
+
+#### 4. Per-item stages, summed over the 157 items
+
+Summed over items running 16 at a time, so these describe the mix of work, not
+wall time.
+
+| Stage | Sum over items | Mean per item | Share of `build()` |
+|-------|----------------|---------------|--------------------|
+| `build()` total | 28,878 s | 183.9 s | 100% |
+| NLI relation extraction (kev) | 14,096 s | 89.8 s | 49% |
+| — of which atom–context pairs | 13,786 s | 87.8 s | 48% |
+| Context retrieval (Serper searches, page fetches, summaries made during retrieval) | 11,175 s | 71.2 s | 39% |
+| Context summarization in `build()` (the question's contexts, relevance filter) | 3,348 s | 21.3 s | 12% |
+| — of which the summarization batch | 956 s | 6.1 s | 3% |
+| Near-duplicate context removal (embedding model) | 251 s | 1.6 s | 0.9% |
+| Graphical model construction | 5 s | 0.03 s | — |
+| `score()` (Merlin inference) | 36 s | 0.23 s | outside `build()` |
+
+Retrieval per item: median 60.6 s, mean 71.2 s, 90th percentile 180 s. 16 items
+hit the 180 s per-batch cap, so their slowest atoms got no contexts; the other
+141 items averaged 58.8 s. (Per-page fetch timeouts are logged through Python
+`logging`, which this run did not configure, so how many pages hit the 60 s limit
+is not recorded.)
+
+#### 5. Reliability during the run
+
+| | Count |
+|-|-------|
+| Items completed | 157 / 157 |
+| Tracebacks in the job log | 0 |
+| Search-cache lock errors | 0 (606 in the first attempt; see below) |
+| Failed summarization requests | 90 of 15,445 (72 `APITimeoutError`, 18 `APIConnectionError`), all in one burst near the end of the run, after 141 items had finished. vLLM's log shows no request errors in that window and a short queue, so the failures were on the client side. Those contexts got an empty summary and were dropped as irrelevant. |
+| Failed NLI requests | 5 of 13,514 (`httpx.ReadError`, as in the first run); those premise groups fell back to neutral |
+| Items with retrieval cut off at the 180 s cap | 16 |
+
+The first attempt at this run (LSF job 478811) stopped after 5 of 157 items. With
+16 items and dozens of retrieval threads each, every search opened its own
+connection to the shared SQLite search cache on GPFS. They fought over SQLite's
+file lock, which stretched every item's retrieval to about 117 s and made 606
+cache writes fail with `database is locked`. Then the startup of a new item hit
+the lock and ended the run. Commit `8dcc487` gives each cache file one shared,
+locked connection; a 256-thread stress test on GPFS then ran 5,120 writes and
+reads in 3.9 s without a lock error.
+
+#### 6. Accuracy of this run
+
+| | Stored contexts | Retrieved contexts |
+|-|-----------------|--------------------|
+| Atom accuracy (4,859 atoms) | 66.3% | **78.2%** |
+| Mean absolute factuality-score error | 0.228 | **0.165** |
+
 ## Reproducing
 
 ```bash
 # once, from a login node: environments and models (see README,
 # "kev.serve + vLLM on a two-GPU job"), then
-ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S4
-ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh check S4
+ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S4   # stored contexts
+ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S5   # Google retrieval (~5k Serper searches)
+ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh check S4 S5
 ```
 
-The job writes the results, `timing_<results>.json` (the server and stage numbers
-above) and `S4-c16.gpu.csv` (per-second GPU utilisation) under `artifacts/smoke/`.
+Each job writes its results, `timing_<results>.json` (the server and stage
+numbers above) and `<job>.gpu.csv` (per-second GPU utilisation) under
+`artifacts/smoke/`. S5 needs `SERPER_API_KEY` in the repo's `.env`.
