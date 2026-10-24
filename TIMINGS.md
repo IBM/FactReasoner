@@ -304,9 +304,8 @@ matched to the servers by their memory footprint.
 Unlike the first run, busy time here is not mostly GPU work: each server's GPU was
 over 50% utilised for under half of its busy time (vLLM 47%, kev 49%). Requests
 arrive in bursts as items finish retrieving, so a server is often holding a few
-requests at low load rather than a full batch. kev's lower rate (181 vs 326 pairs
-per busy second) comes from that, and from longer premises: retrieved pages are
-longer than the stored passages. Its long client-side wait (42 s per request) is
+requests at low load rather than a full batch, which lowers kev's rate (181 vs 326
+pairs per busy second). Its long client-side wait (42 s per request) is
 the opposite case: when a retrieval burst ends, many items reach NLI at once and
 queue behind the 64-request ceiling.
 
