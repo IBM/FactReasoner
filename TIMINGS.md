@@ -3,9 +3,11 @@
 This file records how long FactReasoner takes on the full labelled biography
 dataset when NLI runs on kev-9b (served by `kev.serve`) and every other LLM stage
 runs on granite-4.1-8b (served by vLLM), one server per GPU. It covers the job
-setup, the hardware and models, and detailed timing reports for two reference
-runs: one on the dataset's stored contexts (the sections up to *Other runs*), and
-one that retrieves fresh contexts with Google search (*Run 2*, below). The
+setup, the hardware and models, and detailed timing reports for three reference
+runs: one on the dataset's stored contexts (the sections up to *Other runs*), one
+that retrieves fresh contexts with Google search (*Run 2*), and that retrieval
+run again after the rank-order page fetch, retries and 32 items in flight
+(*Run 3*). The
 README's *kev.serve + vLLM on a two-GPU job* section explains the architecture;
 this file is the measurement.
 
@@ -371,14 +373,175 @@ reads in 3.9 s without a lock error.
 | Atom accuracy (4,859 atoms) | 66.3% | **78.2%** |
 | Mean absolute factuality-score error | 0.228 | **0.165** |
 
+## Run 3: retrieval with the rank-order fetch, retries and 32 items in flight
+
+The run 2 configuration rerun after three changes (commits `fa64205`, `7172df8`,
+`1698b09`): Google result pages are fetched in rank order and only until the 3
+kept pages are known; requests that fail in transport are retried; and retrieval
+runs default to 32 items in flight instead of 16. The search cache again started
+empty, so every search was a real Serper call, as in run 2.
+
+The run also used the new temperature-0 default (`070b0d2`). Atomization was not
+used (atoms are precomputed), so it affects only the granite summaries, which
+are now deterministic.
+
+### Summary
+
+| | Run 2 (16 in flight) | **Run 3 (32 in flight)** |
+|-|----------------------|--------------------------|
+| Processing time, all items | 1,823 s (11.61 s/item) | **1,700 s** (28 min 20 s), 10.83 s/item: **7% faster** |
+| Total job, including startup | 1,930 s | 1,928 s |
+| Server startup | 76 s | 100 s |
+| Contexts kept per item | 63.7 | 56.6 |
+| NLI pairs scored by kev | 284,092 | 253,471 |
+| kev busy / granite busy | 1,568 s / 1,569 s | 1,421 s / 1,404 s |
+| Items whose retrieval hit the 180 s cap | 16 | **78** |
+| Failed requests (after retries) | 95 | **0** (54 retried) |
+| Atom accuracy / factuality error | 78.2% / 0.165 | 77.3% / 0.166 |
+
+The run is 7% faster overall, though the page fetch alone is much faster (next
+section). The two other changes pulled against it: with 32 items in flight,
+granite's queue grew (37 s average wait for a slot, against 8 s), and because an
+atom's retrieval includes summarizing its pages on granite, half the items now
+hit the 180 s retrieval cap. Those atoms got no contexts, which is why fewer
+contexts and NLI pairs were scored and accuracy fell by 0.9 points.
+
+### The page-fetch change on its own
+
+Measured on the login node with no GPU servers involved: 40 random atoms of the
+dataset, run one at a time through the old (`619f0ee`) and new retrieval code,
+with each atom's search results taken from this run's search cache (no Serper
+calls) and every page downloaded for real.
+
+| | Old: fetch every result | New: rank order |
+|-|-------------------------|-----------------|
+| Pages downloaded per atom (of 9.9 results) | 9.9 | **6.9** (30% fewer) |
+| Per-atom fetch time, median | 1.2 s | 0.9 s |
+| Per-atom fetch time, mean | 3.2 s | **1.8 s** (44% less) |
+| Per-atom fetch time, 90th percentile | 9.0 s | 5.1 s |
+| Atoms keeping the same 3 pages | — | 40 / 40 |
+
+### Job setup
+
+As run 2, except:
+
+| | |
+|-|-|
+| LSF job | 480844, `kev-smoke-S5-c32`, 2026-10-24 12:55:34 – 13:27:43 |
+| Host | `p6-r23-n1`, one node, 2 × H100 80GB HBM3 |
+| FactReasoner | commit `132a901` |
+| Items in flight | 32 (`--item-concurrency 32`) |
+| Host memory / threads | 42.3 GB peak used / 4,904 peak threads (run 2: 29.2 GB / 2,980) |
+| Search cache | fresh, empty; 5,008 entries at the end, 0 cache hits (identical to run 2) |
+| Sampling | temperature 0 on granite (backend default) |
+
+```bash
+fact-reasoner ... --use-priors --use-summarizer --item-concurrency 32 \
+    --retrieve-contexts --service-type google --cache-dir artifacts/smoke/S5-c32/search-cache \
+    --input-file data/bio-labeled_wikipedia.jsonl --output-dir artifacts/smoke/S5-c32 \
+    --dataset-name bio
+```
+
+(`...` is the server and pipeline flags of the first run.) Submitted with
+`bash scripts/submit_kev_vllm_smoke.sh submit S5`.
+
+### Detailed timing report
+
+#### 1. Job phases
+
+| Phase | Time |
+|-------|------|
+| Server startup (parallel) | 100 s |
+| Processing 157 items | **1,700 s** |
+| Other overhead | ~128 s: ~40 s after the last item before the servers were told to stop, then ~88 s until the job script ended (run 2: ~31 s in all). The cause of the longer wind-down was not measured. |
+| **Total job (START → END)** | **1,928 s**; LSF `Run time` 1,930 s |
+
+#### 2. Server activity during the 1,700 s
+
+| | vLLM — granite-4.1-8b | kev.serve — kev-9b |
+|-|-----------------------|--------------------|
+| Busy (≥ 1 request in flight) | 1,404 s (83%) | 1,421 s (84%) |
+| Requests (retried) | 15,405 (44) | 12,040 (10) |
+| NLI pairs | — | 253,471 (21.0 per request) |
+| Throughput while busy | 11.0 requests/s | 178 pairs/s (8.5 requests/s) |
+| Mean requests in flight | 184 of 256 | 61 of 64 |
+| Mean time in flight per request | 16.8 s | 7.2 s |
+| Mean wait for a client slot per request | **37.1 s** (run 2: 8.0 s) | **77.8 s** (run 2: 42.1 s) |
+| GPU utilisation, mean over the job | 36% | 36% |
+| Seconds with GPU > 0% / > 50% | 743 s / 693 s | 761 s / 683 s |
+| Peak GPU memory | 72.7 GiB | 30.8 GiB |
+
+As in run 2, LSF ordered the GPUs differently from `nvidia-smi` (vLLM on device 1,
+kev on 0); the GPU rows are matched to the servers by memory footprint. GPU
+utilisation is still low: each server's GPU was over 50% busy for under half of
+its busy time (vLLM 49%, kev 48%), so doubling the items in flight lengthened the
+queues in front of both servers without filling their GPUs.
+
+#### 3. How the two servers overlapped
+
+| | Time | Share of 1,700 s |
+|-|------|------------------|
+| Both busy | 1,134 s | 67% |
+| Only granite busy | 270 s | 16% |
+| Only kev busy | 287 s | 17% |
+| Neither busy | 9 s | 0.5% |
+
+#### 4. Per-item stages, summed over the 157 items
+
+With 32 items in flight these sums count overlapping items twice as often as at
+16, so per-item means rise even where the work did not grow.
+
+| Stage | Sum over items | Mean per item (run 2) | Share of `build()` |
+|-------|----------------|-----------------------|--------------------|
+| `build()` total | 52,554 s | 334.7 s (183.9 s) | 100% |
+| NLI relation extraction (kev) | 27,380 s | 174.4 s (89.8 s) | 52% |
+| — of which atom–context pairs | 26,906 s | 171.4 s (87.8 s) | 51% |
+| Context retrieval (searches, page fetches, summaries during retrieval) | 19,875 s | 126.6 s (71.2 s) | 38% |
+| Context summarization in `build()` | 4,551 s | 29.0 s (21.3 s) | 9% |
+| — of which the summarization batch | 1,277 s | 8.1 s (6.1 s) | 2% |
+| Near-duplicate context removal | 730 s | 4.6 s (1.6 s) | 1.4% |
+| Graphical model construction | 9 s | 0.06 s | — |
+| `score()` (Merlin inference) | 52 s | 0.33 s (0.23 s) | outside `build()` |
+
+Retrieval per item: median 178.6 s, mean 126.6 s, 90th percentile 182 s, maximum
+210 s. 78 of 157 items hit the 180 s cap (run 2: 16); the other 79 averaged 71.8 s.
+Among retrieval batches that completed, the median was about the same as in run
+2 (56 s vs 54 s): the cap, not the downloads, is what changed.
+
+#### 5. Reliability during the run
+
+| | Count |
+|-|-------|
+| Items completed | 157 / 157 |
+| Tracebacks / search-cache lock errors | 0 / 0 |
+| Failed summarization requests | **0** (run 2: 90); 44 transient failures recovered by a retry |
+| Failed NLI requests | **0** (run 2: 5); 10 transient failures recovered by a retry |
+| Items with retrieval cut off at the 180 s cap | 78 |
+
+#### 6. Accuracy of this run
+
+| | Run 2 | Run 3 |
+|-|-------|-------|
+| Atom accuracy (4,859 atoms) | 78.2% | 77.3% |
+| Mean absolute factuality-score error | 0.165 | 0.166 |
+
+### What to change next
+
+32 items in flight is too many with retrieval on this hardware: it trades
+retrieval cut-offs (and accuracy) for little speed. The page-fetch and retry
+changes are wins on their own. The next run should keep them and go back to 16
+items in flight, or keep 32 and raise the 180 s per-atom retrieval cap, which now
+mostly measures time spent waiting for granite rather than the network.
+
 ## Reproducing
 
 ```bash
 # once, from a login node: environments and models (see README,
 # "kev.serve + vLLM on a two-GPU job"), then
-ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S4   # stored contexts
-ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh submit S5   # Google retrieval (~5k Serper searches)
-ITEMS=16 bash scripts/submit_kev_vllm_smoke.sh check S4 S5
+bash scripts/submit_kev_vllm_smoke.sh submit S4   # stored contexts (16 in flight)
+bash scripts/submit_kev_vllm_smoke.sh submit S5   # Google retrieval, ~5k Serper searches (32 in flight)
+bash scripts/submit_kev_vllm_smoke.sh check S4 S5
+# ITEMS=16 bash ... reproduces run 2 exactly; set ITEMS to override either job
 ```
 
 Each job writes its results, `timing_<results>.json` (the server and stage
