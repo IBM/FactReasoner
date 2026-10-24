@@ -471,3 +471,92 @@ class TestNLIPromptSelection:
 
         with pytest.raises(ValueError, match="Unknown nli_prompt"):
             FactualityRunner(MagicMock(), pipeline="factscore", nli_prompt="bogus")
+
+
+class TestLazyPageFetch:
+    """Google retrieval fetches pages in rank order and stops at top_k valid ones."""
+
+    GOOD = "This is a perfectly ordinary article about the subject. " * 20
+
+    @classmethod
+    def _hits(cls, n):
+        return [{"title": f"T{i}", "snippet": f"s{i}", "link": f"u{i}"} for i in range(n)]
+
+    @classmethod
+    def _run(cls, pages, top_k=3, n=15):
+        """pages: link -> text, or an Exception to raise. Missing links are good."""
+        with patch("fact_reasoner.core.retriever.SearchAPI"):
+            retriever = SourceRetriever(service_type="google", fetch_text=True, top_k=top_k)
+        hits = cls._hits(n)
+        retriever.google_retriever.get_snippets.return_value = {"q": hits}
+        fetched = []
+
+        def fetch(link, size):
+            fetched.append(link)
+            page = pages.get(link, cls.GOOD + link)
+            if isinstance(page, Exception):
+                raise page
+            return page
+
+        with patch("fact_reasoner.core.retriever.fetch_text_from_link", side_effect=fetch):
+            results = retriever.query("q")
+        return results, fetched
+
+    def test_fetches_only_top_k_when_all_valid(self):
+        results, fetched = self._run({})
+        assert [r["link"] for r in results] == ["u0", "u1", "u2"]
+        assert all(r["text"] for r in results)
+        # top_k plus the prefetch margin, never all 15 hits.
+        from fact_reasoner.core.retriever import FETCH_PREFETCH
+
+        assert sorted(fetched, key=lambda u: int(u[1:])) == [
+            f"u{i}" for i in range(3 + FETCH_PREFETCH)
+        ]
+
+    def test_skips_invalid_pages_in_rank_order(self):
+        pages = {
+            "u0": "",  # empty
+            "u1": "Access Denied. 403 Forbidden.",  # restriction notice
+            "u3": TimeoutError("slow site"),  # failed fetch
+            "u4": "A page mentioning chatgpt here. " * 20,  # blocklisted
+        }
+        results, fetched = self._run(pages)
+        assert [r["link"] for r in results] == ["u2", "u5", "u6"]
+        assert all(r["text"] for r in results)
+        # Never fetches far past the last page it needs.
+        assert max(int(u[1:]) for u in fetched) < 10
+
+
+    def test_falls_back_to_empty_text_like_before(self):
+        # Only one valid page among the 15: the rest of top_k are filled with the
+        # earliest invalid hits as empty-text entries, as the eager code did.
+        pages = {f"u{i}": "" for i in range(15) if i != 7}
+        results, fetched = self._run(pages)
+        assert [r["link"] for r in results] == ["u7", "u0", "u1"]
+        assert [bool(r["text"]) for r in results] == [True, False, False]
+        assert len(fetched) == 15  # had to look at every hit
+
+    def test_matches_eager_selection_on_random_mixes(self):
+        import random
+
+        rng = random.Random(0)
+        kinds = ["good", "empty", "denied", "error", "chatgpt"]
+        for _ in range(200):
+            n, top_k = rng.randint(0, 15), rng.randint(1, 5)
+            pages = {}
+            for i in range(n):
+                k = rng.choices(kinds, weights=[5, 1, 1, 1, 1])[0]
+                pages[f"u{i}"] = {
+                    "good": self.GOOD + f"u{i}",
+                    "empty": "",
+                    "denied": "403 Forbidden",
+                    "error": TimeoutError("x"),
+                    "chatgpt": "chatgpt " * 50,
+                }[k]
+            results, _ = self._run(pages, top_k=top_k, n=n)
+            # The eager rule: the first top_k valid hits in rank order; if there
+            # are fewer, the earliest invalid hits fill in as empty-text entries.
+            valid = [f"u{i}" for i in range(n) if pages[f"u{i}"] == self.GOOD + f"u{i}"]
+            invalid = [f"u{i}" for i in range(n) if f"u{i}" not in valid]
+            want = valid[:top_k] if len(valid) >= top_k else valid + invalid[: top_k - len(valid)]
+            assert [r["link"] for r in results] == want, (pages, top_k)

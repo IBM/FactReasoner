@@ -71,6 +71,9 @@ CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB cap on fetched body size
 DEFAULT_PER_URL_TIMEOUT = 60  # seconds, wall-clock cap per link fetch
 DEFAULT_PER_ATOM_TIMEOUT = 180  # seconds, wall-clock cap per atom retrieval
+# Extra hits fetched in each wave beyond the ones still needed, so a few invalid
+# pages (paywalls, empty pages) do not each cost another round trip.
+FETCH_PREFETCH = 2
 MAX_RETRIEVAL_WORKERS = 32  # threads for per-item retrieval (I/O bound)
 
 # Regex patterns to remove common inline citation forms
@@ -568,6 +571,55 @@ class SourceRetriever:
                 future.set_exception(e)
         return future.result()
 
+    @staticmethod
+    def _page_usable(link: str, page_text: str | None) -> bool:
+        """Whether a fetched page passes the checks the top_k selection applies.
+
+        Must match the selection loop in :meth:`query`, which keeps a hit only
+        if this holds for its page.
+        """
+        if not page_text:
+            return False
+        if not is_content_valid(link, page_text):
+            return False
+        doc = make_uniform(page_text)
+        return bool(doc) and not any(
+            kw in doc.lower() for kw in ("chatgpt", "factscore", "dataset viewer")
+        )
+
+    def _fetch_wave(self, search_hits, indices, max_sz, fetched_texts) -> None:
+        """Fetch the pages of ``indices`` in parallel into ``fetched_texts``.
+
+        A page that fails, or is still loading when the wave's deadline passes,
+        is stored as "" (unusable), as before.
+        """
+        # Workers run in parallel, so a wave's wall-clock budget is the per-URL
+        # budget plus a small margin for scheduling.
+        deadline = self.per_url_timeout + 5
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = {
+                executor.submit(self._fetch_page, search_hits[i]["link"], max_sz): i
+                for i in indices
+            }
+            try:
+                for future in as_completed(futures, timeout=deadline):
+                    i = futures[future]
+                    try:
+                        fetched_texts[i] = future.result()
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"Fetch failed for {search_hits[i]['link']}: {e}")
+                        fetched_texts[i] = ""
+            except FuturesTimeoutError:
+                # Threads cannot be killed from Python, but the wave proceeds.
+                for future, i in futures.items():
+                    if not future.done():
+                        logger.warning(
+                            f"Fetch timed out after {self.per_url_timeout}s: "
+                            f"{search_hits[i]['link']}"
+                        )
+                        future.cancel()
+                        fetched_texts[i] = ""
+
     def query(self, text: str, max_size: int = 4000) -> list[dict[str, Any]]:
         """
         Retrieve a number of contexts relevant to the input text.
@@ -679,41 +731,33 @@ class SourceRetriever:
             search_hits = search_results[query_text]
             n = len(search_hits)
 
-            # --- Parallel fetch all links ---
+            # --- Fetch pages in rank order, only as many as needed ---
+            # Only the first top_k valid pages are kept, so fetching all ~15 hits
+            # wastes most downloads and makes the atom wait for its slowest site.
+            # Fetch in waves instead: each wave fetches the next hits still needed
+            # (plus a small margin for pages that turn out invalid), and stops once
+            # the first top_k valid hits are known. A hit's validity depends only
+            # on its own page, so this selects exactly what fetching everything
+            # would; only hits past the last one needed are never fetched.
+            fetched_texts: list[str | None] = [None] * n
             if self.fetch_text:
                 max_sz = None if self.use_in_memory_vectorstore else max_size
-                # Since workers run in parallel, the whole batch's wall-clock budget is
-                # the per-URL budget plus a small margin for scheduling.
-                batch_deadline = self.per_url_timeout + 5
-                with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                    fetch_futures = {
-                        executor.submit(self._fetch_page, hit["link"], max_sz): i
-                        for i, hit in enumerate(search_hits)
-                    }
-                    fetched_texts = [""] * n
-                    try:
-                        for future in as_completed(
-                            fetch_futures, timeout=batch_deadline
-                        ):
-                            idx = fetch_futures[future]
-                            try:
-                                fetched_texts[idx] = future.result()
-                            except Exception as e:  # noqa: BLE001
-                                link = search_hits[idx]["link"]
-                                logger.warning(f"Fetch failed for {link}: {e}")
-                                fetched_texts[idx] = ""
-                    except FuturesTimeoutError:
-                        # Any futures still pending at the deadline are dropped. Threads
-                        # cannot be killed from Python, but the batch proceeds.
-                        for future, idx in fetch_futures.items():
-                            if not future.done():
-                                link = search_hits[idx]["link"]
-                                logger.warning(
-                                    f"Fetch timed out after {self.per_url_timeout}s: {link}"
-                                )
-                                future.cancel()
-            else:
-                fetched_texts = [""] * n
+                next_hit = 0
+                while next_hit < n:
+                    valid = sum(
+                        1
+                        for i in range(next_hit)
+                        if self._page_usable(search_hits[i]["link"], fetched_texts[i])
+                    )
+                    if valid >= self.top_k:
+                        break
+                    wave = range(
+                        next_hit,
+                        min(n, next_hit + self.top_k - valid + FETCH_PREFETCH),
+                    )
+                    self._fetch_wave(search_hits, wave, max_sz, fetched_texts)
+                    next_hit = wave.stop
+            fetched_texts = [t if t is not None else "" for t in fetched_texts]
 
             # --- Select top_k valid results ---
             passages = []
@@ -728,17 +772,11 @@ class SourceRetriever:
                 raw_page_text = fetched_texts[i]
 
                 if self.fetch_text:
-                    if not is_content_valid(link, raw_page_text):
-                        raw_page_text = ""
-                    doc_content = make_uniform(raw_page_text) if raw_page_text else ""
-
-                    if not doc_content or any(
-                        kw in doc_content.lower()
-                        for kw in ("chatgpt", "factscore", "dataset viewer")
-                    ):
-                        doc_content = ""
+                    # Same test the fetch loop above stops on.
+                    if not self._page_usable(link, raw_page_text):
                         index_available.append(i)
                         continue
+                    doc_content = make_uniform(raw_page_text)
 
                     if self.use_in_memory_vectorstore:
                         split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
