@@ -14,6 +14,8 @@
 #                                                             on granite; node network access
 #   S4   2     all 157 bio items, --item-concurrency $ITEMS   full-dataset speed and accuracy
 #              (default 8; run only when named: ITEMS=16 bash ... submit S4)
+#   S5   2     S4, but contexts retrieved fresh via Google    retrieval cost and accuracy
+#              (Serper; ~5k searches, SERPER_API_KEY from .env; run only when named)
 #
 # S1/S2 read atoms and contexts from the dataset, so they need no network; they
 # exercise kev NLI, the granite summarizer (--use-summarizer), Merlin and the
@@ -123,6 +125,23 @@ $FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $ITEMS \\
 echo "END \$(date +%s)"
 EOF
         ;;
+    S5)
+        # A fresh search cache per run, so every search is a real Serper call.
+        cat <<EOF
+rm -rf "$OUT/$(job_name S5)"
+mkdir -p "$OUT/$(job_name S5)/search-cache"
+nvidia-smi --query-gpu=timestamp,index,utilization.gpu,memory.used \\
+    --format=csv,noheader,nounits -l 1 > "$OUT/$(job_name S5).gpu.csv" &
+GPU_MON=\$!
+trap 'kill \$GPU_MON 2>/dev/null || true' EXIT
+$FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $ITEMS \\
+    --retrieve-contexts --service-type google \\
+    --cache-dir "$OUT/$(job_name S5)/search-cache" \\
+    --input-file "$REPO/data/bio-labeled_wikipedia.jsonl" \\
+    --output-dir "$OUT/$(job_name S5)" --dataset-name bio
+echo "END \$(date +%s)"
+EOF
+        ;;
     S3)
         cat <<EOF
 $FR_ENV/bin/fact-reasoner $SERVERS --service-type wikipedia \\
@@ -136,13 +155,13 @@ EOF
 }
 
 # A job's name: S4 is named per concurrency (S4-c8, S4-c16), so runs can coexist.
-job_name() { if [ "$1" = S4 ]; then echo "S4-c$ITEMS"; else echo "$1"; fi; }
+job_name() { case $1 in S4 | S5) echo "$1-c$ITEMS" ;; *) echo "$1" ;; esac; }
 
 submit() {
     local id=$1 gpus=2 walltime=1:30 name
     name=$(job_name "$id")
     [ "$id" = S0 ] && gpus=1
-    [ "$id" = S4 ] && walltime=4:00
+    case $id in S4 | S5) walltime=4:00 ;; esac
     local script=$OUT/$name.sh
     job_script "$id" > "$script"
     chmod +x "$script"
@@ -178,7 +197,7 @@ check() {
         grep -E "KevServer\] Ready|VLLMServer\] Ready" "$log" | sed "s/^/$id: /"
         echo "$id: $n/10 items, wall ${wall}s"
         [ "$n" = 10 ] && echo "$id: PASS" || echo "$id: FAIL (items)" ;;
-    S4)
+    S4 | S5)
         local res n=0
         res=$(ls "$OUT/$name"/*.jsonl 2>/dev/null | head -1)
         [ -n "$res" ] && n=$(wc -l < "$res")

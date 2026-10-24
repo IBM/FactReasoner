@@ -819,3 +819,27 @@ class TestKevServe:
         with pytest.raises(SystemExit, match="--input-file runs only"):
             _run(["--pipeline", "factscore", "--backend", "rits",
                   "--item-concurrency", "4", "--query", "q", "--response", "r"])
+
+
+class TestRetrieveContextsFlag:
+    def test_requires_file_mode(self):
+        with pytest.raises(SystemExit, match="--input-file runs only"):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--query", "q", "--response", "r"])
+
+    def test_google_needs_serper_key(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SERPER_API_KEY", raising=False)
+        with pytest.raises(SystemExit, match="needs SERPER_API_KEY"):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--input-file", "d.jsonl", "--output-dir", str(tmp_path)])
+
+    def test_passed_to_assess_file(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("SERPER_API_KEY", "x")
+        runner = MagicMock()
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=runner),
+        ):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--input-file", "d.jsonl", "--output-dir", str(tmp_path)])
+        assert runner.assess_file.call_args.kwargs["retrieve_contexts"] is True

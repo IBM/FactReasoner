@@ -426,6 +426,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     i.add_argument("--output-dir", default=None, help="File-mode: output directory.")
     i.add_argument("--dataset-name", default=None, help="File-mode: dataset label.")
     i.add_argument(
+        "--retrieve-contexts",
+        action="store_true",
+        help="File-mode: ignore the items' stored contexts and retrieve new ones "
+        "for their atoms with --service-type (e.g. google, which needs "
+        "SERPER_API_KEY). Atoms and gold labels are kept.",
+    )
+    i.add_argument(
         "--item-concurrency",
         type=int,
         default=1,
@@ -726,6 +733,16 @@ def main() -> None:
         raise SystemExit("--vllm-gpus requires --backend vllm --model (a local server).")
     if args.item_concurrency < 1:
         raise SystemExit("--item-concurrency must be at least 1.")
+    if args.retrieve_contexts and not file_mode:
+        raise SystemExit("--retrieve-contexts applies to --input-file runs only.")
+    if (
+        args.retrieve_contexts
+        and args.service_type == "google"
+        and not os.environ.get("SERPER_API_KEY")
+    ):
+        raise SystemExit(
+            "--retrieve-contexts with --service-type google needs SERPER_API_KEY."
+        )
     if args.item_concurrency > 1 and not file_mode:
         raise SystemExit("--item-concurrency applies to --input-file runs only.")
     if args.max_concurrency is not None and args.max_concurrency < 1:
@@ -816,6 +833,7 @@ def main() -> None:
                 args.output_dir,
                 dataset_name=args.dataset_name,
                 model_id=model_label,
+                retrieve_contexts=args.retrieve_contexts,
             )
         else:
             results = runner.assess(

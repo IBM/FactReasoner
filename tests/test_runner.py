@@ -632,3 +632,41 @@ class TestTimingReport:
         assert report["llm_nli_overlap_s"] == 0.0
         text = format_timing_report(report)
         assert "nli busy" in text and "20 pairs" in text
+
+
+class TestRetrieveContexts:
+    def _run(self, tmp_path, retrieve):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        item = {
+            "input": "q", "output": "o",
+            "atoms": [{"id": "a0", "text": "t", "original": "t", "label": "S",
+                       "contexts": ["c0"]}],
+            "contexts": [{"id": "c0", "title": "T", "text": "stored"}],
+        }
+        path = tmp_path / "in.jsonl"
+        path.write_text(json.dumps(item))
+        pipe = MagicMock()
+        pipe.score.return_value = {"input": "q"}
+        with (
+            patch.object(r, "_build_context_retriever", return_value=MagicMock()),
+            patch.object(r, "_make_pipeline", return_value=pipe),
+        ):
+            r.assess_file(str(path), str(tmp_path / "out"), dataset_name="d",
+                          model_id="m", retrieve_contexts=retrieve)
+        return pipe, next((tmp_path / "out").glob("eval_*.jsonl")).name
+
+    def test_drops_stored_contexts_and_keeps_atoms(self, tmp_path):
+        pipe, name = self._run(tmp_path, True)
+        data = pipe.from_dict_with_contexts.call_args.args[0]
+        assert data["contexts"] == []
+        assert data["atoms"][0]["contexts"] == []
+        assert data["atoms"][0]["label"] == "S"
+        kwargs = pipe.build.call_args.kwargs
+        assert kwargs["has_atoms"] is True and kwargs["has_contexts"] is False
+        assert "-retrieved" in name
+
+    def test_default_uses_stored_contexts(self, tmp_path):
+        pipe, name = self._run(tmp_path, False)
+        assert pipe.from_dict_with_contexts.call_args.args[0]["contexts"]
+        assert pipe.build.call_args.kwargs["has_contexts"] is True
+        assert "-retrieved" not in name

@@ -541,6 +541,7 @@ class FactualityRunner:
         *,
         dataset_name: str | None = None,
         model_id: str | None = None,
+        retrieve_contexts: bool = False,
     ) -> list[dict[str, Any]]:
         """Assess a jsonl dataset of pre-annotated responses.
 
@@ -554,6 +555,12 @@ class FactualityRunner:
             output_dir: Directory for the output jsonl.
             dataset_name: Dataset label (used in the output filename).
             model_id: Model label recorded in each result and the filename.
+            retrieve_contexts: Ignore the items' stored contexts and retrieve
+                new ones for their atoms (and the query) with this runner's
+                ``service_type`` retriever. The atoms and their gold labels
+                are kept, so accuracy is still measured. The output filename
+                gains a ``-retrieved`` suffix, so it never resumes from, or
+                overwrites, a run on the stored contexts.
 
         Returns:
             The list of result dictionaries.
@@ -573,8 +580,9 @@ class FactualityRunner:
         print(f"[FactualityRunner] Loaded {len(dataset)} items from {input_file}")
 
         os.makedirs(output_dir, exist_ok=True)
+        suffix = "-retrieved" if retrieve_contexts else ""
         out_name = (
-            f"eval_{pipeline_name}_{self.service_type}_{dataset_name}_{model_id}.jsonl"
+            f"eval_{pipeline_name}_{self.service_type}{suffix}_{dataset_name}_{model_id}.jsonl"
         )
         output_filename = os.path.join(output_dir, out_name)
 
@@ -596,9 +604,21 @@ class FactualityRunner:
         def assess_item(input_data: dict[str, Any]) -> dict[str, Any]:
             context_retriever = self._build_context_retriever()
             pipeline_obj = self._make_pipeline(context_retriever)
+            if retrieve_contexts:
+                # Keep the item's atoms and gold labels; drop its stored contexts
+                # so build() retrieves fresh ones with this runner's retriever.
+                input_data = {
+                    **input_data,
+                    "atoms": [{**a, "contexts": []} for a in input_data["atoms"]],
+                    "contexts": [],
+                }
             pipeline_obj.from_dict_with_contexts(input_data)
 
-            build_kwargs = {"has_atoms": True, "has_contexts": True, "revise_atoms": False}
+            build_kwargs = {
+                "has_atoms": True,
+                "has_contexts": not retrieve_contexts,
+                "revise_atoms": False,
+            }
             if self.pipeline == "factreasoner":
                 build_kwargs.update(
                     remove_duplicates=remove_dups,
