@@ -31,7 +31,11 @@ from mellea.stdlib.components import Message
 from mellea.stdlib.context import ChatContext
 
 from fact_reasoner import telemetry
-from fact_reasoner.utils import handle_generation_error, run_throttled
+from fact_reasoner.utils import (
+    handle_generation_error,
+    run_throttled,
+    throttle_for,
+)
 
 from ._async_runner import run_coroutine
 
@@ -205,7 +209,11 @@ class AtomizerReviser:
                 "fact_reasoner.atomizer_reviser.reasoning": str(self.reasoning),
             },
         ):
-            outputs = await run_throttled(factory, list(zip(responses, queries)))
+            outputs = await run_throttled(
+                factory,
+                list(zip(responses, queries)),
+                throttle=throttle_for(self.backend),
+            )
 
         # Positionally aligned with `responses`; every failure maps to {}.
         return [self._parse_output(output) for output in outputs]

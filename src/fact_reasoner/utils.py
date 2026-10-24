@@ -14,7 +14,11 @@
 
 import asyncio
 import json
+import random
 import re
+import threading
+import time
+import weakref
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -30,6 +34,40 @@ LOOP_BUDGET = 5
 # the number of in-flight requests (and thus open sockets) at any given time.
 MAX_REQUESTS_PER_MINUTE = 1500
 MAX_CONCURRENT_REQUESTS = 32
+
+# Retries for a request that failed in transport (connection reset, read error,
+# client-side timeout), as opposed to one the server answered with an error. On a
+# busy GPU node a few in ten thousand loopback requests fail this way and succeed
+# when sent again; each would otherwise drop a summary or a whole NLI group.
+TRANSIENT_RETRIES = 2
+TRANSIENT_BACKOFF_S = 1.0
+
+
+def is_transient_error(error: BaseException) -> bool:
+    """Whether ``error`` is a transport failure worth sending the request again for.
+
+    True for connection, read and timeout errors from the OpenAI client (used by
+    the vLLM and RITS backends) and from httpx (the System One client), and for
+    the built-in ``ConnectionError`` / ``TimeoutError``. False for errors the
+    server returned (4xx/5xx) and for anything raised while handling a response.
+    """
+    try:
+        import openai
+
+        if isinstance(error, openai.APIStatusError):
+            return False
+        if isinstance(error, openai.APIConnectionError):  # includes APITimeoutError
+            return True
+    except ImportError:  # pragma: no cover - openai is a dependency
+        pass
+    try:
+        import httpx
+
+        if isinstance(error, httpx.TransportError):  # Read/Connect/Timeout errors
+            return True
+    except ImportError:  # pragma: no cover - httpx is a dependency
+        pass
+    return isinstance(error, (ConnectionError, TimeoutError))
 
 
 class AsyncRateLimiter:
@@ -85,6 +123,235 @@ class AsyncRateLimiter:
                 self._allowance -= 1.0
 
 
+class BackendThrottle:
+    """Concurrency ceiling and rate limit shared by every batch sent to a backend.
+
+    :func:`run_throttled` on its own bounds only the batch it is given, so two
+    stages (or two dataset items) running at the same time each get the full
+    budget and together overload the server. Passing the same throttle to every
+    batch makes the budget global to the backend.
+
+    Pipeline stages run on more than one event loop (``asyncio.run`` for
+    ``build()``, the background loop of ``run_coroutine`` for the rest), and
+    asyncio primitives are bound to one loop. The state here is guarded by a
+    ``threading.Lock`` instead, and waiters poll with ``asyncio.sleep``, so one
+    throttle is safe to share across loops and threads.
+    """
+
+    # How long a waiter sleeps between checks for a free slot or token.
+    _POLL_SECONDS = 0.01
+
+    def __init__(
+        self,
+        max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+        rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+    ):
+        """
+        Args:
+            max_concurrency: int
+                Maximum number of items in flight at once, across all batches.
+            rate_per_minute: int
+                Maximum number of items started per minute, across all batches.
+        """
+        if max_concurrency <= 0:
+            raise ValueError("max_concurrency must be a positive integer")
+        if rate_per_minute <= 0:
+            raise ValueError("rate_per_minute must be a positive integer")
+
+        self.max_concurrency = max_concurrency
+        self.rate_per_minute = rate_per_minute
+        self._in_flight = 0
+        self._tokens = float(rate_per_minute)
+        self._last = time.monotonic()
+        self._lock = threading.Lock()
+        # Activity accounting (see stats()): when the backend last went from
+        # idle to busy, total busy time, and per-request totals.
+        self._busy_since: float | None = None
+        self._busy_s = 0.0
+        # Closed busy intervals, (start, end), so two backends' busy time can be
+        # intersected (see busy_overlap_s). Thousands per run, not millions:
+        # one per idle-to-busy transition, not one per request.
+        self._busy_intervals: list[tuple[float, float]] = []
+        self._first_start: float | None = None
+        self._last_end: float | None = None
+        self._requests = 0
+        self._retries = 0
+        self._service_s = 0.0
+        self._wait_s = 0.0
+        self._peak_in_flight = 0
+
+    def _try_acquire(self) -> bool:
+        """Take a slot and a token if both are available, without blocking."""
+        with self._lock:
+            now = time.monotonic()
+            self._tokens = min(
+                float(self.rate_per_minute),
+                self._tokens + (now - self._last) * self.rate_per_minute / 60.0,
+            )
+            self._last = now
+            if self._in_flight >= self.max_concurrency or self._tokens < 1.0:
+                return False
+            if self._in_flight == 0:
+                self._busy_since = now
+            if self._first_start is None:
+                self._first_start = now
+            self._in_flight += 1
+            self._peak_in_flight = max(self._peak_in_flight, self._in_flight)
+            self._tokens -= 1.0
+            return True
+
+    async def acquire(self) -> float:
+        """Wait until a slot and a rate token are free, then take both.
+
+        Returns:
+            The time the slot was taken (``time.monotonic()``), to pass back to
+            :meth:`release` so the request's service time is counted.
+        """
+        asked = time.monotonic()
+        while not self._try_acquire():
+            await asyncio.sleep(self._POLL_SECONDS)
+        started = time.monotonic()
+        with self._lock:
+            self._wait_s += started - asked
+        return started
+
+    def release(self, started: float | None = None) -> None:
+        """Return the slot taken by :meth:`acquire`.
+
+        Args:
+            started: What :meth:`acquire` returned; when given, the time since
+                then is counted as this request's service time.
+        """
+        with self._lock:
+            now = time.monotonic()
+            self._in_flight -= 1
+            self._last_end = now
+            if started is not None:
+                self._requests += 1
+                self._service_s += now - started
+            if self._in_flight == 0 and self._busy_since is not None:
+                self._busy_s += now - self._busy_since
+                self._busy_intervals.append((self._busy_since, now))
+                self._busy_since = None
+
+    def count_retry(self) -> None:
+        """Count one request sent again after a transient transport failure."""
+        with self._lock:
+            self._retries += 1
+
+    def stats(self) -> dict[str, float | int]:
+        """How busy the backend has been, as seen by the requests sent to it.
+
+        ``busy_s`` is wall-clock time with at least one request in flight: for a
+        local server, the time it was working (or had work queued). Overlapping
+        requests count once, so it is directly comparable to the run's wall time,
+        unlike a per-item sum of stage times. ``service_s`` sums each request's
+        own time in flight; ``service_s / busy_s`` is the mean concurrency while
+        busy. ``wait_s`` is time requests spent waiting for a slot here, before
+        reaching the server.
+        """
+        with self._lock:
+            now = time.monotonic()
+            busy = self._busy_s
+            if self._busy_since is not None:
+                busy += now - self._busy_since
+            span = (
+                (self._last_end or now) - self._first_start
+                if self._first_start is not None
+                else 0.0
+            )
+            return {
+                "requests": self._requests,
+                "retries": self._retries,
+                "busy_s": busy,
+                "span_s": span,
+                "service_s": self._service_s,
+                "wait_s": self._wait_s,
+                "mean_concurrency": self._service_s / busy if busy else 0.0,
+                "peak_in_flight": self._peak_in_flight,
+                "max_concurrency": self.max_concurrency,
+            }
+
+    def busy_intervals(self) -> list[tuple[float, float]]:
+        """The ``time.monotonic()`` intervals with a request in flight, in order."""
+        with self._lock:
+            out = list(self._busy_intervals)
+            if self._busy_since is not None:
+                out.append((self._busy_since, time.monotonic()))
+            return out
+
+
+def busy_overlap_s(a: BackendThrottle, b: BackendThrottle) -> float:
+    """Seconds during which both backends had a request in flight."""
+    xs, ys = a.busy_intervals(), b.busy_intervals()
+    i = j = 0
+    total = 0.0
+    while i < len(xs) and j < len(ys):
+        lo = max(xs[i][0], ys[j][0])
+        hi = min(xs[i][1], ys[j][1])
+        if hi > lo:
+            total += hi - lo
+        if xs[i][1] < ys[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
+
+
+# One throttle per backend object, so every component built on the same backend
+# shares a single budget. Weak keys let a discarded backend take its throttle
+# with it.
+_backend_throttles: "weakref.WeakKeyDictionary[Any, BackendThrottle]" = (
+    weakref.WeakKeyDictionary()
+)
+_backend_throttles_lock = threading.Lock()
+
+
+def set_throttle(
+    backend: Any,
+    *,
+    max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+    rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
+) -> BackendThrottle | None:
+    """Give ``backend`` a shared throttle with non-default limits.
+
+    The defaults protect a remote provider (RITS levels off near 9 requests/s,
+    and returns 429s past its quota). A server running inside the same job has
+    no quota and batches better the more it is sent, so the caller that started
+    it raises both limits here, before the first batch.
+
+    Returns:
+        The throttle now shared by every batch sent to ``backend``, or None for
+        a backend that cannot be weakly referenced (as in :func:`throttle_for`).
+    """
+    throttle = BackendThrottle(max_concurrency, rate_per_minute)
+    with _backend_throttles_lock:
+        try:
+            _backend_throttles[backend] = throttle
+        except TypeError:
+            return None
+    return throttle
+
+
+def throttle_for(backend: Any) -> BackendThrottle | None:
+    """Return the shared :class:`BackendThrottle` for ``backend``.
+
+    Created with the module defaults on first use (unless :func:`set_throttle`
+    configured it). Returns None for a backend that cannot be weakly referenced
+    (plain stand-ins in tests), in which case callers fall back to per-batch
+    throttling.
+    """
+    with _backend_throttles_lock:
+        try:
+            throttle = _backend_throttles.get(backend)
+            if throttle is None:
+                throttle = BackendThrottle()
+                _backend_throttles[backend] = throttle
+        except TypeError:
+            return None
+        return throttle
+
+
 async def run_throttled(
     factory: Callable[[Any], Awaitable[Any]],
     items: list[Any],
@@ -92,6 +359,7 @@ async def run_throttled(
     max_concurrency: int = MAX_CONCURRENT_REQUESTS,
     rate_per_minute: int = MAX_REQUESTS_PER_MINUTE,
     on_progress: Callable[[], None] | None = None,
+    throttle: BackendThrottle | None = None,
 ) -> list[Any]:
     """Run one coroutine per item with bounded concurrency and rate limiting.
 
@@ -115,25 +383,53 @@ async def run_throttled(
             coroutine completes — succeeds or fails. Fires in completion order,
             not input order, so it is suitable for driving a progress bar. Must
             not block.
+        throttle: Optional[BackendThrottle]
+            A budget shared with every other batch sent to the same backend
+            (see :func:`throttle_for`). When given, it replaces the per-batch
+            ``max_concurrency`` / ``rate_per_minute`` limits. Both count items,
+            not requests: an item that issues several generations (SIMBA-UQ)
+            holds one slot.
 
     Returns:
         List[Any]: Results positionally aligned with ``items``. For any item
         whose coroutine raised, the corresponding entry is the ``Exception``
         object (never reordered, never dropped).
     """
-    limiter = AsyncRateLimiter(rate_per_minute)
-    sem = asyncio.Semaphore(max_concurrency)
+    if throttle is None:
+        limiter = AsyncRateLimiter(rate_per_minute)
+        sem = asyncio.Semaphore(max_concurrency)
+
+    async def _call(item: Any) -> Any:
+        try:
+            for attempt in range(TRANSIENT_RETRIES + 1):
+                try:
+                    return await factory(item)
+                except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
+                    if attempt == TRANSIENT_RETRIES or not is_transient_error(e):
+                        return e
+                    telemetry.count_retry(type(e).__name__)
+                    if throttle is not None:
+                        throttle.count_retry()
+                    # Back off, with jitter so a burst of failures does not
+                    # return in lockstep. The item keeps its slot meanwhile.
+                    await asyncio.sleep(
+                        TRANSIENT_BACKOFF_S * (2**attempt) * (0.5 + random.random())
+                    )
+            raise AssertionError("unreachable")  # pragma: no cover
+        finally:
+            if on_progress is not None:
+                on_progress()
 
     async def _one(item: Any) -> Any:
+        if throttle is not None:
+            started = await throttle.acquire()
+            try:
+                return await _call(item)
+            finally:
+                throttle.release(started)
         async with sem:
             await limiter.acquire()
-            try:
-                return await factory(item)
-            except Exception as e:  # capture, so sibling requests are not dropped  # noqa: BLE001
-                return e
-            finally:
-                if on_progress is not None:
-                    on_progress()
+            return await _call(item)
 
     tasks = [asyncio.create_task(_one(item)) for item in items]
     # _one never raises, so gather returns one result per item in order.
@@ -145,7 +441,8 @@ def handle_generation_error(
 ) -> None:
     """Report a failed LLM call, or re-raise it when the caller opted in.
 
-    By default the error is printed as ``"{message}: {error}"`` and counted as a
+    By default the error is printed as ``"{message}: {type}: {error}"`` (the
+    type, because many transport errors have an empty message) and counted as a
     ``generation_error`` fallback; the calling stage then substitutes its
     default result. With ``raise_errors`` the original exception is re-raised
     as is (same object, type, traceback and cause), so callers can catch it.
@@ -165,7 +462,7 @@ def handle_generation_error(
     """
     if raise_errors:
         raise error
-    print(f"{message}: {error}")
+    print(f"{message}: {type(error).__name__}: {error}")
     telemetry.count_fallback(component, "generation_error")
 
 

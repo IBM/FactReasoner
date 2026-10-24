@@ -165,3 +165,51 @@ class TestSearchAPIHelpers:
                 assert results["test query"][0]["title"] == "Title Only"
                 assert results["test query"][0]["snippet"] == ""
                 assert results["test query"][0]["link"] == ""
+
+
+class TestSearchCacheConcurrency:
+    """Many retrieval threads share one cache file (the GPU-node failure)."""
+
+    def test_concurrent_writers_and_new_instances_never_lock(self, tmp_path, caplog):
+        import threading
+
+        from fact_reasoner.search_api import SearchAPI
+
+        SearchAPI(cache_dir=str(tmp_path))  # create the table
+        errors, barrier = [], threading.Barrier(64)
+
+        def worker(i):
+            try:
+                barrier.wait()
+                api = SearchAPI(cache_dir=str(tmp_path))  # init during writes
+                api._save_to_cache(f"query number {i}", {"organic": [{"title": str(i)}]})
+                assert api._get_from_cache(f"query number {i}") is not None
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(64)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == []
+        assert "database is locked" not in caplog.text
+
+    def test_unreadable_cache_is_a_miss(self, tmp_path, monkeypatch):
+        import sqlite3
+
+        from fact_reasoner import search_api
+        from fact_reasoner.search_api import SearchAPI
+
+        api = SearchAPI(cache_dir=str(tmp_path))
+
+        class Broken:
+            def execute(self, *a, **k):
+                raise sqlite3.OperationalError("database is locked")
+
+        import threading
+
+        monkeypatch.setattr(
+            search_api, "_shared_connection", lambda db: (Broken(), threading.Lock())
+        )
+        assert api._get_from_cache("anything") is None

@@ -25,8 +25,10 @@ import json
 import os
 
 from fact_reasoner.backends import build_backend, is_anthropic_compat_endpoint
+from fact_reasoner.core.nli import NLI_PROMPTS
 from fact_reasoner.core.nli_config import NLI_MODES, NLI_PAIR_POLICIES
 from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
+from fact_reasoner.utils import MAX_REQUESTS_PER_MINUTE, set_throttle
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -77,6 +79,92 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "neither of which exposes logprobs). Default: logprobs.",
     )
     p.add_argument(
+        "--nli-prompt",
+        default="few_shot",
+        choices=list(NLI_PROMPTS),
+        help="The NLI prompt for the base model. 'few_shot' (default) has the "
+        "model reason step by step before its label; 'label_only' asks for the "
+        "label alone, which is several times faster. Ignored with --nli-adapter, "
+        "which has its own prompt.",
+    )
+    p.add_argument(
+        "--nli-decision-model",
+        default=None,
+        help="Predict NLI relations with an Ollama decision model (e.g. 'kev') "
+        "through the System One API, instead of an LLM. Much faster, and its "
+        "probabilities come from the model; the rest of the pipeline still uses "
+        "--backend. Cannot be combined with --nli-adapter, --nli-prompt "
+        "label_only or --nli-method simbauq.",
+    )
+    p.add_argument(
+        "--nli-decision-host",
+        default=None,
+        help="Ollama server for --nli-decision-model (default: OLLAMA_HOST, else "
+        "http://localhost:11434).",
+    )
+    p.add_argument(
+        "--nli-decision-serve",
+        action="store_true",
+        help="Start a private Ollama server for --nli-decision-model for the "
+        "duration of the run (on a free port, pulling the model if needed) and "
+        "stop it afterwards -- for a GPU node in an LSF job. See the --ollama-* "
+        "options.",
+    )
+    p.add_argument(
+        "--ollama-binary",
+        default="ollama",
+        help="With --nli-decision-serve: the ollama executable (default: on PATH).",
+    )
+    p.add_argument(
+        "--ollama-models-dir",
+        default=None,
+        help="With --nli-decision-serve: the model store (OLLAMA_MODELS). Point it "
+        "at shared storage, so the model is pulled once for every job.",
+    )
+    p.add_argument(
+        "--ollama-num-parallel",
+        type=int,
+        default=None,
+        help="With --nli-decision-serve: requests the server answers at once "
+        "(OLLAMA_NUM_PARALLEL; default 8, sized for an H100).",
+    )
+    p.add_argument(
+        "--no-ollama-pull",
+        action="store_true",
+        help="With --nli-decision-serve: fail instead of pulling a missing model "
+        "(for nodes without internet access).",
+    )
+    p.add_argument(
+        "--nli-decision-server",
+        default="ollama",
+        choices=["ollama", "kev"],
+        help="With --nli-decision-serve: which server to start. 'ollama' "
+        "(default) runs `ollama serve` for --nli-decision-model; 'kev' runs "
+        "kev's own server (kev.serve) for the published kev checkpoint "
+        "(--kev-run), from the environment of --kev-python. Both speak the "
+        "System One API.",
+    )
+    p.add_argument(
+        "--kev-run",
+        default=None,
+        help="With --nli-decision-server kev: the kev checkpoint, a Hub id "
+        "optionally pinned with @revision, or a local run directory (default: "
+        "jaredpalmer/kev-9b). Nodes without internet need it in the HF cache.",
+    )
+    p.add_argument(
+        "--kev-python",
+        default=None,
+        help="With --nli-decision-server kev: the Python of the environment "
+        "kev is installed in (required; kev pins its own torch and kernels).",
+    )
+    p.add_argument(
+        "--kev-gpus",
+        default=None,
+        help="With --nli-decision-server kev: the job's GPU(s) for kev.serve, "
+        "e.g. '1' (default: the job's GPUs, as given). Pair with --vllm-gpus "
+        "to give each server its own GPU.",
+    )
+    p.add_argument(
         "--nli-similarity-metric",
         default="rouge",
         choices=["rouge", "jaccard", "sbert", "difflib", "levenshtein"],
@@ -117,15 +205,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     # One LLM call per candidate pair means A*C calls for the atom-context phase
     # and C*(C-1) for context-context. Since contexts are retrieved per atom
     # (C ~ A*top_k), that is quadratic in atoms for v2 and cubic-ish for v3.
-    # Every flag here defaults to the original behavior.
+    # --nli-mode defaults to 'fast'; pass --nli-mode all_pairs for the original
+    # behavior. Every other flag here defaults to its preset's value.
     n = parser.add_argument_group("nli relation extraction (cost control)")
     n.add_argument(
         "--nli-mode",
-        default="all_pairs",
+        default="fast",
         # Read from the shared tuple so the two can never drift apart.
         choices=list(NLI_MODES),
         help=(
-            "Which NLI candidate-pair preset to start from (default: all_pairs). "
+            "Which NLI candidate-pair preset to start from (default: fast). "
             "'all_pairs' scores every enumerated pair and reproduces published "
             "numbers. 'fast' restricts atom-context pairs to the atoms that "
             "actually retrieved each context, gates context-context pairs, "
@@ -307,6 +396,26 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="With --atomizer-adapter-path / --nli-adapter-path: the largest "
         "adapter LoRA rank, if above vLLM's default maximum (16).",
     )
+    b.add_argument(
+        "--vllm-binary",
+        default="vllm",
+        help="With --model (local vLLM server): the vllm executable, e.g. from "
+        "its own environment (default: vllm on PATH).",
+    )
+    b.add_argument(
+        "--vllm-gpus",
+        default=None,
+        help="With --model (local vLLM server): the job's GPU(s) for vLLM, e.g. "
+        "'0' (default: all the job's GPUs). Sets the default "
+        "--tensor-parallel-size to their number.",
+    )
+    b.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=None,
+        help="Requests in flight at once to --backend, across all stages and "
+        "items (default: 32, or 256 for a local vLLM server started with --model).",
+    )
 
     # --- Input (single vs file) ---
     i = parser.add_argument_group("input")
@@ -316,6 +425,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     i.add_argument("--input-file", default=None, help="File-mode: input jsonl dataset.")
     i.add_argument("--output-dir", default=None, help="File-mode: output directory.")
     i.add_argument("--dataset-name", default=None, help="File-mode: dataset label.")
+    i.add_argument(
+        "--retrieve-contexts",
+        action="store_true",
+        help="File-mode: ignore the items' stored contexts and retrieve new ones "
+        "for their atoms with --service-type (e.g. google, which needs "
+        "SERPER_API_KEY). Atoms and gold labels are kept.",
+    )
+    i.add_argument(
+        "--item-concurrency",
+        type=int,
+        default=1,
+        help="File-mode: dataset items assessed at once (default 1). With local "
+        "servers, 8-16 keeps the LLM and NLI servers busy at the same time.",
+    )
 
     # --- Output ---
     parser.add_argument(
@@ -377,6 +500,8 @@ def _backend_context(args):
                 if path
             },
             max_lora_rank=args.max_lora_rank,
+            gpus=args.vllm_gpus,
+            vllm_binary=args.vllm_binary,
         ) as server:
             adapters = {
                 role: server.build_backend(model_id=name)
@@ -403,6 +528,90 @@ def _backend_context(args):
         )
     else:  # ollama
         yield build_backend("ollama", model_id=args.model_id), {}
+
+
+# Requests in flight to a vLLM server inside the job: it has no quota, and
+# batches better the more sequences it is given.
+LOCAL_VLLM_MAX_CONCURRENCY = 256
+# kev.serve batches up to 64 queued requests per pass (kev.serve MAX_BATCH).
+LOCAL_KEV_MAX_CONCURRENCY = 64
+# A local server needs no rate limit; this only keeps the token bucket finite.
+LOCAL_RATE_PER_MINUTE = 1_000_000
+
+
+@contextlib.contextmanager
+def _decision_server(args):
+    """Yield ``(host, api_key)`` for an Ollama decision model, serving it if asked.
+
+    With ``--nli-decision-serve`` an :class:`~fact_reasoner.serving.OllamaServer`
+    runs for the duration of the block; otherwise this yields
+    ``--nli-decision-host`` (None means the ollama package default) and no key.
+    A kev.serve server is started by :func:`_servers` instead.
+    """
+    if not args.nli_decision_serve:
+        yield args.nli_decision_host, None
+        return
+    from fact_reasoner.serving import DEFAULT_OLLAMA_NUM_PARALLEL, OllamaServer
+
+    with OllamaServer(
+        args.nli_decision_model,
+        binary=args.ollama_binary,
+        models_dir=args.ollama_models_dir,
+        num_parallel=args.ollama_num_parallel or DEFAULT_OLLAMA_NUM_PARALLEL,
+        pull=not args.no_ollama_pull,
+    ) as server:
+        yield server.base_url, None
+
+
+@contextlib.contextmanager
+def _servers(args):
+    """Start every server the run needs, loading them at the same time.
+
+    kev.serve is launched first and waited for last, so its model loads while
+    vLLM's ``with`` block blocks on vLLM's own startup: on a two-GPU job the two
+    loads overlap instead of adding up. Yields ``(backend, adapters,
+    decision_host, decision_api_key)``.
+    """
+    kev = None
+    if args.nli_decision_serve and args.nli_decision_server == "kev":
+        from fact_reasoner.serving import DEFAULT_KEV_RUN, KevServer
+
+        kev = KevServer(
+            args.kev_run or DEFAULT_KEV_RUN, python=args.kev_python, gpus=args.kev_gpus
+        )
+    with contextlib.ExitStack() as stack:
+        if kev is not None:
+            # __enter__/__exit__ by hand: launch now, wait after vLLM is up.
+            from fact_reasoner.serving import _StopOnSigterm
+
+            stack.enter_context(_StopOnSigterm())
+            stack.callback(kev.stop)
+            kev.launch()
+        backend, adapters = stack.enter_context(_backend_context(args))
+        if kev is not None:
+            kev.wait_ready()
+            host, api_key = kev.base_url, kev.api_key
+        else:
+            host, api_key = stack.enter_context(_decision_server(args))
+        yield backend, adapters, host, api_key
+
+
+def _configure_throttles(args, backend, adapters) -> None:
+    """Size the shared throttle of every LLM backend for where it runs.
+
+    A server this job started (``--model``) gets a high ceiling and no rate
+    limit; a remote one keeps the defaults, unless ``--max-concurrency`` says
+    otherwise.
+    """
+    local = args.backend == "vllm" and args.model is not None
+    concurrency = args.max_concurrency or (
+        LOCAL_VLLM_MAX_CONCURRENCY if local else None
+    )
+    if concurrency is None:
+        return
+    rate = LOCAL_RATE_PER_MINUTE if local else MAX_REQUESTS_PER_MINUTE
+    for b in (backend, *adapters.values()):
+        set_throttle(b, max_concurrency=concurrency, rate_per_minute=rate)
 
 
 def main() -> None:
@@ -471,6 +680,73 @@ def main() -> None:
             "(the RITS model name)."
         )
     # The SIMBA-UQ classifier confidence method needs a trained classifier.
+    serve_flags = [
+        flag
+        for flag, used in (
+            ("--ollama-binary", args.ollama_binary != "ollama"),
+            ("--ollama-models-dir", args.ollama_models_dir is not None),
+            ("--ollama-num-parallel", args.ollama_num_parallel is not None),
+            ("--no-ollama-pull", args.no_ollama_pull),
+        )
+        if used
+    ]
+    if args.nli_decision_server == "kev" and not args.nli_decision_model:
+        # kev.serve answers to any model name; this one is just the label the
+        # NLI cache keys on.
+        from fact_reasoner.serving import KEV_SERVED_MODEL
+
+        args.nli_decision_model = KEV_SERVED_MODEL
+    if args.nli_decision_serve:
+        if not args.nli_decision_model:
+            raise SystemExit("--nli-decision-serve requires --nli-decision-model.")
+        if args.nli_decision_host:
+            raise SystemExit(
+                "--nli-decision-serve starts its own server; drop --nli-decision-host."
+            )
+    elif serve_flags:
+        raise SystemExit(f"{', '.join(serve_flags)} require --nli-decision-serve.")
+    kev_flags = [
+        flag
+        for flag, used in (
+            ("--kev-run", args.kev_run is not None),
+            ("--kev-python", args.kev_python is not None),
+            ("--kev-gpus", args.kev_gpus is not None),
+        )
+        if used
+    ]
+    if args.nli_decision_server == "kev":
+        if not args.nli_decision_serve:
+            raise SystemExit("--nli-decision-server kev requires --nli-decision-serve.")
+        if not args.kev_python:
+            raise SystemExit(
+                "--nli-decision-server kev requires --kev-python (the Python of "
+                "the environment kev is installed in)."
+            )
+        if serve_flags:
+            raise SystemExit(
+                f"{', '.join(serve_flags)} configure an Ollama server; drop them "
+                "with --nli-decision-server kev."
+            )
+    elif kev_flags:
+        raise SystemExit(f"{', '.join(kev_flags)} require --nli-decision-server kev.")
+    if args.vllm_gpus is not None and not (args.backend == "vllm" and args.model):
+        raise SystemExit("--vllm-gpus requires --backend vllm --model (a local server).")
+    if args.item_concurrency < 1:
+        raise SystemExit("--item-concurrency must be at least 1.")
+    if args.retrieve_contexts and not file_mode:
+        raise SystemExit("--retrieve-contexts applies to --input-file runs only.")
+    if (
+        args.retrieve_contexts
+        and args.service_type == "google"
+        and not os.environ.get("SERPER_API_KEY")
+    ):
+        raise SystemExit(
+            "--retrieve-contexts with --service-type google needs SERPER_API_KEY."
+        )
+    if args.item_concurrency > 1 and not file_mode:
+        raise SystemExit("--item-concurrency applies to --input-file runs only.")
+    if args.max_concurrency is not None and args.max_concurrency < 1:
+        raise SystemExit("--max-concurrency must be at least 1.")
     if args.nli_confidence_method == "classifier":
         if args.nli_method != "simbauq":
             raise SystemExit(
@@ -487,8 +763,9 @@ def main() -> None:
             )
     # Some backends do not expose token logprobs, so the default NLI method
     # degrades to all-neutral relations. Steer the user to the SIMBA-UQ method.
-    # One if/elif so a run never prints two overlapping warnings.
-    if args.nli_method == "logprobs":
+    # One if/elif so a run never prints two overlapping warnings. A decision
+    # model does the NLI without logprobs, so it needs no warning.
+    if args.nli_method == "logprobs" and args.nli_decision_model is None:
         if args.backend == "ollama":
             print(
                 "[warning] The 'ollama' backend does not expose logprobs, so "
@@ -505,7 +782,8 @@ def main() -> None:
                 "relations. Use --nli-method simbauq instead."
             )
 
-    with _backend_context(args) as (backend, adapters):
+    with _servers(args) as (backend, adapters, decision_host, decision_api_key):
+        _configure_throttles(args, backend, adapters)
         runner = FactualityRunner(
             backend,
             pipeline=args.pipeline,
@@ -518,6 +796,10 @@ def main() -> None:
             use_query_builder=args.use_query_builder,
             merlin_path=args.merlin_path,
             nli_method=args.nli_method,
+            nli_prompt=args.nli_prompt,
+            nli_decision_model=args.nli_decision_model,
+            nli_decision_host=decision_host,
+            nli_decision_api_key=decision_api_key,
             nli_similarity_metric=args.nli_similarity_metric,
             nli_confidence_method=args.nli_confidence_method,
             nli_classifier_path=args.nli_classifier_path,
@@ -534,7 +816,15 @@ def main() -> None:
             atomizer_backend=adapters.get("atomizer"),
             nli_backend=adapters.get("nli"),
             raise_errors=args.raise_errors,
+            item_concurrency=args.item_concurrency,
         )
+        if args.nli_decision_serve and args.nli_decision_server == "kev":
+            # kev.serve batches whatever is queued; never rate-limit it.
+            set_throttle(
+                runner.nli_extractor.backend,
+                max_concurrency=LOCAL_KEV_MAX_CONCURRENCY,
+                rate_per_minute=LOCAL_RATE_PER_MINUTE,
+            )
 
         if file_mode:
             model_label = args.served_model or args.model_id
@@ -543,6 +833,7 @@ def main() -> None:
                 args.output_dir,
                 dataset_name=args.dataset_name,
                 model_id=model_label,
+                retrieve_contexts=args.retrieve_contexts,
             )
         else:
             results = runner.assess(

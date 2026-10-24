@@ -14,7 +14,7 @@ from .lcs import (
 from .models import MODELS, UnifiedModel, list_models, resolve
 from .runner import FactualityRunner
 from .search_api import SearchAPI
-from .serving import VLLMServer
+from .serving import KevServer, OllamaServer, VLLMServer
 from .utils import (
     extract_first_square_brackets,
     extract_last_square_brackets,
@@ -35,6 +35,8 @@ __all__ = [
     "FactualityRunner",
     "SearchAPI",
     "build_backend",
+    "KevServer",
+    "OllamaServer",
     "VLLMServer",
     "RelationMiner",
     "MinedRelation",
