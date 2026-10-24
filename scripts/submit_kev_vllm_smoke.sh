@@ -112,6 +112,11 @@ EOF
         ;;
     S4)
         cat <<EOF
+# Per-second GPU utilisation of both GPUs (0 = vLLM, 1 = kev), for the report.
+nvidia-smi --query-gpu=timestamp,index,utilization.gpu,memory.used \\
+    --format=csv,noheader,nounits -l 1 > "$OUT/$(job_name S4).gpu.csv" &
+GPU_MON=\$!
+trap 'kill \$GPU_MON 2>/dev/null || true' EXIT
 $FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $ITEMS \\
     --input-file "$REPO/data/bio-labeled_wikipedia.jsonl" \\
     --output-dir "$OUT/S4-c$ITEMS" --dataset-name bio

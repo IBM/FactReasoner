@@ -550,3 +550,61 @@ class TestSetThrottle:
         from fact_reasoner.utils import set_throttle
 
         assert set_throttle(object(), max_concurrency=2) is None
+
+
+class TestThrottleActivity:
+    def test_busy_time_counts_overlapping_requests_once(self, monkeypatch):
+        import asyncio
+
+        from fact_reasoner import utils
+        from fact_reasoner.utils import BackendThrottle
+
+        clock = [100.0]
+        monkeypatch.setattr(utils.time, "monotonic", lambda: clock[0])
+        t = BackendThrottle(max_concurrency=10, rate_per_minute=10_000)
+
+        async def run():
+            a = await t.acquire()
+            clock[0] += 1.0
+            b = await t.acquire()  # overlaps a
+            clock[0] += 1.0
+            t.release(a)
+            clock[0] += 1.0
+            t.release(b)  # busy 100 -> 103
+            clock[0] += 5.0  # idle
+            c = await t.acquire()
+            clock[0] += 2.0
+            t.release(c)  # busy 108 -> 110
+
+        asyncio.run(run())
+        s = t.stats()
+        assert s["requests"] == 3
+        assert s["busy_s"] == pytest.approx(5.0)
+        assert s["service_s"] == pytest.approx(2.0 + 2.0 + 2.0)
+        assert s["span_s"] == pytest.approx(10.0)
+        assert s["peak_in_flight"] == 2
+        assert t.busy_intervals() == [(100.0, 103.0), (108.0, 110.0)]
+
+    def test_run_throttled_records_requests(self):
+        import asyncio
+
+        from fact_reasoner.utils import BackendThrottle, run_throttled
+
+        t = BackendThrottle(max_concurrency=4, rate_per_minute=10_000)
+
+        async def work(x):
+            await asyncio.sleep(0.01)
+            return x
+
+        assert asyncio.run(run_throttled(work, [1, 2, 3], throttle=t)) == [1, 2, 3]
+        s = t.stats()
+        assert s["requests"] == 3 and s["busy_s"] > 0
+        assert s["mean_concurrency"] > 1
+
+    def test_overlap_of_two_backends(self, monkeypatch):
+        from fact_reasoner.utils import BackendThrottle, busy_overlap_s
+
+        a, b = BackendThrottle(), BackendThrottle()
+        monkeypatch.setattr(a, "busy_intervals", lambda: [(0, 10), (20, 30)])
+        monkeypatch.setattr(b, "busy_intervals", lambda: [(5, 25)])
+        assert busy_overlap_s(a, b) == pytest.approx(5 + 5)

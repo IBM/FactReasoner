@@ -129,6 +129,20 @@ class BackendThrottle:
         self._tokens = float(rate_per_minute)
         self._last = time.monotonic()
         self._lock = threading.Lock()
+        # Activity accounting (see stats()): when the backend last went from
+        # idle to busy, total busy time, and per-request totals.
+        self._busy_since: float | None = None
+        self._busy_s = 0.0
+        # Closed busy intervals, (start, end), so two backends' busy time can be
+        # intersected (see busy_overlap_s). Thousands per run, not millions:
+        # one per idle-to-busy transition, not one per request.
+        self._busy_intervals: list[tuple[float, float]] = []
+        self._first_start: float | None = None
+        self._last_end: float | None = None
+        self._requests = 0
+        self._service_s = 0.0
+        self._wait_s = 0.0
+        self._peak_in_flight = 0
 
     def _try_acquire(self) -> bool:
         """Take a slot and a token if both are available, without blocking."""
@@ -141,19 +155,105 @@ class BackendThrottle:
             self._last = now
             if self._in_flight >= self.max_concurrency or self._tokens < 1.0:
                 return False
+            if self._in_flight == 0:
+                self._busy_since = now
+            if self._first_start is None:
+                self._first_start = now
             self._in_flight += 1
+            self._peak_in_flight = max(self._peak_in_flight, self._in_flight)
             self._tokens -= 1.0
             return True
 
-    async def acquire(self) -> None:
-        """Wait until a slot and a rate token are free, then take both."""
+    async def acquire(self) -> float:
+        """Wait until a slot and a rate token are free, then take both.
+
+        Returns:
+            The time the slot was taken (``time.monotonic()``), to pass back to
+            :meth:`release` so the request's service time is counted.
+        """
+        asked = time.monotonic()
         while not self._try_acquire():
             await asyncio.sleep(self._POLL_SECONDS)
-
-    def release(self) -> None:
-        """Return the slot taken by :meth:`acquire`."""
+        started = time.monotonic()
         with self._lock:
+            self._wait_s += started - asked
+        return started
+
+    def release(self, started: float | None = None) -> None:
+        """Return the slot taken by :meth:`acquire`.
+
+        Args:
+            started: What :meth:`acquire` returned; when given, the time since
+                then is counted as this request's service time.
+        """
+        with self._lock:
+            now = time.monotonic()
             self._in_flight -= 1
+            self._last_end = now
+            if started is not None:
+                self._requests += 1
+                self._service_s += now - started
+            if self._in_flight == 0 and self._busy_since is not None:
+                self._busy_s += now - self._busy_since
+                self._busy_intervals.append((self._busy_since, now))
+                self._busy_since = None
+
+    def stats(self) -> dict[str, float | int]:
+        """How busy the backend has been, as seen by the requests sent to it.
+
+        ``busy_s`` is wall-clock time with at least one request in flight: for a
+        local server, the time it was working (or had work queued). Overlapping
+        requests count once, so it is directly comparable to the run's wall time,
+        unlike a per-item sum of stage times. ``service_s`` sums each request's
+        own time in flight; ``service_s / busy_s`` is the mean concurrency while
+        busy. ``wait_s`` is time requests spent waiting for a slot here, before
+        reaching the server.
+        """
+        with self._lock:
+            now = time.monotonic()
+            busy = self._busy_s
+            if self._busy_since is not None:
+                busy += now - self._busy_since
+            span = (
+                (self._last_end or now) - self._first_start
+                if self._first_start is not None
+                else 0.0
+            )
+            return {
+                "requests": self._requests,
+                "busy_s": busy,
+                "span_s": span,
+                "service_s": self._service_s,
+                "wait_s": self._wait_s,
+                "mean_concurrency": self._service_s / busy if busy else 0.0,
+                "peak_in_flight": self._peak_in_flight,
+                "max_concurrency": self.max_concurrency,
+            }
+
+    def busy_intervals(self) -> list[tuple[float, float]]:
+        """The ``time.monotonic()`` intervals with a request in flight, in order."""
+        with self._lock:
+            out = list(self._busy_intervals)
+            if self._busy_since is not None:
+                out.append((self._busy_since, time.monotonic()))
+            return out
+
+
+def busy_overlap_s(a: BackendThrottle, b: BackendThrottle) -> float:
+    """Seconds during which both backends had a request in flight."""
+    xs, ys = a.busy_intervals(), b.busy_intervals()
+    i = j = 0
+    total = 0.0
+    while i < len(xs) and j < len(ys):
+        lo = max(xs[i][0], ys[j][0])
+        hi = min(xs[i][1], ys[j][1])
+        if hi > lo:
+            total += hi - lo
+        if xs[i][1] < ys[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
 
 
 # One throttle per backend object, so every component built on the same backend
@@ -268,11 +368,11 @@ async def run_throttled(
 
     async def _one(item: Any) -> Any:
         if throttle is not None:
-            await throttle.acquire()
+            started = await throttle.acquire()
             try:
                 return await _call(item)
             finally:
-                throttle.release()
+                throttle.release(started)
         async with sem:
             await limiter.acquire()
             return await _call(item)

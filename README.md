@@ -733,11 +733,27 @@ On all 157 items (4,859 atoms; ~139k NLI pairs), same settings:
 | | Pipeline | Atom accuracy | Factuality error |
 |-|----------|---------------|------------------|
 | `--item-concurrency 8` | 635 s (4.0 s/item) | 66.5% | 0.226 |
-| `--item-concurrency 16` (3 runs) | 565–585 s (3.6–3.7 s/item) | 66.3–67.0% | 0.225–0.232 |
+| `--item-concurrency 16` (4 runs) | 553–585 s (3.5–3.7 s/item) | 66.3–67.0% | 0.225–0.232 |
 
 The full set is harder than its first 10 items. Going from 8 to 16 items in flight
 gains ~11%, so past 8 the servers are near saturation; more throughput needs more
 granite GPUs or a job array over slices of the dataset.
+
+**Where the time goes.** `assess_file` ends with a timing report (printed, and
+written as `timing_<results>.json` next to the results). Its server rows come from
+each backend's shared throttle, which sees every request, so concurrent items are
+counted once: `busy_s` is wall time with a request in flight. On the 553 s run
+above (16 in flight):
+
+| | Busy | Requests | Mean in flight | GPU >50% utilised |
+|-|------|----------|----------------|-------------------|
+| vLLM (granite: summarization) | 505 s (91%) | 12,518 | 234 of 256 | 496 s |
+| kev.serve (NLI, 139,829 pairs) | 429 s (78%) | 6,993 | 57 of 64 | 383 s |
+
+Both servers were busy for 385 s at once; granite alone for 120 s, kev alone for
+44 s, neither for 4 s. kev scored 326 pairs per busy second. Merlin (`score`) took
+21 s summed over all items. Both servers ran at their in-flight ceiling, so they,
+not the client, set the pace.
 
 > **Run-to-run variation.** Per-item scores differ between runs (mean |Δ| ≈ 0.06)
 > even at the same concurrency, because no stage sets a temperature: vLLM samples

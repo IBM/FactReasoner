@@ -589,3 +589,46 @@ class TestLoopClientRelease:
                 return None
 
         _run_build(Pipe(), release_clients_of=(object(), MagicMock()))
+
+
+class TestTimingReport:
+    def test_report_written_with_server_and_stage_rows(self, tmp_path):
+        from fact_reasoner.runner import format_timing_report
+        from fact_reasoner.utils import set_throttle
+
+        class Backend:
+            pass
+
+        llm, nli = Backend(), Backend()
+        set_throttle(llm, max_concurrency=8)
+        set_throttle(nli, max_concurrency=8)
+        r = FactualityRunner(llm, pipeline="factscore")
+        r.nli_extractor = MagicMock(backend=nli)
+        data = [{"input": f"q{i}", "output": "o", "atoms": [], "contexts": []} for i in range(2)]
+        path = tmp_path / "in.jsonl"
+        path.write_text("\n".join(json.dumps(d) for d in data))
+
+        def make_pipeline(_):
+            pipe = MagicMock()
+            pipe.timing = {"nli_relation_extraction": 1.5}
+            pipe.score.return_value = {
+                "elapsed_time": 2.0,
+                "nli_stats": {"totals": {"llm_calls": 10}},
+            }
+            return pipe
+
+        with (
+            patch.object(r, "_build_context_retriever", return_value=MagicMock()),
+            patch.object(r, "_make_pipeline", side_effect=make_pipeline),
+        ):
+            r.assess_file(str(path), str(tmp_path / "out"), dataset_name="d", model_id="m")
+
+        report = json.loads(next((tmp_path / "out").glob("timing_*.json")).read_text())
+        assert report["items"] == 2
+        assert report["nli_pairs"] == 20
+        assert set(report["servers"]) == {"llm", "nli"}
+        assert report["stage_sums_s"]["nli_relation_extraction"] == 3.0
+        assert "score" in report["stage_sums_s"]
+        assert report["llm_nli_overlap_s"] == 0.0
+        text = format_timing_report(report)
+        assert "nli busy" in text and "20 pairs" in text

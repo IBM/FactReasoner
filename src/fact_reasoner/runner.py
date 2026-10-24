@@ -22,6 +22,7 @@ import asyncio
 import inspect
 import json
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
@@ -34,6 +35,7 @@ from fact_reasoner.baselines.factverify import FactVerify
 from fact_reasoner.baselines.veriscore import VeriScore
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.atomizer_reviser import AtomizerReviser
+from fact_reasoner.utils import busy_overlap_s
 from fact_reasoner.core.nli import (
     NLI_PROMPTS,
     DecisionNLIExtractor,
@@ -112,6 +114,42 @@ async def _release_loop_clients(backends) -> None:
                 await cache.aclose(client)
             except Exception:  # noqa: BLE001  best-effort cleanup at item end
                 pass
+
+
+def _existing_throttle(backend: Any):
+    """The backend's shared throttle, if one was created (never creates one)."""
+    from fact_reasoner.utils import _backend_throttles, _backend_throttles_lock
+
+    with _backend_throttles_lock:
+        try:
+            return _backend_throttles.get(backend)
+        except TypeError:
+            return None
+
+
+def format_timing_report(report: dict[str, Any]) -> str:
+    """Render :meth:`FactualityRunner.timing_report` as a short text table."""
+    wall = report["wall_s"]
+    lines = [
+        "[FactualityRunner] Timing report",
+        f"  items {report['items']} at concurrency {report['item_concurrency']}: "
+        f"{wall:.0f} s wall ({report['s_per_item']:.2f} s/item)",
+    ]
+    for role, s in report["servers"].items():
+        line = (
+            f"  {role:3s} busy {s['busy_s']:7.0f} s ({100 * s['busy_s'] / wall if wall else 0:3.0f}% of wall), "
+            f"{s['requests']} requests, mean {s['mean_concurrency']:.1f} in flight "
+            f"(peak {s['peak_in_flight']}/{s['max_concurrency']}), "
+            f"queued here {s['wait_s']:.0f} s"
+        )
+        if role == "nli":
+            line += f", {s['pairs']} pairs = {s['pairs_per_busy_s']:.0f} pairs/busy s"
+        lines.append(line)
+    if report.get("llm_nli_overlap_s") is not None:
+        lines.append(f"  llm and nli both busy: {report['llm_nli_overlap_s']:.0f} s")
+    for name, seconds in sorted(report["stage_sums_s"].items(), key=lambda kv: -kv[1]):
+        lines.append(f"  stage sum (overlapping items) {name}: {seconds:.0f} s")
+    return "\n".join(lines)
 
 
 def _fit_client_cache(backend: Any, item_concurrency: int) -> None:
@@ -574,9 +612,16 @@ class FactualityRunner:
             )
             _run_build(pipeline_obj, release_clients_of=release, **build_kwargs)
 
+            score_start = time.perf_counter()
             results = self._normalize_results(pipeline_obj.score())
+            timing = dict(getattr(pipeline_obj, "timing", None) or {})
+            # score() runs Merlin (FactReasoner) or labels atoms (baselines).
+            timing["score"] = time.perf_counter() - score_start
+            results.setdefault("timing", timing)
             results["model_name"] = model_id
             return results
+
+        run_start = time.monotonic()
 
         def save(results: dict[str, Any]) -> None:
             evaluation_data.append(results)
@@ -600,5 +645,66 @@ class FactualityRunner:
                 for results in pool.map(assess_item, todo):
                     save(results)
 
+        wall_s = time.monotonic() - run_start
         print(f"[FactualityRunner] Results written to: {output_filename}")
+        report = self.timing_report(evaluation_data[-len(todo):] if todo else [], wall_s)
+        report_file = os.path.join(output_dir, f"timing_{os.path.splitext(out_name)[0]}.json")
+        with open(report_file, "w") as f:
+            json.dump(report, f, indent=2)
+        print(format_timing_report(report))
+        print(f"[FactualityRunner] Timing report written to: {report_file}")
         return evaluation_data
+
+    def timing_report(self, results: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
+        """Where a run's time went: per server, on the run's own clock.
+
+        Server rows come from the backends' shared throttles (see
+        :meth:`fact_reasoner.utils.BackendThrottle.stats`), which see every
+        request, so concurrent items are not double-counted. Stage sums add each
+        item's own stage time and do double-count overlapping items; they show
+        the per-item mix, not wall time.
+
+        Args:
+            results: The results of the items this call assessed.
+            wall_s: Wall time of the call, from the first item to the last.
+        """
+        servers: dict[str, Any] = {}
+        throttles: dict[str, Any] = {}
+        roles = [("llm", self.backend), ("nli", getattr(self.nli_extractor, "backend", None))]
+        seen: set[int] = set()
+        for role, backend in roles:
+            if backend is None or id(backend) in seen:
+                continue
+            seen.add(id(backend))
+            throttle = _existing_throttle(backend)
+            if throttle is None:
+                continue
+            throttles[role] = throttle
+            servers[role] = {"backend": str(backend), **throttle.stats()}
+        nli_pairs = sum(
+            r.get("nli_stats", {}).get("totals", {}).get("llm_calls", 0) for r in results
+        )
+        if "nli" in servers:
+            servers["nli"]["pairs"] = nli_pairs
+            busy = servers["nli"]["busy_s"]
+            servers["nli"]["pairs_per_busy_s"] = nli_pairs / busy if busy else 0.0
+        overlap = (
+            busy_overlap_s(throttles["llm"], throttles["nli"])
+            if {"llm", "nli"} <= throttles.keys()
+            else None
+        )
+        stage_sums: dict[str, float] = {}
+        for r in results:
+            for name, seconds in (r.get("timing") or {}).items():
+                stage_sums[name] = stage_sums.get(name, 0.0) + seconds
+        return {
+            "items": len(results),
+            "item_concurrency": self.item_concurrency,
+            "wall_s": wall_s,
+            "s_per_item": wall_s / len(results) if results else 0.0,
+            "nli_pairs": nli_pairs,
+            "servers": servers,
+            "llm_nli_overlap_s": overlap,
+            "item_elapsed_sum_s": sum(r.get("elapsed_time", 0.0) for r in results),
+            "stage_sums_s": stage_sums,
+        }
