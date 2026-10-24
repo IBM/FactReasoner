@@ -538,10 +538,10 @@ mostly measures time spent waiting for granite rather than the network.
 ```bash
 # once, from a login node: environments and models (see README,
 # "kev.serve + vLLM on a two-GPU job"), then
-bash scripts/submit_kev_vllm_smoke.sh submit S4   # stored contexts (16 in flight)
-bash scripts/submit_kev_vllm_smoke.sh submit S5   # Google retrieval, ~5k Serper searches (32 in flight)
+bash scripts/submit_kev_vllm_smoke.sh submit S4   # stored contexts
+bash scripts/submit_kev_vllm_smoke.sh submit S5   # Google retrieval, ~5k Serper searches
 bash scripts/submit_kev_vllm_smoke.sh check S4 S5
-# ITEMS=16 bash ... reproduces run 2 exactly; set ITEMS to override either job
+# Both default to 16 items in flight; ITEMS=32 bash ... reproduces run 3
 ```
 
 Each job writes its results, `timing_<results>.json` (the server and stage

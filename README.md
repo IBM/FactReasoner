@@ -687,10 +687,11 @@ What makes it fast:
   launched before vLLM and waited for after it, so the two models load at once.
   `--vllm-gpus` / `--kev-gpus` index the job's GPUs (LSF's `CUDA_VISIBLE_DEVICES`).
 - **Items in flight at once** (`--item-concurrency`). One item at a time leaves a
-  server idle whenever the item is on the other's stage. 16 was fastest on stored
-  contexts; with retrieval use 32, because each item first waits on the network
-  (the GPUs were ~40% utilised at 16). Results are still written in input order,
-  and a resumed run skips done items.
+  server idle whenever the item is on the other's stage. Use 16, with or without
+  retrieval: at 32 with retrieval, granite's queue grew so long that half the items
+  hit the 180 s retrieval cap and lost contexts (see [TIMINGS.md](TIMINGS.md),
+  run 3). Results are still written in input order, and a resumed run skips done
+  items.
 - **Pages fetched only as needed.** Google retrieval keeps the first 3 usable
   pages of ~15 search results. It used to download all of them and wait for the
   slowest; it now fetches in rank order, a few at a time, and stops once the first
