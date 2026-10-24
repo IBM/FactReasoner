@@ -13,9 +13,11 @@
 #   S3   2     one query/response, single mode, Wikipedia     atomizer + reviser + retrieval
 #                                                             on granite; node network access
 #   S4   2     all 157 bio items, --item-concurrency $ITEMS   full-dataset speed and accuracy
-#              (default 8; run only when named: ITEMS=16 bash ... submit S4)
+#              (default 16; run only when named: ITEMS=8 bash ... submit S4)
 #   S5   2     S4, but contexts retrieved fresh via Google    retrieval cost and accuracy
 #              (Serper; ~5k searches, SERPER_API_KEY from .env; run only when named)
+#              (default 32 items in flight: with retrieval the GPUs were ~40% used
+#              at 16, since each item waits on the network before it reaches them)
 #
 # S1/S2 read atoms and contexts from the dataset, so they need no network; they
 # exercise kev NLI, the granite summarizer (--use-summarizer), Merlin and the
@@ -36,7 +38,8 @@ KEV_RUN=${KEV_RUN:-jaredpalmer/kev-9b@b5d8c18e}
 OUT=${OUT:-$REPO/artifacts/smoke}
 LSF_GROUP=${LSF_GROUP:-grp_big_job_lease}
 LSF_QUEUE=${LSF_QUEUE:-normal}
-ITEMS=${ITEMS:-8}
+# Items in flight for S4/S5; unset picks each job's default (see items_for).
+ITEMS=${ITEMS:-}
 ALL_JOBS=(S0 S1 S2 S3)  # S4 (the full dataset) runs only when named
 
 mkdir -p "$OUT"
@@ -119,9 +122,9 @@ nvidia-smi --query-gpu=timestamp,index,utilization.gpu,memory.used \\
     --format=csv,noheader,nounits -l 1 > "$OUT/$(job_name S4).gpu.csv" &
 GPU_MON=\$!
 trap 'kill \$GPU_MON 2>/dev/null || true' EXIT
-$FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $ITEMS \\
+$FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $(items_for S4) \\
     --input-file "$REPO/data/bio-labeled_wikipedia.jsonl" \\
-    --output-dir "$OUT/S4-c$ITEMS" --dataset-name bio
+    --output-dir "$OUT/S4-c$(items_for S4)" --dataset-name bio
 echo "END \$(date +%s)"
 EOF
         ;;
@@ -134,7 +137,7 @@ nvidia-smi --query-gpu=timestamp,index,utilization.gpu,memory.used \\
     --format=csv,noheader,nounits -l 1 > "$OUT/$(job_name S5).gpu.csv" &
 GPU_MON=\$!
 trap 'kill \$GPU_MON 2>/dev/null || true' EXIT
-$FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $ITEMS \\
+$FR_ENV/bin/fact-reasoner $SERVERS --use-summarizer --item-concurrency $(items_for S5) \\
     --retrieve-contexts --service-type google \\
     --cache-dir "$OUT/$(job_name S5)/search-cache" \\
     --input-file "$REPO/data/bio-labeled_wikipedia.jsonl" \\
@@ -155,7 +158,13 @@ EOF
 }
 
 # A job's name: S4 is named per concurrency (S4-c8, S4-c16), so runs can coexist.
-job_name() { case $1 in S4 | S5) echo "$1-c$ITEMS" ;; *) echo "$1" ;; esac; }
+# Items in flight for a job: $ITEMS if set, else 16 for S4 and 32 for S5.
+items_for() {
+    if [ -n "$ITEMS" ]; then echo "$ITEMS"
+    elif [ "$1" = S5 ]; then echo 32
+    else echo 16; fi
+}
+job_name() { case $1 in S4 | S5) echo "$1-c$(items_for "$1")" ;; *) echo "$1" ;; esac; }
 
 submit() {
     local id=$1 gpus=2 walltime=1:30 name

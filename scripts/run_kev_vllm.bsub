@@ -52,7 +52,11 @@ OUTPUT=/path/to/results
 MERLIN=/path/to/merlin/build/merlin
 GRANITE=ibm-granite/granite-4.1-8b          # HF id (cached) or a local weights dir
 KEV_RUN=jaredpalmer/kev-9b@b5d8c18e         # pinned: the revision this was validated on
-ITEMS_IN_FLIGHT=8
+# Items assessed at once. 16 was fastest on stored contexts (8 -> 16 saved ~11%).
+# When the run retrieves contexts (--retrieve-contexts, or single-mode runs that
+# search), use 32: each item then waits on the network before it reaches the
+# GPUs, which sat ~40% utilised at 16.
+ITEMS_IN_FLIGHT=16
 mkdir -p "$OUTPUT"
 
 export HF_HUB_OFFLINE=1
