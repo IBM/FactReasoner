@@ -61,6 +61,14 @@ ANTHROPIC_COMPAT_HOST = "api.anthropic.com"
 # Default generation budget applied to every backend unless overridden.
 DEFAULT_MAX_NEW_TOKENS = 4096
 
+# Default sampling temperature applied to every backend unless overridden. Greedy
+# decoding makes atomization, revision and summarization reproducible: at a
+# server's own default (vLLM samples at 1.0) the summarizer kept different
+# contexts on every run, moving per-item scores by ~0.06 between identical runs,
+# and no NLI cache could hit across runs. Calls that set their own temperature
+# (the SIMBA-UQ schedule) still override it.
+DEFAULT_TEMPERATURE = 0.0
+
 
 def is_anthropic_compat_endpoint(base_url: str | None) -> bool:
     """Return True if ``base_url`` points at Anthropic's OpenAI-compat endpoint.
@@ -139,9 +147,11 @@ def build_backend(
             - For ``"rits"`` with a custom endpoint: passed to ``RITSBackend``;
               when ``None`` it falls back to the ``RITS_API_KEY`` environment
               variable.
-        model_options: Extra Mellea model options. A default of
-            ``{ModelOption.MAX_NEW_TOKENS: 4096}`` is applied unless the caller
-            already provides ``ModelOption.MAX_NEW_TOKENS``.
+        model_options: Extra Mellea model options. Defaults of
+            ``{ModelOption.MAX_NEW_TOKENS: 4096, ModelOption.TEMPERATURE: 0.0}``
+            are applied for whichever of the two the caller does not provide. A
+            per-call temperature (e.g. SIMBA-UQ's sampling schedule) overrides
+            the backend's.
 
     Returns:
         Backend: A ready-to-use Mellea backend.
@@ -168,6 +178,7 @@ def build_backend(
     # Apply the default generation budget without clobbering caller options.
     options: dict[Any, Any] = dict(model_options or {})
     options.setdefault(ModelOption.MAX_NEW_TOKENS, DEFAULT_MAX_NEW_TOKENS)
+    options.setdefault(ModelOption.TEMPERATURE, DEFAULT_TEMPERATURE)
 
     # Resolve the model to the identifier this backend expects. Precedence:
     #   1. an explicit model_id that names a unified catalog model (or alias);

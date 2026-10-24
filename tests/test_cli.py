@@ -432,8 +432,11 @@ class TestNliModeAndVersion:
             )
         return ctor.call_args.kwargs
 
-    def test_nli_mode_defaults_to_all_pairs(self):
-        assert self._run_and_capture([])["nli_mode"] == "all_pairs"
+    def test_nli_mode_defaults_to_fast(self):
+        assert self._run_and_capture([])["nli_mode"] == "fast"
+
+    def test_nli_mode_all_pairs_reaches_runner(self):
+        assert self._run_and_capture(["--nli-mode", "all_pairs"])["nli_mode"] == "all_pairs"
 
     def test_nli_mode_fast_reaches_runner(self):
         kwargs = self._run_and_capture(["--nli-mode", "fast"])
@@ -901,3 +904,174 @@ class TestAtomizerAdapter:
         assert kwargs["max_lora_rank"] == 64
         fake_server.build_backend.assert_any_call(model_id="ar")
         assert fr.call_args.kwargs["atomizer_backend"] is not None
+
+
+class TestDecisionServe:
+    """--nli-decision-serve: the CLI owns an Ollama server for the run."""
+
+    def _run_and_capture(self, extra_argv, server_url="http://127.0.0.1:5555"):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        server = MagicMock()
+        server.__enter__.return_value.base_url = server_url
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as ctor,
+            patch("fact_reasoner.serving.OllamaServer", return_value=server) as srv,
+        ):
+            _run(
+                ["--pipeline", "factscore", "--backend", "ollama", *extra_argv,
+                 "--query", "q", "--response", "r"]
+            )
+        return ctor.call_args.kwargs, srv
+
+    def test_serve_passes_the_private_server_url(self):
+        kwargs, srv = self._run_and_capture(
+            ["--nli-decision-model", "kev", "--nli-decision-serve",
+             "--ollama-models-dir", "/shared/ollama", "--ollama-num-parallel", "4",
+             "--no-ollama-pull"]
+        )
+        assert kwargs["nli_decision_model"] == "kev"
+        assert kwargs["nli_decision_host"] == "http://127.0.0.1:5555"
+        srv.assert_called_once_with(
+            "kev", binary="ollama", models_dir="/shared/ollama", num_parallel=4,
+            pull=False,
+        )
+
+    def test_without_serve_the_host_is_passed_through(self):
+        kwargs, srv = self._run_and_capture(
+            ["--nli-decision-model", "kev", "--nli-decision-host", "http://gpu:11434"]
+        )
+        assert kwargs["nli_decision_host"] == "http://gpu:11434"
+        srv.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "argv, message",
+        [
+            (["--nli-decision-serve"], "requires --nli-decision-model"),
+            (["--nli-decision-model", "kev", "--nli-decision-serve",
+              "--nli-decision-host", "http://x:1"], "drop --nli-decision-host"),
+            (["--nli-decision-model", "kev", "--ollama-models-dir", "/m"],
+             "require --nli-decision-serve"),
+        ],
+    )
+    def test_invalid_combinations(self, argv, message):
+        with pytest.raises(SystemExit, match=message):
+            self._run_and_capture(argv)
+
+
+class TestKevServe:
+    """--nli-decision-server kev: kev.serve next to a local vLLM server."""
+
+    BASE = ["--pipeline", "factscore", "--backend", "vllm", "--model", "/w/granite",
+            "--served-model", "granite", "--vllm-gpus", "0"]
+    KEV = ["--nli-decision-serve", "--nli-decision-server", "kev",
+           "--kev-python", "/envs/kev/bin/python", "--kev-gpus", "1"]
+
+    def _run(self, extra, tmp_path):
+        events = []
+        backend = MagicMock()
+        vllm = MagicMock()
+        vllm.build_backend.return_value = backend
+        vllm.__enter__.side_effect = lambda: events.append("vllm ready") or vllm
+        vllm.__exit__.return_value = False
+        kev = MagicMock(base_url="http://127.0.0.1:8008", api_key="key")
+        kev.launch.side_effect = lambda: events.append("kev launch")
+        kev.wait_ready.side_effect = lambda: events.append("kev ready")
+        kev.stop.side_effect = lambda: events.append("kev stop")
+        runner = MagicMock()
+        runner.nli_extractor.backend = MagicMock()
+        with (
+            patch("fact_reasoner.serving.VLLMServer", return_value=vllm) as vctor,
+            patch("fact_reasoner.serving.KevServer", return_value=kev) as kctor,
+            patch.object(cli, "FactualityRunner", return_value=runner) as fr,
+            patch.object(cli, "set_throttle") as throttle,
+        ):
+            _run([*self.BASE, *extra, "--input-file", "d.jsonl",
+                  "--output-dir", str(tmp_path)])
+        return events, vctor, kctor, fr, throttle, backend, runner
+
+    def test_kev_loads_while_vllm_starts(self, tmp_path):
+        events, vctor, kctor, fr, throttle, backend, runner = self._run(
+            [*self.KEV, "--item-concurrency", "8"], tmp_path
+        )
+        assert events == ["kev launch", "vllm ready", "kev ready", "kev stop"]
+        kctor.assert_called_once_with(
+            "jaredpalmer/kev-9b", python="/envs/kev/bin/python", gpus="1"
+        )
+        assert vctor.call_args.kwargs["gpus"] == "0"
+        kwargs = fr.call_args.kwargs
+        assert kwargs["nli_decision_model"] == "kev-latest"
+        assert kwargs["nli_decision_host"] == "http://127.0.0.1:8008"
+        assert kwargs["nli_decision_api_key"] == "key"
+        assert kwargs["item_concurrency"] == 8
+        limits = {id(c.args[0]): c.kwargs for c in throttle.call_args_list}
+        assert limits[id(backend)]["max_concurrency"] == cli.LOCAL_VLLM_MAX_CONCURRENCY
+        assert limits[id(runner.nli_extractor.backend)]["max_concurrency"] == (
+            cli.LOCAL_KEV_MAX_CONCURRENCY
+        )
+
+    def test_kev_is_stopped_if_vllm_fails_to_start(self, tmp_path):
+        kev = MagicMock()
+        vllm = MagicMock()
+        vllm.__enter__.side_effect = RuntimeError("vLLM died")
+        with (
+            patch("fact_reasoner.serving.VLLMServer", return_value=vllm),
+            patch("fact_reasoner.serving.KevServer", return_value=kev),
+            pytest.raises(RuntimeError, match="vLLM died"),
+        ):
+            _run([*self.BASE, *self.KEV, "--input-file", "d.jsonl",
+                  "--output-dir", str(tmp_path)])
+        kev.launch.assert_called_once()
+        kev.wait_ready.assert_not_called()
+        kev.stop.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "argv, message",
+        [
+            (["--nli-decision-server", "kev", "--kev-python", "p"],
+             "requires --nli-decision-serve"),
+            (["--nli-decision-serve", "--nli-decision-server", "kev"],
+             "requires --kev-python"),
+            (["--kev-gpus", "1"], "require --nli-decision-server kev"),
+            ([*KEV, "--ollama-num-parallel", "4"], "drop them"),
+            (["--item-concurrency", "0"], "at least 1"),
+        ],
+    )
+    def test_invalid_combinations(self, argv, message, tmp_path):
+        with pytest.raises(SystemExit, match=message):
+            self._run(argv, tmp_path)
+
+    def test_vllm_gpus_needs_a_local_server(self):
+        with pytest.raises(SystemExit, match="--vllm-gpus requires"):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--vllm-gpus", "0",
+                  "--query", "q", "--response", "r"])
+
+    def test_item_concurrency_is_file_mode_only(self):
+        with pytest.raises(SystemExit, match="--input-file runs only"):
+            _run(["--pipeline", "factscore", "--backend", "rits",
+                  "--item-concurrency", "4", "--query", "q", "--response", "r"])
+
+
+class TestRetrieveContextsFlag:
+    def test_requires_file_mode(self):
+        with pytest.raises(SystemExit, match="--input-file runs only"):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--query", "q", "--response", "r"])
+
+    def test_google_needs_serper_key(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SERPER_API_KEY", raising=False)
+        with pytest.raises(SystemExit, match="needs SERPER_API_KEY"):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--input-file", "d.jsonl", "--output-dir", str(tmp_path)])
+
+    def test_passed_to_assess_file(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("SERPER_API_KEY", "x")
+        runner = MagicMock()
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=runner),
+        ):
+            _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
+                  "--input-file", "d.jsonl", "--output-dir", str(tmp_path)])
+        assert runner.assess_file.call_args.kwargs["retrieve_contexts"] is True

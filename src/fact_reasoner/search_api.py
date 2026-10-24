@@ -19,6 +19,7 @@ import logging
 import os
 import sqlite3
 import sys
+import threading
 from ast import literal_eval
 
 import requests
@@ -26,6 +27,35 @@ from dotenv import load_dotenv
 from thefuzz import fuzz
 
 logger = logging.getLogger(__name__)
+
+
+# How long a cache operation waits for SQLite's file lock before giving up. The
+# default (5 s) is far too short when many retrieval threads share one cache, and
+# a give-up was fatal at startup ("database is locked" on a shared filesystem).
+_SQLITE_BUSY_TIMEOUT_S = 60.0
+
+# One connection per database file for the whole process, used under a lock.
+# Retrieval runs dozens of threads per item and several items at once, and each
+# used to open its own connection: on a shared filesystem (GPFS, NFS) their
+# fights over SQLite's file lock cost minutes per item and failed hundreds of
+# writes. Serialising them here costs little (a cache operation takes
+# milliseconds; the search it saves takes seconds).
+_connections: dict[str, tuple[sqlite3.Connection, threading.Lock]] = {}
+_connections_lock = threading.Lock()
+
+
+def _shared_connection(database: str) -> tuple[sqlite3.Connection, threading.Lock]:
+    """The process-wide connection to ``database`` and the lock that guards it."""
+    key = os.path.abspath(database)
+    with _connections_lock:
+        entry = _connections.get(key)
+        if entry is None:
+            conn = sqlite3.connect(
+                key, timeout=_SQLITE_BUSY_TIMEOUT_S, check_same_thread=False
+            )
+            entry = (conn, threading.Lock())
+            _connections[key] = entry
+        return entry
 
 
 class SearchAPI:
@@ -72,10 +102,18 @@ class SearchAPI:
         """
         assert self.do_caching is True, "Caching requires an existing cache dir."
 
-        with sqlite3.connect(self.database) as conn:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL;")  # Enable Write-Ahead Logging
-            cursor.execute("""
+        conn, lock = _shared_connection(self.database)
+        with lock:
+            try:
+                # WAL is a property of the file, so asking once is enough; on a
+                # filesystem that cannot do it (no shared memory), SQLite keeps
+                # its default journal, which is fine for a cache.
+                mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+                if mode != "wal":
+                    conn.execute("PRAGMA journal_mode=WAL;")
+            except sqlite3.Error as e:
+                logger.warning(f"Search cache: could not enable WAL ({e}); continuing.")
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS search_cache USING fts5(
                     query, response
                 )
@@ -165,17 +203,21 @@ class SearchAPI:
         # Escape double quotes for FTS5
         query = query.replace('"', '""')
 
-        with sqlite3.connect(self.database) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT query, response FROM search_cache
-                WHERE query MATCH ?
-                LIMIT 3
-            """,
-                (f'"{query}"',),
-            )
-            rows = cursor.fetchall()
+        conn, lock = _shared_connection(self.database)
+        try:
+            with lock:
+                rows = conn.execute(
+                    """
+                    SELECT query, response FROM search_cache
+                    WHERE query MATCH ?
+                    LIMIT 3
+                """,
+                    (f'"{query}"',),
+                ).fetchall()
+        except sqlite3.Error as e:
+            # A cache that cannot be read is a miss, never a failed retrieval.
+            logger.error(f"Database error: {e}")
+            return None
 
         if not rows:
             return None
@@ -210,20 +252,17 @@ class SearchAPI:
         if len(organic_res) == 0:
             return
 
-        conn = sqlite3.connect(self.database)
-        try:
-            cursor = conn.cursor()
-            cursor.execute("BEGIN TRANSACTION;")  # Start transaction
-            cursor.execute(
-                "REPLACE INTO search_cache (query, response) VALUES (?, ?)",
-                (query, json.dumps(response_json)),
-            )
-            conn.commit()  # Commit transaction
-        except sqlite3.Error as e:
-            conn.rollback()  # Rollback on error
-            logger.error(f"Database error: {e}")
-        finally:
-            conn.close()
+        conn, lock = _shared_connection(self.database)
+        with lock:
+            try:
+                conn.execute(
+                    "REPLACE INTO search_cache (query, response) VALUES (?, ?)",
+                    (query, json.dumps(response_json)),
+                )
+                conn.commit()
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.error(f"Database error: {e}")
 
 
 if __name__ == "__main__":

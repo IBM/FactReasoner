@@ -121,7 +121,21 @@ class TestContextSummarizerGetProbability:
         }
 
         result = summarizer._get_probability(mock_output)
-        assert result == 0.0  # empty logprobs -> avg over 0 tokens -> 0.0
+        # No tokens means no information: 1.0 leaves the context prior unchanged.
+        assert result == 1.0
+
+    def test_get_probability_without_logprobs_keeps_the_prior(self, capsys):
+        # Ollama returns no logprobs at all. The confidence multiplies the
+        # context prior, so 0.0 here would zero every prior and leave every atom
+        # at 0.5 whatever the NLI found.
+        summarizer = ContextSummarizer(backend=MagicMock())
+        mock_output = MagicMock()
+        mock_output.raw.response = {"choices": [{"logprobs": None}]}
+
+        assert summarizer._get_probability(mock_output) == 1.0
+        assert summarizer._get_probability(mock_output) == 1.0
+        # Reported once per summarizer, not once per context.
+        assert capsys.readouterr().out.count("[Summarizer] No logprobs") == 1
 
 
 class TestContextSummarizerRunBatch:

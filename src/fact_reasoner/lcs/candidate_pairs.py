@@ -48,6 +48,8 @@
 # atom-id order (a0, a1, ...); direction is meaningful for the relation model.
 
 import re
+import threading
+from typing import Any
 
 from fact_reasoner.core.base import Atom
 
@@ -158,6 +160,39 @@ def _opens_with_connective(text: str) -> bool:
     return bool(m) and m.group(0).lower() in _CONNECTIVES
 
 
+# Loaded embedding models, by name. Loading one takes ~20 s (most of it
+# importing torch and reading the weights), and a gate is built for every item a
+# run assesses, so without this a 1,000-item run would spend hours reloading the
+# same model. Inference with a loaded model is thread-safe, so concurrent items
+# share one; the lock only keeps two of them from loading it at once.
+#
+# The model runs on CPU. It is small (MiniLM encodes an item's few dozen texts in
+# milliseconds), and on a GPU node the job's GPUs are held by its servers in
+# LSF's exclusive_process mode, so a CUDA context here fails and the gate would
+# silently fall back to Jaccard.
+_embedding_models: dict[str, Any] = {}
+_embedding_models_lock = threading.Lock()
+
+
+def _embedding_model(model_name: str) -> Any:
+    """Return the shared ``SentenceTransformer`` for ``model_name``, loading it once.
+
+    Raises whatever loading raises (missing package, offline cache miss), and
+    caches nothing in that case, so a later call tries again.
+    """
+    model = _embedding_models.get(model_name)
+    if model is not None:
+        return model
+    with _embedding_models_lock:
+        model = _embedding_models.get(model_name)
+        if model is None:
+            from sentence_transformers import SentenceTransformer  # type: ignore
+
+            model = SentenceTransformer(model_name, device="cpu")
+            _embedding_models[model_name] = model
+        return model
+
+
 class _EmbeddingGate:
     """Lazy embedding-similarity gate.
 
@@ -173,14 +208,16 @@ class _EmbeddingGate:
         self._token_sets = [_content_tokens(t) for t in texts]
         try:
             import numpy as np  # noqa: F401
-            from sentence_transformers import SentenceTransformer  # type: ignore
 
-            model = SentenceTransformer(model_name)
+            model = _embedding_model(model_name)
             emb = model.encode(texts, normalize_embeddings=True)
             self._vectors = emb
             self.backend = f"sbert:{model_name}"
-        except Exception:  # noqa: BLE001
-            # No sentence-transformers (or load failure): stay on Jaccard.
+        except Exception as e:  # noqa: BLE001
+            # No sentence-transformers (or load failure): stay on Jaccard. Say
+            # why: the callers' warning cannot tell an offline cache from a
+            # missing package or a GPU it could not use.
+            print(f"[Gate] Embedding model {model_name!r} unavailable: {e!r}")
             self._vectors = None
 
     def similarity(self, i: int, j: int) -> float:

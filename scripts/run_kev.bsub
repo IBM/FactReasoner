@@ -1,0 +1,79 @@
+#!/bin/bash
+# ---------------------------------------------------------------------------
+# LSF job template: FactReasoner with a decision model (kev) for NLI on an H100.
+#
+# One job, one GPU node. The job starts a private Ollama server for the decision
+# model (`--nli-decision-serve`), and optionally a vLLM server for the other LLM
+# stages, runs the pipeline against them on localhost, and stops both when the
+# Python process exits -- on success, on error, and on `bkill` (SIGTERM).
+#
+# Copy this file, adjust the #BSUB directives and the paths below, then submit:
+#     bsub < scripts/run_kev.bsub
+# ---------------------------------------------------------------------------
+
+#BSUB -J factreasoner-kev
+#BSUB -q <gpu-queue>                       # your cluster's GPU queue
+#BSUB -gpu "num=1:mode=exclusive_process"  # one H100 serves both kev and vLLM
+#BSUB -n 8                                 # CPU cores (retrieval threads, Merlin)
+#BSUB -R "rusage[mem=64G]"                 # host memory
+#BSUB -W 4:00                              # walltime (hh:mm)
+#BSUB -o factreasoner-kev.%J.out
+#BSUB -e factreasoner-kev.%J.err
+
+set -euo pipefail
+
+# --- Environment -----------------------------------------------------------
+# The environment must have fact_reasoner installed (and vllm, for MODE=vllm).
+source /path/to/venv/bin/activate
+
+# Ollama, installed without root (see README, "Decision models on a GPU
+# cluster"). Use the Linux build: on a CUDA node `ollama pull kev` fetches kev's
+# llama.cpp (GGUF) variant, not the Apple-only MLX one.
+OLLAMA_BIN=/path/to/ollama/bin/ollama
+
+# Shared model store, so kev (several GB) is downloaded once for every job
+# rather than into each node's home directory. Pre-pull it from a login node
+# with internet access:
+#     OLLAMA_MODELS=$OLLAMA_STORE $OLLAMA_BIN serve &  then  $OLLAMA_BIN pull kev
+OLLAMA_STORE=/path/to/shared/ollama-models
+
+# Retrieval API key (only for --service-type google).
+export SERPER_API_KEY="${SERPER_API_KEY:-<your-serper-key>}"
+
+# --- Paths (edit these) ----------------------------------------------------
+INPUT=/path/to/dataset.jsonl
+OUTPUT=/path/to/results
+MERLIN=/path/to/merlin
+mkdir -p "$OUTPUT"
+
+# Where the non-NLI LLM stages (atomization, revision, summarization) run:
+#   vllm -- a vLLM server inside this job, on the same H100 as kev
+#   rits -- the remote RITS service (needs RITS_API_KEY and network access)
+MODE=vllm
+MODEL=/path/to/granite-4.1-8b      # MODE=vllm: local weights dir or HF repo id
+SERVED_MODEL=granite-4.1-8b        # MODE=vllm: served-model name
+
+if [ "$MODE" = vllm ]; then
+    # vLLM claims 90% of GPU memory by default, which would leave kev too little
+    # to load next to it. 0.70 keeps ~24 GB of an 80 GB H100 for kev's weights
+    # and its parallel request slots.
+    BACKEND=(--backend vllm --model "$MODEL" --served-model "$SERVED_MODEL"
+             --gpu-memory-utilization 0.70)
+else
+    BACKEND=(--backend rits)
+fi
+
+# --- Run -------------------------------------------------------------------
+# --no-ollama-pull: compute nodes often have no internet; fail fast instead of
+# hanging on a pull if the model is not in the shared store. Remove it to let
+# the job pull kev itself.
+fact-reasoner \
+    "${BACKEND[@]}" \
+    --pipeline factreasoner --pipeline-version v2 --merlin-path "$MERLIN" \
+    --use-priors \
+    --nli-decision-model kev --nli-decision-serve \
+    --ollama-binary "$OLLAMA_BIN" \
+    --ollama-models-dir "$OLLAMA_STORE" \
+    --ollama-num-parallel 8 \
+    --no-ollama-pull \
+    --input-file "$INPUT" --output-dir "$OUTPUT" --dataset-name my-dataset

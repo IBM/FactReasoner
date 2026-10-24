@@ -30,6 +30,7 @@ from fact_reasoner.utils import (
     LOOP_BUDGET,
     handle_generation_error,
     run_throttled,
+    throttle_for,
     strip_code_fences,
 )
 
@@ -298,7 +299,9 @@ class Reviser:
                 "fact_reasoner.reviser.reasoning": str(self.reasoning),
             },
         ):
-            outputs = await run_throttled(factory, units)
+            outputs = await run_throttled(
+                factory, units, throttle=throttle_for(self.backend)
+            )
 
         # Results are positionally aligned with `units`; every atom yields one
         # entry (a no-op revision on failure), so callers can index result[i].

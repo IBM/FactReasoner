@@ -316,3 +316,39 @@ class TestUnknownKind:
     def test_unknown_kind_message_lists_openai(self):
         with pytest.raises(ValueError, match="openai"):
             build_backend("bogus")
+
+
+class TestDefaultTemperature:
+    """Every backend decodes greedily unless the caller asks otherwise."""
+
+    def test_vllm_defaults_to_zero(self):
+        from fact_reasoner.backends import DEFAULT_TEMPERATURE
+
+        backend = _make_vllm(model_id="m")
+        assert DEFAULT_TEMPERATURE == 0.0
+        assert backend.model_options.get(ModelOption.TEMPERATURE) == 0.0
+
+    def test_openai_defaults_to_zero(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        backend = _make_openai(model_id="gpt-x")
+        assert backend.model_options.get(ModelOption.TEMPERATURE) == 0.0
+
+    def test_caller_temperature_wins(self):
+        backend = _make_vllm(model_id="m", model_options={ModelOption.TEMPERATURE: 0.7})
+        assert backend.model_options.get(ModelOption.TEMPERATURE) == 0.7
+        assert (
+            backend.model_options.get(ModelOption.MAX_NEW_TOKENS) == DEFAULT_MAX_NEW_TOKENS
+        )
+
+    def test_per_call_temperature_overrides_backend_default(self):
+        # SIMBA-UQ passes {"temperature": t} per call; it must win over the
+        # backend's default of 0, or every sample would be identical.
+        from mellea.backends._options import resolve_model_options
+
+        backend = _make_vllm(model_id="m")
+        resolved = resolve_model_options(
+            backend_defaults=backend.model_options,
+            remap={},
+            call_options={"temperature": 0.7},
+        )
+        assert resolved["temperature"] == 0.7

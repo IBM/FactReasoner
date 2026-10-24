@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.8.2-red.svg)](https://github.com/IBM/FactReasoner)
+[![Version](https://img.shields.io/badge/version-0.9.0-red.svg)](https://github.com/IBM/FactReasoner)
 ![Static Badge](https://img.shields.io/badge/mellea-0.8.0-blue?style=flat)
 ![Static Badge](https://img.shields.io/badge/uv-0.9.28-green?style=flat)
 
@@ -81,9 +81,15 @@ FactReasoner addresses hallucination detection through a principled five-stage p
    - **`logprobs`** (default): derived from the token logprobs of the generated label. Requires a logprobs-capable backend (RITS / vLLM / OpenAI).
    - **`simbauq`**: estimated via [SIMBA-UQ](https://arxiv.org/abs/2510.13836) self-consistency (sampling across temperatures and scoring by consensus). Backend-agnostic — **required for Ollama** and for **Claude via Anthropic's OpenAI-compatible endpoint**, neither of which exposes logprobs. No extra install needed.
 
-   The relations can also be predicted by a fine-tuned **NLI LoRA adapter** for `granite-4.2-8b` in place of the few-shot prompt; both probability methods work with it unchanged (see [LoRA adapters](#lora-adapters-atomization-and-nli)).
+   Two prompts are available for the base model (`--nli-prompt`):
+   - **`few_shot`** (default): the model reasons step by step before giving its label. Most accurate; the reasoning is most of an NLI call's latency.
+   - **`label_only`**: the same label definitions and examples, but the model answers with the label alone (capped at 16 tokens). About 3× faster end to end, for a small accuracy cost — see [Performance](#performance).
 
-   The number of NLI calls is the dominant cost of a run; see [`--nli-mode fast`](#nli-cost-control-advanced) for how to reduce it.
+   The relations can also be predicted by a fine-tuned **NLI LoRA adapter** for `granite-4.2-8b` in place of either prompt; both probability methods work with it unchanged (see [LoRA adapters](#lora-adapters-atomization-and-nli)).
+
+   Or by a **decision model** such as `kev`, served by Ollama, which scores each relation directly instead of generating text (see [Decision models](#decision-models-for-nli-kev)).
+
+   The number of NLI calls is the dominant cost of a run; `--nli-mode fast` (the default) reduces it — see [NLI cost control](#nli-cost-control-advanced).
 
 5. **Probabilistic Reasoning (Evaluator)**: A **Markov Network** (undirected graphical model) is constructed where:
    - **Nodes** represent atoms and contexts as binary random variables
@@ -406,6 +412,9 @@ cheaper pair set without giving up `v3`'s richer graph.
 | `--use-summarizer` | Summarize contexts (FactReasoner only). |
 | `--use-priors` | Use atom/context priors (FactReasoner only). |
 | `--use-query-builder` | Generate search queries with the QueryBuilder. |
+| `--nli-decision-model NAME` | Predict NLI relations with an Ollama decision model (e.g. `kev`) instead of an LLM; the other stages still use `--backend`. See [Decision models](#decision-models-for-nli-kev). |
+| `--nli-decision-host URL` / `--nli-decision-serve` | Use an existing Ollama server, or start a private one for the run (with `--ollama-binary`, `--ollama-models-dir`, `--ollama-num-parallel`, `--no-ollama-pull`). |
+| `--nli-prompt {few_shot,label_only}` | NLI prompt for the base model (default `few_shot`). `label_only` asks for the label without reasoning: ~3× faster, slightly less accurate (see [Performance](#performance)). Ignored with `--nli-adapter`. |
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
 | `--list-models` | Print the available unified model ids (and aliases) and exit. |
 | `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
@@ -441,7 +450,7 @@ from a mode and adjust one feature at a time.
 
 | Option | Meaning |
 |--------|---------|
-| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `all_pairs`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
+| `--nli-mode {all_pairs,fast}` | **Which pair-scoring preset to start from** (default `fast`). `all_pairs` scores every enumerated pair and reproduces published numbers. `fast` bundles four settings at once: provenance pairs, gated context–context, near-duplicate collapsing, and one-direction context scoring. Orthogonal to `--pipeline-version`. Little effect on `v1`, whose atom–context pairs are already limited to each atom's own contexts and which runs no context–context phase. |
 | `--nli-pair-policy {all_pairs,gated,provenance}` | Which candidate pairs to score — **one knob**, where `--nli-mode` is a bundle. `all_pairs` scores every enumerated pair; `gated` prefilters on a similarity gate; `provenance` additionally restricts atom–context pairs to the atoms that retrieved each context. So `--nli-pair-policy provenance` is *weaker* than `--nli-mode fast`, which also turns on dedup, cascade and merged phases. |
 | `--nli-gate-threshold` | Similarity at or above which a pair survives the gate (default `0.20`, calibrated for the embedding backend). Deliberately low: a false prune silently weakens an atom's evidence, a false keep only costs money. |
 | `--nli-neighbor-window` | For `provenance`, how many atoms either side of an owning atom are also compared against a context (default `1`). |
@@ -509,7 +518,8 @@ runner = FactualityRunner(
     backend,
     pipeline="factreasoner",
     pipeline_version="v3",         # "v1" / "v2" / "v3" -- graph shape
-    nli_mode="fast",               # "all_pairs" (default) or "fast" -- pair cost
+    nli_mode="fast",               # "fast" (default) or "all_pairs" -- pair cost
+    nli_prompt="few_shot",         # "few_shot" (default) or "label_only" -- NLI speed
     merlin_path="/path/to/merlin",
     nli_cache_dir=".cache/nli",    # score-neutral; re-runs cost no LLM calls
 )
@@ -556,7 +566,7 @@ queued. Parsing failures and retrieval errors keep their fallbacks.
 To run everything inside a single LSF job — start a local vLLM server from
 locally-available (or HuggingFace) weights, run a factuality assessor against
 it, then tear the server down — pass `--backend vllm` together with `--model`
-(a weights path or HF id). The `scripts/run_vllm.bsub` template does this:
+(a weights path or HF id):
 
 ```bash
 fact-reasoner --backend vllm \
@@ -575,6 +585,201 @@ request; A100 or H100), waits for readiness, and always cleans up. Without
 `--model`, `--backend vllm` connects as a client to an existing server at
 `--base-url` / `VLLM_BASE_URL`. **The GPU node's environment must have
 `vllm` installed (`pip install "vllm>=0.28"`), with GPU drivers/CUDA available.**
+
+Both server managers stop their servers when the job is killed: an LSF `bkill` or
+walltime limit sends SIGTERM, which unwinds the run so no vLLM or Ollama process is
+left holding the GPU. The job then exits with code 143.
+
+`scripts/run_kev.bsub` is a complete template for a job that serves a decision model
+for NLI next to vLLM on one H100 — see below.
+
+### Decision models for NLI (kev)
+
+A **decision model** answers scored questions rather than generating text. Through
+Ollama's System One API, FactReasoner gives it each premise as the *state* and asks
+one three-way `choice` question per hypothesis; the model returns a probability for
+each of entailment, contradiction and neutral, and the chosen label's probability
+becomes the edge strength. It generates no tokens, so it is fast, and its
+probabilities are the model's own rather than near-certain token logprobs.
+
+```bash
+fact-reasoner --pipeline factreasoner --merlin-path /path/to/merlin --use-priors \
+    --backend rits \
+    --nli-decision-model kev \
+    --query "..." --response "..."
+```
+
+`--backend` still runs atomization, revision and summarization; only NLI moves to the
+decision model. Requests are grouped by premise (one request, many questions), which
+is ~40% faster and never changes a verdict: questions in a request are scored
+independently. It cannot be combined with `--nli-adapter`, `--nli-prompt label_only`
+or `--nli-method simbauq`. Needs the `ollama` Python package ≥ 0.6.3 (a dependency).
+
+> **Accuracy caveat.** On 10 items (248 human-labelled atoms) of
+> `data/bio-labeled_wikipedia.jsonl`, v2 with `--nli-mode fast`, `kev` reached
+> **69.8%** atom accuracy against 79.8% for the RITS few-shot prompt. Most of the gap
+> is one behavior: `kev` labels a premise about a *different* subject (e.g. a
+> namesake returned by search) as a **contradiction** where an LLM says neutral, and
+> those contradictions cancel genuine support. It reads the right page correctly.
+> These numbers come from kev's Apple-silicon (MLX) build; a CUDA node runs its
+> separate llama.cpp (GGUF) build, so re-measure on your hardware before relying on it.
+
+#### Decision models on a GPU cluster (LSF)
+
+`--nli-decision-serve` makes the run own a private Ollama server
+(`fact_reasoner.OllamaServer`): it starts `ollama serve` on a free loopback port (so
+jobs sharing a node never collide on 11434), makes sure the model is present, sends
+one warm-up request so the model is on the GPU before the first batch, and stops the
+server when the run ends. No root, system service or desktop app is needed.
+`scripts/run_kev.bsub` is a ready-to-edit template. Setup, once:
+
+1. **Install Ollama without root** — download the Linux release archive (amd64, with
+   CUDA support) from the [Ollama releases](https://github.com/ollama/ollama/releases)
+   and unpack it under your home or project space; pass its `bin/ollama` as
+   `--ollama-binary`. Use a release recent enough to serve decision models.
+2. **Pull the model into a shared store**, from a login node with internet access,
+   so every job reuses one copy instead of downloading several GB:
+   ```bash
+   export OLLAMA_MODELS=/shared/ollama-models
+   /path/to/ollama serve &  /path/to/ollama pull kev ; kill %1
+   ```
+   On a CUDA node this fetches kev's llama.cpp (GGUF) variant.
+3. In the job, pass `--ollama-models-dir /shared/ollama-models --no-ollama-pull`.
+   Without `--no-ollama-pull` a missing model is pulled at startup (within a 30-minute
+   budget); with it, the job fails at once with instructions instead.
+
+| Option | Meaning |
+|--------|---------|
+| `--nli-decision-serve` | Start and stop a private Ollama server for `--nli-decision-model`. |
+| `--ollama-binary PATH` | The `ollama` executable (default: on `PATH`). |
+| `--ollama-models-dir DIR` | Model store (`OLLAMA_MODELS`); use shared storage. |
+| `--ollama-num-parallel N` | Requests answered at once (`OLLAMA_NUM_PARALLEL`, default 8 — sized for an H100; a laptop serves one at a time). |
+| `--no-ollama-pull` | Fail instead of pulling a missing model (nodes without internet). |
+
+**Sharing one H100 with vLLM.** vLLM claims 90% of GPU memory by default, leaving too
+little for the decision model. When both run in one job, lower it, e.g.
+`--gpu-memory-utilization 0.70` (the template's default), which keeps ~24 GB of an
+80 GB H100 for kev and its parallel request slots.
+
+Startup fails fast, with the server log, when the binary is missing, the server
+exits, the model is not in the store and pulling is disabled, or the model is not a
+decision model.
+
+#### kev.serve + vLLM on a two-GPU job (fastest)
+
+`--nli-decision-server kev` runs NLI on kev's own server,
+[`kev.serve`](https://github.com/jaredpalmer/kev), instead of Ollama. It serves the
+published `jaredpalmer/kev-9b` checkpoint in bf16 with fused DeltaNet kernels and
+CUDA graphs, batches concurrent requests, and reuses each premise's prefill for all
+of its questions. It speaks the same System One API, so the NLI extractor is
+unchanged. `fact_reasoner.KevServer` starts it on a free port with a random API key,
+warms it up, and stops it with the run. Everything else stays on vLLM; one GPU per
+server:
+
+```bash
+fact-reasoner \
+    --backend vllm --model ibm-granite/granite-4.1-8b --served-model granite-4.1-8b \
+    --vllm-binary /envs/vllm/bin/vllm --vllm-gpus 0 --max-model-len 32768 \
+    --nli-decision-serve --nli-decision-server kev \
+    --kev-python /envs/kev/bin/python --kev-run jaredpalmer/kev-9b@b5d8c18e --kev-gpus 1 \
+    --pipeline factreasoner --merlin-path /path/to/merlin --use-priors \
+    --item-concurrency 16 --input-file data.jsonl --output-dir out/
+```
+
+What makes it fast:
+
+- **One GPU per server.** vLLM keeps its default memory share, and kev.serve is
+  launched before vLLM and waited for after it, so the two models load at once.
+  `--vllm-gpus` / `--kev-gpus` index the job's GPUs (LSF's `CUDA_VISIBLE_DEVICES`).
+- **Items in flight at once** (`--item-concurrency`). One item at a time leaves a
+  server idle whenever the item is on the other's stage. Use 16, with or without
+  retrieval: at 32 with retrieval, granite's queue grew so long that half the items
+  hit the 180 s retrieval cap and lost contexts (see [TIMINGS.md](TIMINGS.md),
+  run 3). Results are still written in input order, and a resumed run skips done
+  items.
+- **Pages fetched only as needed.** Google retrieval keeps the first 3 usable
+  pages of ~15 search results. It used to download all of them and wait for the
+  slowest; it now fetches in rank order, a few at a time, and stops once the first
+  3 usable pages are known. It keeps exactly the same pages.
+- **Transient failures are retried.** A request that fails in transport
+  (connection reset, read error, client-side timeout) is sent again up to twice,
+  with backoff, before its stage falls back. Server errors are not retried.
+- **No client-side limits on local servers.** The shared throttle protects remote
+  providers (32 in flight, 1500/min). For servers the job started, vLLM gets 256 in
+  flight and kev.serve 64 (its batch size), with no rate limit. `--max-concurrency`
+  overrides the vLLM ceiling.
+- **The embedding gate loads once per process, on CPU.** It used to reload the model
+  (~20 s) for every item, and on a GPU node held by the job's servers its CUDA
+  context failed, so it fell back to token Jaccard without saying why.
+
+Setup, once (kev pins `torch<2.9` and exact kernels, so it gets its own environment):
+
+```bash
+git clone https://github.com/jaredpalmer/kev.git && cd kev
+UV_PROJECT_ENVIRONMENT=/envs/kev uv sync --python-preference only-managed --python 3.13 --extra serve --no-dev
+VIRTUAL_ENV=/envs/kev uv pip install "flash-linear-attention==0.5.2" "triton>=3.7.1"
+VIRTUAL_ENV=/envs/kev uv pip install --no-deps \
+  "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0%2Bcu12torch2.8cxx11abiTRUE-cp313-cp313-linux_x86_64.whl"
+```
+
+Use a uv-managed Python (`--python-preference only-managed`, on shared storage): a
+venv on the login node's system Python does not exist on compute nodes. Pre-download
+`ibm-granite/granite-4.1-8b`, `jaredpalmer/kev-9b@b5d8c18e` and its base
+`Qwen/Qwen3.5-9B-Base@68c46c4b` from a login node (see `scripts/run_kev_vllm.bsub`,
+the job template); jobs run with `HF_HUB_OFFLINE=1`.
+`scripts/submit_kev_vllm_smoke.sh submit|status|check` runs the smoke jobs below.
+
+Measured on BlueVela H100s, 10 items (248 human-labelled atoms) of
+`data/bio-labeled_wikipedia.jsonl`, v2, `--nli-mode fast`, `--use-priors
+--use-summarizer`, granite-4.1-8b for summarization:
+
+| | Servers ready | Pipeline | Atom accuracy | Factuality error |
+|-|---------------|----------|---------------|------------------|
+| `--item-concurrency 1` | 72 s | 124 s | 73.0% | 0.160 |
+| `--item-concurrency 8` | 46 s | 60 s | 74.6% | 0.154 |
+
+Server startup is 50–200 s, depending on how warm the node's file and Triton caches
+are. kev.serve alone answered 298 NLI pairs/s (6 labelled sanity cases: 6/6).
+Per item, NLI and summarization now take similar time (4–9 s each), so neither
+server is the bottleneck.
+
+On all 157 items (4,859 atoms; ~139k NLI pairs), same settings:
+
+| | Pipeline | Atom accuracy | Factuality error |
+|-|----------|---------------|------------------|
+| `--item-concurrency 8` | 635 s (4.0 s/item) | 66.5% | 0.226 |
+| `--item-concurrency 16` (4 runs) | 553–585 s (3.5–3.7 s/item) | 66.3–67.0% | 0.225–0.232 |
+
+The full set is harder than its first 10 items. Going from 8 to 16 items in flight
+gains ~11%, so past 8 the servers are near saturation; more throughput needs more
+granite GPUs or a job array over slices of the dataset.
+
+**Where the time goes.** [TIMINGS.md](TIMINGS.md) has the full report for this run,
+with the job, GPU and model setup. `assess_file` ends with a timing report (printed, and
+written as `timing_<results>.json` next to the results). Its server rows come from
+each backend's shared throttle, which sees every request, so concurrent items are
+counted once: `busy_s` is wall time with a request in flight. On the 553 s run
+above (16 in flight):
+
+| | Busy | Requests | Mean in flight | GPU >50% utilised |
+|-|------|----------|----------------|-------------------|
+| vLLM (granite: summarization) | 505 s (91%) | 12,518 | 234 of 256 | 496 s |
+| kev.serve (NLI, 139,829 pairs) | 429 s (78%) | 6,993 | 57 of 64 | 383 s |
+
+Both servers were busy for 385 s at once; granite alone for 120 s, kev alone for
+44 s, neither for 4 s. kev scored 326 pairs per busy second. Merlin (`score`) took
+21 s summed over all items. Both servers ran at their in-flight ceiling, so they,
+not the client, set the pace.
+
+> **Run-to-run variation.** In the runs above, per-item scores differed between
+> runs (mean |Δ| ≈ 0.06) even at the same concurrency, because no stage set a
+> temperature: vLLM sampled granite at its default temperature 1.0, so
+> summarization kept or dropped different contexts each run. Aggregate accuracy
+> was stable (±0.5 points). Every backend now defaults to temperature 0
+> (`fact_reasoner.backends.DEFAULT_TEMPERATURE`), so runs are reproducible and
+> `--nli-cache-dir` can hit across them; scores will shift once against these
+> numbers. Pass `model_options={ModelOption.TEMPERATURE: ...}` to
+> `build_backend` to sample instead.
 
 ### LoRA adapters (atomization and NLI)
 
@@ -658,6 +863,53 @@ get their own `--nli-cache-dir` keys, so they never mix with few-shot verdicts.
   flattens the evidence strengths the Markov network relies on. `simbauq` derives
   confidence from agreement across samples instead.
 
+### Performance
+
+The pipeline runs everything that does not depend on an earlier result
+concurrently, under one request budget per backend:
+
+- **Retrieval.** Every atom (and the query) is retrieved in its own worker, so
+  searches, page fetches and context summaries for all atoms overlap.
+  `per_atom_timeout` (default 180 s) caps the whole batch, and an atom still
+  running at the deadline is logged and skipped instead of holding up the rest.
+- **Page cache.** Searches for different atoms of one response return many of the
+  same pages, so each page is fetched once per assessment; concurrent requests for
+  the same page wait for the first download. A failed fetch is not retried.
+- **One summarization pass.** Contexts are summarized as they are retrieved. With
+  `--use-summarizer`, `build()` summarizes only what is left (the question's
+  contexts), in a single batch, instead of summarizing every context again.
+- **Shared throttle.** All LLM calls to a backend share one concurrency ceiling (32
+  in flight) and rate limit (1500/min) — `fact_reasoner.utils.throttle_for(backend)`
+  — whichever stage or thread issues them, so overlapping stages cannot overload
+  the server. Raising the ceiling buys little: RITS throughput was measured to
+  level off near 9 requests/s, with latency growing instead.
+
+What still dominates is NLI (75–85% of a run), which is why `--nli-mode fast` is
+the default and `--nli-prompt label_only` is available. Measured on RITS
+(`llama-3-3-70b-instruct`, Google retrieval, a 16-atom biography):
+
+| Change | Before | After |
+|--------|--------|-------|
+| Retrieval stage (v2, top-k 3 / top-k 5) | 32 s / 43 s | 14 s / 14 s |
+| Page fetches per assessment | ~180 | ~70 |
+| `build()` summarization with `--use-summarizer` | 17 s, 31 calls | 3 s, 4 calls |
+| v3 end to end, `--nli-mode fast` vs `all_pairs` | 343 s, 1066 NLI calls | 122 s, 256 NLI calls (same predictions) |
+
+And the two NLI prompts, on 10 items (248 human-labelled atoms) of
+`data/bio-labeled_wikipedia.jsonl`, v2 with `--nli-mode fast`:
+
+| `--nli-prompt` | Atom accuracy | Factuality error | Brier | Wall time |
+|----------------|---------------|------------------|-------|-----------|
+| `few_shot` (default) | 79.8% | 0.123 | 0.231 | 965 s |
+| `label_only` | 78.6% | 0.134 | 0.255 | 321 s |
+
+The prompts agreed on 237 of the 248 atoms. A 10-item sample cannot separate a
+one-point accuracy difference from noise, so use `few_shot` for published numbers.
+
+> **Behavior change with `--use-summarizer`.** A context summarized twice used to
+> have its prior multiplied by both summaries' confidences; it is now discounted
+> once. Context priors, and so scores, can shift slightly in that mode.
+
 ### Telemetry
 
 FactReasoner can emit [OpenTelemetry](https://opentelemetry.io/) traces and metrics
@@ -715,7 +967,7 @@ Two things to pick before you run anything:
 
 - **`--pipeline-version {v1,v2,v3}`** — the graph shape (default `v2`).
 - **`--nli-mode {all_pairs,fast}`** — how many NLI candidate pairs get scored
-  (default `all_pairs`). This is the main cost dial: NLI is the dominant expense of a
+  (default `fast`). This is the main cost dial: NLI is the dominant expense of a
   run, and `fast` prunes the pairs it scores while keeping the same graph. How much it
   saves depends on the workload (measured between ~1.2× and ~5×).
 
@@ -723,8 +975,8 @@ They are independent, so any version pairs with either mode.
 
 #### 1. The CLI (easiest)
 
-**`all_pairs` — score every candidate pair.** The default: highest fidelity, and what
-reproduces the published numbers.
+**`all_pairs` — score every candidate pair.** Highest fidelity, and what reproduces
+the published numbers; pass it explicitly, since the default is `fast`.
 
 ```bash
 fact-reasoner \
@@ -736,7 +988,7 @@ fact-reasoner \
     --topic "Albert Einstein"
 ```
 
-**`fast` — same assessment, far fewer LLM calls.** Only one line differs:
+**`fast` — same assessment, far fewer LLM calls.** The default. Only one line differs:
 
 ```bash
 fact-reasoner \
@@ -748,8 +1000,8 @@ fact-reasoner \
     --topic "Albert Einstein"
 ```
 
-Since `all_pairs` is the default, you can simply omit `--nli-mode` to get it — the
-first command above is explicit for contrast, not because the flag is required.
+Since `fast` is the default, you can simply omit `--nli-mode` to get it — the
+second command above is explicit for contrast, not because the flag is required.
 
 **How to confirm `fast` took effect.** On `--pipeline factreasoner` it prints a
 one-line banner at startup:
@@ -758,7 +1010,7 @@ one-line banner at startup:
 [FactReasoner] NLI pair policy: provenance (cascade=True, near-dup dedup=True)
 ```
 
-`all_pairs` prints nothing, since it is the default behavior.
+`all_pairs` prints nothing, since it is the original, unpruned behavior.
 
 > `--nli-mode` applies to `--pipeline factreasoner` only. The baseline pipelines
 > (`factscore`, `veriscore`, `factverify`) do not build a pair-scored NLI graph, so
@@ -792,8 +1044,8 @@ print(f"Factuality score: {results['factuality_score']:.2%}")
 
 | Mode | Use it when | Trade-off |
 |------|-------------|-----------|
-| `all_pairs` *(default)* | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
-| `fast` | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
+| `all_pairs` | Publishing results, comparing against the paper, or any run that must be bit-for-bit reproducible. | Cost is quadratic in atoms for `v2`, cubic-ish for `v3`. |
+| `fast` *(default)* | Iterating, large datasets, or exploratory runs where cost matters more than exact reproducibility. | Prunes candidate pairs, so it can miss a relation — see the [accuracy note](#nli-cost-control-advanced). |
 
 Start with `fast` while developing, then confirm final numbers with `all_pairs`.
 
@@ -849,7 +1101,9 @@ nli_extractor = NLIExtractor(backend)
 #       build_backend("vllm", model_id="fr-nli", base_url=url))
 
 # The Retriever fetches evidence; ContextRetriever wraps it for parallel,
-# per-atom retrieval (optionally summarizing each context).
+# per-atom retrieval (optionally summarizing each context). SourceRetriever's
+# num_workers is the page-fetch threads per search; ContextRetriever runs one
+# worker per atom by default (pass num_workers only to cap it).
 retriever = SourceRetriever(
     service_type="google",  # or "wikipedia", "chromadb", "ntrs"
     top_k=5,
@@ -860,7 +1114,6 @@ retriever = SourceRetriever(
 context_retriever = ContextRetriever(
     retriever=retriever,
     context_summarizer=context_summarizer,
-    num_workers=4,
 )
 
 # Create the FactReasoner pipeline.
@@ -962,7 +1215,7 @@ LLM Response
     ▼
 ┌─────────────┐
 │     NLI     │ ──► Entailment/Contradiction relationships
-└─────────────┘     (few-shot prompt, or the NLI LoRA adapter)
+└─────────────┘     (few-shot or label-only prompt, or the NLI LoRA adapter)
     │
     ▼
 ┌─────────────┐
@@ -1135,6 +1388,7 @@ The `score()` method returns a results dictionary:
 
 ```
 FactReasoner/
+├── TIMINGS.md                # Measured timings: kev.serve NLI + vLLM granite, 2 H100s
 ├── src/fact_reasoner/
 │   ├── __init__.py           # Package exports
 │   ├── assessor.py           # Main FactReasoner class
@@ -1168,7 +1422,9 @@ FactReasoner/
 │       ├── build_ntrs_benchmark.py  # Frozen per-backend dataset generation
 │       └── eval_ntrs_benchmark.py   # Frozen-dataset evaluation runner
 ├── scripts/
-│   └── run_vllm.bsub         # LSF template (local vLLM + fact-reasoner)
+│   ├── run_kev.bsub          # LSF template (Ollama decision model + vLLM)
+│   ├── run_kev_vllm.bsub     # LSF template (kev.serve + vLLM, one GPU each)
+│   └── submit_kev_vllm_smoke.sh  # BlueVela smoke jobs for the kev.serve setup
 ├── docs/
 |   ├── examples
 │   │   ├── assessors/        # Assessor examples

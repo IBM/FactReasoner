@@ -30,6 +30,7 @@ from fact_reasoner.utils import (
     LOOP_BUDGET,
     handle_generation_error,
     run_throttled,
+    throttle_for,
     strip_code_fences,
     validate_json_code_block,
 )
@@ -293,7 +294,9 @@ class Atomizer:
             )
 
         print(f"[Atomizer] Running throttled batch of {len(responses)} requests ...")
-        outputs = await run_throttled(factory, responses)
+        outputs = await run_throttled(
+            factory, responses, throttle=throttle_for(self.backend)
+        )
 
         # Results are positionally aligned with responses; map every failure
         # (raised exception, unsuccessful sampling, or unparsable output) to {}.

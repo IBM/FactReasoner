@@ -1480,3 +1480,47 @@ class TestPromptVariantAndEvidence:
         m = self._miner()
         assert m.prompt_variant == "v2"
         assert m.require_evidence is True
+
+
+def test_embedding_model_is_loaded_once_per_process(monkeypatch):
+    import sys
+    import types
+
+    from fact_reasoner.lcs import candidate_pairs
+
+    loads = []
+
+    class FakeST:
+        def __init__(self, name, device=None):
+            loads.append((name, device))
+
+        def encode(self, texts, normalize_embeddings=True):
+            import numpy as np
+
+            return np.eye(len(texts))
+
+    monkeypatch.setitem(
+        sys.modules, "sentence_transformers", types.SimpleNamespace(SentenceTransformer=FakeST)
+    )
+    monkeypatch.setattr(candidate_pairs, "_embedding_models", {})
+    for _ in range(3):
+        gate = candidate_pairs._EmbeddingGate(["a b", "c d"], model_name="m")
+        assert gate.backend == "sbert:m"
+    assert loads == [("m", "cpu")]
+
+
+def test_failed_embedding_load_is_retried(monkeypatch):
+    import sys
+    import types
+
+    from fact_reasoner.lcs import candidate_pairs
+
+    def boom(name, device=None):
+        raise OSError("offline")
+
+    monkeypatch.setitem(
+        sys.modules, "sentence_transformers", types.SimpleNamespace(SentenceTransformer=boom)
+    )
+    monkeypatch.setattr(candidate_pairs, "_embedding_models", {})
+    assert candidate_pairs._EmbeddingGate(["a"], model_name="m").backend == "jaccard"
+    assert candidate_pairs._embedding_models == {}

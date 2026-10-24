@@ -14,7 +14,8 @@
 
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from io import BytesIO
 from itertools import islice
@@ -70,6 +71,10 @@ CHARACTER_SPLITTER = RecursiveCharacterTextSplitter(
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB cap on fetched body size
 DEFAULT_PER_URL_TIMEOUT = 60  # seconds, wall-clock cap per link fetch
 DEFAULT_PER_ATOM_TIMEOUT = 180  # seconds, wall-clock cap per atom retrieval
+# Extra hits fetched in each wave beyond the ones still needed, so a few invalid
+# pages (paywalls, empty pages) do not each cost another round trip.
+FETCH_PREFETCH = 2
+MAX_RETRIEVAL_WORKERS = 32  # threads for per-item retrieval (I/O bound)
 
 # Regex patterns to remove common inline citation forms
 CITATION_PATTERNS = [
@@ -494,6 +499,14 @@ class SourceRetriever:
         self.ntrs_retriever = None
         self.in_memory_vectorstore = None
 
+        # Page text by (link, max_size). Searches for different atoms of one
+        # response return many of the same pages, so without this most fetches
+        # repeat an earlier one. Each entry is a Future, so a second thread asking
+        # for a page that is still downloading waits for it instead of fetching
+        # it again.
+        self._page_cache: dict[tuple[str, int | None], Future] = {}
+        self._page_cache_lock = threading.Lock()
+
         assert self.service_type in ["chromadb", "milvus", "wikipedia", "google", "ntrs"]
 
         # shared across chromadb/milvus so both take the same override
@@ -537,6 +550,75 @@ class SourceRetriever:
 
     def set_query_builder(self, query_builder: QueryBuilder = None):
         self.query_builder = query_builder
+
+    def _fetch_page(self, link: str, max_size: int | None) -> str:
+        """Fetch a page's text once, sharing the result with every later caller.
+
+        A failed fetch is cached as its exception and re-raised to each caller,
+        so a dead link costs one timeout per retriever rather than one per atom.
+        """
+        key = (link, max_size)
+        with self._page_cache_lock:
+            future = self._page_cache.get(key)
+            owner = future is None
+            if owner:
+                future = Future()
+                self._page_cache[key] = future
+        if owner:
+            try:
+                future.set_result(fetch_text_from_link(link, max_size))
+            except BaseException as e:  # noqa: BLE001  hand it to every waiter
+                future.set_exception(e)
+        return future.result()
+
+    @staticmethod
+    def _page_usable(link: str, page_text: str | None) -> bool:
+        """Whether a fetched page passes the checks the top_k selection applies.
+
+        Must match the selection loop in :meth:`query`, which keeps a hit only
+        if this holds for its page.
+        """
+        if not page_text:
+            return False
+        if not is_content_valid(link, page_text):
+            return False
+        doc = make_uniform(page_text)
+        return bool(doc) and not any(
+            kw in doc.lower() for kw in ("chatgpt", "factscore", "dataset viewer")
+        )
+
+    def _fetch_wave(self, search_hits, indices, max_sz, fetched_texts) -> None:
+        """Fetch the pages of ``indices`` in parallel into ``fetched_texts``.
+
+        A page that fails, or is still loading when the wave's deadline passes,
+        is stored as "" (unusable), as before.
+        """
+        # Workers run in parallel, so a wave's wall-clock budget is the per-URL
+        # budget plus a small margin for scheduling.
+        deadline = self.per_url_timeout + 5
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = {
+                executor.submit(self._fetch_page, search_hits[i]["link"], max_sz): i
+                for i in indices
+            }
+            try:
+                for future in as_completed(futures, timeout=deadline):
+                    i = futures[future]
+                    try:
+                        fetched_texts[i] = future.result()
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"Fetch failed for {search_hits[i]['link']}: {e}")
+                        fetched_texts[i] = ""
+            except FuturesTimeoutError:
+                # Threads cannot be killed from Python, but the wave proceeds.
+                for future, i in futures.items():
+                    if not future.done():
+                        logger.warning(
+                            f"Fetch timed out after {self.per_url_timeout}s: "
+                            f"{search_hits[i]['link']}"
+                        )
+                        future.cancel()
+                        fetched_texts[i] = ""
 
     def query(self, text: str, max_size: int = 4000) -> list[dict[str, Any]]:
         """
@@ -649,41 +731,33 @@ class SourceRetriever:
             search_hits = search_results[query_text]
             n = len(search_hits)
 
-            # --- Parallel fetch all links ---
+            # --- Fetch pages in rank order, only as many as needed ---
+            # Only the first top_k valid pages are kept, so fetching all ~15 hits
+            # wastes most downloads and makes the atom wait for its slowest site.
+            # Fetch in waves instead: each wave fetches the next hits still needed
+            # (plus a small margin for pages that turn out invalid), and stops once
+            # the first top_k valid hits are known. A hit's validity depends only
+            # on its own page, so this selects exactly what fetching everything
+            # would; only hits past the last one needed are never fetched.
+            fetched_texts: list[str | None] = [None] * n
             if self.fetch_text:
                 max_sz = None if self.use_in_memory_vectorstore else max_size
-                # Since workers run in parallel, the whole batch's wall-clock budget is
-                # the per-URL budget plus a small margin for scheduling.
-                batch_deadline = self.per_url_timeout + 5
-                with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                    fetch_futures = {
-                        executor.submit(fetch_text_from_link, hit["link"], max_sz): i
-                        for i, hit in enumerate(search_hits)
-                    }
-                    fetched_texts = [""] * n
-                    try:
-                        for future in as_completed(
-                            fetch_futures, timeout=batch_deadline
-                        ):
-                            idx = fetch_futures[future]
-                            try:
-                                fetched_texts[idx] = future.result()
-                            except Exception as e:  # noqa: BLE001
-                                link = search_hits[idx]["link"]
-                                logger.warning(f"Fetch failed for {link}: {e}")
-                                fetched_texts[idx] = ""
-                    except FuturesTimeoutError:
-                        # Any futures still pending at the deadline are dropped. Threads
-                        # cannot be killed from Python, but the batch proceeds.
-                        for future, idx in fetch_futures.items():
-                            if not future.done():
-                                link = search_hits[idx]["link"]
-                                logger.warning(
-                                    f"Fetch timed out after {self.per_url_timeout}s: {link}"
-                                )
-                                future.cancel()
-            else:
-                fetched_texts = [""] * n
+                next_hit = 0
+                while next_hit < n:
+                    valid = sum(
+                        1
+                        for i in range(next_hit)
+                        if self._page_usable(search_hits[i]["link"], fetched_texts[i])
+                    )
+                    if valid >= self.top_k:
+                        break
+                    wave = range(
+                        next_hit,
+                        min(n, next_hit + self.top_k - valid + FETCH_PREFETCH),
+                    )
+                    self._fetch_wave(search_hits, wave, max_sz, fetched_texts)
+                    next_hit = wave.stop
+            fetched_texts = [t if t is not None else "" for t in fetched_texts]
 
             # --- Select top_k valid results ---
             passages = []
@@ -698,17 +772,11 @@ class SourceRetriever:
                 raw_page_text = fetched_texts[i]
 
                 if self.fetch_text:
-                    if not is_content_valid(link, raw_page_text):
-                        raw_page_text = ""
-                    doc_content = make_uniform(raw_page_text) if raw_page_text else ""
-
-                    if not doc_content or any(
-                        kw in doc_content.lower()
-                        for kw in ("chatgpt", "factscore", "dataset viewer")
-                    ):
-                        doc_content = ""
+                    # Same test the fetch loop above stops on.
+                    if not self._page_usable(link, raw_page_text):
                         index_available.append(i)
                         continue
+                    doc_content = make_uniform(raw_page_text)
 
                     if self.use_in_memory_vectorstore:
                         split_doc_content = CHARACTER_SPLITTER.split_text(doc_content)
@@ -812,9 +880,24 @@ class ContextRetriever:
         self,
         retriever: SourceRetriever,
         context_summarizer: ContextSummarizer | None = None,
-        num_workers: int = 4,
+        num_workers: int | None = None,
         per_atom_timeout: int = DEFAULT_PER_ATOM_TIMEOUT,
     ):
+        """
+        Args:
+            retriever: SourceRetriever
+                The source the items are searched in.
+            context_summarizer: ContextSummarizer
+                Summarizes each atom's contexts as soon as they are retrieved.
+            num_workers: int
+                Number of worker threads. None (default) runs one per item, up
+                to ``MAX_RETRIEVAL_WORKERS``: workers spend their time waiting on
+                the network (search, page fetches, LLM summaries), and the shared
+                backend throttle, not this pool, bounds the LLM calls.
+            per_atom_timeout: int
+                Wall-clock cap (seconds) on the whole batch; items still running
+                at the deadline are logged and skipped.
+        """
         self.retriever = retriever
         self.context_summarizer = context_summarizer
         self.num_workers = num_workers
@@ -825,8 +908,14 @@ class ContextRetriever:
         text: str,
         atom: Atom | None = None,
         id_prefix: str = "c",
+        stop: threading.Event | None = None,
     ) -> list[Context] | Exception:
         """Worker function: retrieve contexts (and optionally summarize) for one item.
+
+        Args:
+            stop: threading.Event
+                Set by :meth:`retrieve_all` after a raise-mode summarizer error;
+                a worker that sees it skips its own summarization.
 
         Returns:
             list[Context] | Exception: The contexts, or the summarizer's
@@ -834,6 +923,8 @@ class ContextRetriever:
             (:meth:`retrieve_all` re-raises it).
         """
         retrieved = self.retriever.query(text=text)
+        if stop is not None and stop.is_set():
+            return []
 
         contexts = []
         for j, ctx in enumerate(retrieved):
@@ -882,60 +973,80 @@ class ContextRetriever:
     ) -> dict[str, Context]:
         """Retrieve contexts for all atoms (and optionally the query) in parallel.
 
-        An item whose retrieval fails or times out is logged and skipped. If the
-        context summarizer was created with ``raise_errors=True``, the first
-        summarizer error to complete is re-raised here instead, and the items
-        still queued are cancelled.
+        By default every item gets its own worker (see ``num_workers``), so
+        searches and summaries for all items overlap. An item whose retrieval
+        fails, or is still running ``per_atom_timeout`` seconds after the batch
+        started, is logged and skipped. If the context summarizer was created with
+        ``raise_errors=True``, the first summarizer error to complete is
+        re-raised here instead, the items still queued are cancelled, and the
+        ones still searching skip their summaries.
         """
         all_contexts: dict[str, Context] = {}
         futures = {}
+        stop = threading.Event()
 
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            # Submit one task per atom
-            for aid, atom in atoms.items():
+        items = [(atom.text, atom, f"c_{aid}", aid) for aid, atom in atoms.items()]
+        if query:
+            items.append((query, None, "c_q", "query"))
+        if self.num_workers is not None:
+            workers = self.num_workers
+        else:
+            workers = max(1, min(len(items), MAX_RETRIEVAL_WORKERS))
+
+        executor = ThreadPoolExecutor(max_workers=workers)
+        try:
+            for text, atom, prefix, aid in items:
                 future = executor.submit(
-                    self._retrieve_for_item, atom.text, atom, f"c_{aid}"
+                    self._retrieve_for_item, text, atom, prefix, stop
                 )
                 futures[future] = (aid, atom)
 
-            # Submit query task
-            if query:
-                future = executor.submit(self._retrieve_for_item, query, None, "c_q")
-                futures[future] = ("query", None)
-
-            # Collect results with progress bar. A per-atom wall-clock cap ensures
-            # one stuck task cannot stall the entire batch.
-            for future in tqdm(
-                as_completed(futures),
-                total=len(futures),
-                desc="Retrieving contexts",
-            ):
-                aid, atom = futures[future]
-                try:
-                    contexts = future.result(timeout=self.per_atom_timeout)
-                except FuturesTimeoutError:
+            # Collect results with progress bar. The deadline is on the batch, so
+            # one stuck item cannot stall the rest: whatever is still running when
+            # it passes is skipped (as_completed alone never times out a task).
+            done = set()
+            bar = tqdm(total=len(futures), desc="Retrieving contexts")
+            try:
+                for future in as_completed(futures, timeout=self.per_atom_timeout):
+                    done.add(future)
+                    bar.update()
+                    aid, atom = futures[future]
+                    try:
+                        contexts = future.result()
+                    except Exception as e:  # noqa: BLE001
+                        label = atom.text if atom is not None else "query"
+                        logger.warning(
+                            f"Retrieval failed for atom {aid!r} ({label[:120]!r}): {e}"
+                        )
+                        telemetry.count_fallback("retriever", "retrieval_error")
+                        continue
+                    if isinstance(contexts, Exception):
+                        # Stop queued items from making more search and LLM calls,
+                        # and running ones from starting their summaries.
+                        stop.set()
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise contexts
+                    for ctx in contexts:
+                        all_contexts[ctx.id] = ctx
+                    if atom is not None:
+                        atom.add_contexts(contexts)
+            except FuturesTimeoutError:
+                for future, (aid, atom) in futures.items():
+                    if future in done:
+                        continue
                     label = atom.text if atom is not None else "query"
                     logger.warning(
                         f"Retrieval timed out after {self.per_atom_timeout}s for atom "
                         f"{aid!r}: {label[:120]!r}"
                     )
                     telemetry.count_fallback("retriever", "timeout")
-                    continue
-                except Exception as e:  # noqa: BLE001
-                    label = atom.text if atom is not None else "query"
-                    logger.warning(
-                        f"Retrieval failed for atom {aid!r} ({label[:120]!r}): {e}"
-                    )
-                    telemetry.count_fallback("retriever", "retrieval_error")
-                    continue
-                if isinstance(contexts, Exception):
-                    # Stop queued items from making more search and LLM calls;
-                    # items already running finish when the executor exits.
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise contexts
-                for ctx in contexts:
-                    all_contexts[ctx.id] = ctx
-                if atom is not None:
-                    atom.add_contexts(contexts)
+                    future.cancel()
+            finally:
+                bar.close()
+        finally:
+            # Do not block on items that timed out; their threads finish on their
+            # own and their results are discarded.
+            stop.set()
+            executor.shutdown(wait=False, cancel_futures=True)
 
         return all_contexts

@@ -28,6 +28,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from mellea.backends.dummy import DummyBackend
 
+
+@pytest.fixture(autouse=True)
+def _no_transient_retries(monkeypatch):
+    """These tests are about one failed call's fallback, not about retries.
+
+    Their stub backends raise ``ConnectionError``, which ``run_throttled`` would
+    otherwise retry (see ``fact_reasoner.utils.TRANSIENT_RETRIES``).
+    """
+    monkeypatch.setattr("fact_reasoner.utils.TRANSIENT_RETRIES", 0)
+
 from fact_reasoner import telemetry
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.atomizer_reviser import AtomizerReviser
@@ -59,7 +69,7 @@ STAGE_CALLS = [
     pytest.param(
         lambda backend, **kw: Atomizer(backend, **kw).run("response"),
         {},
-        "[Atomizer] Generation failed: Connection error.",
+        "[Atomizer] Generation failed: ConnectionError: Connection error.",
         "atomizer",
         id="atomizer-run",
     ),
@@ -68,14 +78,14 @@ STAGE_CALLS = [
             Atomizer(backend, **kw).run_batch(["r1", "r2"])
         ),
         [{}, {}],
-        "[Atomizer] Batch item failed: Connection error.",
+        "[Atomizer] Batch item failed: ConnectionError: Connection error.",
         "atomizer",
         id="atomizer-run_batch",
     ),
     pytest.param(
         lambda backend, **kw: Reviser(backend, **kw).run(["a1"], "response"),
         [{"revised_unit": "a1", "rationale": "", "text": "a1"}],
-        "[Reviser] Batch item failed: Connection error.",
+        "[Reviser] Batch item failed: ConnectionError: Connection error.",
         "reviser",
         id="reviser-run",
     ),
@@ -87,14 +97,14 @@ STAGE_CALLS = [
             {"revised_unit": "a1", "rationale": "", "text": "a1"},
             {"revised_unit": "a2", "rationale": "", "text": "a2"},
         ],
-        "[Reviser] Batch item failed: Connection error.",
+        "[Reviser] Batch item failed: ConnectionError: Connection error.",
         "reviser",
         id="reviser-run_batch",
     ),
     pytest.param(
         lambda backend, **kw: NLIExtractor(backend, **kw).run("premise", "hyp"),
         NEUTRAL,
-        "[NLI] Generation failed: Connection error.",
+        "[NLI] Generation failed: ConnectionError: Connection error.",
         "nli",
         id="nli-run",
     ),
@@ -103,21 +113,21 @@ STAGE_CALLS = [
             NLIExtractor(backend, **kw).run_batch(["p1", "p2"], ["h1", "h2"])
         ),
         [NEUTRAL, NEUTRAL],
-        "[NLI] Batch item failed: Connection error.",
+        "[NLI] Batch item failed: ConnectionError: Connection error.",
         "nli",
         id="nli-run_batch",
     ),
     pytest.param(
         lambda backend, **kw: NLIAdapterExtractor(backend, **kw).run("p", "h"),
         NEUTRAL,
-        "[NLI] Batch item failed: Connection error.",
+        "[NLI] Batch item failed: ConnectionError: Connection error.",
         "nli",
         id="nli-adapter-run",
     ),
     pytest.param(
         lambda backend, **kw: ContextSummarizer(backend, **kw).run(["c1"], "atom"),
         [{"context": "c1", "summary": "", "probability": 0.0}],
-        "[Summarizer] Batch item failed: Connection error.",
+        "[Summarizer] Batch item failed: ConnectionError: Connection error.",
         "summarizer",
         id="summarizer-run",
     ),
@@ -129,14 +139,14 @@ STAGE_CALLS = [
             {"context": "c1", "summary": "", "probability": 0.0},
             {"context": "c2", "summary": "", "probability": 0.0},
         ],
-        "[Summarizer] Batch item failed: Connection error.",
+        "[Summarizer] Batch item failed: ConnectionError: Connection error.",
         "summarizer",
         id="summarizer-run_batch",
     ),
     pytest.param(
         lambda backend, **kw: AtomizerReviser(backend, **kw).run("response"),
         {},
-        "[AtomizerReviser] Generation failed: Connection error.",
+        "[AtomizerReviser] Generation failed: ConnectionError: Connection error.",
         "atomizer_reviser",
         id="atomizer-reviser-run",
     ),

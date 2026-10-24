@@ -65,10 +65,15 @@ if _otel_trace is not None and _otel_metrics is not None:
             "a neutral NLI label) after a generation or parsing failure"
         ),
     )
+    _retries = _meter.create_counter(
+        "fact_reasoner.retries",
+        description="Requests sent again after a transient transport failure",
+    )
 else:
     _tracer = None
     _stage_duration = None
     _fallbacks = None
+    _retries = None
 
 
 def _attributes(attributes: dict[str, Any]) -> dict[str, Any]:
@@ -160,3 +165,15 @@ def count_fallback(component: str, reason: str) -> None:
     """
     if _fallbacks is not None:
         _fallbacks.add(1, {"component": component, "reason": reason})
+
+
+def count_retry(error_type: str) -> None:
+    """Count one request sent again after a transient transport failure.
+
+    Not a fallback: the retried request may still succeed.
+
+    Args:
+        error_type: The exception's class name (e.g. ``"ReadError"``).
+    """
+    if _retries is not None:
+        _retries.add(1, {"error_type": error_type})
