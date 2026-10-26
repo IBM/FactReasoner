@@ -37,7 +37,7 @@ import asyncio
 import json
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -369,6 +369,7 @@ class RelationMiner:
         prompt_variant: str = "v1",
         require_evidence: bool = False,
         show_progress: bool = False,
+        on_progress: Callable[[str, int, int], None] | None = None,
     ):
         """Initialize the relation miner.
 
@@ -442,6 +443,11 @@ class RelationMiner:
                 "none" as the model's answer rather than treating it as missing
                 data, and refusing to invent a coupling for an unrecognised one.
             show_progress: If True, show a tqdm bar as pairs are mined.
+            on_progress: Optional ``callback(stage, done, total)`` invoked as each
+                LLM call completes, with ``stage`` one of ``"pairs"`` (Prompt A)
+                or ``"strength"`` (Prompt B), plus ``"pairs"`` with ``done=0``
+                once candidate pairs are selected. Lets a UI report live
+                progress; exceptions it raises are not caught.
 
         Raises:
             ValueError: If ``backend`` is None, or ``nli_method`` / ``strength_method``
@@ -536,6 +542,7 @@ class RelationMiner:
         # v2 asks for an evidence span; requiring it only makes sense there.
         self.require_evidence = bool(require_evidence)
         self.show_progress = show_progress
+        self.on_progress = on_progress
         # Why parsed answers were refused, reset per mining run.
         self._drop_reasons: dict[str, int] = {}
 
@@ -908,12 +915,11 @@ class RelationMiner:
             )
 
         bar = None
-        on_progress = None
         if self.show_progress and pairs:
             from tqdm import tqdm
 
             bar = tqdm(total=len(pairs), desc="Mining relations", unit="pair")
-            on_progress = bar.update
+        on_progress = self._progress_hook("pairs", len(pairs), bar)
         try:
             sense_outputs = await run_throttled(
                 sense_factory,
@@ -976,6 +982,27 @@ class RelationMiner:
             )
         return results
 
+    def _progress_hook(self, stage: str, total: int, bar: Any = None):
+        """A ``run_throttled`` progress callback feeding ``bar`` and ``on_progress``.
+
+        Returns None when neither is set, so the throttle skips the call entirely.
+        """
+        if bar is None and self.on_progress is None:
+            return None
+        done = 0
+        if self.on_progress is not None:
+            self.on_progress(stage, 0, total)
+
+        def tick() -> None:
+            nonlocal done
+            done += 1
+            if bar is not None:
+                bar.update()
+            if self.on_progress is not None:
+                self.on_progress(stage, done, total)
+
+        return tick
+
     async def _estimate_strengths(
         self,
         atoms: dict[str, Atom],
@@ -1007,6 +1034,7 @@ class RelationMiner:
                 ),
                 edge_indices,
                 max_concurrency=self.max_concurrency,
+                on_progress=self._progress_hook("strength", len(edge_indices)),
             )
             self._record_call_errors("strength_verbalized", outputs)
             for idx, out in zip(edge_indices, outputs):
@@ -1020,6 +1048,7 @@ class RelationMiner:
                 ),
                 edge_indices,
                 max_concurrency=self.max_concurrency,
+                on_progress=self._progress_hook("strength", len(edge_indices)),
             )
             self._record_call_errors("strength_surrogate_logprobs", outputs)
             for idx, out in zip(edge_indices, outputs):
@@ -1035,6 +1064,7 @@ class RelationMiner:
             ),
             jobs,
             max_concurrency=self.max_concurrency,
+            on_progress=self._progress_hook("strength", len(jobs)),
         )
         self._record_call_errors("strength_surrogate_sampled", outputs)
         per_edge: dict[int, list[str]] = {idx: [] for idx in edge_indices}

@@ -108,6 +108,9 @@ dependencies = [
 # GPU node: `pip install "vllm>=0.28"` (0.28.0 patches its own known advisories).
 # RITS backends (IBM internal). See README for the mellea-ibm install source.
 rits = ["mellea-ibm"]
+# The Logical Coherence demo (`fact-reasoner-lcs-demo`): a FastAPI backend and a
+# static Carbon page. Floors are the versions already in uv.lock.
+demo = ["fastapi>=0.143.0", "uvicorn>=0.54.0"]
 # `pytest-asyncio` is required, not optional: the pytest config below sets
 # `asyncio_mode = "auto"`, and without the plugin every `async def` test is
 # reported as a failure ("async def functions are not natively supported")
@@ -133,6 +136,7 @@ telemetry = ["mellea[telemetry]"]
 [project.scripts]
 fact-reasoner = "fact_reasoner.cli:main"
 fact-reasoner-lcs = "fact_reasoner.lcs.cli:main"
+fact-reasoner-lcs-demo = "fact_reasoner.demo.app:main"
 locobench-generate = "fact_reasoner.locobench.cli:main"
 locobench-lcs-eval = "fact_reasoner.locoeval.cli:main"
 

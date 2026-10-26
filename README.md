@@ -208,6 +208,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 | RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
 | Atomizer / NLI LoRA adapters | vLLM `--enable-lora` | Fine-tuned granite-4.2-8b stages; see [LoRA adapters](#lora-adapters-atomization-and-nli). |
 | Telemetry         | `[telemetry]` | OpenTelemetry traces and metrics; see [Telemetry](#telemetry). |
+| Coherence demo    | `[demo]` | FastAPI + Carbon web UI, `fact-reasoner-lcs-demo`; see [docs/examples/lcs/demo.md](docs/examples/lcs/demo.md). |
 
 ### Dependencies
 
@@ -1449,6 +1450,7 @@ See the `docs/` directory for complete examples:
 | `docs/examples/core/ex_nli.py` | NLI extraction |
 | `docs/examples/core/ex_retriever.py` | Context retrieval |
 | `docs/examples/core/ex_summarizer.py` | Context summarization |
+| `docs/examples/lcs/demo.md` | Interactive Logical Coherence demo (claims, relation graph, LCS scores) |
 
 ## Citation
 
