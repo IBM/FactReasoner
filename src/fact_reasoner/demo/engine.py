@@ -102,6 +102,9 @@ BACKENDS = ("rits", "ollama")
 #: Most pasted evidence passages accepted (each is compared with every claim).
 MAX_PASTED_PASSAGES = 12
 
+#: Seconds a stopped run may take to wind down before it is ended regardless.
+STOP_GRACE_SECONDS = 8.0
+
 #: The Ollama decision model that scores factuality NLI on the Ollama backend.
 DEFAULT_DECISION_MODEL = "kev"
 
@@ -238,11 +241,19 @@ class Run:
     cancelled: bool = False
     # The asyncio task currently running for this run (on the worker loop).
     task: asyncio.Task | None = None
+    # Backend cache keys this run used: closed and evicted if the run is stopped.
+    backend_keys: set[tuple[str, str]] = field(default_factory=set)
     cond: threading.Condition = field(default_factory=threading.Condition)
 
     def emit(self, kind: str, **data: Any) -> None:
-        """Append an event and wake every listener."""
+        """Append an event and wake every listener.
+
+        Nothing is appended once the run has ended: a step that finishes after
+        a forced stop must not resurrect it.
+        """
         with self.cond:
+            if self.done:
+                return
             self.events.append({"type": kind, **data})
             if kind in ("result", "error", "stopped"):
                 self.done = True
@@ -535,11 +546,28 @@ class Engine:
         run = self._runs.get(run_id)
         if run is None or run.done:
             return False
+        if run.cancelled:
+            return True
         run.cancelled = True
         task = run.task
-        if task is not None and not task.done():
+        cancellable = task is not None and not task.done()
+        if cancellable:
             self._loop.call_soon_threadsafe(task.cancel)
+        # Acknowledge at once, server-side, so every listener shows it.
+        run.emit(
+            "stopping",
+            message="Stopping…" if cancellable else "Stopping after the current step…",
+        )
+        # A step that ignores cancellation (e.g. the NLI call FactReasoner runs
+        # on its own loop) must not leave the run hanging: after a grace period
+        # end it as stopped; the worker discards whatever that step returns.
+        threading.Timer(STOP_GRACE_SECONDS, self._force_stopped, args=(run,)).start()
         return True
+
+    @staticmethod
+    def _force_stopped(run: Run) -> None:
+        if not run.done:
+            run.emit("stopped", message="Stopped", claims_kept=bool(run.claims), forced=True)
 
     def rescore(self, run_id: str, priors: Mapping[str, float]) -> dict[str, Any]:
         """Re-score a finished run's coherence under edited priors (no LLM calls).
@@ -602,6 +630,8 @@ class Engine:
                     run.emit("error", message=f"{type(e).__name__}: {e}")
             finally:
                 run.task = None
+                if run.cancelled:
+                    self._release_backends(run)
             return
         priors, box = extra
         try:
@@ -610,8 +640,10 @@ class Engine:
             traceback.print_exc()
             box.put((False, f"{type(e).__name__}: {e}"))
 
-    def _backend(self, kind: str, name: str) -> Any:
+    def _backend(self, kind: str, name: str, run: Run | None = None) -> Any:
         key = (kind, name)
+        if run is not None:
+            run.backend_keys.add(key)
         if key in self._backends:
             return self._backends[key]
         if self.dry_run:
@@ -632,6 +664,45 @@ class Engine:
                 backend = build_backend("ollama", model_id=name, base_url=self.ollama_host)
         self._backends[key] = backend
         return backend
+
+    def _release_backends(self, run: Run) -> None:
+        """Abort a stopped run's in-flight model requests, then drop its backends.
+
+        Cancelling the run's task is not enough: Mellea sends every generation
+        as a DETACHED task (``ModelOutputThunk._gen.generate``, created inside
+        ``generate_from_context``), which no cancellation reaches. Each one keeps
+        its request open and the server keeps generating, so after one stopped
+        SIMBA-UQ mining run ~100 requests linger and hold every server slot,
+        and the next run waits behind work nobody wants. Only one run is ever
+        active and this loop is its own, so every task still on it belongs to
+        the stopped run: cancel them all (closing their sockets, which aborts the
+        server-side generation), then close and evict the backends so the next
+        run builds fresh ones (a closed backend cannot be reused).
+        """
+        self._cancel_loop_tasks()
+        for key in run.backend_keys:
+            backend = self._backends.pop(key, None)
+            if backend is None or self.dry_run:
+                continue
+            aclose = getattr(backend, "aclose", None)
+            try:
+                if aclose is not None:
+                    self._loop.run_until_complete(asyncio.wait_for(aclose(), 10))
+                elif hasattr(backend, "close"):
+                    backend.close()
+            except Exception:  # noqa: BLE001 - best effort; the backend is dropped anyway
+                traceback.print_exc()
+
+    def _cancel_loop_tasks(self, timeout: float = 10.0) -> int:
+        """Cancel every task still pending on the worker loop; return how many."""
+        pending = [t for t in asyncio.all_tasks(self._loop) if not t.done()]
+        for t in pending:
+            t.cancel()
+        if pending:
+            self._loop.run_until_complete(
+                asyncio.wait(pending, timeout=timeout)
+            )
+        return len(pending)
 
     @staticmethod
     def _checkpoint(run: Run) -> None:
@@ -656,7 +727,7 @@ class Engine:
         claims_backend = None
         if not run.given_claims:
             run.emit("stage", stage="setup", message=f"Connecting to {claims_name} ({claims_kind})")
-            claims_backend = self._backend(claims_kind, claims_name)
+            claims_backend = self._backend(claims_kind, claims_name, run)
 
         # -- 1. claims ---------------------------------------------------------
         t = time.perf_counter()
@@ -675,7 +746,7 @@ class Engine:
         if s.wants_factuality:
             self._checkpoint(run)
             t = time.perf_counter()
-            fact_backend = self._backend(s.fact_backend, s.fact_model)
+            fact_backend = self._backend(s.fact_backend, s.fact_model, run)
             factuality = self._factuality(run, fact_backend, atoms)
             timing["factuality"] = time.perf_counter() - t
             run.emit("factuality", **factuality)
@@ -702,7 +773,7 @@ class Engine:
         if gold is not None:
             run.mining = _mining_from_gold(atoms, gold["relations"], run.priors)
         else:
-            miner = self._miner(self._backend(s.coh_backend, s.coh_model), s, run)
+            miner = self._miner(self._backend(s.coh_backend, s.coh_model, run), s, run)
             run.mining = self._run_async(
                 run, miner.amine_from_atoms(atoms, run.response, node_priors=run.priors)
             )
@@ -731,7 +802,6 @@ class Engine:
 
     def _atomize(self, run: Run, backend: Any) -> dict[str, Atom]:
         from fact_reasoner.core.atomizer import Atomizer
-        from fact_reasoner.core.utils import build_atoms
 
         gold = self._replay(run)
         if gold is not None:
@@ -742,12 +812,18 @@ class Engine:
 
             sents = [run.response[a:b] for a, b in split_sentences(run.response)]
             return {f"a{i}": Atom(id=f"a{i}", text=t) for i, t in enumerate(sents)}
-        atoms = build_atoms(run.response, Atomizer(backend), query=run.query or None)
+        # The async batch API, run as the run's task on the worker loop, so a
+        # Stop cancels the model call instead of waiting for it (build_atoms is
+        # synchronous and cannot be interrupted).
+        (units,) = self._run_async(run, Atomizer(backend).run_batch([run.response]))
+        atoms = {f"a{i}": Atom(id=f"a{i}", text=v) for i, v in enumerate(units.values())}
         if run.settings.revise_atoms and atoms:
             from fact_reasoner.core.reviser import Reviser
 
             ids = sorted(atoms, key=_atom_sort_key)
-            revised = Reviser(backend).run([atoms[a].text for a in ids], run.response)
+            revised = self._run_async(
+                run, Reviser(backend).run_batch([atoms[a].text for a in ids], run.response)
+            )
             for aid, rev in zip(ids, revised):
                 atoms[aid].set_text(rev.get("revised_unit") or atoms[aid].text)
         return atoms

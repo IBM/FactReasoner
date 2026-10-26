@@ -41,11 +41,12 @@ import argparse
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from fact_reasoner.demo.engine import (
@@ -216,6 +217,20 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
             raise HTTPException(404, "Unknown run, or it has not finished mining.") from e
         except RuntimeError as e:
             raise HTTPException(500, str(e)) from e
+
+    @app.get("/", response_class=HTMLResponse)
+    def index() -> HTMLResponse:
+        """The page, with each asset tagged by its file's modification time.
+
+        A browser that cached an older ``app.js`` would otherwise keep running
+        it after an update -- silently missing new features (e.g. the Stop
+        button's handler). Tagging by mtime makes every change a new URL.
+        """
+        html = (STATIC_DIR / "index.html").read_text()
+        for name in ("app.js", "style.css"):
+            tag = int((STATIC_DIR / name).stat().st_mtime)
+            html = re.sub(rf'{re.escape(name)}\?v=[^"]*', f"{name}?v={tag}", html)
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

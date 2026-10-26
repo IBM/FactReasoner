@@ -24,10 +24,13 @@ real FactReasoner inference behind the factuality view.
 
 import json
 import os
+import re
 import threading
+import time
 
 import pytest
 
+from fact_reasoner.core.base import Atom
 from fact_reasoner.experiments.mock import make_mock_backend
 
 fastapi = pytest.importorskip("fastapi")
@@ -457,7 +460,8 @@ class TestPipelineModels:
         examples = load_examples(DATA)
         engine = Engine(models=load_models(MODELS), merlin_path=None, dry_run=True, replays=examples)
         real = engine._backend
-        monkeypatch.setattr(engine, "_backend", lambda kind, name: used.append((kind, name)) or real(kind, name))
+        monkeypatch.setattr(engine, "_backend",
+                            lambda kind, name, run=None: used.append((kind, name)) or real(kind, name, run))
         ex = examples[1]
         try:
             run = engine.submit(ex["response"], settings=Settings.from_json({
@@ -567,3 +571,105 @@ class TestStopAndReuse:
     def test_stop_endpoint(self, client):
         c, _ = client
         assert c.post("/api/runs/nope/stop").status_code == 404
+
+    def _live_like_engine(self, monkeypatch):
+        """A non-dry-run engine (so the real atomizer path runs) with fake models."""
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        return Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                      backend_factory=lambda kind, name: make_mock_backend(name))
+
+    def test_stop_during_claim_extraction(self, monkeypatch):
+        """Atomization runs as a cancellable task: Stop does not wait for it."""
+        import asyncio
+
+        from fact_reasoner.core import atomizer as atomizer_mod
+
+        started = threading.Event()
+
+        async def hang(self, responses):
+            started.set()
+            await asyncio.sleep(60)
+
+        monkeypatch.setattr(atomizer_mod.Atomizer, "run_batch", hang)
+        engine = self._live_like_engine(monkeypatch)
+        try:
+            run = engine.submit("A claim. Another claim.", settings=Settings.from_json(
+                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+            assert started.wait(30)
+            t = time.perf_counter()
+            assert engine.stop(run.id) is True
+            with run.cond:
+                run.cond.wait_for(lambda: run.done, timeout=10)
+            kinds = [e["type"] for e in run.events]
+            assert kinds[-2:] == ["stopping", "stopped"]
+            assert time.perf_counter() - t < 2  # cancelled, not waited out
+            assert run.events[-1]["claims_kept"] is False
+        finally:
+            engine.close()
+
+    def test_uncancellable_step_is_force_stopped(self, monkeypatch):
+        """A step that ignores cancellation ends as stopped after the grace period."""
+        from fact_reasoner.demo import engine as engine_mod
+
+        monkeypatch.setattr(engine_mod, "STOP_GRACE_SECONDS", 0.3)
+        engine = self._live_like_engine(monkeypatch)
+        release = threading.Event()
+        monkeypatch.setattr(engine, "_atomize", lambda run, backend: release.wait(10) or {})
+        try:
+            run = engine.submit("A claim.", settings=Settings.from_json(
+                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+            time.sleep(0.2)
+            assert engine.stop(run.id) is True
+            stopping = next(e for e in run.events if e["type"] == "stopping")
+            assert stopping["message"] == "Stopping after the current step…"
+            with run.cond:
+                run.cond.wait_for(lambda: run.done, timeout=5)
+            assert run.events[-1]["type"] == "stopped" and run.events[-1]["forced"] is True
+            n = len(run.events)
+            release.set()  # the stuck step returns late...
+            time.sleep(0.3)
+            assert len(run.events) == n  # ...and cannot add events to a stopped run
+        finally:
+            release.set()
+            engine.close()
+
+    def test_stop_cancels_detached_tasks_and_drops_backends(self, monkeypatch):
+        """Model calls Mellea detaches from our task tree must not outlive a stop.
+
+        Mellea sends each generation as its own task, so cancelling the run's
+        task leaves them running (holding a server slot each). Stop must cancel
+        every task left on the worker loop and evict the run's backends.
+        """
+        import asyncio
+
+        engine = self._live_like_engine(monkeypatch)
+        detached, started = [], threading.Event()
+
+        class Hang:
+            async def amine_from_atoms(self, *a, **k):
+                # Like Mellea's ModelOutputThunk._gen.generate: not awaited by us.
+                detached.append(asyncio.get_running_loop().create_task(asyncio.sleep(60)))
+                started.set()
+                await asyncio.sleep(60)
+
+        monkeypatch.setattr(engine, "_miner", lambda *a, **k: Hang())
+        monkeypatch.setattr(engine, "_atomize", lambda run, backend: {
+            "a0": Atom(id="a0", text="One."), "a1": Atom(id="a1", text="Two.")})
+        try:
+            run = engine.submit("One. Two.", settings=Settings.from_json(
+                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+            assert started.wait(30)
+            assert ("rits", "llama-3.3-70b-instruct") in engine._backends
+            engine.stop(run.id)
+            with run.cond:
+                run.cond.wait_for(lambda: run.done, timeout=10)
+            time.sleep(0.3)
+            assert detached and detached[0].cancelled()
+            assert ("rits", "llama-3.3-70b-instruct") not in engine._backends
+        finally:
+            engine.close()
+
+    def test_page_assets_are_cache_busted(self, client):
+        c, _ = client
+        page = c.get("/").text
+        assert re.search(r'app\.js\?v=\d{9,}', page) and re.search(r'style\.css\?v=\d{9,}', page)

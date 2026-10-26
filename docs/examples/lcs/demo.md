@@ -105,10 +105,13 @@ can stand in for `--merlin-path`.
 
 - **Examples** sit above the editor. The Voyager pair ships evidence passages, used
   with *Paste evidence*.
-- **Stop** appears next to Analyze while a run is in progress. A stopped run keeps the
-  claims it had already extracted. Stopping during relation mining takes effect at
-  once; during claim extraction or the factuality NLI step, it takes effect when that
-  step returns (a few seconds).
+- **Stop** appears next to Analyze while a run is in progress. The status shows
+  *Stopping…* at once, then *Stopped · claims kept*. Claim extraction and relation
+  mining are cancelled mid-call (about 0.3 s on a live Ollama run). The factuality NLI
+  step, which FactReasoner runs on its own event loop, stops when it returns; a step
+  that ignores the stop is cut off after 8 s. Stopping also cancels the model
+  requests still in flight, so the next run starts at once instead of queueing
+  behind them.
 - **Claims are kept between runs.** Once a response's claims are extracted, every
   later run on the same text reuses exactly those claims (same ids, same wording),
   whatever the analysis or settings. So switching from Factuality to Coherence

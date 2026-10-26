@@ -300,8 +300,9 @@
   }
 
   async function stopRun() {
-    if (!S.runId) return;
-    $("#stop").setAttribute("disabled", "");
+    if (!S.runId || S.stopping) return;
+    // Say so at once; the server confirms with a "stopping" event.
+    S.stopping = true;
     setBusy(true, "Stopping…");
     $("#stop").setAttribute("disabled", "");
     try {
@@ -372,6 +373,7 @@
       body.evidence = $("#evidence-text").value || "";
     }
     S.whatIf = false;
+    S.stopping = false;
     // The results panel shows only what this run computes; "both" ends on coherence.
     $("#result-tabs").hidden = settings.mode !== "both";
     showTab(settings.mode === "factuality" ? "factuality" : "coherence");
@@ -403,8 +405,9 @@
     S.source = es;
     const on = (type, fn) => es.addEventListener(type, (ev) => fn(JSON.parse(ev.data)));
     on("queued", (d) => setBusy(true, d.position ? `Queued behind ${d.position} run(s)` : "Starting"));
-    on("stage", (d) => setBusy(true, d.message));
+    on("stage", (d) => { if (!S.stopping) setBusy(true, d.message); });
     on("progress", (d) => {
+      if (S.stopping) return;
       const what = d.stage === "pairs" ? "Classifying claim pairs" : "Estimating relation strength";
       setBusy(true, `${what} · ${d.done}/${d.total}`, d.total ? d.done / d.total : null);
     });
@@ -432,7 +435,13 @@
       stopStream();
     });
     on("error", (d) => { setBusy(false); showError(d.message); stopStream(); });
+    on("stopping", (d) => {
+      S.stopping = true;
+      setBusy(true, d.message || "Stopping…");
+      $("#stop").setAttribute("disabled", "");
+    });
     on("stopped", (d) => {
+      S.stopping = false;
       setBusy(false, d.claims_kept ? "Stopped · claims kept" : "Stopped");
       stopStream();
       renderClaims(); renderFactuality(); renderScores();
@@ -496,7 +505,7 @@
     if (busy) $("#analyze").setAttribute("disabled", ""); else $("#analyze").removeAttribute("disabled");
     // Stop is offered exactly while a run is in flight.
     $("#stop").hidden = !busy;
-    $("#stop").removeAttribute("disabled");
+    if (!S.stopping) $("#stop").removeAttribute("disabled");
   }
 
   function showError(msg) {
