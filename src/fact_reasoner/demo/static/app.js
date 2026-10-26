@@ -16,7 +16,8 @@
     config: null,
     runId: null,
     response: "",
-    mode: "both",        // factuality | coherence | both (as last run)
+    mode: "factuality",  // factuality | coherence | both (as last run)
+    whatIf: false,       // per-claim prior sliders opened after a coherence run
     claims: [],          // [{id, label, text, original, span}]
     fact: null,          // the factuality payload (engine._factuality_payload)
     priors: {},          // {id: coherence prior}
@@ -32,7 +33,6 @@
     factView: "evidence",
     source: null,        // EventSource
     exampleId: null,
-    examplePriors: null, // {claim text: prior} for the selected example
     rescoreTimer: null,
   };
   const $ = (sel) => document.querySelector(sel);
@@ -102,8 +102,8 @@
       fact_model: val("fact-model") || "",
       coh_backend: backendOf("coh"),
       coh_model: val("coh-model") || "",
-      prior_mode: priorMode(),
-      flat_prior: num("flat-prior"),
+      prior_mode: "flat",
+      flat_prior: 0.5,
       methods: methods.length ? methods : ["mean_marginal"],
       window: num("window", parseInt),
       ibound: num("ibound", parseInt),
@@ -117,46 +117,51 @@
     return s;
   }
 
-  function priorMode() {
-    return $("#prior-mode").value || "flat";
-  }
-
   function currentMode() {
-    return $("#mode").value || "both";
+    return $("#mode").value || "factuality";
   }
 
-  /* Show only the settings the chosen mode uses, and the priors the mode allows:
-   * in "both" the coherence priors ARE the factuality posteriors. */
+  const MODE_TEXT = {
+    factuality: {
+      button: "Check factuality",
+      note: "Checks each claim against evidence. Coherence is not run.",
+    },
+    coherence: {
+      button: "Analyze coherence",
+      note: "Mines the relations between claims, with a uniform 0.5 prior on every claim. Factuality is not run.",
+    },
+    both: {
+      button: "Analyze coherence with factuality priors",
+      note: "Checks the claims against evidence first, then uses each claim's factuality posterior as its coherence prior.",
+    },
+  };
+
+  /* The analysis choice drives everything else: which settings card is in play
+   * (the other is dimmed, never hidden, so the layout does not move), whether
+   * the evidence box shows, and the coherence priors. */
   function syncMode() {
     const m = currentMode();
     const fact = m !== "coherence", coh = m !== "factuality";
-    for (const n of document.querySelectorAll('[data-needs="factuality"]')) n.hidden = !fact;
-    for (const n of document.querySelectorAll('[data-needs="coherence"]')) n.hidden = !coh;
-    $("#both-priors-hint").hidden = m !== "both";
-    $("#prior-mode-wrap").hidden = m === "both";
+    $("#pipe-fact").classList.toggle("unused", !fact);
+    $("#pipe-coh").classList.toggle("unused", !coh);
     // Claims come from the factuality model unless only coherence runs.
     $("#coh-claims-note").hidden = m !== "coherence";
-    $("#pipelines").classList.toggle("single", m !== "both");
+    $("#priors-text").textContent = m === "both" ? "factuality posteriors" : "uniform 0.5";
+    $("#analysis-note").textContent = MODE_TEXT[m].note;
+    $("#analyze").firstChild.textContent = MODE_TEXT[m].button + " ";
     syncEvidence();
-    syncPriorMode();
-    syncSummary();
-    $("#analyze").firstChild.textContent = { factuality: "Check factuality", coherence: "Analyze coherence", both: "Analyze" }[m] + " ";
   }
 
   function syncEvidence() {
     const pasted = $("#evidence").value === "pasted";
     const fact = currentMode() !== "coherence";
     $("#evidence-wrap").hidden = !(fact && pasted);
-    $("#retrieval-wrap").hidden = pasted;
-    $("#pairs-wrap").hidden = pasted;
-  }
-
-  function syncPriorMode() {
-    const m = priorMode();
-    const both = currentMode() === "both";
-    $("#flat-prior-wrap").hidden = both || m !== "flat";
-    $("#manual-hint").hidden = both || m !== "manual";
-    renderClaims();
+    // Retrieval settings stay in place (the grid must not shift), just inactive.
+    for (const id of ["retrieval-wrap", "pairs-wrap"]) {
+      const f = document.getElementById(id);
+      f.classList.toggle("off", pasted);
+      f.title = pasted ? "Not used with pasted evidence" : "";
+    }
   }
 
   const backendOf = (pipe) => $(`#${pipe}-backend`).value || "rits";
@@ -189,7 +194,6 @@
     const anyOllama = factOllama || cohOllama;
     $("#ollama-line").hidden = !anyOllama;
     $("#ollama-empty").hidden = !anyOllama || (S.ollama || []).length > 0;
-    syncSummary();
   }
 
   function showDecision(status) {
@@ -197,25 +201,6 @@
     S.decision = st;
     for (const n of document.querySelectorAll("[data-decision]")) n.textContent = st.model;
     $("#decision-missing").hidden = !!st.available || S.config.dry_run;
-  }
-
-  /* One line that says what will run, shown even when the settings are hidden. */
-  function syncSummary() {
-    if (!S.config) return;
-    const m = currentMode();
-    const parts = [];
-    if (m !== "coherence") {
-      const nli = backendOf("fact") === "ollama" ? `NLI ${(S.decision && S.decision.model) || "kev"}` : `NLI ${$("#nli_method").value || "auto"}`;
-      parts.push(`Factuality: ${$("#fact-model").value || "–"} · ${nli} · ${LABELS.evidence[$("#evidence").value] || ""}`);
-    }
-    if (m !== "factuality") {
-      const strength = backendOf("coh") === "ollama" ? "verbalized" : ($("#strength_method").value || "auto");
-      const priors = m === "both" ? "factuality priors" : `${priorMode()} priors`;
-      parts.push(`Coherence: ${$("#coh-model").value || "–"} · strength ${strength} · ${priors}`);
-    }
-    const box = $("#settings-summary");
-    box.innerHTML = "";
-    parts.forEach((t, i) => box.append(el("span", { class: "sum " + (t.startsWith("Factuality") ? "sum-fact" : "sum-coh") }, t)));
   }
 
   async function refreshOllama() {
@@ -274,16 +259,13 @@
 
   function pickExample(e) {
     S.exampleId = e.id;
-    S.examplePriors = e.claim_priors || null;
     for (const b of document.querySelectorAll("#examples button")) {
       b.setAttribute("aria-pressed", String(b.dataset.id === e.id));
     }
     showEditor();
     $("#response").value = e.response;
     $("#query").value = e.query || "";
-    // The Voyager pair ships its 0.9 / 0.1 priors (used in Coherence mode) and
-    // evidence passages (used by Factuality / Both with "Paste evidence").
-    if (S.examplePriors) setPriorMode("manual");
+    // The Voyager pair ships evidence passages (used with "Paste evidence").
     if (e.evidence && e.evidence.length) {
       $("#evidence-text").value = e.evidence.join("\n\n");
       if (S.config.dry_run || $("#evidence").value === "pasted") {
@@ -291,7 +273,27 @@
       }
     }
     syncEvidence();
-    syncSummary();
+  }
+
+  /* After a coherence-only run, per-claim prior sliders let you ask "what if
+   * this claim were more (or less) plausible?": each drag re-scores the mined
+   * graph with no model calls. Starting the sliders from the uniform 0.5. */
+  function toggleWhatIf() {
+    S.whatIf = !S.whatIf;
+    if (!S.whatIf) {
+      for (const c of S.claims) S.priors[c.id] = 0.5;
+      scheduleRescore();
+    }
+    syncWhatIf();
+    renderClaims();
+  }
+
+  function syncWhatIf() {
+    const can = S.mode === "coherence" && S.relations.length > 0;
+    const btn = $("#what-if");
+    btn.hidden = !can;
+    btn.textContent = S.whatIf ? "Reset priors to 0.5" : "What if? Edit claim priors";
+    $("#whatif-hint").hidden = !(can && S.whatIf);
   }
 
   function setSettingsOpen(open) {
@@ -315,10 +317,7 @@
     }
   }
 
-  function setPriorMode(m) {
-    setDropdown("prior-mode", m);
-    syncPriorMode();
-  }
+
 
   // ---------------------------------------------------------------- run
   async function analyze() {
@@ -336,14 +335,13 @@
     const settings = readSettings();
     S.mode = settings.mode;
     const body = { response, query: $("#query").value || "", settings };
-    if (settings.prior_mode === "manual" && S.examplePriors && response === exampleResponse()) {
-      body.priors = S.examplePriors;
-    }
     if (settings.mode !== "coherence" && settings.evidence === "pasted") {
       body.evidence = $("#evidence-text").value || "";
     }
-    // Open the tab for what this run computes first.
-    showTab(settings.mode === "coherence" ? "coherence" : "factuality");
+    S.whatIf = false;
+    // The results panel shows only what this run computes; "both" ends on coherence.
+    $("#result-tabs").hidden = settings.mode !== "both";
+    showTab(settings.mode === "factuality" ? "factuality" : "coherence");
     let r;
     try {
       r = await fetch("api/analyze", {
@@ -358,8 +356,6 @@
       setBusy(false); showError(msg.detail || `Request failed (${r.status}).`); return;
     }
     S.runId = (await r.json()).run_id;
-    // Give the results the room: the summary line still says what is running.
-    setSettingsOpen(false);
     showHighlighted();
     listen(S.runId);
   }
@@ -420,7 +416,7 @@
     S.relations = d.relations || [];
     S.diagnostics = d.diagnostics || {};
     S.coverage = d.coverage || S.coverage;
-    renderClaims(); renderGraph(); renderScores();
+    renderClaims(); renderGraph(); renderScores(); syncWhatIf();
   }
 
   function scheduleRescore() {
@@ -437,7 +433,7 @@
     });
     if (!r.ok) { setBusy(false); showError("Re-scoring failed."); return; }
     applyResult(await r.json());
-    setBusy(false, "Re-scored · no model calls");
+    setBusy(false, S.whatIf ? "What-if re-scored · no model calls" : "Re-scored · no model calls");
   }
 
   // ------------------------------------------------------------- status
@@ -600,7 +596,7 @@
     }
     const showFact = S.mode !== "coherence";
     const showCoh = S.mode !== "factuality";
-    const manual = showCoh && S.mode !== "both" && priorMode() === "manual" && S.relations.length;
+    const manual = showCoh && S.mode === "coherence" && S.whatIf && S.relations.length;
     const focus = activeIds();
     const factM = (S.fact && S.fact.marginals) || {};
     for (const c of S.claims) {
@@ -797,7 +793,8 @@
     ctxs.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: (c.title || c.id).slice(0, 28) },
       position: { x: 320, y: (i + 0.5) * (h / ctxs.length) }, classes: "ctx" }));
     fcy.add(els.concat(edges));
-    fcy.layout({ name: "preset", fit: true, padding: 30 }).run();
+    fcy.layout({ name: "preset", fit: false }).run();
+    fitGraph(fcy, 30);
     paintFocus();
   }
 
@@ -833,17 +830,31 @@
     $("#view-coherence").hidden = which !== "coherence";
     // Cytoscape cannot size a hidden container; redraw once visible.
     requestAnimationFrame(() => {
-      if (which === "coherence" && cy) { cy.resize(); cy.fit(undefined, 32); }
+      if (which === "coherence" && cy) { cy.resize(); fitGraph(cy, 32); }
       if (which === "factuality") renderFactGraph();
     });
+  }
+
+  /* Fit a graph to its canvas, but never past its natural size (zoom 1): a
+   * five-claim graph in a tall panel should stay at its designed node size,
+   * centred, not blow up to fill the space. Dense graphs still zoom out. */
+  function fitGraph(g, padding) {
+    if (!g || g.elements().empty()) return;
+    g.fit(undefined, padding);
+    if (g.zoom() > 1.15) g.zoom(1.15);
+    g.center();
   }
 
   /* Graph canvases are flex-sized: refit them when the panel changes size. */
   function watchGraphSize() {
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
-      if (cy && !$("#view-coherence").hidden) { cy.resize(); cy.fit(undefined, 32); }
-      if (fcy && !$("#fact-graph-wrap").hidden) { fcy.resize(); fcy.fit(undefined, 30); }
+      if (cy && !$("#view-coherence").hidden) {
+        cy.resize();
+        if (S.claims.length && S.claims.length <= 12 && S.view !== "mrf") cy.layout(layoutOptions()).run();
+        fitGraph(cy, 32);
+      }
+      if (fcy && !$("#fact-graph-wrap").hidden) { fcy.resize(); fitGraph(fcy, 30); }
     });
     ro.observe($("#graph"));
     ro.observe($("#fact-graph"));
@@ -951,15 +962,17 @@
     const n = S.claims.length;
     if (n > 12 || S.view === "mrf") {
       return {
-        name: "cose", animate: false, randomize: false, padding: 28,
+        name: "cose", animate: false, randomize: false, padding: 28, fit: false,
         nodeRepulsion: () => (S.view === "mrf" ? 6000 : 12000),
         idealEdgeLength: () => (S.view === "mrf" ? 36 : 100),
       };
     }
     return {
-      name: "circle", padding: 36, fit: true, clockwise: true,
+      name: "circle", padding: 36, fit: false, clockwise: true,
       startAngle: -Math.PI / 2, sort: (a, b) => order(a.id()) - order(b.id()),
-      radius: Math.max(110, n * 17),
+      // Size the circle to the canvas: it fills ~70% of the shorter side, so
+      // a small graph uses the space instead of floating in it.
+      radius: Math.max(90, Math.min(cy ? Math.min(cy.width(), cy.height()) * 0.36 : 160, 60 + n * 32)),
     };
   }
   function order(id) {
@@ -996,12 +1009,7 @@
       cy.elements().remove();
       cy.add(graphElements());
       cy.layout(layoutOptions()).run();
-      if (cy.zoom() < 0.8 && S.claims.length <= 20) {
-        // A dense graph fitted to the canvas shrinks its labels; trade a little
-        // margin for legibility.
-        cy.zoom({ level: 0.8, position: { x: cy.width() / 2, y: cy.height() / 2 } });
-        cy.center();
-      }
+      fitGraph(cy, 32);
       cy.scratch("view", S.view);
       cy.scratch("relcount", S.relations.length);
     }
@@ -1138,7 +1146,7 @@
     Object.assign(S, { claims: [], fact: null, priors: {}, marginals: {}, relations: [], scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
     pinned = null;
     $("#edge-card").hidden = true;
-    renderClaims(); renderGraph(); renderScores(); renderFactuality();
+    renderClaims(); renderGraph(); renderScores(); renderFactuality(); syncWhatIf();
     $("#facts").innerHTML = "";
   }
 
@@ -1148,32 +1156,25 @@
     $("#edit").addEventListener("click", () => { stopStream(); setBusy(false); showEditor(); });
     $("#start-over").addEventListener("click", () => {
       stopStream(); setBusy(false); showError(null);
-      S.runId = null; S.response = ""; S.exampleId = null; S.examplePriors = null;
+      S.runId = null; S.response = ""; S.exampleId = null;
       $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
-      showEditor(); resetResults(); setSettingsOpen(true);
+      showEditor(); resetResults();
+      $("#result-tabs").hidden = false;
     });
-    $("#prior-mode").addEventListener("cds-dropdown-selected", () => { syncPriorMode(); syncSummary(); });
     $("#mode").addEventListener("cds-content-switcher-selected", syncMode);
     $("#fact-backend").addEventListener("cds-content-switcher-selected", syncBackend);
     $("#coh-backend").addEventListener("cds-content-switcher-selected", syncBackend);
-    $("#evidence").addEventListener("cds-dropdown-selected", () => { syncEvidence(); syncSummary(); });
-    for (const id of ["fact-model", "coh-model", "nli_method", "strength_method"]) {
-      $("#" + id).addEventListener("cds-dropdown-selected", syncSummary);
-    }
+    $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
-    $("#open-advanced").addEventListener("click", () => {
-      const adv = $("#coh-advanced");
-      adv.hidden = !adv.hidden;
-      $("#open-advanced").textContent = adv.hidden ? "More coherence settings" : "Fewer coherence settings";
-    });
+    $("#what-if").addEventListener("click", toggleWhatIf);
     $("#refresh-ollama").addEventListener("click", refreshOllama);
     $("#result-tabs").addEventListener("cds-tabs-selected", (e) => showTab(e.detail.item.value));
     $("#fact-view").addEventListener("cds-content-switcher-selected", (e) => {
       S.factView = e.detail.item.value;
       renderFactGraph();
     });
-    for (const out of document.querySelectorAll(".slider-head [data-for]")) {
+    for (const out of document.querySelectorAll("[data-for]")) {
       const sl = document.getElementById(out.dataset.for);
       const show = () => { out.textContent = fmt(parseFloat(sl.value), 2); };
       sl.addEventListener("cds-slider-changed", show);
@@ -1233,6 +1234,11 @@
     // Deep link / QA: ?mode=factuality|coherence|both&example=<id>&run=1.
     const q = new URLSearchParams(location.search);
     if (q.get("mode")) setSwitcher("mode", q.get("mode"));
+    // Open by default; on a phone the two stacked cards would push the response
+    // a long way down, so there the panel starts closed (one tap to open).
+    if (q.get("settings") === "hidden" || window.matchMedia("(max-width: 860px)").matches) {
+      setSettingsOpen(false);
+    }
     syncMode();
     renderScores();
     renderFactuality();
@@ -1250,6 +1256,9 @@
     }
     if (q.get("view") === "mrf") S.view = "mrf";
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
+    if (q.get("whatif") === "1") {
+      const wait = setInterval(() => { if (S.relations.length) { clearInterval(wait); toggleWhatIf(); } }, 100);
+    }
     if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
     for (const pipe of ["fact", "coh"]) {
       if (q.get(pipe)) { setSwitcher(`${pipe}-backend`, q.get(pipe)); syncBackend(); }

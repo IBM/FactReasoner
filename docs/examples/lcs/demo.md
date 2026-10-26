@@ -16,15 +16,26 @@ Paste a response and the demo:
    (entails / contradicts / equivalent / exclusive, line width = strength `p`). It then
    solves the coherence MRF for the **LCS readouts**: mean marginal, consistency and
    normalized log partition (reified is optional).
-4. **Both**: runs factuality first, and uses its posteriors as the coherence priors.
+4. **Coherence with factuality priors**: runs factuality first, and uses its posteriors as the coherence priors.
 
-![The demo on the paper's incoherent Voyager response, Both mode](demo-screenshot.png)
+![The demo on the paper's incoherent Voyager response, coherence with factuality priors](demo-screenshot.png)
 
 **Layout.** The settings span the top in two cards: **Factuality pipeline** (blue) and
-**Coherence pipeline** (purple). The result tabs below use the same colours. Under the
-settings, the response and claims sit on the left. The results sit on the right in a
-panel that fills the viewport, and the graphs grow to fill it. Starting a run collapses
-the settings to a one-line summary of what is running; *Show settings* opens them again.
+**Coherence pipeline** (purple). Both cards share one grid, so their fields line up
+row by row. The panel is open by default, *Hide* collapses it, and on a phone it
+starts collapsed. Under the settings, the response and claims sit on the left. The
+results sit on the right in a panel that fills the viewport.
+
+**Analysis.** Under the response, three buttons pick what a run computes:
+
+| Analysis | Runs | Claim priors | Results panel |
+|---|---|---|---|
+| **Factuality** (default) | claims → evidence → NLI → inference | n/a | Factuality only |
+| **Coherence** | claims → relation miner → MRF | uniform 0.5 | Coherence only |
+| **Coherence with factuality priors** | both, chained | each claim's factuality posterior | both tabs, opening on Coherence |
+
+The settings card a run doesn't use is dimmed and marked *not used by this analysis*.
+It is never hidden, so the layout doesn't move.
 
 The layout follows the IBM Research Demos Spaces (e.g. *Speech to Decisions with
 Granite*): a FastAPI backend and one hand-built page styled with the **Carbon design
@@ -73,7 +84,7 @@ lists only the **Voyager 1** pair (coherent and incoherent):
 - **Factuality** runs the real FactReasoner inference against the example's three
   shipped evidence passages. A lexical stand-in replaces the NLI model, so the true
   claims come out supported and the two false ones contradicted.
-- **Both** combines the two. The two responses get identical factuality (same claims,
+- **Coherence with factuality priors** combines the two. The two responses get identical factuality (same claims,
   same evidence), and coherence separates them.
 
 Retrieval needs a live run. Pasted text still works offline, but its claims and
@@ -91,12 +102,8 @@ can stand in for `--merlin-path`.
 
 ## Using it
 
-- **Factuality | Coherence | Both** in the header picks what one run computes. The
-  settings panel shows only what that mode uses. The results column has a tab per
-  analysis, and opens on the first one the run computes.
-- **Examples** sit above the editor. The Voyager pair ships the paper's 0.9 / 0.1
-  priors (used for coherence alone) and evidence passages (used for factuality with
-  *Paste evidence*).
+- **Examples** sit above the editor. The Voyager pair ships evidence passages, used
+  with *Paste evidence*.
 - **Each claim row** shows its factuality posterior with a ✓/✗ verdict, its coherence
   posterior against its prior, or both. **↓ below** marks a claim whose coherence
   posterior fell below its own prior: one the response's own argument undermines.
@@ -106,8 +113,9 @@ can stand in for `--merlin-path`.
   (prompt v2), which is highlighted in the text.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
-- **Manual priors** (coherence mode): after a run, drag a claim's prior and the
-  scores update with **no model calls**.
+- **What if?** After a *Coherence* run, *What if? Edit claim priors* adds a prior
+  slider to each claim, starting at the uniform 0.5. Drag one and the scores re-compute
+  on the mined graph with **no model calls**. *Reset priors to 0.5* puts them back.
 
 ### Control panel
 
@@ -123,9 +131,9 @@ can stand in for `--merlin-path`.
 | **Coherence pipeline** | |
 | Relation miner | RITS or Ollama, and which model. |
 | Relation strength | RITS: the estimator. Ollama: fixed to verbalized, since there are no logprobs. |
-| Coherence priors | Flat or manual. In **Both** the priors are the factuality posteriors. |
+| Claim priors | Read-only: set by the analysis (uniform 0.5, or factuality posteriors). |
 | LCS readouts | Which readouts to compute. They share the base inference runs. |
-| Mining | Prompt variant and candidate-pair policy. *More coherence settings* adds the sense menu, window, reconcile mode, Merlin i-bound, concession discount and the evidence-span requirement. |
+| Mining and inference | Prompt variant, sense menu, sense/coupling reconcile, candidate pairs, window radius, Merlin i-bound, concession discount, evidence-span requirement, LCS readouts. All shown, none hidden. |
 
 Analyses are queued and run one at a time on one worker thread with a persistent
 event loop. Mellea caches its async client per loop, and one run at a time also

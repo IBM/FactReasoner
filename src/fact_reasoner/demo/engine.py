@@ -104,7 +104,7 @@ class Settings:
     find.
     """
 
-    mode: str = "coherence"
+    mode: str = "factuality"
     # Factuality pipeline: the model behind its LLM components (claims, reviser,
     # summarizer). NLI is the chat model on RITS, the decision model on Ollama.
     fact_backend: str = "rits"

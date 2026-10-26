@@ -121,6 +121,10 @@ class TestSettings:
         with pytest.raises(ValueError):
             Settings.from_json({"methods": ["mean_marginal", "nope"]})
 
+    def test_default_analysis_is_factuality(self):
+        s = Settings.from_json({})
+        assert s.mode == "factuality" and s.wants_factuality and not s.wants_coherence
+
     def test_unknown_prior_mode_rejected(self):
         with pytest.raises(ValueError):
             Settings.from_json({"prior_mode": "oracle"})
@@ -281,6 +285,17 @@ class TestAPI:
         assert rs["priors"]["a3"] == pytest.approx(0.9)
         assert rs["marginals"]["a2"] > base["marginals"]["a2"]
         assert len(rs["relations"]) == len(base["relations"])
+
+    def test_coherence_only_uses_uniform_priors(self, client):
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        rid = c.post("/api/analyze",
+                     json={"response": ex["response"], "settings": {"mode": "coherence"}}).json()["run_id"]
+        events = _events(c, rid)
+        priors_ev = next(e for e in events if e["type"] == "priors")
+        assert priors_ev["source"] == "flat"
+        assert set(events[-1]["coherence"]["priors"].values()) == {0.5}
+        assert events[-1]["factuality"] is None
 
     def test_stub_run_on_free_text(self, client):
         c, _ = client

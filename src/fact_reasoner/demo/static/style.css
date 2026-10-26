@@ -69,9 +69,7 @@ body {
   padding-left: 12px; border-left: 1px solid var(--cds-border-subtle-01);
 }
 .header-actions { display: flex; align-items: center; gap: 4px; }
-.mode-switch { width: 330px; flex: 0 0 auto; }
-/* The analysis mode is the page's main switch: selected in interactive blue. */
-#mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-interactive); --cds-text-inverse: #fff; }
+
 
 /* ---------------- Workspace ---------------- */
 /* Settings span the top; below, response and results share the full height. */
@@ -87,7 +85,7 @@ body {
  * the score tiles leave, so no space sits idle under it. */
 .results { grid-area: results; position: sticky; top: 64px; height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
 .results .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.results .view > .graph-wrap { flex: 1; min-height: 300px; display: flex; flex-direction: column; }
+.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; max-height: 520px; display: flex; flex-direction: column; }
 .results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
 .results .fact-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .results .evidence-list { flex: 1; max-height: none; }
@@ -111,37 +109,61 @@ body {
 .hint { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--cds-text-helper); }
 .hint.warn { color: var(--cds-text-primary); border-left: 3px solid var(--cds-support-warning); padding-left: 8px; }
 
-/* ---------------- Settings: one card per pipeline ---------------- */
-.settings-head { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--cds-border-subtle-01); }
-.settings-summary { flex: 1; min-width: 0; margin: 0; font-size: 12px; color: var(--cds-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 20px; }
-.settings-summary .sum { overflow: hidden; text-overflow: ellipsis; padding-left: 8px; border-left: 3px solid var(--pipe-fact); }
-.settings-summary .sum-coh { border-left-color: var(--pipe-coh); }
+/* ---------------- Settings: one card per pipeline ----------------
+ * Both cards share one grid: 3 equal columns; every field is a fixed-height
+ * label line over a fixed-height control, so each row lines up across fields
+ * and across the two cards. Nothing inside a field may change its height. */
+.settings { --label-h: 18px; --ctl-h: 32px; }
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--cds-border-subtle-01); }
 .settings.collapsed .pipelines, .settings.collapsed .ollama-host { display: none; }
 .settings.collapsed .settings-head { border-bottom: 0; }
-.pipelines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 12px; padding: 12px 16px 4px; }
-.pipe { border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: 6px; padding: 10px 14px 14px; min-width: 0; }
+.pipelines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 12px; padding: 12px 16px 4px; }
+.pipe { border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: 6px; padding: 10px 14px 14px; min-width: 0; transition: opacity 0.15s; }
 .pipe-fact { --accent: var(--pipe-fact); }
 .pipe-coh { --accent: var(--pipe-coh); }
-.pipe-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.pipe.unused { opacity: 0.45; }
+.pipe-unused { display: none; margin-left: auto; font-size: 11px; color: var(--cds-text-helper); font-style: italic; }
+.pipe.unused .pipe-unused { display: inline; }
+.pipe-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .pipe-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); align-self: center; }
 .pipe-title { margin: 0; font-size: 14px; font-weight: 600; }
 .pipe-sub { font-size: 12px; color: var(--cds-text-helper); }
-.pipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; align-items: start; }
-.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field.model-field { grid-column: span 2; }
-.field-label { font-size: 12px; font-weight: 600; color: var(--cds-text-secondary); }
+.pipe-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: calc(var(--label-h) + 4px + var(--ctl-h)); gap: 12px 16px; }
+.field { display: grid; grid-template-rows: var(--label-h) var(--ctl-h); row-gap: 4px; min-width: 0; }
+.field.span2 { grid-column: span 2; }
+.field.span3 { grid-column: 1 / -1; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--cds-text-secondary); line-height: var(--label-h); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field-note { font-size: 11px; font-weight: 400; color: var(--cds-text-helper); }
-.field.toggles { gap: 4px; justify-content: center; }
-.fixed-value { font-size: 13px; min-height: 32px; padding: 6px 10px; border-radius: 4px; background: var(--cds-layer-02); border-left: 3px solid var(--accent); display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pipe-advanced { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--cds-border-subtle-00); }
-.checks { display: flex; flex-direction: column; gap: 0; }
+.field-value { font-weight: 400; color: var(--cds-text-primary); margin-left: 4px; }
+/* Every control fills the same 32px box, so control tops and bottoms match
+ * across a row: dropdowns are 32px at size sm, number inputs are clamped to
+ * it, and checkboxes / sliders are centred in it. */
+.field > :not(.field-label) { height: var(--ctl-h); min-width: 0; }
+.field cds-dropdown, .field cds-number-input { display: block; width: 100%; height: var(--ctl-h); }
+.field cds-number-input { overflow: hidden; }
+.field.off { opacity: 0.4; pointer-events: none; }
+.model-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: center; }
+.model-row cds-content-switcher { height: var(--ctl-h); }
+.check-row { height: var(--ctl-h); display: flex; align-items: center; gap: 16px; }
+.methods-row { flex-wrap: nowrap; }
+.slider-row { height: var(--ctl-h); display: flex; align-items: center; }
+.fixed-value { height: 32px; box-sizing: border-box; font-size: 13px; padding: 0 10px; border-radius: 4px; background: var(--cds-layer-02); border-left: 3px solid var(--accent); display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; }
+.pipe-foot { margin: 10px 0 0; font-size: 12px; color: var(--cds-text-primary); border-left: 3px solid var(--cds-support-warning); padding-left: 8px; }
 .ollama-host { margin: 0; padding: 6px 16px 10px; font-size: 11px; color: var(--cds-text-helper); }
 .linklike { font: inherit; background: none; border: 0; padding: 0; color: var(--cds-link-primary); cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Result tabs carry the same accents as the settings cards. */
 #tab-factuality[selected] { --cds-border-interactive: var(--pipe-fact); }
 #tab-coherence[selected] { --cds-border-interactive: var(--pipe-coh); }
+.result-tabs[hidden] { display: none !important; }
+
+.whatif-hint { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--cds-text-primary); background: var(--cds-layer-02); border-left: 3px solid var(--pipe-coh); }
+
+/* ---------------- Analysis choice (under the response) ---------------- */
+.analysis { display: flex; flex-direction: column; gap: 6px; }
+.analysis #mode { width: 100%; }
+#mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-interactive); --cds-text-inverse: #fff; }
+#analysis-note { margin: 0; }
 cds-slider { width: 100%; }
 .slider-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--cds-text-secondary); margin-bottom: -4px; }
 .slider-head .mono { color: var(--cds-text-primary); }
@@ -327,22 +349,24 @@ cds-content-switcher:not(#mode) cds-content-switcher-item[selected] { --cds-laye
 .info-foot { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px 20px 20px; }
 
 /* ---------------- Responsive ---------------- */
-@media (max-width: 1100px) {
-  .mode-switch { width: 260px; }
-}
 @media (max-width: 1180px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "settings" "response" "results"; }
   .results { position: static; height: auto; overflow: visible; }
   .results .view > .graph-wrap > .graph, .results #fact-graph-wrap > .graph { height: 420px; flex: none; }
 }
 @media (max-width: 860px) {
+  /* Three long options do not fit side by side: stack them. */
+  .analysis #mode { flex-direction: column; height: auto; }
+  .analysis #mode cds-content-switcher-item { width: 100%; }
+  .pipe-grid { grid-template-columns: minmax(0, 1fr); }
+  .field.span2, .field.span3 { grid-column: auto; }
+  .methods-row { flex-wrap: wrap; height: auto; }
+  .pipe-grid { grid-auto-rows: auto; }
   .brand-sub, .brand-divider, .brand-title { display: none; }
   .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
-  .mode-switch { order: 3; width: 100%; }
   .ev-items, .ev-none { padding-left: 0; }
   #dry-run-tag { display: none; }
-  .field.model-field { grid-column: auto; }
-  .settings-summary { display: none; }
+
   .scores { grid-template-columns: minmax(0, 1fr); }
   .scores.four { grid-template-columns: minmax(0, 1fr); }
   .graph { height: 320px; }

@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <!-- Carbon tokens + component styles (g10 / g100 theme classes). -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@carbon/styles@1.116.0/css/styles.min.css">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <!-- Carbon web components: one ESM bundle registers every cds-* element. -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@carbon/web-components@2.64.0/es/index.js/+esm"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js"></script>
@@ -25,12 +25,6 @@
         <span class="brand-sub">FactReasoner</span>
         <cds-tag id="dry-run-tag" type="warm-gray" size="sm" hidden>Offline replay</cds-tag>
       </div>
-      <!-- What one analysis computes. -->
-      <cds-content-switcher id="mode" size="sm" value="both" class="mode-switch" aria-label="Analysis">
-        <cds-content-switcher-item value="factuality">Factuality</cds-content-switcher-item>
-        <cds-content-switcher-item value="coherence">Coherence</cds-content-switcher-item>
-        <cds-content-switcher-item value="both" selected>Both</cds-content-switcher-item>
-      </cds-content-switcher>
       <div class="header-actions">
         <cds-icon-button id="toggle-theme" kind="ghost" align="bottom">
           <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: contrast --><path d="M29.37 11.84a14 14 0 1 0 0 8.32 13.6 13.6 0 0 0 0-8.32zM16 4a12 12 0 0 1 0 24z"/></svg>
@@ -46,125 +40,136 @@
 
     <main class="workspace">
       <!-- ============ Settings: one card per pipeline ============ -->
+      <!-- Both cards use one grid: 3 equal columns, every field a one-line
+           label over a 32px control, so rows line up across the two cards. -->
       <section class="panel settings" id="settings" aria-label="Settings">
         <div class="settings-head">
           <h2 class="panel-title">Settings</h2>
-          <p class="settings-summary mono" id="settings-summary"></p>
           <cds-button id="collapse-settings" kind="ghost" size="sm">Hide</cds-button>
         </div>
         <div class="pipelines" id="pipelines">
           <!-- ---------- Factuality pipeline ---------- -->
-          <div class="pipe pipe-fact" data-needs="factuality">
+          <div class="pipe pipe-fact" id="pipe-fact">
             <div class="pipe-head">
               <span class="pipe-dot" aria-hidden="true"></span>
               <h3 class="pipe-title">Factuality pipeline</h3>
               <span class="pipe-sub">claims · evidence · NLI · inference</span>
+              <span class="pipe-unused">not used by this analysis</span>
             </div>
             <div class="pipe-grid">
-              <div class="field model-field" data-pipe="fact">
+              <div class="field span2">
                 <span class="field-label">Model <span class="field-note">claims, reviser, summarizer</span></span>
-                <cds-content-switcher id="fact-backend" size="sm" value="rits" aria-label="Factuality model backend">
-                  <cds-content-switcher-item value="rits" selected>RITS</cds-content-switcher-item>
-                  <cds-content-switcher-item value="ollama">Ollama</cds-content-switcher-item>
-                </cds-content-switcher>
-                <cds-dropdown id="fact-model" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
+                <div class="model-row">
+                  <cds-content-switcher id="fact-backend" size="sm" value="rits" aria-label="Factuality model backend">
+                    <cds-content-switcher-item value="rits" selected>RITS</cds-content-switcher-item>
+                    <cds-content-switcher-item value="ollama">Ollama</cds-content-switcher-item>
+                  </cds-content-switcher>
+                  <cds-dropdown id="fact-model" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
+                </div>
               </div>
               <div class="field">
                 <span class="field-label">NLI <span class="field-note">claim ↔ evidence</span></span>
-                <div class="fixed-value" id="fact-nli-ollama" hidden>
-                  <span><span class="mono" data-decision>kev</span> decision model</span>
-                  <span class="field-note" id="decision-missing" hidden>not pulled: <span class="mono">ollama pull <span data-decision>kev</span></span></span>
-                </div>
-                <div id="fact-nli-rits">
-                  <cds-dropdown id="nli_method" title-text="" aria-label="NLI probability" size="sm"></cds-dropdown>
-                </div>
+                <div class="fixed-value" id="fact-nli-ollama" hidden><span><span class="mono" data-decision>kev</span> decision model</span></div>
+                <div id="fact-nli-rits"><cds-dropdown id="nli_method" title-text="" aria-label="NLI probability" size="sm"></cds-dropdown></div>
               </div>
+
               <div class="field">
-                <span class="field-label">Evidence</span>
+                <span class="field-label">Evidence source</span>
                 <cds-dropdown id="evidence" title-text="" aria-label="Evidence source" size="sm"></cds-dropdown>
               </div>
               <div class="field" id="retrieval-wrap">
                 <span class="field-label">Passages per claim</span>
-                <cds-number-input id="top_k" label="" aria-label="Passages per claim" min="1" max="10" value="3" size="sm"></cds-number-input>
+                <cds-number-input id="top_k" label="" hide-label aria-label="Passages per claim" min="1" max="10" value="3" size="sm"></cds-number-input>
               </div>
               <div class="field" id="pairs-wrap">
                 <span class="field-label">Claim–evidence pairs</span>
                 <cds-dropdown id="nli_mode" title-text="" aria-label="Claim–evidence pairs" size="sm"></cds-dropdown>
               </div>
+
               <div class="field">
-                <span class="field-label">FactReasoner</span>
+                <span class="field-label">FactReasoner version</span>
                 <cds-dropdown id="pipeline_version" title-text="" aria-label="FactReasoner version" size="sm"></cds-dropdown>
               </div>
-              <div class="field toggles">
-                <cds-checkbox id="revise_atoms" label-text="Decontextualize claims"></cds-checkbox>
-                <cds-checkbox id="summarize_contexts" label-text="Summarize evidence"></cds-checkbox>
+              <div class="field">
+                <span class="field-label">Claims</span>
+                <div class="check-row"><cds-checkbox id="revise_atoms" label-text="Decontextualize"></cds-checkbox></div>
+              </div>
+              <div class="field">
+                <span class="field-label">Evidence</span>
+                <div class="check-row"><cds-checkbox id="summarize_contexts" label-text="Summarize"></cds-checkbox></div>
               </div>
             </div>
+            <p class="pipe-foot" id="decision-missing" hidden>The <span class="mono" data-decision>kev</span> decision model is not pulled on this server: <span class="mono">ollama pull <span data-decision>kev</span></span></p>
           </div>
 
           <!-- ---------- Coherence pipeline ---------- -->
-          <div class="pipe pipe-coh" data-needs="coherence">
+          <div class="pipe pipe-coh" id="pipe-coh">
             <div class="pipe-head">
               <span class="pipe-dot" aria-hidden="true"></span>
               <h3 class="pipe-title">Coherence pipeline</h3>
               <span class="pipe-sub">relation miner · MRF · LCS</span>
+              <span class="pipe-unused">not used by this analysis</span>
             </div>
             <div class="pipe-grid">
-              <div class="field model-field" data-pipe="coh">
+              <div class="field span2">
                 <span class="field-label">Relation miner <span class="field-note" id="coh-claims-note">also extracts the claims</span></span>
-                <cds-content-switcher id="coh-backend" size="sm" value="rits" aria-label="Relation miner backend">
-                  <cds-content-switcher-item value="rits" selected>RITS</cds-content-switcher-item>
-                  <cds-content-switcher-item value="ollama">Ollama</cds-content-switcher-item>
-                </cds-content-switcher>
-                <cds-dropdown id="coh-model" title-text="" aria-label="Relation miner model" size="sm"></cds-dropdown>
+                <div class="model-row">
+                  <cds-content-switcher id="coh-backend" size="sm" value="rits" aria-label="Relation miner backend">
+                    <cds-content-switcher-item value="rits" selected>RITS</cds-content-switcher-item>
+                    <cds-content-switcher-item value="ollama">Ollama</cds-content-switcher-item>
+                  </cds-content-switcher>
+                  <cds-dropdown id="coh-model" title-text="" aria-label="Relation miner model" size="sm"></cds-dropdown>
+                </div>
               </div>
               <div class="field">
                 <span class="field-label">Relation strength</span>
-                <div class="fixed-value" id="strength-ollama" hidden><span>verbalized</span><span class="field-note">no logprobs on Ollama</span></div>
-                <div id="strength-rits">
-                  <cds-dropdown id="strength_method" title-text="" aria-label="Strength estimator" size="sm"></cds-dropdown>
-                </div>
+                <div class="fixed-value" id="strength-ollama" hidden><span>verbalized</span><span class="field-note">no logprobs</span></div>
+                <div id="strength-rits"><cds-dropdown id="strength_method" title-text="" aria-label="Strength estimator" size="sm"></cds-dropdown></div>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Prompt variant</span>
+                <cds-dropdown id="prompt_variant" title-text="" aria-label="Prompt variant" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Sense menu</span>
+                <cds-dropdown id="sense_menu" title-text="" aria-label="Sense menu" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Sense/coupling reconcile</span>
+                <cds-dropdown id="reconcile" title-text="" aria-label="Sense/coupling reconcile" size="sm"></cds-dropdown>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Candidate pairs</span>
+                <cds-dropdown id="pair_policy" title-text="" aria-label="Candidate pairs" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Window radius</span>
+                <cds-number-input id="window" label="" hide-label aria-label="Window radius" min="1" max="20" value="4" size="sm"></cds-number-input>
+              </div>
+              <div class="field">
+                <span class="field-label">Merlin i-bound</span>
+                <cds-number-input id="ibound" label="" hide-label aria-label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Concession discount <span class="mono field-value" data-for="concession_discount">0.45</span></span>
+                <div class="slider-row"><cds-slider id="concession_discount" hide-label hide-text-input label-text="Concession discount" min="0" max="1" step="0.05" value="0.45"><span slot="min-text"></span><span slot="max-text"></span></cds-slider></div>
+              </div>
+              <div class="field">
+                <span class="field-label">Evidence span</span>
+                <div class="check-row"><cds-checkbox id="require_evidence" label-text="Require (prompt v2)"></cds-checkbox></div>
               </div>
               <div class="field">
                 <span class="field-label">Claim priors</span>
-                <div class="fixed-value" id="both-priors-hint"><span>factuality posteriors</span><span class="field-note">Both mode</span></div>
-                <div id="prior-mode-wrap">
-                  <cds-dropdown id="prior-mode" title-text="" aria-label="Claim priors" size="sm" value="flat">
-                    <cds-dropdown-item value="flat">Flat (coherence only)</cds-dropdown-item>
-                    <cds-dropdown-item value="manual">Manual, per claim</cds-dropdown-item>
-                  </cds-dropdown>
-                  <div id="flat-prior-wrap">
-                    <div class="slider-head"><span>π</span><span class="mono" data-for="flat-prior">0.50</span></div>
-                    <cds-slider id="flat-prior" hide-label hide-text-input label-text="Flat prior π" min="0.05" max="0.95" step="0.05" value="0.5"><span slot="min-text"></span><span slot="max-text"></span></cds-slider>
-                  </div>
-                  <p class="field-note" id="manual-hint">Drag each claim's prior after a run.</p>
-                </div>
+                <div class="fixed-value" id="priors-value"><span id="priors-text">uniform 0.5</span></div>
               </div>
-              <div class="field">
+
+              <div class="field span3">
                 <span class="field-label">LCS readouts</span>
-                <div id="methods" class="checks"></div>
+                <div id="methods" class="check-row methods-row"></div>
               </div>
-              <div class="field">
-                <span class="field-label">Mining</span>
-                <div class="pair">
-                  <cds-dropdown id="prompt_variant" title-text="Prompt" size="sm"></cds-dropdown>
-                  <cds-dropdown id="pair_policy" title-text="Pairs" size="sm"></cds-dropdown>
-                </div>
-              </div>
-              <div class="field">
-                <cds-button id="open-advanced" kind="ghost" size="sm">More coherence settings</cds-button>
-              </div>
-            </div>
-            <div class="pipe-advanced" id="coh-advanced" hidden>
-              <cds-dropdown id="sense_menu" title-text="Sense menu" size="sm"></cds-dropdown>
-              <cds-number-input id="window" label="Window radius" min="1" max="20" value="4" size="sm"></cds-number-input>
-              <cds-dropdown id="reconcile" title-text="Sense/coupling reconcile" size="sm"></cds-dropdown>
-              <cds-number-input id="ibound" label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
-              <div>
-                <div class="slider-head"><span>Concession discount</span><span class="mono" data-for="concession_discount">0.45</span></div>
-                <cds-slider id="concession_discount" hide-label hide-text-input label-text="Concession discount" min="0" max="1" step="0.05" value="0.45"><span slot="min-text"></span><span slot="max-text"></span></cds-slider>
-              </div>
-              <cds-toggle id="require_evidence" label-text="Require evidence span (v2)" size="sm"></cds-toggle>
             </div>
           </div>
         </div>
@@ -185,6 +190,15 @@
           </div>
           <div id="evidence-wrap" hidden>
             <cds-textarea id="evidence-text" label="Evidence passages" rows="6" helper-text="One passage per paragraph (separate with a blank line). Each passage is compared with every claim." placeholder="Paste the sources to check the response against."></cds-textarea>
+          </div>
+          <div class="analysis" role="group" aria-labelledby="analysis-label">
+            <span class="field-label" id="analysis-label">Analysis</span>
+            <cds-content-switcher id="mode" size="md" value="factuality" aria-label="Analysis">
+              <cds-content-switcher-item value="factuality" selected>Factuality</cds-content-switcher-item>
+              <cds-content-switcher-item value="coherence">Coherence</cds-content-switcher-item>
+              <cds-content-switcher-item value="both">Coherence with factuality priors</cds-content-switcher-item>
+            </cds-content-switcher>
+            <p class="field-note" id="analysis-note"></p>
           </div>
           <div class="run-bar">
             <cds-button id="analyze" kind="primary">Analyze
@@ -281,7 +295,9 @@
 
           <div class="panel-head sub">
             <h2 class="panel-title">Logical coherence scores</h2>
+            <cds-button id="what-if" kind="tertiary" size="sm" hidden>What if? Edit claim priors</cds-button>
           </div>
+          <p class="whatif-hint" id="whatif-hint" hidden>Drag a claim's prior in the claims list. The scores re-compute on the mined graph, with no model calls.</p>
           <div class="scores" id="scores">
             <div class="score-tile" data-m="mean_marginal">
               <div class="score-label">Mean marginal <span class="sym">LCS<sub>mm</sub></span></div>
@@ -343,6 +359,6 @@
       </div>
     </aside>
   </div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
