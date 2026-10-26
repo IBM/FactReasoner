@@ -36,7 +36,7 @@ system** (`@carbon/web-components`, IBM Plex, g10/g100 themes). There is no buil
 pip install -e ".[demo,rits]"          # plus mellea-ibm, see the README
 
 # live: RITS and/or local Ollama, plus Merlin
-fact-reasoner-lcs-demo --merlin-path ~/git/merlin/build_native/merlin
+fact-reasoner-lcs-demo --merlin-path ~/git/merlin/build_boost192/merlin
 # -> http://127.0.0.1:7860
 
 # offline: no model server, no Merlin
@@ -78,6 +78,12 @@ lists only the **Voyager 1** pair (coherent and incoherent):
 
 Retrieval needs a live run. Pasted text still works offline, but its claims and
 relations come from the stub and don't mean anything.
+
+If Merlin exits at once (return code -9 or -6), the binary is the problem, not the
+demo. On macOS, a binary from a browser-downloaded archive carries a quarantine flag,
+and macOS kills it on launch (`xattr -d com.apple.quarantine <merlin>`). A binary
+linked against an older Homebrew Boost fails with `Symbol not found` or `Library not
+loaded`; rebuild it against the installed Boost.
 
 Options: `--host`, `--port` (default 7860), `--models-file`, `--data-dir` (examples,
 default `data/lcs`), `--ollama-host`, `--decision-model` (default `kev`). `MERLIN_PATH`
