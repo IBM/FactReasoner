@@ -29,11 +29,12 @@ fact-reasoner-lcs-demo --merlin-path ~/git/merlin/build_native/merlin
 fact-reasoner-lcs-demo --dry-run
 ```
 
-`--dry-run` stubs the LLM and uses exact brute-force inference. The two **Voyager 1**
-examples replay the paper's gold relation graphs, so they reproduce the worked
-example's numbers exactly (A: 0.590 / 0.962 / 0.193, B: 0.494 / 0.414 / 0.267). Any
-other text gets sentence-level claims and the stub's relations. Use it to try the UI;
-the stub's relations don't mean anything.
+`--dry-run` stubs the LLM and uses exact brute-force inference. Its example list is
+just the **Voyager 1** pair (coherent and incoherent): they replay the paper's gold
+relation graphs, so they reproduce the worked example's numbers exactly
+(A: 0.590 / 0.962 / 0.193, B: 0.494 / 0.414 / 0.267). The other examples appear only
+in live mode. Pasted text still runs offline, with sentence-level claims and the
+stub's relations. Use that to try the UI; the stub's relations don't mean anything.
 
 Options: `--host`, `--port` (default 7860), `--models-file` (default
 `configs/rits_models.json`), `--data-dir` (examples, default `data/lcs`).

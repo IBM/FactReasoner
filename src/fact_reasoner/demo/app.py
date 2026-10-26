@@ -69,6 +69,11 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
     models = list(engine.models.values())
     if models and defaults.model not in engine.models:
         defaults.model = models[0]["name"]
+    # Offline replay can only answer examples that ship a gold graph (the Voyager
+    # pair); the rest would show the stub model's meaningless relations.
+    if engine.dry_run:
+        examples = [e for e in examples if e.get("gold")]
+    public_examples = [{k: v for k, v in e.items() if k != "gold"} for e in examples]
 
     @app.get("/api/config")
     def config() -> dict[str, Any]:
@@ -89,7 +94,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
                 "nli_mode": ["fast", "all_pairs"],
                 "pipeline_version": ["v1", "v2", "v3"],
             },
-            "examples": [{k: v for k, v in e.items() if k != "gold"} for e in examples],
+            "examples": public_examples,
             "max_response_chars": MAX_RESPONSE_CHARS,
         }
 

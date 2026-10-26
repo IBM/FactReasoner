@@ -145,8 +145,26 @@ class TestAPI:
         cfg = c.get("/api/config").json()
         assert cfg["dry_run"] is True
         assert cfg["models"] and cfg["defaults"]["model"] in {m["name"] for m in cfg["models"]}
-        assert cfg["examples"][0]["id"] == "voyager-a"
         assert all("gold" not in e for e in cfg["examples"])
+
+    def test_offline_replay_lists_only_the_voyager_pair(self, client):
+        c, _ = client
+        ids = [e["id"] for e in c.get("/api/config").json()["examples"]]
+        assert ids == ["voyager-a", "voyager-b"]
+
+    def test_live_mode_lists_every_example(self):
+        # Built without starting the dry-run worker's jobs; config() never runs one.
+        examples = load_examples(DATA)
+        engine = Engine(
+            models=load_models(MODELS), merlin_path="/fake/merlin",
+            backend_factory=lambda spec: None,
+        )
+        try:
+            cfg = TestClient(create_app(engine, examples=examples)).get("/api/config").json()
+        finally:
+            engine.close()
+        assert cfg["dry_run"] is False
+        assert len(cfg["examples"]) == len(examples) > 2
 
     @pytest.mark.parametrize(
         "eid,key", [("voyager-a", "A"), ("voyager-b", "B")]
