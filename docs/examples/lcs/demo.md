@@ -11,7 +11,7 @@ Paste a response and the demo:
    Both analyses use this one claim set.
 2. **Factuality**: checks each claim against evidence (Google, Wikipedia, or passages you
    paste). It shows each passage's support or contradiction verdict, a claim↔evidence
-   graph, and every claim's posterior probability of being true.
+   graph (FactGraph), and every claim's posterior probability of being true.
 3. **Coherence**: mines the relations between claims and draws the **relation graph**
    (entails / contradicts / equivalent / exclusive, line width = strength `p`). It then
    solves the coherence MRF for the **LCS readouts**: mean marginal, consistency and
@@ -130,6 +130,14 @@ can stand in for `--merlin-path`.
   (prompt v2), which is highlighted in the text.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
+- **Evidence what-if.** After any run that checks factuality, *What if? Edit evidence
+  priors* adds a prior slider to each evidence passage. Every passage starts at 0.9,
+  meaning how far it is trusted. Lower a passage's prior to distrust it, and the
+  claims it supports or refutes re-score on the same NLI links, with **no model
+  calls**. A passage backing several claims has one prior, so its sliders move
+  together. In *Coherence with factuality priors*, the new factuality posteriors are
+  the new coherence priors, so coherence re-scores too. The FactGraph labels an
+  edited passage with its prior. *Reset evidence priors to 0.9* undoes it.
 - **What if?** After a *Coherence* run, *What if? Edit claim priors* adds a prior
   slider to each claim, starting at the uniform 0.5. Drag one and the scores re-compute
   on the mined graph with **no model calls**. *Reset priors to 0.5* puts them back.
@@ -163,6 +171,7 @@ keeps a single user from saturating the shared RITS quota or a local GPU.
 | `GET /api/config` | RITS and Ollama chat models, the decision model's status, option menus, defaults, examples. |
 | `GET /api/ollama/models` | Re-list the local Ollama models and the decision model's status. |
 | `POST /api/analyze` | `{response, query?, settings, priors?, evidence?, claims?}` → `{run_id}`. `settings.mode` is `factuality`, `coherence` or `both`. `claims` (`[{id, text, original}]`) reuses an earlier run's claims instead of extracting them. |
+| `POST /api/runs/{id}/rescore-factuality` | `{context_priors: {context id: prior}}` → factuality (and, in the chained mode, coherence) re-scored under the new evidence priors (no LLM calls). |
 | `POST /api/runs/{id}/stop` | Stop a queued or running analysis; its event stream ends with `stopped`. |
 | `GET /api/runs/{id}/events` | Server-sent events: `queued`, `stage`, `claims`, `factuality`, `priors`, `progress`, then `result` (`{factuality, coherence, timing}`), `stopped` or `error`. |
 | `POST /api/runs/{id}/rescore` | `{priors}` → coherence scores under new priors (no LLM calls). |

@@ -705,3 +705,57 @@ class TestStopAndReuse:
         c, _ = client
         page = c.get("/").text
         assert re.search(r'app\.js\?v=\d{9,}', page) and re.search(r'style\.css\?v=\d{9,}', page)
+
+
+class TestFactualityWhatIf:
+    """Editing evidence (context) priors re-scores factuality with no model calls."""
+
+    def _run(self, client, mode):
+        c, examples = client
+        ex = _example(examples, "voyager-b")
+        rid = c.post("/api/analyze", json={
+            "response": ex["response"], "evidence": "\n\n".join(ex["evidence"]),
+            "settings": {"mode": mode, "evidence": "pasted"},
+        }).json()["run_id"]
+        return c, rid, _events(c, rid)[-1]
+
+    def test_contexts_report_their_default_prior(self, client):
+        _, _, res = self._run(client, "factuality")
+        assert [ctx["prior"] for ctx in res["factuality"]["contexts"]] == [0.9, 0.9, 0.9]
+
+    def test_distrusting_a_refuting_passage_raises_its_claim(self, client):
+        c, rid, base = self._run(client, "factuality")
+        m0 = base["factuality"]["marginals"]
+        # Passage 2 refutes a3 ("the instrument failed"); trust it less.
+        r = c.post(f"/api/runs/{rid}/rescore-factuality", json={"context_priors": {"c_p_1": 0.3}}).json()
+        m1 = r["factuality"]["marginals"]
+        assert m1["a3"] > m0["a3"] + 0.1
+        for aid in ("a0", "a1", "a2", "a4"):  # untouched by that passage
+            assert m1[aid] == pytest.approx(m0[aid], abs=1e-6)
+        assert {ctx["id"]: ctx["prior"] for ctx in r["factuality"]["contexts"]}["c_p_1"] == pytest.approx(0.3)
+        assert "coherence" not in r
+
+    def test_reset_restores_the_original_posteriors(self, client):
+        c, rid, base = self._run(client, "factuality")
+        c.post(f"/api/runs/{rid}/rescore-factuality", json={"context_priors": {"c_p_0": 0.1}})
+        r = c.post(f"/api/runs/{rid}/rescore-factuality",
+                   json={"context_priors": {"c_p_0": 0.9, "c_p_1": 0.9, "c_p_2": 0.9}}).json()
+        for aid, p in base["factuality"]["marginals"].items():
+            assert r["factuality"]["marginals"][aid] == pytest.approx(p, abs=1e-6)
+
+    def test_chained_mode_rescores_coherence_too(self, client):
+        c, rid, base = self._run(client, "both")
+        r = c.post(f"/api/runs/{rid}/rescore-factuality", json={"context_priors": {"c_p_0": 0.2}}).json()
+        m = r["factuality"]["marginals"]
+        # The new factuality posteriors are the new coherence priors.
+        for aid, p in m.items():
+            assert r["coherence"]["priors"][aid] == pytest.approx(min(0.99, max(0.01, p)))
+        assert r["coherence"]["scores"]["mean_marginal"] != pytest.approx(
+            base["coherence"]["scores"]["mean_marginal"])
+
+    def test_coherence_only_run_has_no_factuality_to_rescore(self, client):
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        rid = c.post("/api/analyze", json={"response": ex["response"], "settings": {"mode": "coherence"}}).json()["run_id"]
+        _events(c, rid)
+        assert c.post(f"/api/runs/{rid}/rescore-factuality", json={"context_priors": {}}).status_code == 404

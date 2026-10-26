@@ -18,6 +18,8 @@
     response: "",
     mode: "factuality",  // factuality | coherence | both (as last run)
     whatIf: false,       // per-claim prior sliders opened after a coherence run
+    factWhatIf: false,   // per-evidence prior sliders opened after a factuality run
+    ctxPriors: {},       // {context id: prior} while the factuality what-if is on
     claimsFor: null,     // the response text S.claims were extracted from
     forceExtract: false, // "Re-extract claims" pressed: ignore the kept claims
     claims: [],          // [{id, label, text, original, span}]
@@ -374,6 +376,8 @@
       body.evidence = $("#evidence-text").value || "";
     }
     S.whatIf = false;
+    S.factWhatIf = false;
+    S.ctxPriors = {};
     S.stopping = false;
     // The results panel shows only what this run computes; "both" ends on coherence.
     $("#result-tabs").hidden = settings.mode !== "both";
@@ -434,6 +438,7 @@
       const secs = Object.values(d.timing || {}).reduce((a, b) => a + b, 0);
       setBusy(false, S.config.dry_run ? "Done · offline replay" : `Done in ${fmt(secs, 1)} s`);
       stopStream();
+      syncFactWhatIf(); syncWhatIf();
     });
     on("error", (d) => { setBusy(false); showError(d.message); stopStream(); });
     on("stopping", (d) => {
@@ -488,6 +493,7 @@
 
   // ------------------------------------------------------------- status
   function setBusy(busy, text, frac) {
+    S.busy = busy;
     const st = $("#status");
     st.innerHTML = "";
     if (busy) {
@@ -772,9 +778,11 @@
           const src = it.ctx.link
             ? el("a", { href: it.ctx.link, target: "_blank", rel: "noopener" }, it.ctx.title || it.ctx.link)
             : el("span", {}, it.ctx.title || it.ctx.id);
-          ul.append(el("li", { class: "ev-item " + (ent ? "ent" : "con") },
+          const li = el("li", { class: "ev-item " + (ent ? "ent" : "con") },
             el("div", { class: "ev-src" }, el("span", { class: "ev-rel" }, `${ent ? "supports" : "contradicts"} ${fmt(it.probability, 2)}`), src),
-            el("div", {}, it.ctx.text)));
+            el("div", {}, it.ctx.text));
+          if (S.factWhatIf) li.append(evidencePrior(it.ctx));
+          ul.append(li);
         }
         card.append(ul);
       } else {
@@ -790,10 +798,81 @@
     ];
     if (st.llm_calls != null) facts.push(["NLI calls", st.llm_calls]);
     if (S.timing.factuality != null && !S.config.dry_run) facts.push(["time", `${fmt(S.timing.factuality, 1)} s`]);
+    const edited = Object.values(S.ctxPriors).filter((p) => Math.abs(p - 0.9) > 1e-9).length;
+    if (S.factWhatIf) facts.push(["edited priors", edited]);
     const dl = $("#fact-facts");
     dl.innerHTML = "";
     for (const [k, v] of facts) dl.append(el("div", {}, el("dt", {}, k), el("dd", {}, String(v))));
     renderFactGraph();
+    syncFactWhatIf();
+  }
+
+  /* One evidence passage's prior slider. A passage can back several claims and
+   * so appear on several cards: every copy reads and writes S.ctxPriors, and a
+   * drag updates the other copies' readouts in place. */
+  function evidencePrior(ctx) {
+    const v = S.ctxPriors[ctx.id] ?? ctx.prior ?? 0.9;
+    const out = el("span", { class: "pnum" + (Math.abs(v - 0.9) > 1e-9 ? " edited" : ""), "data-ctx": ctx.id }, fmt(v, 2));
+    const range = el("input", {
+      type: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
+      "aria-label": `Prior for ${ctx.title || ctx.id}`, "data-ctx": ctx.id,
+    });
+    range.addEventListener("click", (e) => e.stopPropagation());  // not a claim click
+    range.addEventListener("input", () => {
+      const p = parseFloat(range.value);
+      S.ctxPriors[ctx.id] = p;
+      for (const n of document.querySelectorAll(`.ev-prior [data-ctx="${ctx.id}"]`)) {
+        if (n.tagName === "INPUT" && n !== range) n.value = String(p);
+        if (n.tagName === "SPAN") { n.textContent = fmt(p, 2); n.classList.toggle("edited", Math.abs(p - 0.9) > 1e-9); }
+      }
+      scheduleFactRescore();
+    });
+    return el("div", { class: "ev-prior" }, "evidence prior", range, out);
+  }
+
+  function toggleFactWhatIf() {
+    S.factWhatIf = !S.factWhatIf;
+    if (!S.factWhatIf) {
+      // Reset every passage to its default trust.
+      for (const c of (S.fact && S.fact.contexts) || []) S.ctxPriors[c.id] = 0.9;
+      scheduleFactRescore();
+    } else {
+      S.ctxPriors = Object.fromEntries(((S.fact && S.fact.contexts) || []).map((c) => [c.id, c.prior ?? 0.9]));
+    }
+    syncFactWhatIf();
+    renderFactuality();
+  }
+
+  function syncFactWhatIf() {
+    const can = !!(S.fact && (S.fact.contexts || []).length && S.mode !== "coherence" && S.runId && !S.busy);
+    const btn = $("#fact-what-if");
+    btn.hidden = !can;
+    btn.textContent = S.factWhatIf ? "Reset evidence priors to 0.9" : "What if? Edit evidence priors";
+    $("#fact-whatif-hint").hidden = !(can && S.factWhatIf);
+    $("#fact-whatif-hint").textContent = S.factView === "graph"
+      ? "Edit each passage's prior in the Evidence view; the FactGraph labels a passage with its prior once it differs from 0.9."
+      : "Each evidence passage starts at a prior of 0.9 (how far it is trusted). Drag one to distrust or trust it more: the claims re-score on the same NLI links, with no model calls.";
+  }
+
+  let factRescoreTimer = null;
+  function scheduleFactRescore() {
+    clearTimeout(factRescoreTimer);
+    factRescoreTimer = setTimeout(rescoreFactuality, 250);
+  }
+
+  async function rescoreFactuality() {
+    if (!S.runId || !S.fact) return;
+    setBusy(true, "Re-scoring factuality under the new evidence priors");
+    const r = await fetch(`api/runs/${S.runId}/rescore-factuality`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_priors: S.ctxPriors }),
+    });
+    if (!r.ok) { setBusy(false); showError("Re-scoring factuality failed."); return; }
+    const d = await r.json();
+    S.fact = d.factuality;
+    if (d.coherence) applyResult(d.coherence);  // chained mode: priors moved too
+    renderClaims(); renderFactuality();
+    setBusy(false, S.factWhatIf ? "What-if re-scored · no model calls" : "Evidence priors reset · no model calls");
   }
 
   function setTile(key, value, meter = value) {
@@ -843,12 +922,19 @@
     const els = [];
     claims.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
       position: { x: 0, y: (i + 0.5) * (h / claims.length) }, classes: "claim" }));
-    ctxs.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: (c.title || c.id).slice(0, 28) },
+    ctxs.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) },
       position: { x: 320, y: (i + 0.5) * (h / ctxs.length) }, classes: "ctx" }));
     fcy.add(els.concat(edges));
     fcy.layout({ name: "preset", fit: false }).run();
     fitGraph(fcy, 30);
     paintFocus();
+  }
+
+  /* A passage node's label: its title, plus its prior once it differs from 0.9. */
+  function ctxLabel(c) {
+    const title = (c.title || c.id).slice(0, 28);
+    const p = S.ctxPriors[c.id] ?? c.prior ?? 0.9;
+    return Math.abs(p - 0.9) > 1e-9 ? `${title} · π ${fmt(p, 2)}` : title;
   }
 
   function factGraphStyle() {
@@ -1224,11 +1310,13 @@
     $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
     $("#what-if").addEventListener("click", toggleWhatIf);
+    $("#fact-what-if").addEventListener("click", toggleFactWhatIf);
     $("#refresh-ollama").addEventListener("click", refreshOllama);
     $("#result-tabs").addEventListener("cds-tabs-selected", (e) => showTab(e.detail.item.value));
     $("#fact-view").addEventListener("cds-content-switcher-selected", (e) => {
       S.factView = e.detail.item.value;
       renderFactGraph();
+      syncFactWhatIf();
     });
     for (const out of document.querySelectorAll("[data-for]")) {
       const sl = document.getElementById(out.dataset.for);
@@ -1312,6 +1400,9 @@
     }
     if (q.get("view") === "mrf") S.view = "mrf";
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
+    if (q.get("factwhatif") === "1") {
+      const wait = setInterval(() => { if (S.fact && !S.busy) { clearInterval(wait); toggleFactWhatIf(); } }, 100);
+    }
     if (q.get("whatif") === "1") {
       const wait = setInterval(() => { if (S.relations.length) { clearInterval(wait); toggleWhatIf(); } }, 100);
     }

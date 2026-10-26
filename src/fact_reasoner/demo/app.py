@@ -27,6 +27,9 @@ static page with no build step. The API:
   ``error``).
 * ``POST /api/runs/{id}/rescore`` -- re-score coherence under edited priors (no
   LLM calls).
+* ``POST /api/runs/{id}/rescore-factuality`` -- re-score factuality under edited
+  evidence (context) priors, and coherence with it in the chained mode (no LLM
+  calls).
 * ``POST /api/runs/{id}/stop`` -- stop a queued or running analysis; the stream
   ends with a ``stopped`` event.
 
@@ -211,6 +214,17 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
         if engine.get(run_id) is None:
             raise HTTPException(404, "Unknown run.")
         return {"stopping": engine.stop(run_id)}
+
+    @app.post("/api/runs/{run_id}/rescore-factuality")
+    async def rescore_factuality(run_id: str, request: Request) -> dict[str, Any]:
+        body = await request.json()
+        priors = {str(k): float(v) for k, v in (body.get("context_priors") or {}).items()}
+        try:
+            return await asyncio.to_thread(engine.rescore_factuality, run_id, priors)
+        except KeyError as e:
+            raise HTTPException(404, "Unknown run, or it ran no factuality analysis.") from e
+        except RuntimeError as e:
+            raise HTTPException(500, str(e)) from e
 
     @app.post("/api/runs/{run_id}/rescore")
     async def rescore(run_id: str, request: Request) -> dict[str, Any]:

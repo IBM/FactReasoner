@@ -234,6 +234,9 @@ class Run:
     events: list[dict[str, Any]] = field(default_factory=list)
     done: bool = False
     mining: MiningResult | None = None
+    # The FactReasoner pipeline of the factuality stage, kept so its graph can be
+    # re-scored under edited context priors (the factuality what-if).
+    fact_pipeline: Any = None
     claims: dict[str, dict[str, Any]] = field(default_factory=dict)
     priors: dict[str, float] = field(default_factory=dict)
     # Claims to reuse instead of atomizing: [{id, text, original}].
@@ -588,6 +591,29 @@ class Engine:
             raise RuntimeError(value)
         return value
 
+    def rescore_factuality(
+        self, run_id: str, context_priors: Mapping[str, float]
+    ) -> dict[str, Any]:
+        """Re-score a finished run's factuality under edited context priors.
+
+        Pure inference on the run's FactReasoner graph: the NLI relations are
+        reused, only the contexts' unary priors change (default 0.9). In "both"
+        mode the new claim posteriors are the coherence priors, so coherence is
+        re-scored on the mined graph too. No model calls either way.
+
+        Raises:
+            KeyError: If the run is unknown or ran no factuality stage.
+        """
+        run = self._runs.get(run_id)
+        if run is None or run.fact_pipeline is None:
+            raise KeyError(run_id)
+        box: queue.Queue = queue.Queue(maxsize=1)
+        self._jobs.put(("rescore_fact", run, (dict(context_priors), box)))
+        ok, value = box.get(timeout=300)
+        if not ok:
+            raise RuntimeError(value)
+        return value
+
     def close(self) -> None:
         """Stop the worker after the queued jobs, and close its event loop."""
         self._jobs.put(("stop", None, None))
@@ -635,7 +661,10 @@ class Engine:
             return
         priors, box = extra
         try:
-            box.put((True, self._score(run, priors, final=False)))
+            if kind == "rescore_fact":
+                box.put((True, self._rescore_factuality(run, priors)))
+            else:
+                box.put((True, self._score(run, priors, final=False)))
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             box.put((False, f"{type(e).__name__}: {e}"))
@@ -903,6 +932,7 @@ class Engine:
             )
         )
         self._checkpoint(run)
+        run.fact_pipeline = pipeline
         if pipeline.fact_graph is None or not pipeline.relations:
             # No contexts / no relations: FactReasoner has nothing to infer over,
             # and every claim stays at its prior.
@@ -918,6 +948,47 @@ class Engine:
             for aid in pipeline.atoms:
                 marginals.setdefault(aid, 0.5)
         return _factuality_payload(pipeline, results, marginals)
+
+    def _rescore_factuality(self, run: Run, context_priors: Mapping[str, float]) -> dict[str, Any]:
+        """Rebuild the factuality MRF with new context priors and infer again.
+
+        Only the contexts' unary factors change: in the with-priors pairwise
+        tables the source prior of a context->claim edge is the claim prior,
+        not the context's, so the edge factors are untouched. Contexts not in
+        ``context_priors`` keep their own prior.
+        """
+        from fact_reasoner.factors import build_markov_network
+
+        pipeline = run.fact_pipeline
+        known = set(pipeline.contexts)
+        for cid, p in context_priors.items():
+            if cid in known:
+                pipeline.contexts[cid].set_probability(_clip(p))
+        # Every context's current prior, so a reset to 0.9 is as exact as an edit.
+        overrides = {cid: ctx.get_probability() for cid, ctx in pipeline.contexts.items()}
+        if pipeline.fact_graph is None or not pipeline.relations:
+            results: dict[str, Any] = {}
+            marginals = {aid: 0.5 for aid in pipeline.atoms}
+        else:
+            pipeline.markov_network = build_markov_network(
+                pipeline.fact_graph, use_priors=pipeline.use_priors, node_priors=overrides
+            )
+            results, _ = pipeline.score()
+            marginals = {
+                k: float(v["score"])
+                for entry in results.get("factuality_score_per_atom", [])
+                for k, v in entry.items()
+            }
+            for aid in pipeline.atoms:
+                marginals.setdefault(aid, 0.5)
+        out: dict[str, Any] = {"factuality": _factuality_payload(pipeline, results, marginals)}
+        # Coherence with factuality priors: the claim posteriors ARE the priors.
+        if run.settings.mode == "both" and run.mining is not None:
+            out["coherence"] = self._score(
+                run, {aid: marginals.get(aid, 0.5) for aid in run.mining.atoms}, final=False
+            )
+            out["coherence"].pop("scoring_seconds", None)
+        return out
 
     def _nli_extractor(self, backend: Any, s: Settings):
         """The claim<->evidence NLI scorer for the factuality stage.
@@ -1076,6 +1147,7 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
                 "link": c.get_link() or "",
                 "text": (c.get_snippet() or c.text or "")[:600],
                 "atom": getattr(c.atom, "id", None),
+                "prior": float(c.get_probability()),
             }
         )
     relations = [
