@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Logical Coherence</title>
+  <title>FactReasoner Demo</title>
   <!-- IBM Plex, the Carbon design system's typeface. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <!-- Carbon tokens + component styles (g10 / g100 theme classes). -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@carbon/styles@1.116.0/css/styles.min.css">
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <!-- Carbon web components: one ESM bundle registers every cds-* element. -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@carbon/web-components@2.64.0/es/index.js/+esm"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js"></script>
@@ -22,9 +22,15 @@
         <span class="brand-ibm">IBM</span>
         <span class="brand-divider" aria-hidden="true"></span>
         <span class="brand-title"><strong>Research</strong> Demos</span>
-        <span class="brand-sub">Logical Coherence</span>
+        <span class="brand-sub">FactReasoner</span>
         <cds-tag id="dry-run-tag" type="warm-gray" size="sm" hidden>Offline replay</cds-tag>
       </div>
+      <!-- What one analysis computes. -->
+      <cds-content-switcher id="mode" size="sm" value="both" class="mode-switch" aria-label="Analysis">
+        <cds-content-switcher-item value="factuality">Factuality</cds-content-switcher-item>
+        <cds-content-switcher-item value="coherence">Coherence</cds-content-switcher-item>
+        <cds-content-switcher-item value="both" selected>Both</cds-content-switcher-item>
+      </cds-content-switcher>
       <div class="header-actions">
         <cds-icon-button id="toggle-settings" kind="ghost" align="bottom" class="only-narrow">
           <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: settings-adjust --><path d="M30 8h-4.1a5 5 0 0 0-9.8 0H2v2h14.1a5 5 0 0 0 9.8 0H30zm-9 4a3 3 0 1 1 3-3 3 3 0 0 1-3 3zM2 24h4.1a5 5 0 0 0 9.8 0H30v-2H15.9a5 5 0 0 0-9.8 0H2zm9-4a3 3 0 1 1-3 3 3 3 0 0 1 3-3z"/></svg>
@@ -50,38 +56,67 @@
         </div>
         <div class="settings-body">
           <section class="group">
-            <h3 class="group-title">Relation miner model</h3>
-            <cds-dropdown id="model" title-text="RITS model" size="md"></cds-dropdown>
-            <p class="hint mono" id="model-id"></p>
+            <h3 class="group-title">Model</h3>
+            <cds-content-switcher id="backend" size="sm" value="rits" aria-label="Model backend">
+              <cds-content-switcher-item value="rits" selected>RITS</cds-content-switcher-item>
+              <cds-content-switcher-item value="ollama">Ollama (local)</cds-content-switcher-item>
+            </cds-content-switcher>
+            <div id="rits-wrap">
+              <cds-dropdown id="model" title-text="RITS model" size="md"></cds-dropdown>
+              <p class="hint mono" id="model-id"></p>
+            </div>
+            <div id="ollama-wrap" hidden>
+              <div class="row-end">
+                <cds-dropdown id="ollama-model" title-text="Local model" size="md"></cds-dropdown>
+                <cds-icon-button id="refresh-ollama" kind="ghost" size="md" align="left">
+                  <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: renew --><path d="M12 10H6.78A11 11 0 0 1 27 16h2A13 13 0 0 0 6 7.68V4H4v8h8zm8 12h5.22A11 11 0 0 1 5 16H3a13 13 0 0 0 23 8.32V28h2v-8h-8z"/></svg>
+                  <span slot="tooltip-content">Refresh model list</span>
+                </cds-icon-button>
+              </div>
+              <p class="hint mono" id="ollama-host"></p>
+              <p class="hint" id="ollama-empty" hidden>No local models found. Start <span class="mono">ollama serve</span> and pull a model (e.g. <span class="mono">ollama pull granite4.2:3b</span>), then refresh.</p>
+              <p class="hint" id="decision-ok">Factuality NLI is scored by the <span class="mono" data-decision></span> decision model on this server. The model above extracts claims and mines relations; it returns no logprobs, so relation strengths are sampled.</p>
+              <p class="hint warn" id="decision-missing" hidden>Factuality needs the <span class="mono" data-decision></span> decision model on this server: <span class="mono">ollama pull <span data-decision></span></span>, then refresh. Coherence works without it.</p>
+            </div>
           </section>
 
-          <section class="group">
-            <h3 class="group-title">Claim priors</h3>
-            <cds-radio-button-group id="prior-mode" orientation="vertical" name="prior-mode" legend-text="Prior for each claim">
-              <cds-radio-button value="flat" label-text="Flat (coherence only)" checked></cds-radio-button>
-              <cds-radio-button value="manual" label-text="Manual, per claim"></cds-radio-button>
-              <cds-radio-button value="factuality" label-text="Factuality (with retrieval)"></cds-radio-button>
-            </cds-radio-button-group>
-            <div id="flat-prior-wrap">
-              <div class="slider-head"><span>Flat prior π</span><span class="mono" data-for="flat-prior">0.50</span></div>
-              <cds-slider id="flat-prior" hide-label hide-text-input label-text="Flat prior π" min="0.05" max="0.95" step="0.05" value="0.5"><span slot="min-text"></span><span slot="max-text"></span></cds-slider>
+          <section class="group" data-needs="factuality">
+            <h3 class="group-title">Factuality</h3>
+            <cds-dropdown id="evidence" title-text="Evidence source" size="sm"></cds-dropdown>
+            <div id="retrieval-wrap">
+              <cds-number-input id="top_k" label="Passages per claim" min="1" max="10" value="3" size="sm"></cds-number-input>
+              <cds-dropdown id="nli_mode" title-text="Claim–evidence pairs" size="sm"></cds-dropdown>
             </div>
-            <p class="hint" id="manual-hint" hidden>Run once, then drag a claim's prior in the claims list. The scores update without calling the model again.</p>
-            <div id="factuality-wrap" hidden>
-              <cds-dropdown id="service_type" title-text="Retrieval service" size="sm"></cds-dropdown>
-              <cds-number-input id="top_k" label="Contexts per claim" min="1" max="10" value="3" size="sm"></cds-number-input>
-              <cds-dropdown id="nli_mode" title-text="NLI mode" size="sm"></cds-dropdown>
-              <p class="hint">Runs FactReasoner first. Each claim's factuality posterior becomes its prior. This is slower.</p>
+            <cds-dropdown id="pipeline_version" title-text="FactReasoner version" size="sm"></cds-dropdown>
+            <div id="nli-method-wrap">
+              <cds-dropdown id="nli_method" title-text="NLI probability" size="sm" helper-text="How the RITS model's support / contradict verdict gets a probability."></cds-dropdown>
             </div>
+            <p class="hint" id="nli-decision-hint" hidden>NLI: <span class="mono" data-decision></span> decision model (Ollama).</p>
           </section>
 
-          <section class="group">
+          <section class="group" data-needs="coherence">
+            <h3 class="group-title">Coherence priors</h3>
+            <p class="hint" id="both-priors-hint">In <b>Both</b> mode each claim's prior is its factuality posterior.</p>
+            <div id="prior-mode-wrap">
+              <cds-radio-button-group id="prior-mode" orientation="vertical" name="prior-mode" legend-text="Prior for each claim">
+                <cds-radio-button value="flat" label-text="Flat (coherence only)" checked></cds-radio-button>
+                <cds-radio-button value="manual" label-text="Manual, per claim"></cds-radio-button>
+              </cds-radio-button-group>
+              <div id="flat-prior-wrap">
+                <div class="slider-head"><span>Flat prior π</span><span class="mono" data-for="flat-prior">0.50</span></div>
+                <cds-slider id="flat-prior" hide-label hide-text-input label-text="Flat prior π" min="0.05" max="0.95" step="0.05" value="0.5"><span slot="min-text"></span><span slot="max-text"></span></cds-slider>
+              </div>
+            </div>
+            <p class="hint" id="manual-hint">After a run, drag a claim's prior in the claims list. The scores update without calling the model again.</p>
+          </section>
+
+          <section class="group" data-needs="coherence">
             <h3 class="group-title">LCS readouts</h3>
             <div id="methods" class="checks"></div>
           </section>
 
           <cds-accordion size="sm">
-            <cds-accordion-item title="Relation mining">
+            <cds-accordion-item title="Relation mining" data-needs="coherence">
               <cds-dropdown id="prompt_variant" title-text="Prompt variant" size="sm"></cds-dropdown>
               <cds-dropdown id="sense_menu" title-text="Sense menu" size="sm"></cds-dropdown>
               <cds-dropdown id="pair_policy" title-text="Candidate pairs" size="sm"></cds-dropdown>
@@ -91,7 +126,7 @@
               <cds-toggle id="require_evidence" label-text="Require evidence span (v2)" size="sm"></cds-toggle>
               <cds-toggle id="revise_atoms" label-text="Decontextualize claims" size="sm"></cds-toggle>
             </cds-accordion-item>
-            <cds-accordion-item title="Inference">
+            <cds-accordion-item title="Inference" data-needs="coherence">
               <cds-number-input id="ibound" label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
               <div class="slider-head"><span>Concession discount</span><span class="mono" data-for="concession_discount">0.45</span></div>
               <cds-slider id="concession_discount" hide-label hide-text-input label-text="Concession discount" min="0" max="1" step="0.05" value="0.45"><span slot="min-text"></span><span slot="max-text"></span></cds-slider>
@@ -112,8 +147,11 @@
             <cds-textarea id="response" label="Long-form response" rows="9" placeholder="Paste a long-form response, or pick an example above."></cds-textarea>
             <div class="highlighted" id="highlighted" hidden tabindex="0" aria-label="Response with claim highlights"></div>
           </div>
+          <div id="evidence-wrap" hidden>
+            <cds-textarea id="evidence-text" label="Evidence passages" rows="6" helper-text="One passage per paragraph (separate with a blank line). Each passage is compared with every claim." placeholder="Paste the sources to check the response against."></cds-textarea>
+          </div>
           <div class="run-bar">
-            <cds-button id="analyze" kind="primary">Analyze coherence
+            <cds-button id="analyze" kind="primary">Analyze
               <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: arrow--right --><path d="m18 6-1.43 1.39L24.15 15H4v2h20.15l-7.58 7.57L18 26l10-10z"/></svg>
             </cds-button>
             <cds-button id="edit" kind="ghost" hidden>Edit text</cds-button>
@@ -123,10 +161,7 @@
 
           <div class="claims-head">
             <h3 class="section-title">Claims <span class="count" id="claim-count"></span></h3>
-            <div class="legend-inline">
-              <span class="lg"><span class="bar-swatch prior"></span>prior</span>
-              <span class="lg"><span class="bar-swatch post"></span>posterior</span>
-            </div>
+            <div class="legend-inline" id="claims-legend"></div>
           </div>
           <ol class="claims" id="claims">
             <li class="empty">Claims extracted from the response appear here, each linked to its span in the text.</li>
@@ -134,58 +169,111 @@
         </div>
       </section>
 
-      <!-- ============ Graph + scores ============ -->
+      <!-- ============ Results: factuality / coherence ============ -->
       <section class="panel results" aria-label="Results">
-        <div class="panel-head">
-          <h2 class="panel-title">Relation graph</h2>
-          <cds-content-switcher id="graph-view" size="sm" value="graph">
-            <cds-content-switcher-item value="graph" selected>Relations</cds-content-switcher-item>
-            <cds-content-switcher-item value="mrf">MRF</cds-content-switcher-item>
-          </cds-content-switcher>
-        </div>
-        <div class="graph-wrap">
-          <div id="graph" class="graph" role="img" aria-label="Relation graph between claims"></div>
-          <div class="graph-empty" id="graph-empty">The relation graph is drawn here once claims are extracted.</div>
-          <div class="graph-legend" id="graph-legend">
-            <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>entails</span>
-            <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>
-            <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln eqv"/></svg>equivalent</span>
-            <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln exc"/></svg>exclusive / co-necessary</span>
-            <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+        <cds-tabs id="result-tabs" value="factuality" class="result-tabs">
+          <cds-tab id="tab-factuality" target="view-factuality" value="factuality">Factuality</cds-tab>
+          <cds-tab id="tab-coherence" target="view-coherence" value="coherence">Coherence</cds-tab>
+        </cds-tabs>
+
+        <!-- Factuality view -->
+        <div id="view-factuality" role="tabpanel" aria-labelledby="tab-factuality" class="view">
+          <div class="panel-head sub-first">
+            <h2 class="panel-title">Factuality</h2>
+            <cds-content-switcher id="fact-view" size="sm" value="evidence">
+              <cds-content-switcher-item value="evidence" selected>Evidence</cds-content-switcher-item>
+              <cds-content-switcher-item value="graph">Graph</cds-content-switcher-item>
+            </cds-content-switcher>
           </div>
-          <div class="edge-card" id="edge-card" hidden></div>
+          <div class="scores" id="fact-scores">
+            <div class="score-tile" data-f="factuality_score">
+              <div class="score-label">Factuality score <span class="sym">F</span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Share of claims whose posterior favours "supported"</div>
+            </div>
+            <div class="score-tile" data-f="supported">
+              <div class="score-label">Supported</div>
+              <div class="score-value">–</div>
+              <div class="score-note" id="fact-counts">Claims with posterior above 0.5</div>
+            </div>
+            <div class="score-tile" data-f="avg_prob">
+              <div class="score-label">Mean posterior</div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Average P(claim true | evidence)</div>
+            </div>
+          </div>
+          <div class="fact-body">
+            <div id="fact-evidence" class="evidence-list">
+              <p class="empty-note">Run an analysis in <b>Factuality</b> or <b>Both</b> mode to check each claim against evidence.</p>
+            </div>
+            <div id="fact-graph-wrap" class="graph-wrap" hidden>
+              <div id="fact-graph" class="graph" role="img" aria-label="Claim to evidence graph"></div>
+              <div class="graph-legend">
+                <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>supports</span>
+                <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>
+                <span class="lg"><span class="sq"></span>evidence passage</span>
+                <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+              </div>
+            </div>
+          </div>
+          <dl class="facts" id="fact-facts"></dl>
         </div>
 
-        <div class="panel-head sub">
-          <h2 class="panel-title">Logical coherence scores</h2>
+        <!-- Coherence view -->
+        <div id="view-coherence" role="tabpanel" aria-labelledby="tab-coherence" class="view" hidden>
+          <div class="panel-head sub-first">
+            <h2 class="panel-title">Relation graph</h2>
+            <cds-content-switcher id="graph-view" size="sm" value="graph">
+              <cds-content-switcher-item value="graph" selected>Relations</cds-content-switcher-item>
+              <cds-content-switcher-item value="mrf">MRF</cds-content-switcher-item>
+            </cds-content-switcher>
+          </div>
+          <div class="graph-wrap">
+            <div id="graph" class="graph" role="img" aria-label="Relation graph between claims"></div>
+            <div class="graph-empty" id="graph-empty">The relation graph is drawn here once claims are extracted.</div>
+            <div class="graph-legend" id="graph-legend">
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>entails</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln eqv"/></svg>equivalent</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln exc"/></svg>exclusive / co-necessary</span>
+              <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+            </div>
+            <div class="edge-card" id="edge-card" hidden></div>
+          </div>
+
+          <div class="panel-head sub">
+            <h2 class="panel-title">Logical coherence scores</h2>
+          </div>
+          <div class="scores" id="scores">
+            <div class="score-tile" data-m="mean_marginal">
+              <div class="score-label">Mean marginal <span class="sym">LCS<sub>mm</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Average posterior that each claim holds</div>
+            </div>
+            <div class="score-tile" data-m="consistency">
+              <div class="score-label">Consistency <span class="sym">LCS<sub>cons</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Probability that no relation is violated</div>
+            </div>
+            <div class="score-tile" data-m="log_partition">
+              <div class="score-label">Log partition <span class="sym">LCS<sub>Z</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">log Z, normalized between its MAP floor and its conflict-free ceiling</div>
+            </div>
+            <div class="score-tile" data-m="reified" hidden>
+              <div class="score-label">Reified <span class="sym">LCS<sub>R</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Posterior of a coherence variable R</div>
+            </div>
+          </div>
+          <dl class="facts" id="facts"></dl>
         </div>
-        <div class="scores" id="scores">
-          <div class="score-tile" data-m="mean_marginal">
-            <div class="score-label">Mean marginal <span class="sym">LCS<sub>mm</sub></span></div>
-            <div class="score-value">–</div>
-            <div class="score-meter"><span></span></div>
-            <div class="score-note">Average posterior that each claim holds</div>
-          </div>
-          <div class="score-tile" data-m="consistency">
-            <div class="score-label">Consistency <span class="sym">LCS<sub>cons</sub></span></div>
-            <div class="score-value">–</div>
-            <div class="score-meter"><span></span></div>
-            <div class="score-note">Probability that no relation is violated</div>
-          </div>
-          <div class="score-tile" data-m="log_partition">
-            <div class="score-label">Log partition <span class="sym">LCS<sub>Z</sub></span></div>
-            <div class="score-value">–</div>
-            <div class="score-meter"><span></span></div>
-            <div class="score-note">log Z, normalized between its MAP floor and its conflict-free ceiling</div>
-          </div>
-          <div class="score-tile" data-m="reified" hidden>
-            <div class="score-label">Reified <span class="sym">LCS<sub>R</sub></span></div>
-            <div class="score-value">–</div>
-            <div class="score-meter"><span></span></div>
-            <div class="score-note">Posterior of a coherence variable R</div>
-          </div>
-        </div>
-        <dl class="facts" id="facts"></dl>
       </section>
     </main>
 
@@ -193,7 +281,7 @@
       <div class="info-head">
         <div>
           <h2 id="info-title">How it works</h2>
-          <p class="info-sub">Logical Coherence Score, from FactReasoner</p>
+          <p class="info-sub">Factuality and logical coherence, from FactReasoner</p>
         </div>
         <cds-icon-button id="close-info" kind="ghost" align="left">
           <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: close --><path d="M17.41 16 24 9.41 22.59 8 16 14.59 9.41 8 8 9.41 14.59 16 8 22.59 9.41 24 16 17.41 22.59 24 24 22.59 17.41 16z"/></svg>
@@ -201,24 +289,24 @@
         </cds-icon-button>
       </div>
       <div class="info-body">
-        <p>Factuality asks whether each claim is supported by evidence. Coherence asks whether the claims <em>hang together</em>. A response can be fully factual and still contradict itself.</p>
+        <p>Two questions about one response. <strong>Factuality</strong>: is each claim supported by evidence? <strong>Coherence</strong>: do the claims <em>hang together</em>? A response can be fully factual and still contradict itself, or perfectly consistent and wrong.</p>
         <ol>
-          <li><strong>Claims.</strong> The response is split into atomic claims. Each is matched back to the words in the text that state it.</li>
-          <li><strong>Relations.</strong> The selected RITS model reads each pair of claims against the response. It names the discourse sense (Evidence, Contrast, Cause–Effect, …), which compiles to a logical coupling, and estimates how strongly the response draws the link.</li>
-          <li><strong>Model.</strong> Every claim becomes a binary variable with a prior. Every relation becomes a pairwise factor whose weight is the mined strength <span class="mono">p</span>. Merlin solves the resulting Markov random field.</li>
-          <li><strong>Scores.</strong> The scores are read off that one model: the mean posterior, the probability that no relation is violated, and the normalized log partition.</li>
+          <li><strong>Claims.</strong> The response is split into atomic claims. Each is matched back to the words in the text that state it. Both analyses use the same claims.</li>
+          <li><strong>Factuality.</strong> FactReasoner gathers evidence for each claim (web search, Wikipedia, or passages you paste), asks whether each passage supports or contradicts the claim, and solves a graphical model for the probability that each claim is true. On Ollama that question goes to the <span class="mono">kev</span> decision model, which returns a probability for each verdict in one pass.</li>
+          <li><strong>Coherence.</strong> The model reads each pair of claims against the response and names the discourse relation (Evidence, Contrast, Cause–Effect, …), which compiles to a logical coupling with a strength <span class="mono">p</span>. A Markov random field over the claims gives the coherence scores.</li>
+          <li><strong>Both.</strong> The factuality posteriors become the coherence model's priors, so one score reflects both questions.</li>
         </ol>
-        <p>The posteriors can be compared with the priors. A claim pulled <em>below its own prior</em> is one the response's own argument undermines. No aggregate score shows this.</p>
-        <p>With <strong>factuality priors</strong>, FactReasoner first retrieves evidence for each claim. Its posteriors then seed the coherence model, so the score reflects both questions.</p>
+        <p>A claim pulled <em>below its own prior</em> is one the response's own argument undermines. No aggregate score shows this.</p>
       </div>
       <div class="info-foot">
         <cds-tag type="blue" size="sm">RITS</cds-tag>
+        <cds-tag type="cyan" size="sm">Ollama</cds-tag>
         <cds-tag type="purple" size="sm">Markov random field</cds-tag>
         <cds-tag type="teal" size="sm">Merlin</cds-tag>
         <cds-tag type="gray" size="sm">FactReasoner</cds-tag>
       </div>
     </aside>
   </div>
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

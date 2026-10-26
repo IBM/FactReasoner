@@ -136,6 +136,9 @@ def build_backend(
               catalog), and RITS is pointed at this endpoint (RITS appends
               ``/v1`` itself, so pass the base endpoint, not ``.../v1``). When
               omitted, the built-in RITS catalog endpoint is used.
+            - For ``"ollama"``: the Ollama server URL (e.g.
+              ``"http://gpu-box:11434"``); falls back to the ``OLLAMA_HOST``
+              environment variable and then to ``http://localhost:11434``.
         api_key: API key.
             - For ``"vllm"``: falls back to the ``VLLM_API_KEY`` environment
               variable and then to ``"EMPTY"`` (vLLM ignores the value but Mellea
@@ -239,7 +242,7 @@ def build_backend(
         # pulled on first use).
         from mellea.backends.ollama import OllamaModelBackend
 
-        return OllamaModelBackend(resolved_id, model_options=options)
+        return OllamaModelBackend(resolved_id, base_url=base_url, model_options=options)
 
     elif kind == "vllm":
         # vLLM exposes an OpenAI-compatible API, so we drive it through Mellea's

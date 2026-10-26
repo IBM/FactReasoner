@@ -352,3 +352,21 @@ class TestDefaultTemperature:
             call_options={"temperature": 0.7},
         )
         assert resolved["temperature"] == 0.7
+
+
+class TestOllamaBackend:
+    """``base_url`` reaches OllamaModelBackend (constructor patched: no server)."""
+
+    def _build(self, **kwargs):
+        with patch("mellea.backends.ollama.OllamaModelBackend") as cls:
+            build_backend("ollama", model_id="granite4.2:3b", **kwargs)
+        return cls.call_args
+
+    def test_base_url_forwarded(self):
+        call = self._build(base_url="http://gpu-box:11434")
+        assert call.kwargs["base_url"] == "http://gpu-box:11434"
+        assert call.args[0] == "granite4.2:3b"
+
+    def test_base_url_defaults_to_none(self):
+        # None lets Mellea fall back to OLLAMA_HOST, then localhost.
+        assert self._build().kwargs["base_url"] is None

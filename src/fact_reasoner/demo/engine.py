@@ -12,13 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The demo's run engine: one analysis = atomize -> align spans -> mine -> score.
+# The demo's run engine. One analysis, in up to three stages:
 #
-# It drives the same components the `fact-reasoner-lcs` CLI does (Atomizer,
-# RelationMiner, CoherencePipeline, and for factuality priors the
-# FactReasonerPriorProvider), but staged by hand so each stage can report to the
-# browser as it finishes: claims appear before any relation is mined, and the
-# miner's on_progress hook drives a live pair counter.
+#   1. claims       -- atomize the response and align each claim to its span;
+#   2. factuality   -- (modes "factuality" / "both") a FactReasoner run over THOSE
+#                      claims: retrieve or take pasted evidence, score claim<->
+#                      evidence NLI, infer the per-claim posteriors. On Ollama the
+#                      NLI step runs on a decision model (kev) on the same server,
+#                      not on the chat model: it scores each pair in one forward
+#                      pass and returns real probabilities, which a small local
+#                      chat model can only approximate by sampling;
+#   3. coherence    -- (modes "coherence" / "both") mine claim<->claim relations
+#                      and read the LCS off the coherence MRF. In "both" the
+#                      factuality posteriors are the MRF's unary priors.
+#
+# The stages are driven by hand rather than through FactualityRunner /
+# CoherenceRunner so each can report to the browser as it finishes, and so both
+# stages share ONE claim set: the factuality pipeline is handed the demo's atoms
+# (has_atoms=True) instead of atomizing the response again, which keeps claim ids
+# identical across the two views by construction.
 #
 # Concurrency model. Every analysis runs on ONE worker thread that owns ONE
 # persistent event loop. Mellea caches its async HTTP client per event loop, so a
@@ -37,6 +49,7 @@ import contextlib
 import json
 import os
 import queue
+import re
 import threading
 import time
 import traceback
@@ -50,7 +63,6 @@ from fact_reasoner.core.base import Atom
 from fact_reasoner.demo.spans import align_claims, locate_evidence
 from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
 from fact_reasoner.lcs.pipeline import CoherencePipeline, build_coherence_model
-from fact_reasoner.lcs.priors import AtomPriors
 from fact_reasoner.lcs.relation_miner import MiningResult, _atom_sort_key
 
 #: Readouts the demo computes by default (the paper's three headline scores).
@@ -59,20 +71,39 @@ DEFAULT_METHODS = ("mean_marginal", "consistency", "log_partition")
 #: How many finished runs are kept for re-scoring.
 MAX_KEPT_RUNS = 32
 
-#: Prior sources the demo offers.
-PRIOR_MODES = ("flat", "manual", "factuality")
+#: What one analysis computes.
+ANALYSIS_MODES = ("factuality", "coherence", "both")
+
+#: Coherence prior sources. In "both" mode the priors are always factuality's.
+PRIOR_MODES = ("flat", "manual")
+
+#: Where the factuality stage gets its evidence.
+EVIDENCE_SOURCES = ("google", "wikipedia", "pasted")
+
+#: Model backends the demo can drive.
+BACKENDS = ("rits", "ollama")
+
+#: Most pasted evidence passages accepted (each is compared with every claim).
+MAX_PASTED_PASSAGES = 12
+
+#: The Ollama decision model that scores factuality NLI on the Ollama backend.
+DEFAULT_DECISION_MODEL = "kev"
 
 
 @dataclass
 class Settings:
     """Everything the control panel can set for one analysis.
 
-    The defaults mirror the `fact-reasoner-lcs` CLI defaults, except
-    ``pair_policy``: the demo inputs are short, so all pairs is affordable and
-    shows every relation the miner can find.
+    The defaults mirror the CLI defaults, except ``pair_policy``: the demo inputs
+    are short, so all pairs is affordable and shows every relation the miner can
+    find.
     """
 
+    mode: str = "coherence"
+    # Model.
+    backend: str = "rits"
     model: str = "llama-3.3-70b-instruct"
+    # Coherence: relation mining.
     prompt_variant: str = "v1"
     sense_menu: str = "full"
     pair_policy: str = "all_pairs"
@@ -85,35 +116,64 @@ class Settings:
     require_evidence: bool = False
     concession_discount: float = 0.45
     revise_atoms: bool = False
+    # Coherence: scoring.
     methods: tuple[str, ...] = DEFAULT_METHODS
     ibound: int = 6
     prior_mode: str = "flat"
     flat_prior: float = 0.5
-    # Factuality priors (prior_mode="factuality").
-    service_type: str = "google"
+    # Factuality.
+    evidence: str = "wikipedia"
     top_k: int = 3
     nli_mode: str = "fast"
+    nli_method: str = "auto"
     pipeline_version: str = "v2"
+    use_priors: bool = True
 
     @classmethod
     def from_json(cls, d: Mapping[str, Any] | None) -> Settings:
         """Build settings from a request body, ignoring unknown keys.
 
         Raises:
-            ValueError: On an unknown readout or prior mode.
+            ValueError: On an unknown mode, backend, readout, prior mode or
+                evidence source.
         """
         d = dict(d or {})
-        known = {f for f in cls.__dataclass_fields__}
+        known = set(cls.__dataclass_fields__)
         kwargs = {k: v for k, v in d.items() if k in known}
         if "methods" in kwargs:
             kwargs["methods"] = tuple(kwargs["methods"]) or DEFAULT_METHODS
         s = cls(**kwargs)
+        for name, value, allowed in (
+            ("mode", s.mode, ANALYSIS_MODES),
+            ("backend", s.backend, BACKENDS),
+            ("prior_mode", s.prior_mode, PRIOR_MODES),
+            ("evidence", s.evidence, EVIDENCE_SOURCES),
+        ):
+            if value not in allowed:
+                raise ValueError(f"Unknown {name}: {value!r} (expected one of {list(allowed)})")
         unknown = [m for m in s.methods if m not in LCS_METHODS]
         if unknown:
             raise ValueError(f"Unknown readout(s): {unknown}")
-        if s.prior_mode not in PRIOR_MODES:
-            raise ValueError(f"Unknown prior_mode: {s.prior_mode!r}")
         return s
+
+    @property
+    def wants_factuality(self) -> bool:
+        return self.mode in ("factuality", "both")
+
+    @property
+    def wants_coherence(self) -> bool:
+        return self.mode in ("coherence", "both")
+
+    def resolved_nli_method(self) -> str:
+        """``logprobs`` where the backend returns them, else SIMBA-UQ.
+
+        Ollama exposes no token logprobs, so the coherence miner estimates its
+        probabilities by sampling there. (Factuality NLI on Ollama does not use
+        this: it runs on the decision model instead -- see ``Engine``.)
+        """
+        if self.nli_method != "auto":
+            return self.nli_method
+        return "simbauq" if self.backend == "ollama" else "logprobs"
 
 
 @dataclass
@@ -125,6 +185,7 @@ class Run:
     query: str
     settings: Settings
     manual_priors: dict[str, float] = field(default_factory=dict)
+    passages: list[str] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     done: bool = False
     mining: MiningResult | None = None
@@ -141,17 +202,39 @@ class Run:
             self.cond.notify_all()
 
 
+# ----------------------------------------------------------------------------
+# Examples and model inventories.
+# ----------------------------------------------------------------------------
+
+#: Evidence passages for the Voyager pair. Shipped with the example so the
+#: factuality view works offline ("pasted" evidence) and in live mode without
+#: depending on what a search engine returns today. Each passage settles one or
+#: more of the five claims: a1-a3 are supported, a4 and a5 are contradicted.
+VOYAGER_EVIDENCE = [
+    "NASA confirmed that Voyager 1 crossed the heliopause in August 2012. After "
+    "the crossing its instruments measured a sharp rise in plasma density, which "
+    "showed that Voyager 1 is in interstellar space.",
+    "The plasma wave instrument aboard Voyager 1 continued to operate after the "
+    "crossing and did not fail; its density measurements are the main evidence "
+    "for the heliopause crossing.",
+    "Voyager 1 has not left the Solar System. The Sun's gravity dominates out to "
+    "the Oort cloud, which the spacecraft will not reach for about 300 years.",
+]
+
+
 def load_examples(data_dir: str) -> list[dict[str, Any]]:
     """The bundled example responses, from ``data/lcs``.
 
     The Voyager pair comes first (it is the paper's worked example, and ships
-    with known priors and expected scores); then the single-response fixtures.
+    with known priors, expected scores and evidence passages); then the
+    single-response fixtures.
 
     Args:
         data_dir: The ``data/lcs`` directory.
 
     Returns:
-        ``[{id, title, query, response, priors?, expected?}]``.
+        ``[{id, title, query, response, claim_priors?, expected?, evidence?,
+        gold?}]``.
     """
     examples: list[dict[str, Any]] = []
     pair = os.path.join(data_dir, "example-7-coherence-pair.json")
@@ -169,6 +252,7 @@ def load_examples(data_dir: str) -> list[dict[str, Any]]:
                     "response": r["response"],
                     "claim_priors": texts,
                     "expected": r.get("expected"),
+                    "evidence": list(VOYAGER_EVIDENCE),
                     # The gold graph, replayed offline in dry-run mode.
                     "gold": {
                         "atoms": [{"id": a["id"], "text": a["text"]} for a in d["atoms"]],
@@ -202,19 +286,59 @@ def load_models(path: str) -> list[dict[str, Any]]:
     return [e for e in entries if e.get("backend") == "rits"]
 
 
+def list_ollama_models(host: str | None, timeout: float = 2.0) -> list[dict[str, Any]]:
+    """The models a local Ollama server has pulled (``GET /api/tags``).
+
+    Args:
+        host: The server URL; ``None`` uses ``OLLAMA_HOST`` or localhost.
+        timeout: Seconds to wait; the demo must not hang on a dead server.
+
+    Returns:
+        ``[{name, model_id}]``, or ``[]`` when the server is unreachable.
+    """
+    import requests
+
+    url = (host or os.environ.get("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    if not url.startswith("http"):
+        url = "http://" + url
+    try:
+        r = requests.get(f"{url}/api/tags", timeout=timeout)
+        r.raise_for_status()
+        tags = [m["name"] for m in r.json().get("models", [])]
+    except Exception:  # noqa: BLE001 - unreachable is an empty list, not an error
+        return []
+    return [{"name": t, "model_id": t} for t in sorted(tags)]
+
+
+def split_passages(text: str) -> list[str]:
+    """Split pasted evidence into passages: blank-line separated paragraphs."""
+    parts = [re.sub(r"\s+", " ", p).strip() for p in re.split(r"\n\s*\n", text or "")]
+    return [p for p in parts if p]
+
+
+# ----------------------------------------------------------------------------
+# The engine.
+# ----------------------------------------------------------------------------
+
+
 class Engine:
     """Queue analyses onto one worker thread and keep their results.
 
     Args:
         models: The RITS model inventory (see :func:`load_models`).
         merlin_path: The Merlin binary. Ignored in dry-run mode.
+        ollama_host: The Ollama server URL; ``None`` uses ``OLLAMA_HOST`` or
+            localhost.
+        decision_model: The Ollama decision model that scores factuality NLI
+            when the backend is Ollama (default ``kev``). It must be pulled on
+            the same server.
         dry_run: Stub the LLM and use exact brute-force inference, so the demo
-            runs with no RITS key and no Merlin (responses up to ~12 claims).
-            A response matching one of ``replays`` is answered with that
-            example's gold claims and relations instead of the stub's.
+            runs with no model server and no Merlin. A response matching one of
+            ``replays`` is answered with that example's gold claims and
+            relations instead of the stub's; factuality needs pasted evidence.
         replays: Bundled examples carrying a ``gold`` graph (see
             :func:`load_examples`), used only in dry-run mode.
-        backend_factory: Override for building a backend from a model entry
+        backend_factory: Override for building a backend from ``(kind, model)``
             (tests).
     """
 
@@ -223,20 +347,24 @@ class Engine:
         *,
         models: list[dict[str, Any]],
         merlin_path: str | None,
+        ollama_host: str | None = None,
+        decision_model: str = DEFAULT_DECISION_MODEL,
         dry_run: bool = False,
-        backend_factory: Callable[[dict[str, Any]], Any] | None = None,
+        backend_factory: Callable[[str, str], Any] | None = None,
         replays: list[dict[str, Any]] | None = None,
     ):
         if not dry_run and not merlin_path:
             raise ValueError("merlin_path is required unless dry_run=True.")
         self.models = {m["name"]: m for m in models}
         self.merlin_path = merlin_path or "dry-run"
+        self.ollama_host = ollama_host
+        self.decision_model = decision_model
         self.dry_run = dry_run
         self.backend_factory = backend_factory
         self._replays = {
             e["response"].strip(): e["gold"] for e in (replays or []) if e.get("gold")
         }
-        self._backends: dict[str, Any] = {}
+        self._backends: dict[tuple[str, str], Any] = {}
         self._runs: OrderedDict[str, Run] = OrderedDict()
         self._jobs: queue.Queue = queue.Queue()
         self._loop = asyncio.new_event_loop()
@@ -245,6 +373,29 @@ class Engine:
 
     # -- public API ----------------------------------------------------------
 
+    def ollama_models(self) -> list[dict[str, Any]]:
+        """The local Ollama chat models (none in dry-run, which needs no server).
+
+        The decision model is listed separately (see :meth:`decision_status`):
+        it scores questions and cannot drive the atomizer or the miner.
+        """
+        if self.dry_run:
+            return []
+        return [
+            m for m in list_ollama_models(self.ollama_host)
+            if _base_name(m["name"]) != _base_name(self.decision_model)
+        ]
+
+    def decision_status(self) -> dict[str, Any]:
+        """Whether the decision model is pulled on the Ollama server."""
+        if self.dry_run:
+            return {"model": self.decision_model, "available": False}
+        names = {_base_name(m["name"]) for m in list_ollama_models(self.ollama_host)}
+        return {
+            "model": self.decision_model,
+            "available": _base_name(self.decision_model) in names,
+        }
+
     def submit(
         self,
         response: str,
@@ -252,29 +403,60 @@ class Engine:
         query: str = "",
         settings: Settings,
         manual_priors: Mapping[str, float] | None = None,
+        evidence_text: str = "",
     ) -> Run:
-        """Queue an analysis and return its :class:`Run` (events stream in)."""
+        """Queue an analysis and return its :class:`Run` (events stream in).
+
+        Raises:
+            ValueError: On an empty response, an unknown RITS model, or a
+                factuality request that cannot run (no evidence offline, too many
+                passages).
+        """
         if not response.strip():
             raise ValueError("The response is empty.")
-        if settings.model not in self.models and not self.dry_run:
-            raise ValueError(f"Unknown model: {settings.model!r}")
-        if settings.prior_mode == "factuality" and self.dry_run:
+        if settings.backend == "rits" and settings.model not in self.models and not self.dry_run:
+            raise ValueError(f"Unknown RITS model: {settings.model!r}")
+        if settings.backend == "ollama" and not settings.model.strip():
+            raise ValueError("Pick an Ollama model.")
+        if (
+            settings.backend == "ollama"
+            and settings.wants_factuality
+            and not self.dry_run
+            and not self.decision_status()["available"]
+        ):
             raise ValueError(
-                "Factuality priors need a live model, retrieval and Merlin; they "
-                "are not available in dry-run mode."
+                f"Factuality on Ollama scores NLI with the '{self.decision_model}' "
+                f"decision model, which this server has not pulled "
+                f"(ollama pull {self.decision_model})."
             )
+        passages: list[str] = []
+        if settings.wants_factuality:
+            if self.dry_run and settings.evidence != "pasted":
+                raise ValueError(
+                    "Offline replay has no retrieval: choose 'Paste evidence' as the "
+                    "evidence source (the Voyager examples ship theirs)."
+                )
+            if settings.evidence == "pasted":
+                passages = split_passages(evidence_text)
+                if not passages:
+                    raise ValueError("Paste at least one evidence passage.")
+                if len(passages) > MAX_PASTED_PASSAGES:
+                    raise ValueError(
+                        f"At most {MAX_PASTED_PASSAGES} evidence passages "
+                        f"(got {len(passages)})."
+                    )
         run = Run(
             id=uuid.uuid4().hex[:12],
             response=response,
             query=query,
             settings=settings,
             manual_priors={k: float(v) for k, v in (manual_priors or {}).items()},
+            passages=passages,
         )
         self._runs[run.id] = run
         while len(self._runs) > MAX_KEPT_RUNS:
             self._runs.popitem(last=False)
-        position = self._jobs.qsize()
-        run.emit("queued", position=position)
+        run.emit("queued", position=self._jobs.qsize())
         self._jobs.put(("analyze", run, None))
         return run
 
@@ -282,7 +464,7 @@ class Engine:
         return self._runs.get(run_id)
 
     def rescore(self, run_id: str, priors: Mapping[str, float]) -> dict[str, Any]:
-        """Re-score a finished run under edited per-claim priors (no LLM calls).
+        """Re-score a finished run's coherence under edited priors (no LLM calls).
 
         Runs on the worker thread like everything else, so it cannot race an
         analysis for the inference patches; the caller blocks on the result.
@@ -300,12 +482,12 @@ class Engine:
             raise RuntimeError(value)
         return value
 
-    # -- the worker ----------------------------------------------------------
-
     def close(self) -> None:
         """Stop the worker after the queued jobs, and close its event loop."""
         self._jobs.put(("stop", None, None))
         self._worker.join(timeout=30)
+
+    # -- the worker ----------------------------------------------------------
 
     def _work(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -342,67 +524,66 @@ class Engine:
             traceback.print_exc()
             box.put((False, f"{type(e).__name__}: {e}"))
 
-    def _backend(self, name: str) -> Any:
-        if name in self._backends:
-            return self._backends[name]
+    def _backend(self, kind: str, name: str) -> Any:
+        key = (kind, name)
+        if key in self._backends:
+            return self._backends[key]
         if self.dry_run:
             from fact_reasoner.experiments.mock import make_mock_backend
 
             backend = make_mock_backend(name)
         elif self.backend_factory is not None:
-            backend = self.backend_factory(self.models[name])
+            backend = self.backend_factory(kind, name)
         else:
             from fact_reasoner.backends import build_backend
 
-            spec = self.models[name]
-            backend = build_backend(
-                "rits", model_id=spec["model_id"], base_url=spec.get("base_url")
-            )
-        self._backends[name] = backend
+            if kind == "rits":
+                spec = self.models[name]
+                backend = build_backend(
+                    "rits", model_id=spec["model_id"], base_url=spec.get("base_url")
+                )
+            else:
+                backend = build_backend("ollama", model_id=name, base_url=self.ollama_host)
+        self._backends[key] = backend
         return backend
 
     def _analyze(self, run: Run) -> None:
         s = run.settings
         timing: dict[str, float] = {}
-        run.emit("stage", stage="setup", message=f"Connecting to {s.model}")
-        backend = self._backend(s.model)
+        run.emit("stage", stage="setup", message=f"Connecting to {s.model} ({s.backend})")
+        backend = self._backend(s.backend, s.model)
 
-        # -- 1. claims (and, for factuality priors, the whole stage-1 run) ------
+        # -- 1. claims ---------------------------------------------------------
+        run.emit("stage", stage="atomize", message="Extracting atomic claims")
         t = time.perf_counter()
-        factuality = None
-        if s.prior_mode == "factuality":
-            run.emit("stage", stage="factuality",
-                     message="Extracting claims, retrieving evidence and scoring factuality")
-            atoms, run.priors, factuality = self._factuality(run, backend)
-        else:
-            run.emit("stage", stage="atomize", message="Extracting atomic claims")
-            atoms = self._atomize(run, backend)
+        atoms = self._atomize(run, backend)
         timing["claims"] = time.perf_counter() - t
+        self._emit_claims(run, atoms)
 
-        originals = {aid: (a.get_original() or a.text) for aid, a in atoms.items()}
-        spans = align_claims(run.response, originals)
-        run.claims = {
-            aid: {
-                "id": aid,
-                "label": f"a{i + 1}",
-                "text": atoms[aid].text,
-                "original": originals[aid],
-                "span": spans[aid].to_json(),
-            }
-            for i, aid in enumerate(sorted(atoms, key=_atom_sort_key))
-        }
-        if s.prior_mode == "manual":
-            run.priors = self._manual_priors(run)
-        elif s.prior_mode == "flat":
+        # -- 2. factuality -----------------------------------------------------
+        factuality = None
+        if s.wants_factuality:
+            t = time.perf_counter()
+            factuality = self._factuality(run, backend, atoms)
+            timing["factuality"] = time.perf_counter() - t
+            run.emit("factuality", **factuality)
+            # Dedup inside FactReasoner can drop a claim; coherence then mines the
+            # surviving set, so the two views never disagree about which exist.
+            atoms = {aid: a for aid, a in atoms.items() if aid in factuality["marginals"]}
+
+        if not s.wants_coherence:
+            run.emit("result", factuality=factuality, coherence=None, timing=timing)
+            return
+
+        # -- 3. coherence ------------------------------------------------------
+        if s.mode == "both":
+            run.priors = {aid: factuality["marginals"][aid] for aid in atoms}
+        elif s.prior_mode == "manual":
+            run.priors = self._manual_priors(run, atoms)
+        else:
             run.priors = {aid: float(s.flat_prior) for aid in atoms}
-        run.emit(
-            "claims",
-            claims=list(run.claims.values()),
-            priors=run.priors,
-            factuality=factuality,
-        )
+        run.emit("priors", priors=run.priors, source="factuality" if s.mode == "both" else s.prior_mode)
 
-        # -- 2. relations ------------------------------------------------------
         run.emit("stage", stage="mine", message="Mining relations between claims")
         t = time.perf_counter()
         gold = self._replay(run)
@@ -415,10 +596,25 @@ class Engine:
             )
         timing["mining"] = time.perf_counter() - t
 
-        # -- 3. scores ---------------------------------------------------------
         run.emit("stage", stage="score", message="Running inference on the coherence MRF")
-        result = self._score(run, run.priors, final=True, timing=timing)
-        run.emit("result", **result)
+        coherence = self._score(run, run.priors, final=True)
+        timing["scoring"] = coherence.pop("scoring_seconds")
+        run.emit("result", factuality=factuality, coherence=coherence, timing=timing)
+
+    def _emit_claims(self, run: Run, atoms: dict[str, Atom]) -> None:
+        originals = {aid: (a.get_original() or a.text) for aid, a in atoms.items()}
+        spans = align_claims(run.response, originals)
+        run.claims = {
+            aid: {
+                "id": aid,
+                "label": f"a{i + 1}",
+                "text": atoms[aid].text,
+                "original": originals[aid],
+                "span": spans[aid].to_json(),
+            }
+            for i, aid in enumerate(sorted(atoms, key=_atom_sort_key))
+        }
+        run.emit("claims", claims=list(run.claims.values()))
 
     def _atomize(self, run: Run, backend: Any) -> dict[str, Atom]:
         from fact_reasoner.core.atomizer import Atomizer
@@ -433,7 +629,7 @@ class Engine:
 
             sents = [run.response[a:b] for a, b in split_sentences(run.response)]
             return {f"a{i}": Atom(id=f"a{i}", text=t) for i, t in enumerate(sents)}
-        atoms = build_atoms(run.response, Atomizer(backend))
+        atoms = build_atoms(run.response, Atomizer(backend), query=run.query or None)
         if run.settings.revise_atoms and atoms:
             from fact_reasoner.core.reviser import Reviser
 
@@ -449,31 +645,107 @@ class Engine:
             return None
         return self._replays.get(run.response.strip())
 
-    def _factuality(self, run: Run, backend: Any):
-        """Stage 1: a FactReasoner run whose posteriors become the priors."""
-        from fact_reasoner.lcs.priors import FactReasonerPriorProvider
-        from fact_reasoner.runner import FactualityRunner
+    # -- stage 2: factuality --------------------------------------------------
+
+    def _factuality(self, run: Run, backend: Any, atoms: dict[str, Atom]) -> dict[str, Any]:
+        """A FactReasoner run over the demo's claims; returns the view's payload.
+
+        Retrieval sources hand FactReasoner the claims and let it fetch contexts;
+        pasted evidence becomes the contexts directly, each passage compared with
+        every claim (there is no retrieval provenance to prune by).
+        """
+        from fact_reasoner.assessor import FactReasoner
+        from fact_reasoner.core.nli_config import get_pair_config
+        from fact_reasoner.runner import _FR_VERSIONS
 
         s = run.settings
-        runner = FactualityRunner(
-            backend,
-            pipeline="factreasoner",
-            pipeline_version=s.pipeline_version,
-            service_type=s.service_type,
-            top_k=s.top_k,
-            use_priors=True,
-            merlin_path=self.merlin_path,
-            nli_mode=s.nli_mode,
-        )
-        provider = FactReasonerPriorProvider(runner=runner, mode="assess")
-        ap: AtomPriors = provider.priors_for(response=run.response, query=run.query)
-        atoms = ap.atoms or self._atomize(run, backend)
-        priors, coverage = ap.resolve(atoms, on_low_coverage="warn")
-        diag = dict(ap.diagnostics or {})
-        diag["coverage"] = coverage
-        return atoms, priors, _jsonable(diag)
+        pasted = s.evidence == "pasted"
+        # A FRESH copy of the atoms: FactReasoner attaches contexts to them and
+        # may dedup the dict, and coherence must see the claims as extracted.
+        fr_atoms = {aid: Atom(id=aid, text=a.text) for aid, a in atoms.items()}
+        for aid, a in atoms.items():
+            fr_atoms[aid].set_original(a.get_original() or a.text)
 
-    def _manual_priors(self, run: Run) -> dict[str, float]:
+        pipeline = FactReasoner(
+            nli_extractor=self._nli_extractor(backend, s),
+            context_retriever=None if pasted else self._retriever(s),
+            context_summarizer=None,
+            merlin_path=self.merlin_path,
+            use_priors=s.use_priors,
+            nli_pair_config=get_pair_config("all_pairs" if pasted else s.nli_mode),
+        )
+        pipeline.query = run.query or ""
+        pipeline.response = run.response
+        pipeline.atoms = fr_atoms
+        if pasted:
+            pipeline.contexts = _pasted_contexts(run.passages)
+
+        rel_ac, rel_cc, dedup, per_atom = _FR_VERSIONS[s.pipeline_version]
+        scorer = f" with {self.decision_model}" if s.backend == "ollama" else ""
+        if pasted:
+            pairs = len(run.passages) * len(fr_atoms)
+            message = (
+                f"Checking {len(fr_atoms)} claims against {len(run.passages)} "
+                f"passage(s): {pairs} NLI pairs{scorer}"
+            )
+        else:
+            message = (
+                f"Retrieving up to {s.top_k} {s.evidence.title()} passages per claim, "
+                f"then checking each claim against them{scorer}"
+            )
+        run.emit("stage", stage="factuality", message=message)
+        self._loop.run_until_complete(
+            pipeline.build(
+                has_atoms=True,
+                has_contexts=pasted,
+                revise_atoms=False,
+                remove_duplicates=dedup,
+                summarize_contexts=False,
+                contexts_per_atom_only=per_atom and not pasted,
+                rel_atom_context=rel_ac,
+                rel_context_context=rel_cc,
+            )
+        )
+        if pipeline.fact_graph is None or not pipeline.relations:
+            # No contexts / no relations: FactReasoner has nothing to infer over,
+            # and every claim stays at its prior.
+            results: dict[str, Any] = {}
+            marginals = {aid: 0.5 for aid in pipeline.atoms}
+        else:
+            results, _ = pipeline.score()
+            marginals = {
+                k: float(v["score"])
+                for entry in results.get("factuality_score_per_atom", [])
+                for k, v in entry.items()
+            }
+            for aid in pipeline.atoms:
+                marginals.setdefault(aid, 0.5)
+        return _factuality_payload(pipeline, results, marginals)
+
+    def _nli_extractor(self, backend: Any, s: Settings):
+        """The claim<->evidence NLI scorer for the factuality stage.
+
+        RITS: the chat model itself, with logprob (or sampled) probabilities.
+        Ollama: the decision model on the same server. It needs no Mellea
+        backend, so the chat model is not involved in this step at all.
+        """
+        from fact_reasoner.core.nli import DecisionNLIExtractor, NLIExtractor
+
+        if self.dry_run:
+            return _lexical_nli(backend)
+        if s.backend == "ollama":
+            return DecisionNLIExtractor(self.decision_model, host=self.ollama_host)
+        return NLIExtractor(backend, nli_method=s.resolved_nli_method())
+
+    def _retriever(self, s: Settings):
+        from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
+
+        source = SourceRetriever(service_type=s.evidence, top_k=s.top_k, fetch_text=True)
+        return ContextRetriever(retriever=source, context_summarizer=None)
+
+    # -- stage 3: coherence ---------------------------------------------------
+
+    def _manual_priors(self, run: Run, atoms: Mapping[str, Atom]) -> dict[str, float]:
         """Per-claim priors from the request: by claim id, or by exact claim text.
 
         Text keys let an example (the Voyager pair) ship its 0.9/0.1 priors
@@ -481,7 +753,8 @@ class Engine:
         """
         out = {}
         mp = run.manual_priors
-        for aid, c in run.claims.items():
+        for aid in atoms:
+            c = run.claims[aid]
             p = mp.get(aid, mp.get(c["text"], mp.get(c["original"])))
             out[aid] = float(p) if p is not None else float(run.settings.flat_prior)
         return out
@@ -492,13 +765,20 @@ class Engine:
         def on_progress(stage: str, done: int, total: int) -> None:
             run.emit("progress", stage=stage, done=done, total=total)
 
+        nli_method = s.resolved_nli_method()
+        strength = s.strength_method
+        if self.dry_run:
+            strength = "verbalized"
+        elif strength == "auto" and nli_method != "logprobs":
+            strength = "surrogate_sampled"  # no logprobs to read a Yes/No from
         return RelationMiner(
             backend,
+            nli_method="logprobs" if nli_method == "logprobs" else "simbauq",
             pair_policy=s.pair_policy,
             window=s.window,
             gate=s.gate,
             gate_threshold=s.gate_threshold,
-            strength_method="verbalized" if self.dry_run else s.strength_method,
+            strength_method=strength,
             strength_samples=s.strength_samples,
             reconcile=s.reconcile,
             prompt_variant=s.prompt_variant,
@@ -508,28 +788,18 @@ class Engine:
             on_progress=on_progress,
         )
 
-    def _score(
-        self,
-        run: Run,
-        priors: Mapping[str, float],
-        *,
-        final: bool,
-        timing: dict[str, float] | None = None,
-    ) -> dict[str, Any]:
+    def _score(self, run: Run, priors: Mapping[str, float], *, final: bool) -> dict[str, Any]:
         s = run.settings
         mining = run.mining
         assert mining is not None
         priors = {aid: _clip(priors.get(aid, s.flat_prior)) for aid in mining.atoms}
-        model = build_coherence_model(
-            "mrf", merlin_path=self.merlin_path, ibound=s.ibound
-        )
+        model = build_coherence_model("mrf", merlin_path=self.merlin_path, ibound=s.ibound)
         pipeline = CoherencePipeline(
             miner=None, coherence_model=model, methods=s.methods  # type: ignore[arg-type]
         )
         t = time.perf_counter()
         result = pipeline.run_from_mining(mining, priors=priors)
-        timing = dict(timing or {})
-        timing["scoring"] = time.perf_counter() - t
+        elapsed = time.perf_counter() - t
         if final:
             run.priors = priors
 
@@ -545,8 +815,131 @@ class Engine:
             "relations": relations,
             "diagnostics": _jsonable(result.diagnostics),
             "coverage": _jsonable(mining.coverage),
-            "timing": timing,
+            "scoring_seconds": elapsed,
         }
+
+
+# ----------------------------------------------------------------------------
+# Helpers.
+# ----------------------------------------------------------------------------
+
+
+def _base_name(tag: str) -> str:
+    """An Ollama tag without its default ``:latest`` suffix (``kev:latest`` -> ``kev``)."""
+    return tag[: -len(":latest")] if tag.endswith(":latest") else tag
+
+
+def _pasted_contexts(passages: list[str]):
+    """Pasted passages as FactReasoner contexts, owned by no particular claim."""
+    from fact_reasoner.core.base import Context
+
+    return {
+        f"c_p_{i}": Context(id=f"c_p_{i}", atom=None, text=p, title=f"Passage {i + 1}")
+        for i, p in enumerate(passages)
+    }
+
+
+def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: dict[str, float]):
+    """What the factuality view needs: scores, evidence, and the NLI edges."""
+    contexts = []
+    for cid, c in pipeline.contexts.items():
+        contexts.append(
+            {
+                "id": cid,
+                "title": c.get_title() or "",
+                "link": c.get_link() or "",
+                "text": (c.get_snippet() or c.text or "")[:600],
+                "atom": getattr(c.atom, "id", None),
+            }
+        )
+    relations = [
+        {
+            "source": r.source.id,
+            "target": r.target.id,
+            "type": r.type,
+            "probability": float(r.probability),
+            "link": r.link,
+        }
+        for r in (pipeline.relations or [])
+        if r.type in ("entailment", "contradiction")
+    ]
+    keys = (
+        "factuality_score", "num_atoms", "num_contexts", "num_true_atoms",
+        "num_false_atoms", "num_uniform_atoms", "avg_norm_entropy", "avg_prob",
+    )
+    summary = {k: results.get(k) for k in keys if k in results}
+    summary.setdefault("num_atoms", len(marginals))
+    summary.setdefault("num_contexts", len(contexts))
+    if "factuality_score" not in summary:
+        supported = sum(1 for p in marginals.values() if p > 0.5)
+        summary["factuality_score"] = supported / len(marginals) if marginals else 0.0
+        summary["num_true_atoms"] = supported
+    return _jsonable(
+        {
+            "marginals": marginals,
+            "summary": summary,
+            "contexts": contexts,
+            "relations": relations,
+            "nli_stats": results.get("nli_stats"),
+        }
+    )
+
+
+def _lexical_nli(backend: Any):
+    """A deterministic offline NLI stand-in for dry-run mode.
+
+    Defined lazily so importing the demo does not import the NLI module. It
+    subclasses :class:`NLIExtractor` only to pass FactReasoner's isinstance guard;
+    the pipeline calls nothing but ``run_batch``, so the parent's (backend-bound)
+    constructor is skipped.
+    """
+    from fact_reasoner.core.nli import NLIExtractor
+
+    class LexicalNLI(NLIExtractor):
+        """Verdicts from content-word overlap between passage and claim.
+
+        A negation cue on exactly one side ("did not fail", "has not left") turns
+        a strong overlap into a contradiction. Crude, but it settles the Voyager
+        evidence the way a reader would, which is all the offline replay needs.
+        """
+
+        _NEG = re.compile(r"\b(not|never|no|didn't|cannot)\b", re.I)
+        _WORD = re.compile(r"[a-z0-9]+")
+        _STOP = frozenset(
+            "a an the of in on at to for from by with and or but is are was were be "
+            "been has have had it its this that after before into which".split()
+        )
+
+        def __init__(self, backend: Any):  # noqa: D107 - see the factory docstring
+            self.backend = backend
+            self.model_id = "lexical-nli"
+            self.nli_method = "lexical"
+
+        def _words(self, text: str) -> set[str]:
+            return {
+                w for w in self._WORD.findall(text.lower())
+                if w not in self._STOP and len(w) > 2
+            }
+
+        def _verdict(self, premise: str, hypothesis: str) -> dict[str, Any]:
+            h = self._words(hypothesis)
+            if not h:
+                return {"label": "neutral", "probability": 0.9}
+            best, negated = 0.0, False
+            for sent in re.split(r"(?<=[.;])\s+", premise):
+                overlap = len(h & self._words(sent)) / len(h)
+                if overlap > best:
+                    best = overlap
+                    negated = bool(self._NEG.search(sent)) != bool(self._NEG.search(hypothesis))
+            if best < 0.5:
+                return {"label": "neutral", "probability": 0.9}
+            p = round(min(0.95, 0.55 + 0.45 * best), 3)
+            return {"label": "contradiction" if negated else "entailment", "probability": p}
+
+        async def run_batch(self, premises, hypotheses):
+            return [self._verdict(p, h) for p, h in zip(premises, hypotheses)]
+
+    return LexicalNLI(backend)
 
 
 def _mining_from_gold(
@@ -557,6 +950,7 @@ def _mining_from_gold(
     """Build a :class:`MiningResult` from a fixture's gold relations.
 
     Mirrors ``tests/test_lcs_worked_pair.py``: type confidence 1, strength p.
+    Relations touching a claim not in ``atoms`` (dropped upstream) are skipped.
     """
     from fact_reasoner.factors import build_markov_network
     from fact_reasoner.lcs.relation_miner import MinedRelation, RelationMiner
@@ -572,6 +966,7 @@ def _mining_from_gold(
             strength=float(r["p"]),
         )
         for r in relations
+        if r["source"] in atoms and r["target"] in atoms
     ]
     miner = object.__new__(RelationMiner)  # graph building needs no backend
     miner.prior = 0.5
@@ -597,4 +992,18 @@ def _jsonable(obj: Any) -> Any:
     return json.loads(json.dumps(obj, default=str))
 
 
-__all__ = ["DEFAULT_METHODS", "Engine", "PRIOR_MODES", "Run", "Settings", "load_examples", "load_models"]
+__all__ = [
+    "ANALYSIS_MODES",
+    "BACKENDS",
+    "DEFAULT_DECISION_MODEL",
+    "DEFAULT_METHODS",
+    "EVIDENCE_SOURCES",
+    "Engine",
+    "PRIOR_MODES",
+    "Run",
+    "Settings",
+    "list_ollama_models",
+    "load_examples",
+    "load_models",
+    "split_passages",
+]

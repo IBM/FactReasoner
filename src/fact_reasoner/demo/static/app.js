@@ -1,10 +1,12 @@
-/* Logical Coherence demo: client.
+/* FactReasoner demo: client.
  *
- * Classic script, no build step. The page talks to four endpoints (see app.py):
- * /api/config, /api/analyze, /api/runs/{id}/events (SSE) and
- * /api/runs/{id}/rescore. All claim <-> span <-> node linking goes through one
- * piece of state, `active`, so hovering anything lights up the same claim
- * everywhere.
+ * Classic script, no build step. The page talks to five endpoints (see app.py):
+ * /api/config, /api/ollama/models, /api/analyze, /api/runs/{id}/events (SSE)
+ * and /api/runs/{id}/rescore. One analysis runs in one of three modes --
+ * factuality, coherence or both -- over ONE shared claim set. All claim <-> span
+ * <-> node linking goes through one piece of state, `active`, so hovering
+ * anything lights up the same claim in the text, the claims list, the evidence
+ * list and both graphs.
  */
 (function () {
   "use strict";
@@ -14,9 +16,11 @@
     config: null,
     runId: null,
     response: "",
+    mode: "both",        // factuality | coherence | both (as last run)
     claims: [],          // [{id, label, text, original, span}]
-    priors: {},          // {id: prior}
-    marginals: {},       // {id: posterior}
+    fact: null,          // the factuality payload (engine._factuality_payload)
+    priors: {},          // {id: coherence prior}
+    marginals: {},       // {id: coherence posterior}
     relations: [],
     scores: {},
     diagnostics: {},
@@ -24,7 +28,8 @@
     timing: {},
     active: null,        // claim id
     activeEdge: null,    // relation index
-    view: "graph",
+    view: "graph",       // coherence graph: graph | mrf
+    factView: "evidence",
     source: null,        // EventSource
     exampleId: null,
     examplePriors: null, // {claim text: prior} for the selected example
@@ -53,13 +58,19 @@
 
   // ------------------------------------------------------------- settings
   const DROPDOWNS = ["prompt_variant", "sense_menu", "pair_policy", "strength_method",
-    "reconcile", "service_type", "nli_mode"];
+    "reconcile", "evidence", "nli_mode", "nli_method", "pipeline_version"];
+  const LABELS = {
+    evidence: { google: "Google (Serper)", wikipedia: "Wikipedia", pasted: "Paste evidence" },
+    nli_method: { auto: "Auto", logprobs: "Token logprobs", direct: "Logprobs (direct)", simbauq: "SIMBA-UQ" },
+    nli_mode: { fast: "Fast", all_pairs: "All pairs" },
+    pipeline_version: { v1: "v1 · per-claim", v2: "v2 · deduplicated", v3: "v3 · + context links" },
+  };
   const METHOD_LABELS = {
     mean_marginal: "Mean marginal", consistency: "Consistency",
     log_partition: "Log partition", reified: "Reified",
   };
 
-  function fillDropdown(id, values, selected, labelFn = (v) => v) {
+  function fillDropdown(id, values, selected, labelFn = (v) => (LABELS[id] && LABELS[id][v]) || v) {
     const dd = document.getElementById(id);
     dd.innerHTML = "";
     for (const v of values) {
@@ -85,8 +96,11 @@
     };
     const methods = [...document.querySelectorAll("#methods cds-checkbox")]
       .filter((c) => c.checked).map((c) => c.getAttribute("value"));
+    const backend = $("#backend").value || "rits";
     const s = {
-      model: val("model") || d.model,
+      mode: currentMode(),
+      backend,
+      model: backend === "ollama" ? (val("ollama-model") || "") : (val("model") || d.model),
       prior_mode: priorMode(),
       flat_prior: num("flat-prior"),
       methods: methods.length ? methods : ["mean_marginal"],
@@ -107,12 +121,71 @@
     return g.value || (checked && checked.getAttribute("value")) || "flat";
   }
 
+  function currentMode() {
+    return $("#mode").value || "both";
+  }
+
+  /* Show only the settings the chosen mode uses, and the priors the mode allows:
+   * in "both" the coherence priors ARE the factuality posteriors. */
+  function syncMode() {
+    const m = currentMode();
+    const fact = m !== "coherence", coh = m !== "factuality";
+    for (const n of document.querySelectorAll('[data-needs="factuality"]')) n.hidden = !fact;
+    for (const n of document.querySelectorAll('[data-needs="coherence"]')) n.hidden = !coh;
+    $("#both-priors-hint").hidden = m !== "both";
+    $("#prior-mode-wrap").hidden = m === "both";
+    syncEvidence();
+    syncPriorMode();
+    $("#analyze").firstChild.textContent = { factuality: "Check factuality", coherence: "Analyze coherence", both: "Analyze" }[m] + " ";
+  }
+
+  function syncEvidence() {
+    const pasted = $("#evidence").value === "pasted";
+    const fact = currentMode() !== "coherence";
+    $("#evidence-wrap").hidden = !(fact && pasted);
+    $("#retrieval-wrap").hidden = pasted;
+  }
+
+  function syncBackend() {
+    const b = $("#backend").value || "rits";
+    $("#rits-wrap").hidden = b !== "rits";
+    $("#ollama-wrap").hidden = b !== "ollama";
+    // On Ollama, factuality NLI runs on the decision model: no method to pick.
+    const ollama = b === "ollama";
+    $("#nli-method-wrap").hidden = ollama;
+    $("#nli-decision-hint").hidden = !ollama;
+  }
+
+  function showDecision(status) {
+    const st = status || { model: "kev", available: false };
+    for (const n of document.querySelectorAll("[data-decision]")) n.textContent = st.model;
+    $("#decision-ok").hidden = !st.available;
+    $("#decision-missing").hidden = !!st.available || S.config.dry_run;
+  }
+
   function syncPriorMode() {
     const m = priorMode();
-    $("#flat-prior-wrap").hidden = m !== "flat";
-    $("#manual-hint").hidden = m !== "manual";
-    $("#factuality-wrap").hidden = m !== "factuality";
+    const both = currentMode() === "both";
+    $("#flat-prior-wrap").hidden = both || m !== "flat";
+    $("#manual-hint").hidden = both || m !== "manual";
     renderClaims();
+  }
+
+  function fillOllama(models) {
+    const prev = $("#ollama-model").value;
+    const names = models.map((m) => m.name);
+    fillDropdown("ollama-model", names, names.includes(prev) ? prev : (names[0] || ""));
+    $("#ollama-empty").hidden = names.length > 0;
+    $("#ollama-model").hidden = names.length === 0;
+  }
+
+  async function refreshOllama() {
+    try {
+      const r = await fetch("api/ollama/models");
+      const d = await r.json();
+      fillOllama(d.models || []);
+      showDecision(d.decision_model);
+    } catch (e) { fillOllama([]); }
   }
 
   async function loadConfig() {
@@ -122,6 +195,16 @@
     $("#dry-run-tag").hidden = !c.dry_run;
 
     fillDropdown("model", c.models.map((m) => m.name), d.model);
+    fillOllama(c.ollama_models || []);
+    showDecision(c.decision_model);
+    $("#ollama-host").textContent = c.ollama_host || "";
+    // Start on whichever backend has models (RITS hidden without a key).
+    if (!c.models.length && (c.ollama_models || []).length) setSwitcher("backend", "ollama");
+    if (c.dry_run) {
+      // Offline: the stub answers for any name; Ollama is not consulted.
+      document.querySelector('#backend cds-content-switcher-item[value="ollama"]').setAttribute("disabled", "");
+    }
+    syncBackend();
     const showId = () => {
       const m = c.models.find((m) => m.name === $("#model").value);
       $("#model-id").textContent = m ? m.model_id : "";
@@ -141,9 +224,8 @@
     }
 
     if (c.dry_run) {
-      const fact = document.querySelector('cds-radio-button[value="factuality"]');
-      fact.setAttribute("disabled", "");
-      fact.setAttribute("label-text", "Factuality (needs a live model)");
+      // No retrieval offline: pasted evidence is the only source.
+      fillDropdown("evidence", ["pasted"], "pasted");
     }
 
     const ex = $("#examples");
@@ -164,8 +246,32 @@
     showEditor();
     $("#response").value = e.response;
     $("#query").value = e.query || "";
-    // The Voyager pair ships its 0.9 / 0.1 priors: switch to manual so they apply.
+    // The Voyager pair ships its 0.9 / 0.1 priors (used in Coherence mode) and
+    // evidence passages (used by Factuality / Both with "Paste evidence").
     if (S.examplePriors) setPriorMode("manual");
+    if (e.evidence && e.evidence.length) {
+      $("#evidence-text").value = e.evidence.join("\n\n");
+      if (S.config.dry_run || $("#evidence").value === "pasted") {
+        setDropdown("evidence", "pasted");
+      }
+    }
+    syncEvidence();
+  }
+
+  function setDropdown(id, value) {
+    const dd = document.getElementById(id);
+    dd.setAttribute("value", value);
+    dd.value = value;
+  }
+
+  function setSwitcher(id, value) {
+    const sw = document.getElementById(id);
+    sw.value = value;
+    for (const it of sw.querySelectorAll("cds-content-switcher-item")) {
+      const on = it.getAttribute("value") === value;
+      it.selected = on;
+      if (on) it.setAttribute("selected", ""); else it.removeAttribute("selected");
+    }
   }
 
   function setPriorMode(m) {
@@ -193,10 +299,16 @@
     setBusy(true, "Queued");
 
     const settings = readSettings();
+    S.mode = settings.mode;
     const body = { response, query: $("#query").value || "", settings };
     if (settings.prior_mode === "manual" && S.examplePriors && response === exampleResponse()) {
       body.priors = S.examplePriors;
     }
+    if (settings.mode !== "coherence" && settings.evidence === "pasted") {
+      body.evidence = $("#evidence-text").value || "";
+    }
+    // Open the tab for what this run computes first.
+    showTab(settings.mode === "coherence" ? "coherence" : "factuality");
     let r;
     try {
       r = await fetch("api/analyze", {
@@ -232,11 +344,21 @@
     });
     on("claims", (d) => {
       S.claims = d.claims;
+      renderHighlighted(); renderClaims(); renderGraph(); renderFactuality();
+    });
+    on("factuality", (d) => {
+      S.fact = d;
+      renderClaims(); renderFactuality();
+    });
+    on("priors", (d) => {
       S.priors = d.priors || {};
-      renderHighlighted(); renderClaims(); renderGraph();
+      renderClaims(); renderGraph();
     });
     on("result", (d) => {
-      applyResult(d);
+      if (d.factuality) S.fact = d.factuality;
+      if (d.coherence) applyResult(d.coherence);
+      S.timing = d.timing || {};
+      renderClaims(); renderFactuality(); renderScores();
       const secs = Object.values(d.timing || {}).reduce((a, b) => a + b, 0);
       setBusy(false, S.config.dry_run ? "Done · offline replay" : `Done in ${fmt(secs, 1)} s`);
       stopStream();
@@ -253,6 +375,7 @@
     if (S.source) { S.source.close(); S.source = null; }
   }
 
+  /* A coherence payload (final result or a re-score). */
   function applyResult(d) {
     S.scores = d.scores || {};
     S.marginals = d.marginals || {};
@@ -260,7 +383,6 @@
     S.relations = d.relations || [];
     S.diagnostics = d.diagnostics || {};
     S.coverage = d.coverage || S.coverage;
-    if (d.timing && d.timing.claims != null) S.timing = d.timing;
     renderClaims(); renderGraph(); renderScores();
   }
 
@@ -270,7 +392,7 @@
   }
 
   async function rescore() {
-    if (!S.runId || !S.relations) return;
+    if (!S.runId || !S.relations.length) return;
     setBusy(true, "Re-scoring under the new priors");
     const r = await fetch(`api/runs/${S.runId}/rescore`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -407,49 +529,88 @@
     return [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16));
   }
 
+  function bar(value, tickAt, cls, title) {
+    const b = el("div", { class: "pbar" + (cls ? " " + cls : ""), title });
+    const fill = el("span", { class: "fill" });
+    fill.style.width = value != null ? `${value * 100}%` : "0";
+    fill.style.background = value != null ? postColor(value) : "";
+    b.append(fill);
+    if (tickAt != null) {
+      const tick = el("span", { class: "tick" });
+      tick.style.left = `${tickAt * 100}%`;
+      b.append(tick);
+    }
+    return b;
+  }
+
+  function renderClaimsLegend() {
+    const lg = $("#claims-legend");
+    lg.innerHTML = "";
+    const coh = S.mode !== "factuality";
+    if (coh) lg.append(el("span", { class: "lg" }, el("span", { class: "bar-swatch prior" }), "prior"));
+    lg.append(el("span", { class: "lg" }, el("span", { class: "bar-swatch post" }), "posterior"));
+  }
+
   function renderClaims() {
     const list = $("#claims");
     $("#claim-count").textContent = S.claims.length ? `(${S.claims.length})` : "";
+    renderClaimsLegend();
     list.innerHTML = "";
     if (!S.claims.length) {
       list.append(el("li", { class: "empty" },
         "Claims extracted from the response appear here, each linked to its span in the text."));
       return;
     }
-    const manual = priorMode() === "manual" && S.runId;
+    const showFact = S.mode !== "coherence";
+    const showCoh = S.mode !== "factuality";
+    const manual = showCoh && S.mode !== "both" && priorMode() === "manual" && S.relations.length;
     const focus = activeIds();
+    const factM = (S.fact && S.fact.marginals) || {};
     for (const c of S.claims) {
+      const fact = factM[c.id];
       const prior = S.priors[c.id];
       const post = S.marginals[c.id];
       const hasPost = post != null;
       const below = hasPost && prior != null && post < prior - 1e-6;
+      // The badge follows the most downstream score available.
+      const head = hasPost ? post : fact;
       const badge = el("span", { class: "claim-id" }, c.label);
-      badge.style.background = hasPost ? postColor(post) : "";
-      const meta = el("div", { class: "claim-meta" });
-      const bar = el("div", { class: "pbar", title: "posterior (fill) vs prior (tick)" });
-      const fill = el("span", { class: "fill" });
-      fill.style.width = hasPost ? `${post * 100}%` : "0";
-      fill.style.background = hasPost ? postColor(post) : "";
-      bar.append(fill);
-      if (prior != null) {
-        const tick = el("span", { class: "tick" });
-        tick.style.left = `${prior * 100}%`;
-        bar.append(tick);
+      badge.style.background = head != null ? postColor(head) : "";
+
+      const rows = [];
+      if (showFact) {
+        const meta = el("div", { class: "claim-meta" });
+        if (showCoh) meta.append(el("span", { class: "tag" }, "factuality"));
+        meta.append(bar(fact, null, "fact", "factuality posterior"),
+          el("span", {}, "posterior ", el("span", { class: "pnum" }, fact != null ? fmt(fact) : "…")));
+        if (fact != null) {
+          meta.append(fact > 0.5
+            ? el("span", { class: "verdict ok" }, "✓ supported")
+            : el("span", { class: "verdict no" }, "✗ not supported"));
+        }
+        rows.push(meta);
       }
-      meta.append(bar,
-        el("span", {}, "posterior ", el("span", { class: "pnum" }, hasPost ? fmt(post) : "…")),
-        el("span", {}, "prior ", el("span", { class: "pnum" }, prior != null ? fmt(prior, 2) : "–")));
-      if (below) meta.append(el("span", { class: "below", title: "Posterior fell below this claim's own prior" }, "↓ below prior"));
-      if (c.span && c.span.method === "implicit") meta.append(el("span", { class: "implicit" }, "implicit in text"));
+      if (showCoh) {
+        const meta = el("div", { class: "claim-meta" });
+        if (showFact) meta.append(el("span", { class: "tag" }, "coherence"));
+        meta.append(bar(post, prior, "", "coherence posterior (fill) vs prior (tick)"),
+          el("span", {}, "posterior ", el("span", { class: "pnum" }, hasPost ? fmt(post) : "…")),
+          el("span", {}, "prior ", el("span", { class: "pnum" }, prior != null ? fmt(prior, 2) : "–")));
+        if (below) meta.append(el("span", { class: "below", title: "Posterior fell below this claim's own prior" }, showFact ? "↓ below" : "↓ below prior"));
+        rows.push(meta);
+      }
+      if (c.span && c.span.method === "implicit") {
+        rows.push(el("div", { class: "claim-meta" }, el("span", { class: "implicit" }, "implicit in text")));
+      }
 
       const li = el("li", {
         class: "claim" + (focus.has(c.id) ? " active" : ""), tabindex: "0", "data-id": c.id,
         onmouseenter: () => setActive(c.id), onmouseleave: () => setActive(null),
         onclick: (e) => { if (e.target.tagName !== "INPUT") selectClaim(c.id); },
         onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectClaim(c.id); } },
-      }, badge, el("div", { class: "claim-text" }, c.text), meta);
+      }, badge, el("div", { class: "claim-text" }, c.text), ...rows);
 
-      if (manual && S.relations) {
+      if (manual) {
         const v = prior != null ? prior : 0.5;
         const out = el("span", { class: "pnum" }, fmt(v, 2));
         const range = el("input", {
@@ -465,6 +626,179 @@
       }
       list.append(li);
     }
+  }
+
+  // ----------------------------------------------------------- factuality
+  /* Evidence per claim: every passage the NLI linked to the claim, strongest
+   * first, with its verdict. Passages that settle nothing are not listed. */
+  function renderFactuality() {
+    const f = S.fact;
+    const box = $("#fact-evidence");
+    for (const t of document.querySelectorAll("#fact-scores .score-tile")) {
+      t.classList.toggle("dim", !f);
+    }
+    if (!f) {
+      box.innerHTML = "";
+      box.append(el("p", { class: "empty-note" },
+        S.mode === "coherence" && S.runId
+          ? "This run checked coherence only. Switch the mode to Factuality or Both to check claims against evidence."
+          : "Run an analysis in Factuality or Both mode to check each claim against evidence."));
+      setTile("factuality_score", null); setTile("supported", null); setTile("avg_prob", null);
+      $("#fact-facts").innerHTML = "";
+      renderFactGraph();
+      return;
+    }
+    const sm = f.summary || {};
+    const marg = f.marginals || {};
+    const vals = Object.values(marg);
+    const supported = vals.filter((p) => p > 0.5).length;
+    setTile("factuality_score", sm.factuality_score);
+    setTile("supported", `${supported} / ${vals.length}`, null);
+    setTile("avg_prob", vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null);
+    $("#fact-counts").textContent = `${vals.length - supported} not supported`;
+
+    const ctx = Object.fromEntries((f.contexts || []).map((c) => [c.id, c]));
+    const byClaim = {};
+    for (const r of f.relations || []) {
+      const claim = marg[r.target] != null ? r.target : (marg[r.source] != null ? r.source : null);
+      const other = claim === r.target ? r.source : r.target;
+      if (!claim || !ctx[other]) continue;
+      (byClaim[claim] = byClaim[claim] || []).push({ ...r, ctx: ctx[other] });
+    }
+    box.innerHTML = "";
+    const focus = activeIds();
+    for (const c of S.claims) {
+      if (marg[c.id] == null) continue;
+      const items = (byClaim[c.id] || []).sort((a, b) => b.probability - a.probability);
+      const p = marg[c.id];
+      const badge = el("span", { class: "claim-id" }, c.label);
+      badge.style.background = postColor(p);
+      const card = el("div", {
+        class: "ev-claim" + (focus.has(c.id) ? " active" : ""), "data-id": c.id,
+        onmouseenter: () => setActive(c.id), onmouseleave: () => setActive(null),
+        onclick: () => selectClaim(c.id),
+      }, el("div", { class: "ev-head" }, badge, el("span", { class: "claim-text" }, c.text),
+        el("span", { class: "pnum" }, fmt(p))));
+      if (items.length) {
+        const ul = el("ul", { class: "ev-items" });
+        for (const it of items) {
+          const ent = it.type === "entailment";
+          const src = it.ctx.link
+            ? el("a", { href: it.ctx.link, target: "_blank", rel: "noopener" }, it.ctx.title || it.ctx.link)
+            : el("span", {}, it.ctx.title || it.ctx.id);
+          ul.append(el("li", { class: "ev-item " + (ent ? "ent" : "con") },
+            el("div", { class: "ev-src" }, el("span", { class: "ev-rel" }, `${ent ? "supports" : "contradicts"} ${fmt(it.probability, 2)}`), src),
+            el("div", {}, it.ctx.text)));
+        }
+        card.append(ul);
+      } else {
+        card.append(el("div", { class: "ev-none" }, "No passage supports or contradicts this claim; it stays near its prior."));
+      }
+      box.append(card);
+    }
+    const st = f.nli_stats || {};
+    const facts = [
+      ["claims", vals.length],
+      ["evidence passages", (f.contexts || []).length],
+      ["NLI links", (f.relations || []).length],
+    ];
+    if (st.llm_calls != null) facts.push(["NLI calls", st.llm_calls]);
+    if (S.timing.factuality != null && !S.config.dry_run) facts.push(["time", `${fmt(S.timing.factuality, 1)} s`]);
+    const dl = $("#fact-facts");
+    dl.innerHTML = "";
+    for (const [k, v] of facts) dl.append(el("div", {}, el("dt", {}, k), el("dd", {}, String(v))));
+    renderFactGraph();
+  }
+
+  function setTile(key, value, meter = value) {
+    const t = document.querySelector(`#fact-scores [data-f="${key}"]`);
+    const v = t.querySelector(".score-value");
+    v.textContent = value == null ? "–" : (typeof value === "number" ? fmt(value) : value);
+    v.classList.toggle("pending", value == null);
+    const m = t.querySelector(".score-meter span");
+    if (m) m.style.width = meter == null ? "0" : `${Math.max(0, Math.min(1, meter)) * 100}%`;
+  }
+
+  /* Claim <-> evidence graph: claims (circles, coloured by factuality posterior)
+   * on the left in reading order, passages (squares) on the right. */
+  let fcy = null;
+  function renderFactGraph() {
+    if (typeof cytoscape === "undefined") return;
+    const wrap = $("#fact-graph-wrap");
+    wrap.hidden = S.factView !== "graph";
+    $("#fact-evidence").hidden = S.factView === "graph";
+    if (wrap.hidden) return;
+    if (!fcy) {
+      fcy = cytoscape({
+        container: $("#fact-graph"), style: factGraphStyle(), elements: [],
+        wheelSensitivity: 0.25, minZoom: 0.3, maxZoom: 2.5, boxSelectionEnabled: false,
+      });
+      fcy.on("mouseover", "node.claim", (e) => setActive(e.target.id()));
+      fcy.on("mouseout", "node.claim", () => setActive(null));
+      fcy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
+    }
+    fcy.elements().remove();
+    const f = S.fact;
+    if (!f) return;
+    const marg = f.marginals || {};
+    const claims = S.claims.filter((c) => marg[c.id] != null);
+    const used = new Set();
+    const edges = [];
+    (f.relations || []).forEach((r, i) => {
+      const claim = marg[r.target] != null ? r.target : r.source;
+      const other = claim === r.target ? r.source : r.target;
+      used.add(other);
+      const ent = r.type === "entailment";
+      edges.push({ group: "edges", data: { id: `fe${i}`, source: other, target: claim, w: 1 + 4 * r.probability,
+        plabel: fmt(r.probability, 2).replace(/^0/, ""), color: cssVar(ent ? "--ent" : "--con") }, classes: ent ? "ent" : "con" });
+    });
+    const ctxs = (f.contexts || []).filter((c) => used.has(c.id));
+    const rowH = 64, h = Math.max(claims.length, ctxs.length) * rowH;
+    const els = [];
+    claims.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
+      position: { x: 0, y: (i + 0.5) * (h / claims.length) }, classes: "claim" }));
+    ctxs.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: (c.title || c.id).slice(0, 28) },
+      position: { x: 320, y: (i + 0.5) * (h / ctxs.length) }, classes: "ctx" }));
+    fcy.add(els.concat(edges));
+    fcy.layout({ name: "preset", fit: true, padding: 30 }).run();
+    paintFocus();
+  }
+
+  function factGraphStyle() {
+    const ink = cssVar("--cds-text-primary"), sub = cssVar("--cds-text-secondary");
+    return [
+      { selector: "node.claim", style: {
+        "background-color": "data(color)", label: "data(label)", color: "#fff", width: 38, height: 38,
+        "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 12, "font-weight": 600,
+        "text-valign": "center", "text-halign": "center",
+      } },
+      { selector: "node.ctx", style: {
+        shape: "round-rectangle", width: 16, height: 16, "background-color": cssVar("--cds-border-strong-01"),
+        label: "data(label)", color: sub, "font-family": "IBM Plex Sans, sans-serif", "font-size": 11,
+        "text-halign": "right", "text-valign": "center", "text-margin-x": 6,
+      } },
+      { selector: "node.claim.active", style: { "border-width": 4, "border-color": ink } },
+      { selector: "node.faded, edge.faded", style: { opacity: 0.2 } },
+      { selector: "edge", style: {
+        width: "data(w)", "line-color": "data(color)", "curve-style": "bezier", label: "data(plabel)",
+        "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 10, color: sub,
+        "text-background-color": cssVar("--cds-layer-01"), "text-background-opacity": 1, "text-background-padding": 2,
+      } },
+      { selector: "edge.con", style: { "line-style": "dashed", "line-dash-pattern": [7, 4] } },
+    ];
+  }
+
+  function showTab(which) {
+    const tabs = $("#result-tabs");
+    tabs.value = which;
+    tabs.setAttribute("value", which);
+    $("#view-factuality").hidden = which !== "factuality";
+    $("#view-coherence").hidden = which !== "coherence";
+    // Cytoscape cannot size a hidden container; redraw once visible.
+    requestAnimationFrame(() => {
+      if (which === "coherence" && cy) { cy.resize(); cy.fit(undefined, 32); }
+      if (which === "factuality") renderFactGraph();
+    });
   }
 
   // ---------------------------------------------------------------- graph
@@ -518,6 +852,7 @@
 
   function graphElements() {
     const els = [];
+    if (S.mode === "factuality") return els;
     for (const c of S.claims) {
       const post = S.marginals[c.id];
       const prior = S.priors[c.id];
@@ -585,7 +920,7 @@
 
   function renderGraph() {
     const box = $("#graph");
-    $("#graph-empty").hidden = S.claims.length > 0;
+    $("#graph-empty").hidden = S.claims.length > 0 && S.mode !== "factuality";
     if (typeof cytoscape === "undefined") return;
     if (!cy) {
       cy = cytoscape({
@@ -626,8 +961,18 @@
   }
 
   function paintFocus() {
-    if (!cy) return;
     const focus = activeIds();
+    for (const n of document.querySelectorAll(".ev-claim")) n.classList.toggle("active", focus.has(n.dataset.id));
+    if (fcy) {
+      fcy.elements().removeClass("active faded");
+      if (focus.size) {
+        const nodes = fcy.nodes().filter((n) => focus.has(n.id()));
+        nodes.addClass("active");
+        const keep = nodes.union(nodes.connectedEdges()).union(nodes.connectedEdges().connectedNodes());
+        fcy.elements().not(keep).addClass("faded");
+      }
+    }
+    if (!cy) return;
     cy.elements().removeClass("active faded");
     if (!focus.size && S.activeEdge == null) return;
     if (S.activeEdge != null) {
@@ -706,7 +1051,11 @@
   // ---------------------------------------------------------------- scores
   function renderScores() {
     const asked = new Set(Object.keys(S.scores));
-    const tiles = document.querySelectorAll(".score-tile");
+    $("#graph-empty").textContent = S.runId && S.mode === "factuality"
+      ? "This run checked factuality only. Switch the mode to Coherence or Both to mine relations between claims."
+      : "The relation graph is drawn here once claims are extracted.";
+    $("#graph-empty").hidden = S.claims.length > 0 && S.mode !== "factuality";
+    const tiles = document.querySelectorAll("#scores .score-tile");
     let shown = 0;
     for (const t of tiles) {
       const m = t.dataset.m;
@@ -728,7 +1077,7 @@
       ["pairs scored", cov.pairs_scored ?? "–"],
       ["LLM errors", cov.llm_call_errors ?? 0],
     ];
-    if (S.timing.claims != null && !S.config.dry_run) {
+    if (S.timing.mining != null && !S.config.dry_run) {
       facts.push(["time · claims", `${fmt(S.timing.claims, 1)} s`]);
       facts.push(["time · mining", `${fmt(S.timing.mining, 1)} s`]);
     }
@@ -738,10 +1087,10 @@
   }
 
   function resetResults() {
-    Object.assign(S, { claims: [], priors: {}, marginals: {}, relations: [], scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
+    Object.assign(S, { claims: [], fact: null, priors: {}, marginals: {}, relations: [], scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
     pinned = null;
     $("#edge-card").hidden = true;
-    renderClaims(); renderGraph(); renderScores();
+    renderClaims(); renderGraph(); renderScores(); renderFactuality();
     $("#facts").innerHTML = "";
   }
 
@@ -752,11 +1101,20 @@
     $("#start-over").addEventListener("click", () => {
       stopStream(); setBusy(false); showError(null);
       S.runId = null; S.response = ""; S.exampleId = null; S.examplePriors = null;
-      $("#response").value = ""; $("#query").value = "";
+      $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
       showEditor(); resetResults();
     });
     $("#prior-mode").addEventListener("cds-radio-button-group-changed", syncPriorMode);
+    $("#mode").addEventListener("cds-content-switcher-selected", syncMode);
+    $("#backend").addEventListener("cds-content-switcher-selected", syncBackend);
+    $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
+    $("#refresh-ollama").addEventListener("click", refreshOllama);
+    $("#result-tabs").addEventListener("cds-tabs-selected", (e) => showTab(e.detail.item.value));
+    $("#fact-view").addEventListener("cds-content-switcher-selected", (e) => {
+      S.factView = e.detail.item.value;
+      renderFactGraph();
+    });
     for (const out of document.querySelectorAll(".slider-head [data-for]")) {
       const sl = document.getElementById(out.dataset.for);
       const show = () => { out.textContent = fmt(parseFloat(sl.value), 2); };
@@ -780,7 +1138,8 @@
       document.body.classList.toggle("cds--g10", !dark);
       try { localStorage.setItem("lcs-theme", dark ? "dark" : "light"); } catch (e) { /* storage blocked */ }
       if (cy) { cy.style(graphStyle()); cy.scratch("view", null); renderGraph(); }
-      renderClaims();
+      if (fcy) { fcy.style(factGraphStyle()); renderFactGraph(); }
+      renderClaims(); renderFactuality();
     });
   }
 
@@ -796,7 +1155,7 @@
     initTheme();
     wire();
     const ready = Promise.all([
-      "cds-dropdown", "cds-radio-button-group", "cds-checkbox", "cds-content-switcher",
+      "cds-dropdown", "cds-radio-button-group", "cds-checkbox", "cds-content-switcher", "cds-tabs",
     ].map((t) => customElements.whenDefined(t)));
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("carbon")), 20000));
     try {
@@ -813,10 +1172,12 @@
       showError("Could not load the demo configuration.");
       return;
     }
-    syncPriorMode();
-    renderScores();
-    // Deep link: ?example=<id> preloads an example; &run=1 also analyzes it.
+    // Deep link / QA: ?mode=factuality|coherence|both&example=<id>&run=1.
     const q = new URLSearchParams(location.search);
+    if (q.get("mode")) setSwitcher("mode", q.get("mode"));
+    syncMode();
+    renderScores();
+    renderFactuality();
     const ex = S.config.examples.find((e) => e.id === q.get("example"));
     if (ex) {
       pickExample(ex);
@@ -830,6 +1191,8 @@
       if (cy) cy.style(graphStyle());
     }
     if (q.get("view") === "mrf") S.view = "mrf";
+    if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
+    if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
     if (q.get("edge") != null) {
       const n = parseInt(q.get("edge"), 10);
       const wait = setInterval(() => {

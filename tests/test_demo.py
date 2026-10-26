@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the Logical Coherence demo (fact_reasoner.demo).
+"""Tests for the FactReasoner demo (fact_reasoner.demo).
 
 Everything runs offline: the engine's dry-run mode stubs the LLM, swaps Merlin
-for the exact brute-force oracle, and replays the Voyager pair's gold graph -- so
-the API test can pin the paper's worked-example numbers end to end.
+for the exact brute-force oracle, replays the Voyager pair's gold graph, and
+checks claims against pasted evidence with a lexical NLI stand-in -- so the API
+tests can pin the paper's worked-example numbers end to end, and exercise the
+real FactReasoner inference behind the factuality view.
 """
 
 import json
@@ -25,11 +27,20 @@ import os
 
 import pytest
 
+from fact_reasoner.experiments.mock import make_mock_backend
+
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from fact_reasoner.demo.app import create_app  # noqa: E402
-from fact_reasoner.demo.engine import Engine, Settings, load_examples, load_models  # noqa: E402
+from fact_reasoner.demo.engine import (  # noqa: E402
+    Engine,
+    Settings,
+    list_ollama_models,
+    load_examples,
+    load_models,
+    split_passages,
+)
 from fact_reasoner.demo.spans import align_claims, locate_evidence, split_sentences  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -114,6 +125,27 @@ class TestSettings:
         with pytest.raises(ValueError):
             Settings.from_json({"prior_mode": "oracle"})
 
+    @pytest.mark.parametrize("key,value", [("mode", "magic"), ("backend", "tgi"), ("evidence", "bing")])
+    def test_unknown_choices_rejected(self, key, value):
+        with pytest.raises(ValueError):
+            Settings.from_json({key: value})
+
+    def test_ollama_falls_back_to_sampling(self):
+        # Ollama exposes no logprobs, so "auto" must not pick the logprobs path.
+        assert Settings.from_json({"backend": "ollama"}).resolved_nli_method() == "simbauq"
+        assert Settings.from_json({"backend": "rits"}).resolved_nli_method() == "logprobs"
+        explicit = Settings.from_json({"backend": "ollama", "nli_method": "logprobs"})
+        assert explicit.resolved_nli_method() == "logprobs"
+
+
+class TestHelpers:
+    def test_split_passages_on_blank_lines(self):
+        text = "First passage\nwraps here.\n\n  \nSecond one.\n\n\n"
+        assert split_passages(text) == ["First passage wraps here.", "Second one."]
+
+    def test_unreachable_ollama_is_an_empty_list(self):
+        assert list_ollama_models("http://127.0.0.1:9", timeout=0.2) == []
+
 
 # -------------------------------------------------------------------- API
 
@@ -152,12 +184,13 @@ class TestAPI:
         ids = [e["id"] for e in c.get("/api/config").json()["examples"]]
         assert ids == ["voyager-a", "voyager-b"]
 
-    def test_live_mode_lists_every_example(self):
+    def test_live_mode_lists_every_example(self, monkeypatch):
         # Built without starting the dry-run worker's jobs; config() never runs one.
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
         examples = load_examples(DATA)
         engine = Engine(
             models=load_models(MODELS), merlin_path="/fake/merlin",
-            backend_factory=lambda spec: None,
+            backend_factory=lambda kind, name: None,
         )
         try:
             cfg = TestClient(create_app(engine, examples=examples)).get("/api/config").json()
@@ -165,6 +198,27 @@ class TestAPI:
             engine.close()
         assert cfg["dry_run"] is False
         assert len(cfg["examples"]) == len(examples) > 2
+
+    def test_config_lists_local_ollama_models(self, monkeypatch):
+        monkeypatch.setattr(
+            "fact_reasoner.demo.engine.list_ollama_models",
+            lambda host: [{"name": "granite4.2:3b", "model_id": "granite4.2:3b"},
+                          {"name": "kev:latest", "model_id": "kev:latest"}],
+        )
+        engine = Engine(models=[], merlin_path="/fake/merlin", ollama_host="http://box:11434",
+                        backend_factory=lambda kind, name: None)
+        try:
+            c = TestClient(create_app(engine, examples=[]))
+            cfg = c.get("/api/config").json()
+            again = c.get("/api/ollama/models").json()
+        finally:
+            engine.close()
+        # kev is a decision model, not a chat model: listed as the NLI scorer only.
+        assert [m["name"] for m in cfg["ollama_models"]] == ["granite4.2:3b"]
+        assert cfg["decision_model"] == {"model": "kev", "available": True}
+        assert cfg["ollama_host"] == "http://box:11434"
+        assert again["models"] == cfg["ollama_models"]
+        assert "ollama" in cfg["options"]["backend"]
 
     @pytest.mark.parametrize(
         "eid,key", [("voyager-a", "A"), ("voyager-b", "B")]
@@ -174,7 +228,8 @@ class TestAPI:
         ex = _example(examples, eid)
         r = c.post(
             "/api/analyze",
-            json={"response": ex["response"], "settings": {"prior_mode": "manual"},
+            json={"response": ex["response"],
+                  "settings": {"mode": "coherence", "prior_mode": "manual"},
                   "priors": ex["claim_priors"]},
         )
         assert r.status_code == 200
@@ -183,7 +238,8 @@ class TestAPI:
         assert kinds[0] == "queued" and kinds[-1] == "result"
         assert kinds.index("claims") < kinds.index("result")
 
-        result = events[-1]
+        assert events[-1]["factuality"] is None
+        result = events[-1]["coherence"]
         expected = voyager["responses"][key]["expected"]
         for m in ("mean_marginal", "consistency", "log_partition"):
             assert result["scores"][m] == pytest.approx(expected[m], abs=1e-3)
@@ -198,10 +254,11 @@ class TestAPI:
         ex = _example(examples, "voyager-b")
         rid = c.post(
             "/api/analyze",
-            json={"response": ex["response"], "settings": {"prior_mode": "manual"},
+            json={"response": ex["response"],
+                  "settings": {"mode": "coherence", "prior_mode": "manual"},
                   "priors": ex["claim_priors"]},
         ).json()["run_id"]
-        base = _events(c, rid)[-1]
+        base = _events(c, rid)[-1]["coherence"]
         # Flip the false premise a3 (paper's a4) to "true": a2 (a3) recovers.
         priors = dict(base["priors"], a3=0.9)
         rs = c.post(f"/api/runs/{rid}/rescore", json={"priors": priors}).json()
@@ -214,16 +271,69 @@ class TestAPI:
         rid = c.post(
             "/api/analyze",
             json={"response": "The bridge opened in 1932. It was closed for repairs in 1932.",
-                  "settings": {"pair_policy": "all_pairs"}},
+                  "settings": {"mode": "coherence", "pair_policy": "all_pairs"}},
         ).json()["run_id"]
         events = _events(c, rid)
         assert events[-1]["type"] == "result"
         assert any(e["type"] == "progress" and e["stage"] == "pairs" for e in events)
-        assert set(events[-1]["priors"].values()) == {0.5}
+        assert set(events[-1]["coherence"]["priors"].values()) == {0.5}
 
-    def test_factuality_refused_in_dry_run(self, client):
+    def test_factuality_against_pasted_evidence(self, client):
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        rid = c.post(
+            "/api/analyze",
+            json={"response": ex["response"], "settings": {"mode": "factuality", "evidence": "pasted"},
+                  "evidence": "\n\n".join(ex["evidence"])},
+        ).json()["run_id"]
+        events = _events(c, rid)
+        kinds = [e["type"] for e in events]
+        assert "factuality" in kinds and "priors" not in kinds
+        result = events[-1]
+        assert result["coherence"] is None
+        f = result["factuality"]
+        m = f["marginals"]
+        # The evidence supports the three true claims and refutes the two false ones.
+        assert min(m["a0"], m["a1"], m["a2"]) > 0.7
+        assert max(m["a3"], m["a4"]) < 0.3
+        assert f["summary"]["factuality_score"] == pytest.approx(0.6)
+        assert len(f["contexts"]) == 3
+        assert {r["type"] for r in f["relations"]} == {"entailment", "contradiction"}
+
+    def test_both_mode_primes_coherence_with_factuality(self, client):
+        c, examples = client
+        out = {}
+        for eid in ("voyager-a", "voyager-b"):
+            ex = _example(examples, eid)
+            rid = c.post(
+                "/api/analyze",
+                json={"response": ex["response"], "settings": {"mode": "both", "evidence": "pasted"},
+                      "evidence": "\n\n".join(ex["evidence"])},
+            ).json()["run_id"]
+            events = _events(c, rid)
+            priors_ev = next(e for e in events if e["type"] == "priors")
+            res = events[-1]
+            assert priors_ev["source"] == "factuality"
+            for aid, p in res["factuality"]["marginals"].items():
+                assert res["coherence"]["priors"][aid] == pytest.approx(min(0.99, max(0.01, p)))
+            out[eid] = res
+        # Same claims, same evidence: identical factuality. Only coherence differs.
+        assert out["voyager-a"]["factuality"]["marginals"] == out["voyager-b"]["factuality"]["marginals"]
+        a = out["voyager-a"]["coherence"]["scores"]["mean_marginal"]
+        b = out["voyager-b"]["coherence"]["scores"]["mean_marginal"]
+        assert a > b + 0.05
+
+    def test_retrieval_refused_in_dry_run(self, client):
         c, _ = client
-        r = c.post("/api/analyze", json={"response": "x.", "settings": {"prior_mode": "factuality"}})
+        r = c.post("/api/analyze",
+                   json={"response": "x.", "settings": {"mode": "factuality", "evidence": "wikipedia"}})
+        assert r.status_code == 400
+        assert "Paste evidence" in r.json()["detail"]
+
+    def test_pasted_evidence_required(self, client):
+        c, _ = client
+        r = c.post("/api/analyze",
+                   json={"response": "x.", "settings": {"mode": "both", "evidence": "pasted"}, "evidence": " "})
         assert r.status_code == 400
 
     def test_empty_and_oversized_responses_refused(self, client):
@@ -239,5 +349,55 @@ class TestAPI:
     def test_static_page_served(self, client):
         c, _ = client
         page = c.get("/").text
-        assert "<title>Logical Coherence</title>" in page
+        assert "<title>FactReasoner Demo</title>" in page
         assert "@carbon/web-components@" in page
+
+
+class TestOllamaFactuality:
+    """On Ollama the factuality NLI is the kev decision model, on the same server."""
+
+    def _engine(self, monkeypatch, tags):
+        monkeypatch.setattr(
+            "fact_reasoner.demo.engine.list_ollama_models",
+            lambda host: [{"name": t, "model_id": t} for t in tags],
+        )
+        return Engine(models=[], merlin_path="/fake/merlin", ollama_host="http://box:11434",
+                      backend_factory=lambda kind, name: object())
+
+    def test_nli_extractor_is_kev_decision_model(self, monkeypatch):
+        from fact_reasoner.core.nli import DecisionNLIExtractor, NLIExtractor
+
+        engine = self._engine(monkeypatch, ["granite4.2:3b", "kev:latest"])
+        try:
+            ollama = engine._nli_extractor(object(), Settings.from_json({"backend": "ollama"}))
+        finally:
+            engine.close()
+        assert isinstance(ollama, DecisionNLIExtractor)
+        assert ollama.backend.model_id == "kev"
+        assert ollama.backend.host == "http://box:11434"
+        assert isinstance(ollama, NLIExtractor)  # passes FactReasoner's guard
+
+    def test_rits_keeps_the_chat_model_nli(self, monkeypatch):
+        from fact_reasoner.core.nli import DecisionNLIExtractor, NLIExtractor
+
+        engine = self._engine(monkeypatch, [])
+        backend = make_mock_backend("m")
+        try:
+            rits = engine._nli_extractor(backend, Settings.from_json({"backend": "rits"}))
+        finally:
+            engine.close()
+        assert isinstance(rits, NLIExtractor) and not isinstance(rits, DecisionNLIExtractor)
+
+    def test_factuality_refused_without_kev(self, monkeypatch):
+        engine = self._engine(monkeypatch, ["granite4.2:3b"])
+        try:
+            with pytest.raises(ValueError, match="ollama pull kev"):
+                engine.submit("A claim.", settings=Settings.from_json(
+                    {"backend": "ollama", "model": "granite4.2:3b", "mode": "factuality",
+                     "evidence": "pasted"}), evidence_text="Some evidence.")
+            # Coherence alone does not need the decision model.
+            run = engine.submit("A claim.", settings=Settings.from_json(
+                {"backend": "ollama", "model": "granite4.2:3b", "mode": "coherence"}))
+            assert run.id
+        finally:
+            engine.close()

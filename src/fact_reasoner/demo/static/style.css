@@ -1,4 +1,4 @@
-/* Logical Coherence demo.
+/* FactReasoner demo (factuality + logical coherence).
  *
  * Every surface, border and ink colour is a Carbon token (--cds-*), so the g10
  * and g100 theme classes on <body> restyle the whole page. The only non-token
@@ -65,6 +65,9 @@ body {
   padding-left: 12px; border-left: 1px solid var(--cds-border-subtle-01);
 }
 .header-actions { display: flex; align-items: center; gap: 4px; }
+.mode-switch { width: 330px; flex: 0 0 auto; }
+/* The analysis mode is the page's main switch: selected in interactive blue. */
+#mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-interactive); --cds-text-inverse: #fff; }
 
 /* ---------------- Workspace ---------------- */
 .workspace {
@@ -88,6 +91,7 @@ body {
 .section-title { margin: 0; font-size: 14px; font-weight: 600; }
 .section-title .count { color: var(--cds-text-helper); font-weight: 400; margin-left: 4px; }
 .hint { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--cds-text-helper); }
+.hint.warn { color: var(--cds-text-primary); border-left: 3px solid var(--cds-support-warning); padding-left: 8px; }
 
 /* ---------------- Settings ---------------- */
 .settings { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
@@ -98,7 +102,9 @@ body {
   color: var(--cds-text-secondary); text-transform: uppercase;
 }
 .group > * + * { margin-top: 12px; }
-#factuality-wrap > * + * { margin-top: 12px; }
+#rits-wrap > * + *, #ollama-wrap > * + *, #retrieval-wrap > * + *, #prior-mode-wrap > * + * { margin-top: 12px; }
+.row-end { display: flex; align-items: flex-end; gap: 4px; }
+.row-end cds-dropdown { flex: 1; min-width: 0; }
 .checks { display: flex; flex-direction: column; gap: 2px; }
 cds-accordion-item > * + * { display: block; margin-top: 12px; }
 cds-slider { width: 100%; }
@@ -179,6 +185,43 @@ cds-slider { width: 100%; }
 .prior-edit { grid-column: 2; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--cds-text-secondary); }
 .prior-edit input[type=range] { flex: 1; max-width: 240px; accent-color: var(--cds-interactive); }
 
+/* Two scores per claim when both analyses ran. */
+.claim-meta .tag { font-size: 11px; color: var(--cds-text-helper); width: 64px; flex: 0 0 auto; }
+/* With both rows present, fix the bar width so the two bars line up. */
+.claim-meta .tag + .pbar { flex: 0 0 min(200px, 38%); }
+.pbar.fact .fill { opacity: 0.9; }
+.verdict { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
+.verdict.ok { color: var(--ent); }
+.verdict.no { color: var(--con); }
+
+/* ---------------- Results tabs ---------------- */
+.result-tabs { display: block; padding: 0 8px; border-bottom: 1px solid var(--cds-border-subtle-01); }
+.panel-head.sub-first { border-bottom: 1px solid var(--cds-border-subtle-01); }
+.view[hidden] { display: none !important; }
+
+/* ---------------- Factuality evidence ---------------- */
+.fact-body { border-top: 1px solid var(--cds-border-subtle-01); }
+.evidence-list { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 560px; overflow: auto; }
+.empty-note { margin: 8px 0; font-size: 13px; color: var(--cds-text-helper); }
+.ev-claim { border: 1px solid var(--cds-border-subtle-01); border-radius: 6px; padding: 10px 12px; cursor: pointer; }
+.ev-claim:hover, .ev-claim.active { border-color: var(--cds-border-strong-01); background: var(--cds-layer-hover-01); }
+.ev-claim.active { box-shadow: inset 3px 0 0 var(--ent); }
+.ev-head { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.ev-head .claim-text { flex: 1; min-width: 0; }
+.ev-head .pnum { font-size: 13px; }
+.ev-items { list-style: none; margin: 8px 0 0; padding: 0 0 0 40px; display: flex; flex-direction: column; gap: 6px; }
+.ev-item { font-size: 13px; line-height: 1.45; color: var(--cds-text-secondary); padding-left: 10px; border-left: 3px solid var(--cds-border-subtle-00); }
+.ev-item.ent { border-left-color: var(--ent); }
+.ev-item.con { border-left-color: var(--con); }
+.ev-item .ev-src { display: flex; gap: 8px; align-items: baseline; color: var(--cds-text-primary); font-weight: 500; }
+.ev-item .ev-src a { color: var(--cds-link-primary); text-decoration: none; overflow-wrap: anywhere; }
+.ev-item .ev-src a:hover { text-decoration: underline; }
+.ev-item .ev-rel { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.ev-item.ent .ev-rel { color: var(--ent); }
+.ev-item.con .ev-rel { color: var(--con); }
+.ev-none { font-size: 12px; color: var(--cds-text-helper); font-style: italic; padding-left: 40px; margin-top: 6px; }
+.sq { width: 10px; height: 10px; display: inline-block; border-radius: 2px; background: var(--cds-border-strong-01); }
+
 /* ---------------- Graph ---------------- */
 .graph-wrap { position: relative; }
 .graph { height: 400px; width: 100%; }
@@ -216,6 +259,7 @@ cds-slider { width: 100%; }
 .scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--cds-border-subtle-01); }
 .scores.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .score-tile { background: var(--cds-layer-01); padding: 14px 16px 16px; min-width: 0; }
+.score-tile.dim .score-value { color: var(--cds-text-placeholder); }
 .score-label { font-size: 12px; color: var(--cds-text-secondary); display: flex; justify-content: space-between; gap: 6px; }
 .score-label .sym { font-family: "IBM Plex Mono", monospace; color: var(--cds-text-helper); }
 .score-value { font-size: 32px; font-weight: 300; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
@@ -230,7 +274,7 @@ cds-slider { width: 100%; }
 
 /* Carbon's content switcher selects in inverse ink; the demo uses the quieter
  * layer-selected fill so the graph, not the tab, carries the contrast. */
-cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-layer-selected-01); --cds-text-inverse: var(--cds-text-primary); }
+cds-content-switcher:not(#mode) cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-layer-selected-01); --cds-text-inverse: var(--cds-text-primary); }
 
 /* ---------------- Info panel (dark, floating) ---------------- */
 .info-panel {
@@ -249,6 +293,9 @@ cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-la
 
 /* ---------------- Responsive ---------------- */
 .only-narrow { display: none; }
+@media (max-width: 1100px) {
+  .mode-switch { width: 260px; }
+}
 @media (max-width: 1280px) {
   .workspace { grid-template-columns: 260px minmax(0, 1fr); }
   .results { grid-column: 1 / -1; }
@@ -256,10 +303,13 @@ cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-la
 @media (max-width: 860px) {
   .only-narrow { display: inline-flex; }
   .brand-sub, .brand-divider, .brand-title { display: none; }
+  .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
+  .mode-switch { order: 3; width: 100%; }
+  .ev-items, .ev-none { padding-left: 0; }
   /* A flex column, not a one-column grid: the settings drawer is fixed-position
    * but would still be counted when sizing implicit grid rows. */
   .workspace { display: flex; flex-direction: column; align-items: stretch; }
-  .settings { position: fixed; top: 48px; bottom: 0; left: 0; width: min(320px, 88vw); max-height: none; z-index: 25; border-radius: 0; transform: translateX(-105%); transition: transform 0.2s; }
+  .settings { position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 88vw); max-height: none; z-index: 25; border-radius: 0; transform: translateX(-105%); transition: transform 0.2s; }
   #dry-run-tag { display: none; }
   .settings.open { transform: none; box-shadow: 4px 0 16px rgba(0,0,0,0.2); }
   .scores { grid-template-columns: minmax(0, 1fr); }
