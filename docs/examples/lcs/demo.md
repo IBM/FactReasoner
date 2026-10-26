@@ -20,6 +20,12 @@ Paste a response and the demo:
 
 ![The demo on the paper's incoherent Voyager response, Both mode](demo-screenshot.png)
 
+**Layout.** The settings span the top in two cards: **Factuality pipeline** (blue) and
+**Coherence pipeline** (purple). The result tabs below use the same colours. Under the
+settings, the response and claims sit on the left. The results sit on the right in a
+panel that fills the viewport, and the graphs grow to fill it. Starting a run collapses
+the settings to a one-line summary of what is running; *Show settings* opens them again.
+
 The layout follows the IBM Research Demos Spaces (e.g. *Speech to Decisions with
 Granite*): a FastAPI backend and one hand-built page styled with the **Carbon design
 system** (`@carbon/web-components`, IBM Plex, g10/g100 themes). There is no build step.
@@ -37,24 +43,27 @@ fact-reasoner-lcs-demo --merlin-path ~/git/merlin/build_native/merlin
 fact-reasoner-lcs-demo --dry-run
 ```
 
-**Models.** The settings panel switches between **RITS** (the models in
-`configs/rits_models.json`, which need `RITS_API_KEY`) and **Ollama**. The Ollama list
-is whatever the local server has pulled, read live from `/api/tags`; use the refresh
-button after `ollama pull`. Point it at another machine with `--ollama-host` (default:
-`OLLAMA_HOST`, else `http://localhost:11434`). Without a RITS key the demo runs on
-Ollama alone.
+**Models.** Each pipeline has its own model, from **RITS** (the models in
+`configs/rits_models.json`, which need `RITS_API_KEY`) or **Ollama**. The Ollama list
+is whatever the local server has pulled, read live from `/api/tags`; use *Refresh
+Ollama models* after `ollama pull`. Point it at another machine with `--ollama-host`
+(default: `OLLAMA_HOST`, else `http://localhost:11434`). Without a RITS key both
+pipelines start on Ollama.
 
-On Ollama the work is split between two models on the same server:
+| | RITS | Ollama |
+|---|---|---|
+| **Factuality model**: claims, reviser, summarizer | chosen model | chosen model |
+| **Factuality NLI** (claim ↔ evidence) | the same model, probability from token logprobs (or SIMBA-UQ / the direct prompt) | the **`kev` decision model** on the same server |
+| **Relation miner** | chosen model; strength estimator selectable | chosen model; type confidence sampled (SIMBA-UQ), strength **always verbalized** |
 
-- The **chosen chat model** extracts the claims and mines the coherence relations.
-  Ollama returns no token logprobs, so relation strengths come from sampled Yes/No
-  answers.
-- The **`kev` decision model** scores factuality NLI. It answers each claim–passage
-  question in one forward pass with a probability for entailment, contradiction and
-  neutral, so it is much faster than prompting a small chat model, and its
-  probabilities are its own. Pull it once with `ollama pull kev`. `--decision-model`
-  names a different one. `kev` is not offered as a chat model, and Factuality mode
-  says so if it isn't pulled. Coherence alone works without it.
+Claims are extracted once, by the factuality model, and both pipelines use them. In
+Coherence-only mode the relation miner's model extracts them.
+
+`kev` answers each claim–passage question in one forward pass, with a probability for
+entailment, contradiction and neutral. That is much faster than prompting a small chat
+model, and the probabilities are the model's own. Pull it once with `ollama pull kev`;
+`--decision-model` names a different one. It is not offered as a chat model, and
+Factuality mode says so if it isn't pulled. Coherence alone works without it.
 
 **Offline (`--dry-run`).** It stubs the LLM, uses exact brute-force inference, and
 lists only the **Voyager 1** pair (coherent and incoherent):
@@ -98,15 +107,19 @@ can stand in for `--merlin-path`.
 
 | Setting | Effect |
 |---|---|
-| Model | RITS or Ollama, and which model. Both stages run on it. |
+| **Factuality pipeline** | |
+| Model | RITS or Ollama, and which model, for claim extraction, the reviser and the evidence summarizer. |
+| NLI | RITS: how the verdict gets a probability. Ollama: fixed to the `kev` decision model. |
 | Evidence source | Google (Serper; needs `SERPER_API_KEY`), Wikipedia, or **Paste evidence**: one passage per paragraph, each compared with every claim (at most 12). |
 | Passages per claim / claim–evidence pairs | Retrieval depth, and which claim–passage pairs get an NLI call (*Fast* compares a passage with the claim that retrieved it and its neighbours). Pasted evidence always uses all pairs. |
 | FactReasoner version | v1 per-claim contexts, v2 deduplicated contexts, v3 adds context–context relations. |
-| NLI probability | RITS only: token logprobs (*Auto*), the direct prompt, or SIMBA-UQ sampling. On Ollama, NLI always runs on the `kev` decision model. |
+| Decontextualize / Summarize | Rewrite claims to stand alone; summarize each passage before NLI. Both run on the factuality model. |
+| **Coherence pipeline** | |
+| Relation miner | RITS or Ollama, and which model. |
+| Relation strength | RITS: the estimator. Ollama: fixed to verbalized, since there are no logprobs. |
 | Coherence priors | Flat or manual. In **Both** the priors are the factuality posteriors. |
 | LCS readouts | Which readouts to compute. They share the base inference runs. |
-| Relation mining | Prompt variant, sense menu, candidate-pair policy and window, strength estimator, reconcile mode, claim decontextualization. |
-| Inference | Merlin i-bound and the concession discount. |
+| Mining | Prompt variant and candidate-pair policy. *More coherence settings* adds the sense menu, window, reconcile mode, Merlin i-bound, concession discount and the evidence-span requirement. |
 
 Analyses are queued and run one at a time on one worker thread with a persistent
 event loop. Mellea caches its async client per loop, and one run at a time also

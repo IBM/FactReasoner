@@ -14,16 +14,21 @@
 
 # The demo's run engine. One analysis, in up to three stages:
 #
-#   1. claims       -- atomize the response and align each claim to its span;
+#   1. claims       -- atomize the response and align each claim to its span
+#                      (on the factuality model; in coherence-only runs, on the
+#                      coherence model, since no factuality model is in play);
 #   2. factuality   -- (modes "factuality" / "both") a FactReasoner run over THOSE
 #                      claims: retrieve or take pasted evidence, score claim<->
-#                      evidence NLI, infer the per-claim posteriors. On Ollama the
-#                      NLI step runs on a decision model (kev) on the same server,
-#                      not on the chat model: it scores each pair in one forward
-#                      pass and returns real probabilities, which a small local
-#                      chat model can only approximate by sampling;
+#                      evidence NLI, infer the per-claim posteriors. Its LLM
+#                      components (atomizer, reviser, summarizer) run on the
+#                      factuality model; on Ollama the NLI step runs on a decision
+#                      model (kev) on the same server instead: it scores each pair
+#                      in one forward pass and returns real probabilities, which a
+#                      small local chat model can only approximate by sampling;
 #   3. coherence    -- (modes "coherence" / "both") mine claim<->claim relations
-#                      and read the LCS off the coherence MRF. In "both" the
+#                      on the coherence model, and read the LCS off the coherence
+#                      MRF. On Ollama (no logprobs) the miner's type confidence is
+#                      sampled and its strength verbalized. In "both" the
 #                      factuality posteriors are the MRF's unary priors.
 #
 # The stages are driven by hand rather than through FactualityRunner /
@@ -100,9 +105,13 @@ class Settings:
     """
 
     mode: str = "coherence"
-    # Model.
-    backend: str = "rits"
-    model: str = "llama-3.3-70b-instruct"
+    # Factuality pipeline: the model behind its LLM components (claims, reviser,
+    # summarizer). NLI is the chat model on RITS, the decision model on Ollama.
+    fact_backend: str = "rits"
+    fact_model: str = "llama-3.3-70b-instruct"
+    # Coherence pipeline: the relation miner's model.
+    coh_backend: str = "rits"
+    coh_model: str = "llama-3.3-70b-instruct"
     # Coherence: relation mining.
     prompt_variant: str = "v1"
     sense_menu: str = "full"
@@ -116,6 +125,7 @@ class Settings:
     require_evidence: bool = False
     concession_discount: float = 0.45
     revise_atoms: bool = False
+    summarize_contexts: bool = False
     # Coherence: scoring.
     methods: tuple[str, ...] = DEFAULT_METHODS
     ibound: int = 6
@@ -145,7 +155,8 @@ class Settings:
         s = cls(**kwargs)
         for name, value, allowed in (
             ("mode", s.mode, ANALYSIS_MODES),
-            ("backend", s.backend, BACKENDS),
+            ("fact_backend", s.fact_backend, BACKENDS),
+            ("coh_backend", s.coh_backend, BACKENDS),
             ("prior_mode", s.prior_mode, PRIOR_MODES),
             ("evidence", s.evidence, EVIDENCE_SOURCES),
         ):
@@ -164,16 +175,36 @@ class Settings:
     def wants_coherence(self) -> bool:
         return self.mode in ("coherence", "both")
 
-    def resolved_nli_method(self) -> str:
-        """``logprobs`` where the backend returns them, else SIMBA-UQ.
+    @property
+    def claims_model(self) -> tuple[str, str]:
+        """``(backend, model)`` that extracts the claims both pipelines share.
 
-        Ollama exposes no token logprobs, so the coherence miner estimates its
-        probabilities by sampling there. (Factuality NLI on Ollama does not use
-        this: it runs on the decision model instead -- see ``Engine``.)
+        Claim extraction is a factuality-pipeline component, so it runs on the
+        factuality model whenever that pipeline is part of the run; a
+        coherence-only run has just the coherence model.
         """
-        if self.nli_method != "auto":
-            return self.nli_method
-        return "simbauq" if self.backend == "ollama" else "logprobs"
+        if self.wants_factuality:
+            return self.fact_backend, self.fact_model
+        return self.coh_backend, self.coh_model
+
+    def fact_nli_method(self) -> str:
+        """The RITS factuality NLI's probability method (``auto`` = logprobs).
+
+        Unused on Ollama, where the NLI is the decision model.
+        """
+        return "logprobs" if self.nli_method == "auto" else self.nli_method
+
+    def miner_methods(self) -> tuple[str, str]:
+        """The relation miner's ``(nli_method, strength_method)``.
+
+        Ollama exposes no token logprobs, so there the type confidence is
+        sampled (SIMBA-UQ) and the strength is always the verbalized estimate,
+        whatever the strength setting says.
+        """
+        if self.coh_backend == "ollama":
+            return "simbauq", "verbalized"
+        strength = self.strength_method
+        return "logprobs", strength
 
 
 @dataclass
@@ -414,13 +445,19 @@ class Engine:
         """
         if not response.strip():
             raise ValueError("The response is empty.")
-        if settings.backend == "rits" and settings.model not in self.models and not self.dry_run:
-            raise ValueError(f"Unknown RITS model: {settings.model!r}")
-        if settings.backend == "ollama" and not settings.model.strip():
-            raise ValueError("Pick an Ollama model.")
+        used = []
+        if settings.wants_factuality:
+            used.append(("factuality", settings.fact_backend, settings.fact_model))
+        if settings.wants_coherence:
+            used.append(("coherence", settings.coh_backend, settings.coh_model))
+        for pipe, kind, name in used:
+            if kind == "rits" and name not in self.models and not self.dry_run:
+                raise ValueError(f"Unknown RITS model for the {pipe} pipeline: {name!r}")
+            if kind == "ollama" and not name.strip():
+                raise ValueError(f"Pick an Ollama model for the {pipe} pipeline.")
         if (
-            settings.backend == "ollama"
-            and settings.wants_factuality
+            settings.wants_factuality
+            and settings.fact_backend == "ollama"
             and not self.dry_run
             and not self.decision_status()["available"]
         ):
@@ -550,13 +587,14 @@ class Engine:
     def _analyze(self, run: Run) -> None:
         s = run.settings
         timing: dict[str, float] = {}
-        run.emit("stage", stage="setup", message=f"Connecting to {s.model} ({s.backend})")
-        backend = self._backend(s.backend, s.model)
+        claims_kind, claims_name = s.claims_model
+        run.emit("stage", stage="setup", message=f"Connecting to {claims_name} ({claims_kind})")
+        claims_backend = self._backend(claims_kind, claims_name)
 
         # -- 1. claims ---------------------------------------------------------
-        run.emit("stage", stage="atomize", message="Extracting atomic claims")
+        run.emit("stage", stage="atomize", message=f"Extracting atomic claims with {claims_name}")
         t = time.perf_counter()
-        atoms = self._atomize(run, backend)
+        atoms = self._atomize(run, claims_backend)
         timing["claims"] = time.perf_counter() - t
         self._emit_claims(run, atoms)
 
@@ -564,7 +602,8 @@ class Engine:
         factuality = None
         if s.wants_factuality:
             t = time.perf_counter()
-            factuality = self._factuality(run, backend, atoms)
+            fact_backend = self._backend(s.fact_backend, s.fact_model)
+            factuality = self._factuality(run, fact_backend, atoms)
             timing["factuality"] = time.perf_counter() - t
             run.emit("factuality", **factuality)
             # Dedup inside FactReasoner can drop a claim; coherence then mines the
@@ -584,13 +623,13 @@ class Engine:
             run.priors = {aid: float(s.flat_prior) for aid in atoms}
         run.emit("priors", priors=run.priors, source="factuality" if s.mode == "both" else s.prior_mode)
 
-        run.emit("stage", stage="mine", message="Mining relations between claims")
+        run.emit("stage", stage="mine", message=f"Mining relations between claims with {s.coh_model}")
         t = time.perf_counter()
         gold = self._replay(run)
         if gold is not None:
             run.mining = _mining_from_gold(atoms, gold["relations"], run.priors)
         else:
-            miner = self._miner(backend, s, run)
+            miner = self._miner(self._backend(s.coh_backend, s.coh_model), s, run)
             run.mining = self._loop.run_until_complete(
                 miner.amine_from_atoms(atoms, run.response, node_priors=run.priors)
             )
@@ -666,10 +705,15 @@ class Engine:
         for aid, a in atoms.items():
             fr_atoms[aid].set_original(a.get_original() or a.text)
 
+        summarizer = None
+        if s.summarize_contexts and not self.dry_run:
+            from fact_reasoner.core.summarizer import ContextSummarizer
+
+            summarizer = ContextSummarizer(backend)
         pipeline = FactReasoner(
             nli_extractor=self._nli_extractor(backend, s),
             context_retriever=None if pasted else self._retriever(s),
-            context_summarizer=None,
+            context_summarizer=summarizer,
             merlin_path=self.merlin_path,
             use_priors=s.use_priors,
             nli_pair_config=get_pair_config("all_pairs" if pasted else s.nli_mode),
@@ -681,7 +725,9 @@ class Engine:
             pipeline.contexts = _pasted_contexts(run.passages)
 
         rel_ac, rel_cc, dedup, per_atom = _FR_VERSIONS[s.pipeline_version]
-        scorer = f" with {self.decision_model}" if s.backend == "ollama" else ""
+        scorer = (
+            f" with {self.decision_model}" if s.fact_backend == "ollama" else f" with {s.fact_model}"
+        )
         if pasted:
             pairs = len(run.passages) * len(fr_atoms)
             message = (
@@ -700,7 +746,7 @@ class Engine:
                 has_contexts=pasted,
                 revise_atoms=False,
                 remove_duplicates=dedup,
-                summarize_contexts=False,
+                summarize_contexts=summarizer is not None,
                 contexts_per_atom_only=per_atom and not pasted,
                 rel_atom_context=rel_ac,
                 rel_context_context=rel_cc,
@@ -733,9 +779,9 @@ class Engine:
 
         if self.dry_run:
             return _lexical_nli(backend)
-        if s.backend == "ollama":
+        if s.fact_backend == "ollama":
             return DecisionNLIExtractor(self.decision_model, host=self.ollama_host)
-        return NLIExtractor(backend, nli_method=s.resolved_nli_method())
+        return NLIExtractor(backend, nli_method=s.fact_nli_method())
 
     def _retriever(self, s: Settings):
         from fact_reasoner.core.retriever import ContextRetriever, SourceRetriever
@@ -765,15 +811,14 @@ class Engine:
         def on_progress(stage: str, done: int, total: int) -> None:
             run.emit("progress", stage=stage, done=done, total=total)
 
-        nli_method = s.resolved_nli_method()
-        strength = s.strength_method
+        nli_method, strength = s.miner_methods()
         if self.dry_run:
-            strength = "verbalized"
-        elif strength == "auto" and nli_method != "logprobs":
-            strength = "surrogate_sampled"  # no logprobs to read a Yes/No from
+            # The stub answers the verbalized prompt; keep the logprobs path so
+            # type confidence comes from the stub's synthetic logprobs.
+            nli_method, strength = "logprobs", "verbalized"
         return RelationMiner(
             backend,
-            nli_method="logprobs" if nli_method == "logprobs" else "simbauq",
+            nli_method=nli_method,
             pair_policy=s.pair_policy,
             window=s.window,
             gate=s.gate,

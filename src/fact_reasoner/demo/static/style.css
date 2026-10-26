@@ -8,6 +8,8 @@
  */
 
 :root {
+  --pipe-fact: #0f62fe;  /* factuality pipeline accent (blue 60)   */
+  --pipe-coh: #8a3ffc;   /* coherence pipeline accent  (purple 60) */
   --ent: #0f62fe;      /* entailment      blue 60   */
   --con: #da1e28;      /* contradiction   red 60    */
   --eqv: #8a3ffc;      /* equivalence     purple 60 */
@@ -22,6 +24,8 @@
   --gutter: 16px;
 }
 body.cds--g100 {
+  --pipe-fact: #4589ff;
+  --pipe-coh: #a56eff;
   --ent: #4589ff;
   --con: #fa4d56;
   --eqv: #a56eff;
@@ -70,11 +74,25 @@ body {
 #mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-interactive); --cds-text-inverse: #fff; }
 
 /* ---------------- Workspace ---------------- */
+/* Settings span the top; below, response and results share the full height. */
 .workspace {
   flex: 1; display: grid; gap: var(--gutter); padding: var(--gutter);
-  grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  grid-template-areas: "settings settings" "response results";
   align-items: start;
 }
+.settings { grid-area: settings; }
+.response { grid-area: response; }
+/* The results column is a full-viewport, sticky panel; the graph takes what
+ * the score tiles leave, so no space sits idle under it. */
+.results { grid-area: results; position: sticky; top: 64px; height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
+.results .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.results .view > .graph-wrap { flex: 1; min-height: 300px; display: flex; flex-direction: column; }
+.results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
+.results .fact-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.results .evidence-list { flex: 1; max-height: none; }
+.results #fact-graph-wrap { flex: 1; min-height: 300px; display: flex; flex-direction: column; }
+.results #fact-graph-wrap > .graph { flex: 1; height: auto; }
 .panel {
   background: var(--cds-layer-01);
   border: 1px solid var(--cds-border-subtle-01);
@@ -93,20 +111,37 @@ body {
 .hint { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--cds-text-helper); }
 .hint.warn { color: var(--cds-text-primary); border-left: 3px solid var(--cds-support-warning); padding-left: 8px; }
 
-/* ---------------- Settings ---------------- */
-.settings { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
-.settings-body { padding: 8px 0 16px; }
-.group { padding: 12px 16px; border-bottom: 1px solid var(--cds-border-subtle-01); }
-.group-title {
-  margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
-  color: var(--cds-text-secondary); text-transform: uppercase;
-}
-.group > * + * { margin-top: 12px; }
-#rits-wrap > * + *, #ollama-wrap > * + *, #retrieval-wrap > * + *, #prior-mode-wrap > * + * { margin-top: 12px; }
-.row-end { display: flex; align-items: flex-end; gap: 4px; }
-.row-end cds-dropdown { flex: 1; min-width: 0; }
-.checks { display: flex; flex-direction: column; gap: 2px; }
-cds-accordion-item > * + * { display: block; margin-top: 12px; }
+/* ---------------- Settings: one card per pipeline ---------------- */
+.settings-head { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--cds-border-subtle-01); }
+.settings-summary { flex: 1; min-width: 0; margin: 0; font-size: 12px; color: var(--cds-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 20px; }
+.settings-summary .sum { overflow: hidden; text-overflow: ellipsis; padding-left: 8px; border-left: 3px solid var(--pipe-fact); }
+.settings-summary .sum-coh { border-left-color: var(--pipe-coh); }
+.settings.collapsed .pipelines, .settings.collapsed .ollama-host { display: none; }
+.settings.collapsed .settings-head { border-bottom: 0; }
+.pipelines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 12px; padding: 12px 16px 4px; }
+.pipe { border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: 6px; padding: 10px 14px 14px; min-width: 0; }
+.pipe-fact { --accent: var(--pipe-fact); }
+.pipe-coh { --accent: var(--pipe-coh); }
+.pipe-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.pipe-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); align-self: center; }
+.pipe-title { margin: 0; font-size: 14px; font-weight: 600; }
+.pipe-sub { font-size: 12px; color: var(--cds-text-helper); }
+.pipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; align-items: start; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field.model-field { grid-column: span 2; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--cds-text-secondary); }
+.field-note { font-size: 11px; font-weight: 400; color: var(--cds-text-helper); }
+.field.toggles { gap: 4px; justify-content: center; }
+.fixed-value { font-size: 13px; min-height: 32px; padding: 6px 10px; border-radius: 4px; background: var(--cds-layer-02); border-left: 3px solid var(--accent); display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pipe-advanced { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--cds-border-subtle-00); }
+.checks { display: flex; flex-direction: column; gap: 0; }
+.ollama-host { margin: 0; padding: 6px 16px 10px; font-size: 11px; color: var(--cds-text-helper); }
+.linklike { font: inherit; background: none; border: 0; padding: 0; color: var(--cds-link-primary); cursor: pointer; }
+.linklike:hover { text-decoration: underline; }
+/* Result tabs carry the same accents as the settings cards. */
+#tab-factuality[selected] { --cds-border-interactive: var(--pipe-fact); }
+#tab-coherence[selected] { --cds-border-interactive: var(--pipe-coh); }
 cds-slider { width: 100%; }
 .slider-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--cds-text-secondary); margin-bottom: -4px; }
 .slider-head .mono { color: var(--cds-text-primary); }
@@ -292,26 +327,22 @@ cds-content-switcher:not(#mode) cds-content-switcher-item[selected] { --cds-laye
 .info-foot { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px 20px 20px; }
 
 /* ---------------- Responsive ---------------- */
-.only-narrow { display: none; }
 @media (max-width: 1100px) {
   .mode-switch { width: 260px; }
 }
-@media (max-width: 1280px) {
-  .workspace { grid-template-columns: 260px minmax(0, 1fr); }
-  .results { grid-column: 1 / -1; }
+@media (max-width: 1180px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "settings" "response" "results"; }
+  .results { position: static; height: auto; overflow: visible; }
+  .results .view > .graph-wrap > .graph, .results #fact-graph-wrap > .graph { height: 420px; flex: none; }
 }
 @media (max-width: 860px) {
-  .only-narrow { display: inline-flex; }
   .brand-sub, .brand-divider, .brand-title { display: none; }
   .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
   .mode-switch { order: 3; width: 100%; }
   .ev-items, .ev-none { padding-left: 0; }
-  /* A flex column, not a one-column grid: the settings drawer is fixed-position
-   * but would still be counted when sizing implicit grid rows. */
-  .workspace { display: flex; flex-direction: column; align-items: stretch; }
-  .settings { position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 88vw); max-height: none; z-index: 25; border-radius: 0; transform: translateX(-105%); transition: transform 0.2s; }
   #dry-run-tag { display: none; }
-  .settings.open { transform: none; box-shadow: 4px 0 16px rgba(0,0,0,0.2); }
+  .field.model-field { grid-column: auto; }
+  .settings-summary { display: none; }
   .scores { grid-template-columns: minmax(0, 1fr); }
   .scores.four { grid-template-columns: minmax(0, 1fr); }
   .graph { height: 320px; }

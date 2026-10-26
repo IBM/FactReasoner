@@ -96,11 +96,12 @@
     };
     const methods = [...document.querySelectorAll("#methods cds-checkbox")]
       .filter((c) => c.checked).map((c) => c.getAttribute("value"));
-    const backend = $("#backend").value || "rits";
     const s = {
       mode: currentMode(),
-      backend,
-      model: backend === "ollama" ? (val("ollama-model") || "") : (val("model") || d.model),
+      fact_backend: backendOf("fact"),
+      fact_model: val("fact-model") || "",
+      coh_backend: backendOf("coh"),
+      coh_model: val("coh-model") || "",
       prior_mode: priorMode(),
       flat_prior: num("flat-prior"),
       methods: methods.length ? methods : ["mean_marginal"],
@@ -109,6 +110,7 @@
       concession_discount: num("concession_discount"),
       require_evidence: on("require_evidence"),
       revise_atoms: on("revise_atoms"),
+      summarize_contexts: on("summarize_contexts"),
       top_k: num("top_k", parseInt),
     };
     for (const id of DROPDOWNS) s[id] = val(id) || d[id];
@@ -116,9 +118,7 @@
   }
 
   function priorMode() {
-    const g = $("#prior-mode");
-    const checked = g.querySelector("cds-radio-button[checked]");
-    return g.value || (checked && checked.getAttribute("value")) || "flat";
+    return $("#prior-mode").value || "flat";
   }
 
   function currentMode() {
@@ -134,8 +134,12 @@
     for (const n of document.querySelectorAll('[data-needs="coherence"]')) n.hidden = !coh;
     $("#both-priors-hint").hidden = m !== "both";
     $("#prior-mode-wrap").hidden = m === "both";
+    // Claims come from the factuality model unless only coherence runs.
+    $("#coh-claims-note").hidden = m !== "coherence";
+    $("#pipelines").classList.toggle("single", m !== "both");
     syncEvidence();
     syncPriorMode();
+    syncSummary();
     $("#analyze").firstChild.textContent = { factuality: "Check factuality", coherence: "Analyze coherence", both: "Analyze" }[m] + " ";
   }
 
@@ -144,23 +148,7 @@
     const fact = currentMode() !== "coherence";
     $("#evidence-wrap").hidden = !(fact && pasted);
     $("#retrieval-wrap").hidden = pasted;
-  }
-
-  function syncBackend() {
-    const b = $("#backend").value || "rits";
-    $("#rits-wrap").hidden = b !== "rits";
-    $("#ollama-wrap").hidden = b !== "ollama";
-    // On Ollama, factuality NLI runs on the decision model: no method to pick.
-    const ollama = b === "ollama";
-    $("#nli-method-wrap").hidden = ollama;
-    $("#nli-decision-hint").hidden = !ollama;
-  }
-
-  function showDecision(status) {
-    const st = status || { model: "kev", available: false };
-    for (const n of document.querySelectorAll("[data-decision]")) n.textContent = st.model;
-    $("#decision-ok").hidden = !st.available;
-    $("#decision-missing").hidden = !!st.available || S.config.dry_run;
+    $("#pairs-wrap").hidden = pasted;
   }
 
   function syncPriorMode() {
@@ -171,22 +159,73 @@
     renderClaims();
   }
 
-  function fillOllama(models) {
-    const prev = $("#ollama-model").value;
-    const names = models.map((m) => m.name);
-    fillDropdown("ollama-model", names, names.includes(prev) ? prev : (names[0] || ""));
-    $("#ollama-empty").hidden = names.length > 0;
-    $("#ollama-model").hidden = names.length === 0;
+  const backendOf = (pipe) => $(`#${pipe}-backend`).value || "rits";
+
+  /* The model list a pipeline shows: RITS inventory or local Ollama models. */
+  function fillModels(pipe) {
+    const c = S.config;
+    const ollama = backendOf(pipe) === "ollama";
+    const names = ollama ? (S.ollama || []).map((m) => m.name) : c.models.map((m) => m.name);
+    const dd = $(`#${pipe}-model`);
+    const prev = dd.value;
+    const fallback = c.defaults[`${pipe}_model`];
+    const pick = names.includes(prev) ? prev : names.includes(fallback) ? fallback : (names[0] || "");
+    fillDropdown(`${pipe}-model`, names, pick);
+    dd.toggleAttribute("disabled", names.length === 0);
+    if (!names.length) dd.setAttribute("label", ollama ? "No local models" : "No RITS models");
+  }
+
+  /* Backend-dependent fixed values: NLI on kev, strength verbalized. */
+  function syncBackend() {
+    fillModels("fact"); fillModels("coh");
+    const factOllama = backendOf("fact") === "ollama";
+    const cohOllama = backendOf("coh") === "ollama";
+    $("#fact-nli-ollama").hidden = !factOllama;
+    $("#fact-nli-rits").hidden = factOllama;
+    $("#strength-ollama").hidden = !cohOllama;
+    $("#strength-rits").hidden = cohOllama;
+    const anyOllama = factOllama || cohOllama;
+    $("#ollama-line").hidden = !anyOllama;
+    $("#ollama-empty").hidden = !anyOllama || (S.ollama || []).length > 0;
+    syncSummary();
+  }
+
+  function showDecision(status) {
+    const st = status || { model: "kev", available: false };
+    S.decision = st;
+    for (const n of document.querySelectorAll("[data-decision]")) n.textContent = st.model;
+    $("#decision-missing").hidden = !!st.available || S.config.dry_run;
+  }
+
+  /* One line that says what will run, shown even when the settings are hidden. */
+  function syncSummary() {
+    if (!S.config) return;
+    const m = currentMode();
+    const parts = [];
+    if (m !== "coherence") {
+      const nli = backendOf("fact") === "ollama" ? `NLI ${(S.decision && S.decision.model) || "kev"}` : `NLI ${$("#nli_method").value || "auto"}`;
+      parts.push(`Factuality: ${$("#fact-model").value || "–"} · ${nli} · ${LABELS.evidence[$("#evidence").value] || ""}`);
+    }
+    if (m !== "factuality") {
+      const strength = backendOf("coh") === "ollama" ? "verbalized" : ($("#strength_method").value || "auto");
+      const priors = m === "both" ? "factuality priors" : `${priorMode()} priors`;
+      parts.push(`Coherence: ${$("#coh-model").value || "–"} · strength ${strength} · ${priors}`);
+    }
+    const box = $("#settings-summary");
+    box.innerHTML = "";
+    parts.forEach((t, i) => box.append(el("span", { class: "sum " + (t.startsWith("Factuality") ? "sum-fact" : "sum-coh") }, t)));
   }
 
   async function refreshOllama() {
     try {
       const r = await fetch("api/ollama/models");
       const d = await r.json();
-      fillOllama(d.models || []);
+      S.ollama = d.models || [];
       showDecision(d.decision_model);
-    } catch (e) { fillOllama([]); }
+    } catch (e) { S.ollama = []; }
+    syncBackend();
   }
+
 
   async function loadConfig() {
     const r = await fetch("api/config");
@@ -194,25 +233,19 @@
     const c = S.config, d = c.defaults;
     $("#dry-run-tag").hidden = !c.dry_run;
 
-    fillDropdown("model", c.models.map((m) => m.name), d.model);
-    fillOllama(c.ollama_models || []);
+    S.ollama = c.ollama_models || [];
     showDecision(c.decision_model);
-    $("#ollama-host").textContent = c.ollama_host || "";
-    // Start on whichever backend has models (RITS hidden without a key).
-    if (!c.models.length && (c.ollama_models || []).length) setSwitcher("backend", "ollama");
+    $("#ollama-host").textContent = `Ollama: ${c.ollama_host || ""}`;
+    setSwitcher("fact-backend", d.fact_backend);
+    setSwitcher("coh-backend", d.coh_backend);
     if (c.dry_run) {
       // Offline: the stub answers for any name; Ollama is not consulted.
-      document.querySelector('#backend cds-content-switcher-item[value="ollama"]').setAttribute("disabled", "");
+      for (const it of document.querySelectorAll('cds-content-switcher-item[value="ollama"]')) {
+        if (it.closest("#fact-backend, #coh-backend")) it.setAttribute("disabled", "");
+      }
     }
-    syncBackend();
-    const showId = () => {
-      const m = c.models.find((m) => m.name === $("#model").value);
-      $("#model-id").textContent = m ? m.model_id : "";
-    };
-    $("#model").addEventListener("cds-dropdown-selected", showId);
-    showId();
-
     for (const id of DROPDOWNS) fillDropdown(id, c.options[id], d[id]);
+    syncBackend();
 
     const box = $("#methods");
     for (const m of c.options.methods) {
@@ -256,6 +289,12 @@
       }
     }
     syncEvidence();
+    syncSummary();
+  }
+
+  function setSettingsOpen(open) {
+    $("#settings").classList.toggle("collapsed", !open);
+    $("#collapse-settings").textContent = open ? "Hide" : "Show settings";
   }
 
   function setDropdown(id, value) {
@@ -275,13 +314,7 @@
   }
 
   function setPriorMode(m) {
-    const g = $("#prior-mode");
-    g.value = m;
-    for (const rb of g.querySelectorAll("cds-radio-button")) {
-      if (rb.getAttribute("value") === m) rb.setAttribute("checked", "");
-      else rb.removeAttribute("checked");
-      rb.checked = rb.getAttribute("value") === m;
-    }
+    setDropdown("prior-mode", m);
     syncPriorMode();
   }
 
@@ -323,6 +356,8 @@
       setBusy(false); showError(msg.detail || `Request failed (${r.status}).`); return;
     }
     S.runId = (await r.json()).run_id;
+    // Give the results the room: the summary line still says what is running.
+    setSettingsOpen(false);
     showHighlighted();
     listen(S.runId);
   }
@@ -801,6 +836,17 @@
     });
   }
 
+  /* Graph canvases are flex-sized: refit them when the panel changes size. */
+  function watchGraphSize() {
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (cy && !$("#view-coherence").hidden) { cy.resize(); cy.fit(undefined, 32); }
+      if (fcy && !$("#fact-graph-wrap").hidden) { fcy.resize(); fcy.fit(undefined, 30); }
+    });
+    ro.observe($("#graph"));
+    ro.observe($("#fact-graph"));
+  }
+
   // ---------------------------------------------------------------- graph
   let cy = null;
 
@@ -1103,12 +1149,22 @@
       S.runId = null; S.response = ""; S.exampleId = null; S.examplePriors = null;
       $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
-      showEditor(); resetResults();
+      showEditor(); resetResults(); setSettingsOpen(true);
     });
-    $("#prior-mode").addEventListener("cds-radio-button-group-changed", syncPriorMode);
+    $("#prior-mode").addEventListener("cds-dropdown-selected", () => { syncPriorMode(); syncSummary(); });
     $("#mode").addEventListener("cds-content-switcher-selected", syncMode);
-    $("#backend").addEventListener("cds-content-switcher-selected", syncBackend);
-    $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
+    $("#fact-backend").addEventListener("cds-content-switcher-selected", syncBackend);
+    $("#coh-backend").addEventListener("cds-content-switcher-selected", syncBackend);
+    $("#evidence").addEventListener("cds-dropdown-selected", () => { syncEvidence(); syncSummary(); });
+    for (const id of ["fact-model", "coh-model", "nli_method", "strength_method"]) {
+      $("#" + id).addEventListener("cds-dropdown-selected", syncSummary);
+    }
+    $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
+    $("#open-advanced").addEventListener("click", () => {
+      const adv = $("#coh-advanced");
+      adv.hidden = !adv.hidden;
+      $("#open-advanced").textContent = adv.hidden ? "More coherence settings" : "Fewer coherence settings";
+    });
     $("#refresh-ollama").addEventListener("click", refreshOllama);
     $("#result-tabs").addEventListener("cds-tabs-selected", (e) => showTab(e.detail.item.value));
     $("#fact-view").addEventListener("cds-content-switcher-selected", (e) => {
@@ -1130,9 +1186,8 @@
     $("#open-info").addEventListener("click", () => { info.hidden = !info.hidden; });
     $("#close-info").addEventListener("click", () => { info.hidden = true; });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { info.hidden = true; selectEdge(null); setActive(null, true); $("#settings").classList.remove("open"); }
+      if (e.key === "Escape") { info.hidden = true; selectEdge(null); setActive(null, true); }
     });
-    $("#toggle-settings").addEventListener("click", () => $("#settings").classList.toggle("open"));
     $("#toggle-theme").addEventListener("click", () => {
       const dark = document.body.classList.toggle("cds--g100");
       document.body.classList.toggle("cds--g10", !dark);
@@ -1154,8 +1209,9 @@
   async function init() {
     initTheme();
     wire();
+    watchGraphSize();
     const ready = Promise.all([
-      "cds-dropdown", "cds-radio-button-group", "cds-checkbox", "cds-content-switcher", "cds-tabs",
+      "cds-dropdown", "cds-checkbox", "cds-content-switcher", "cds-tabs", "cds-toggle",
     ].map((t) => customElements.whenDefined(t)));
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("carbon")), 20000));
     try {
@@ -1193,6 +1249,9 @@
     if (q.get("view") === "mrf") S.view = "mrf";
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
     if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
+    for (const pipe of ["fact", "coh"]) {
+      if (q.get(pipe)) { setSwitcher(`${pipe}-backend`, q.get(pipe)); syncBackend(); }
+    }
     if (q.get("edge") != null) {
       const n = parseInt(q.get("edge"), 10);
       const wait = setInterval(() => {

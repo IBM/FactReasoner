@@ -125,17 +125,28 @@ class TestSettings:
         with pytest.raises(ValueError):
             Settings.from_json({"prior_mode": "oracle"})
 
-    @pytest.mark.parametrize("key,value", [("mode", "magic"), ("backend", "tgi"), ("evidence", "bing")])
+    @pytest.mark.parametrize("key,value", [
+        ("mode", "magic"), ("fact_backend", "tgi"), ("coh_backend", "tgi"), ("evidence", "bing"),
+    ])
     def test_unknown_choices_rejected(self, key, value):
         with pytest.raises(ValueError):
             Settings.from_json({key: value})
 
-    def test_ollama_falls_back_to_sampling(self):
-        # Ollama exposes no logprobs, so "auto" must not pick the logprobs path.
-        assert Settings.from_json({"backend": "ollama"}).resolved_nli_method() == "simbauq"
-        assert Settings.from_json({"backend": "rits"}).resolved_nli_method() == "logprobs"
-        explicit = Settings.from_json({"backend": "ollama", "nli_method": "logprobs"})
-        assert explicit.resolved_nli_method() == "logprobs"
+    def test_ollama_miner_is_sampled_and_verbalized(self):
+        # Ollama exposes no logprobs: type confidence is sampled and the strength
+        # is verbalized, whatever the strength setting says.
+        for strength in ("auto", "surrogate_logprobs", "surrogate_sampled"):
+            s = Settings.from_json({"coh_backend": "ollama", "strength_method": strength})
+            assert s.miner_methods() == ("simbauq", "verbalized")
+        rits = Settings.from_json({"coh_backend": "rits", "strength_method": "surrogate_sampled"})
+        assert rits.miner_methods() == ("logprobs", "surrogate_sampled")
+
+    def test_claims_run_on_the_factuality_model(self):
+        both = Settings.from_json({"mode": "both", "fact_backend": "ollama", "fact_model": "g",
+                                   "coh_backend": "rits", "coh_model": "r"})
+        assert both.claims_model == ("ollama", "g")
+        coh = Settings.from_json({"mode": "coherence", "fact_model": "g", "coh_model": "r"})
+        assert coh.claims_model == ("rits", "r")
 
 
 class TestHelpers:
@@ -176,7 +187,9 @@ class TestAPI:
         c, _ = client
         cfg = c.get("/api/config").json()
         assert cfg["dry_run"] is True
-        assert cfg["models"] and cfg["defaults"]["model"] in {m["name"] for m in cfg["models"]}
+        names = {m["name"] for m in cfg["models"]}
+        assert cfg["models"] and cfg["defaults"]["fact_model"] in names
+        assert cfg["defaults"]["coh_model"] in names
         assert all("gold" not in e for e in cfg["examples"])
 
     def test_offline_replay_lists_only_the_voyager_pair(self, client):
@@ -219,6 +232,9 @@ class TestAPI:
         assert cfg["ollama_host"] == "http://box:11434"
         assert again["models"] == cfg["ollama_models"]
         assert "ollama" in cfg["options"]["backend"]
+        # No RITS models: both pipelines default to the local model.
+        assert cfg["defaults"]["fact_backend"] == cfg["defaults"]["coh_backend"] == "ollama"
+        assert cfg["defaults"]["fact_model"] == "granite4.2:3b"
 
     @pytest.mark.parametrize(
         "eid,key", [("voyager-a", "A"), ("voyager-b", "B")]
@@ -369,7 +385,7 @@ class TestOllamaFactuality:
 
         engine = self._engine(monkeypatch, ["granite4.2:3b", "kev:latest"])
         try:
-            ollama = engine._nli_extractor(object(), Settings.from_json({"backend": "ollama"}))
+            ollama = engine._nli_extractor(object(), Settings.from_json({"fact_backend": "ollama"}))
         finally:
             engine.close()
         assert isinstance(ollama, DecisionNLIExtractor)
@@ -383,7 +399,7 @@ class TestOllamaFactuality:
         engine = self._engine(monkeypatch, [])
         backend = make_mock_backend("m")
         try:
-            rits = engine._nli_extractor(backend, Settings.from_json({"backend": "rits"}))
+            rits = engine._nli_extractor(backend, Settings.from_json({"fact_backend": "rits"}))
         finally:
             engine.close()
         assert isinstance(rits, NLIExtractor) and not isinstance(rits, DecisionNLIExtractor)
@@ -393,11 +409,54 @@ class TestOllamaFactuality:
         try:
             with pytest.raises(ValueError, match="ollama pull kev"):
                 engine.submit("A claim.", settings=Settings.from_json(
-                    {"backend": "ollama", "model": "granite4.2:3b", "mode": "factuality",
+                    {"fact_backend": "ollama", "fact_model": "granite4.2:3b", "mode": "factuality",
                      "evidence": "pasted"}), evidence_text="Some evidence.")
             # Coherence alone does not need the decision model.
             run = engine.submit("A claim.", settings=Settings.from_json(
-                {"backend": "ollama", "model": "granite4.2:3b", "mode": "coherence"}))
+                {"coh_backend": "ollama", "coh_model": "granite4.2:3b", "mode": "coherence"}))
             assert run.id
         finally:
             engine.close()
+
+
+class TestPipelineModels:
+    """Each pipeline runs on its own model; the miner on Ollama is verbalized."""
+
+    def test_miner_on_ollama_uses_verbalized_strength(self, monkeypatch):
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        engine = Engine(models=[], merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: make_mock_backend(name))
+        try:
+            s = Settings.from_json({"coh_backend": "ollama", "coh_model": "granite4.2:3b",
+                                    "strength_method": "surrogate_logprobs"})
+            miner = engine._miner(make_mock_backend("g"), s, run=None)
+        finally:
+            engine.close()
+        assert miner.strength_method == "verbalized"
+        assert miner.nli_method == "simbauq"
+
+    def test_each_stage_uses_its_pipelines_model(self, monkeypatch):
+        """Claims + factuality on the factuality model, mining on the coherence one."""
+        used = []
+        examples = load_examples(DATA)
+        engine = Engine(models=load_models(MODELS), merlin_path=None, dry_run=True, replays=examples)
+        real = engine._backend
+        monkeypatch.setattr(engine, "_backend", lambda kind, name: used.append((kind, name)) or real(kind, name))
+        ex = examples[1]
+        try:
+            run = engine.submit(ex["response"], settings=Settings.from_json({
+                "mode": "both", "evidence": "pasted",
+                "fact_backend": "rits", "fact_model": "granite-4-2-30b",
+                "coh_backend": "rits", "coh_model": "deepseek-v3.2",
+            }), evidence_text="\n\n".join(ex["evidence"]))
+            with run.cond:
+                run.cond.wait_for(lambda: run.done, timeout=60)
+        finally:
+            engine.close()
+        assert run.events[-1]["type"] == "result"
+        assert used[0] == ("rits", "granite-4-2-30b")   # claims
+        assert ("rits", "granite-4-2-30b") in used[1:]  # factuality
+        # Mining replays the gold graph offline, so the coherence model is
+        # resolved only when a live miner is built; the stage message names it.
+        stages = [e.get("message", "") for e in run.events if e["type"] == "stage"]
+        assert any("deepseek-v3.2" in m for m in stages)

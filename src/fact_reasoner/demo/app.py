@@ -80,8 +80,13 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
     app = FastAPI(title="FactReasoner demo", docs_url=None, redoc_url=None)
     defaults = Settings()
     models = list(engine.models.values())
-    if models and defaults.model not in engine.models:
-        defaults.model = models[0]["name"]
+    if models and defaults.fact_model not in engine.models:
+        defaults.fact_model = defaults.coh_model = models[0]["name"]
+    if not models:
+        # No RITS key: both pipelines start on the first local model.
+        local = engine.ollama_models()
+        defaults.fact_backend = defaults.coh_backend = "ollama"
+        defaults.fact_model = defaults.coh_model = local[0]["name"] if local else ""
     # Offline replay can only answer examples that ship a gold graph (the Voyager
     # pair); the rest would show the stub model's meaningless relations.
     if engine.dry_run:
