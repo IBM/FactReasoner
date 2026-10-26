@@ -437,7 +437,7 @@
         bar.append(tick);
       }
       meta.append(bar,
-        el("span", {}, "post ", el("span", { class: "pnum" }, hasPost ? fmt(post) : "…")),
+        el("span", {}, "posterior ", el("span", { class: "pnum" }, hasPost ? fmt(post) : "…")),
         el("span", {}, "prior ", el("span", { class: "pnum" }, prior != null ? fmt(prior, 2) : "–")));
       if (below) meta.append(el("span", { class: "below", title: "Posterior fell below this claim's own prior" }, "↓ below prior"));
       if (c.span && c.span.method === "implicit") meta.append(el("span", { class: "implicit" }, "implicit in text"));
