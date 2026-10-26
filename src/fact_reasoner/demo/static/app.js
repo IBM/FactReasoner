@@ -168,7 +168,9 @@
     const names = ollama ? (S.ollama || []).map((m) => m.name) : c.models.map((m) => m.name);
     const dd = $(`#${pipe}-model`);
     const prev = dd.value;
-    const fallback = c.defaults[`${pipe}_model`];
+    const fallback = ollama && c.defaults[`${pipe}_backend`] !== "ollama"
+      ? c.ollama_preferred
+      : c.defaults[`${pipe}_model`];
     const pick = names.includes(prev) ? prev : names.includes(fallback) ? fallback : (names[0] || "");
     fillDropdown(`${pipe}-model`, names, pick);
     dd.toggleAttribute("disabled", names.length === 0);

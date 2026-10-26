@@ -75,6 +75,20 @@ MAX_RESPONSE_CHARS = 8000
 MAX_EVIDENCE_CHARS = 20000
 
 
+#: Local models tried first, in order. granite4.1:3b answers the miner's prompt
+#: in well under a second; granite4.2:3b reasons first (~25 s a call), which
+#: multiplied by SIMBA-UQ's 20 samples overruns the Ollama client's timeout.
+PREFERRED_OLLAMA_MODELS = ("granite4.1:3b",)
+
+
+def _preferred_local(local: list[dict[str, Any]]) -> str:
+    names = [m["name"] for m in local]
+    for name in PREFERRED_OLLAMA_MODELS:
+        if name in names:
+            return name
+    return names[0] if names else ""
+
+
 def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
     """Build the FastAPI app around a running :class:`Engine`."""
     app = FastAPI(title="FactReasoner demo", docs_url=None, redoc_url=None)
@@ -86,7 +100,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
         # No RITS key: both pipelines start on the first local model.
         local = engine.ollama_models()
         defaults.fact_backend = defaults.coh_backend = "ollama"
-        defaults.fact_model = defaults.coh_model = local[0]["name"] if local else ""
+        defaults.fact_model = defaults.coh_model = _preferred_local(local)
     # Offline replay can only answer examples that ship a gold graph (the Voyager
     # pair); the rest would show the stub model's meaningless relations.
     if engine.dry_run:
@@ -100,6 +114,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
             "models": [{"name": m["name"], "model_id": m["model_id"]} for m in models],
             "ollama_models": engine.ollama_models(),
             "decision_model": engine.decision_status(),
+            "ollama_preferred": _preferred_local(engine.ollama_models()),
             "ollama_host": engine.ollama_host
             or os.environ.get("OLLAMA_HOST")
             or "http://localhost:11434",
