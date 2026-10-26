@@ -175,9 +175,10 @@
     const names = ollama ? (S.ollama || []).map((m) => m.name) : c.models.map((m) => m.name);
     const dd = $(`#${pipe}-model`);
     const prev = dd.value;
-    const fallback = ollama && c.defaults[`${pipe}_backend`] !== "ollama"
-      ? c.ollama_preferred
-      : c.defaults[`${pipe}_model`];
+    // The server's default model applies to its default backend; switching to
+    // the other backend starts on that backend's preferred / first model.
+    const onDefault = backendOf(pipe) === c.defaults[`${pipe}_backend`];
+    const fallback = onDefault ? c.defaults[`${pipe}_model`] : (ollama ? c.ollama_preferred : names[0]);
     const pick = names.includes(prev) ? prev : names.includes(fallback) ? fallback : (names[0] || "");
     fillDropdown(`${pipe}-model`, names, pick);
     dd.toggleAttribute("disabled", names.length === 0);

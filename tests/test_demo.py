@@ -125,6 +125,10 @@ class TestSettings:
         with pytest.raises(ValueError):
             Settings.from_json({"methods": ["mean_marginal", "nope"]})
 
+    def test_default_backend_is_ollama(self):
+        s = Settings.from_json({})
+        assert (s.fact_backend, s.coh_backend) == ("ollama", "ollama")
+
     def test_default_analysis_is_factuality(self):
         s = Settings.from_json({})
         assert s.mode == "factuality" and s.wants_factuality and not s.wants_coherence
@@ -153,7 +157,8 @@ class TestSettings:
         both = Settings.from_json({"mode": "both", "fact_backend": "ollama", "fact_model": "g",
                                    "coh_backend": "rits", "coh_model": "r"})
         assert both.claims_model == ("ollama", "g")
-        coh = Settings.from_json({"mode": "coherence", "fact_model": "g", "coh_model": "r"})
+        coh = Settings.from_json({"mode": "coherence", "fact_model": "g",
+                                  "coh_backend": "rits", "coh_model": "r"})
         assert coh.claims_model == ("rits", "r")
 
 
@@ -219,6 +224,33 @@ class TestAPI:
             engine.close()
         assert cfg["dry_run"] is False
         assert len(cfg["examples"]) == len(examples) > 2
+
+    def test_config_defaults_to_ollama_even_with_rits(self, monkeypatch):
+        """RITS models available too: Ollama is still the default."""
+        monkeypatch.setattr(
+            "fact_reasoner.demo.engine.list_ollama_models",
+            lambda host: [{"name": "granite4.2:3b", "model_id": "granite4.2:3b"},
+                          {"name": "granite4.1:3b", "model_id": "granite4.1:3b"}],
+        )
+        engine = Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: None)
+        try:
+            d = TestClient(create_app(engine, examples=[])).get("/api/config").json()["defaults"]
+        finally:
+            engine.close()
+        assert d["fact_backend"] == d["coh_backend"] == "ollama"
+        assert d["fact_model"] == d["coh_model"] == "granite4.1:3b"  # preferred local
+
+    def test_config_falls_back_to_rits_without_local_models(self, monkeypatch):
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        engine = Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: None)
+        try:
+            d = TestClient(create_app(engine, examples=[])).get("/api/config").json()["defaults"]
+        finally:
+            engine.close()
+        assert d["fact_backend"] == d["coh_backend"] == "rits"
+        assert d["fact_model"] in {m["name"] for m in load_models(MODELS)}
 
     def test_config_lists_local_ollama_models(self, monkeypatch):
         monkeypatch.setattr(
@@ -594,7 +626,7 @@ class TestStopAndReuse:
         engine = self._live_like_engine(monkeypatch)
         try:
             run = engine.submit("A claim. Another claim.", settings=Settings.from_json(
-                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+                {"mode": "coherence", "coh_backend": "rits", "coh_model": "llama-3.3-70b-instruct"}))
             assert started.wait(30)
             t = time.perf_counter()
             assert engine.stop(run.id) is True
@@ -617,7 +649,7 @@ class TestStopAndReuse:
         monkeypatch.setattr(engine, "_atomize", lambda run, backend: release.wait(10) or {})
         try:
             run = engine.submit("A claim.", settings=Settings.from_json(
-                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+                {"mode": "coherence", "coh_backend": "rits", "coh_model": "llama-3.3-70b-instruct"}))
             time.sleep(0.2)
             assert engine.stop(run.id) is True
             stopping = next(e for e in run.events if e["type"] == "stopping")
@@ -657,7 +689,7 @@ class TestStopAndReuse:
             "a0": Atom(id="a0", text="One."), "a1": Atom(id="a1", text="Two.")})
         try:
             run = engine.submit("One. Two.", settings=Settings.from_json(
-                {"mode": "coherence", "coh_model": "llama-3.3-70b-instruct"}))
+                {"mode": "coherence", "coh_backend": "rits", "coh_model": "llama-3.3-70b-instruct"}))
             assert started.wait(30)
             assert ("rits", "llama-3.3-70b-instruct") in engine._backends
             engine.stop(run.id)

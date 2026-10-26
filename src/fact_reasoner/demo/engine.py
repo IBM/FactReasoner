@@ -121,11 +121,11 @@ class Settings:
     mode: str = "factuality"
     # Factuality pipeline: the model behind its LLM components (claims, reviser,
     # summarizer). NLI is the chat model on RITS, the decision model on Ollama.
-    fact_backend: str = "rits"
-    fact_model: str = "llama-3.3-70b-instruct"
+    fact_backend: str = "ollama"
+    fact_model: str = "granite4.1:3b"
     # Coherence pipeline: the relation miner's model.
-    coh_backend: str = "rits"
-    coh_model: str = "llama-3.3-70b-instruct"
+    coh_backend: str = "ollama"
+    coh_model: str = "granite4.1:3b"
     # Coherence: relation mining.
     prompt_variant: str = "v1"
     sense_menu: str = "full"

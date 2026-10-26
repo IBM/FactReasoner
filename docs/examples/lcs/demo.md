@@ -22,7 +22,9 @@ Paste a response and the demo:
 
 **Layout.** The settings span the top in two cards: **Factuality pipeline** (blue) and
 **Coherence pipeline** (purple). Both cards share one grid, so their fields line up
-row by row. The panel is open by default. It hides itself when you press Analyze, to
+row by row. The cards and the panels below sit in the same two columns: the response
+panel has exactly the width and edges of the factuality card, and the results panel
+those of the coherence card. The panel is open by default. It hides itself when you press Analyze, to
 give the results room. *Show settings* brings it back, and on a phone it starts
 collapsed. Under the settings, the response and claims sit on the left. The
 results sit on the right in a panel that fills the viewport.
@@ -55,8 +57,10 @@ fact-reasoner-lcs-demo --merlin-path ~/git/merlin/build_boost192/merlin
 fact-reasoner-lcs-demo --dry-run
 ```
 
-**Models.** Each pipeline has its own model, from **RITS** (the models in
-`configs/rits_models.json`, which need `RITS_API_KEY`) or **Ollama**. The Ollama list
+**Models.** Each pipeline has its own model, from **Ollama** (the default) or
+**RITS** (the models in `configs/rits_models.json`, which need `RITS_API_KEY`). Both
+pipelines start on the local `granite4.1:3b` when it is pulled. They fall back to RITS
+only when the Ollama server has no models, or in offline replay. The Ollama list
 is whatever the local server has pulled, read live from `/api/tags`; use *Refresh
 Ollama models* after `ollama pull`. Point it at another machine with `--ollama-host`
 (default: `OLLAMA_HOST`, else `http://localhost:11434`). Without a RITS key both

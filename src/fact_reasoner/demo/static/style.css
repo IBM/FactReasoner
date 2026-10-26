@@ -73,13 +73,25 @@ body {
 
 /* ---------------- Workspace ---------------- */
 /* Settings span the top; below, response and results share the full height. */
+/* One column grid for the whole page: the settings cards (a subgrid) and the
+ * response / results panels below sit in the SAME two tracks, so each panel
+ * has exactly the width and edges of the pipeline card above it. */
 .workspace {
   flex: 1; display: grid; gap: var(--gutter); padding: var(--gutter);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas: "settings settings" "response results";
   align-items: start;
 }
-.settings { grid-area: settings; }
+/* The settings box is borderless: its header and the two cards are what show,
+ * so a card's outer edge IS the column edge -- the same edge as the panel below. */
+.panel.settings {
+  grid-area: settings; display: grid; grid-template-columns: subgrid;
+  column-gap: var(--gutter); row-gap: 8px;
+  background: transparent; border: 0; border-radius: 0;
+}
+.settings > .settings-head { grid-column: 1 / -1; }
+.settings > .pipelines { grid-column: 1 / -1; }
+.settings > .ollama-host { grid-column: 1 / -1; }
 .response { grid-area: response; }
 /* The results column is a full-viewport, sticky panel; the graph takes what
  * the score tiles leave, so no space sits idle under it. */
@@ -114,11 +126,11 @@ body {
  * label line over a fixed-height control, so each row lines up across fields
  * and across the two cards. Nothing inside a field may change its height. */
 .settings { --label-h: 18px; --ctl-h: 32px; }
-.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--cds-border-subtle-01); }
-.settings.collapsed .pipelines, .settings.collapsed .ollama-host { display: none; }
-.settings.collapsed .settings-head { border-bottom: 0; }
-.pipelines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 12px; padding: 12px 16px 4px; }
-.pipe { border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: 6px; padding: 10px 14px 14px; min-width: 0; transition: opacity 0.15s; }
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 8px 6px 16px; background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01); border-radius: var(--radius); }
+.panel.settings.collapsed > .pipelines, .panel.settings.collapsed > .ollama-host { display: none; }
+
+.pipelines { display: grid; grid-template-columns: subgrid; column-gap: var(--gutter); padding: 0; }
+.pipe { background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: var(--radius); padding: 10px 14px 14px; min-width: 0; transition: opacity 0.15s; }
 .pipe-fact { --accent: var(--pipe-fact); }
 .pipe-coh { --accent: var(--pipe-coh); }
 .pipe.unused { opacity: 0.45; }
@@ -149,7 +161,7 @@ body {
 .slider-row { height: var(--ctl-h); display: flex; align-items: center; }
 .fixed-value { height: 32px; box-sizing: border-box; font-size: 13px; padding: 0 10px; border-radius: 4px; background: var(--cds-layer-02); border-left: 3px solid var(--accent); display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; }
 .pipe-foot { margin: 10px 0 0; font-size: 12px; color: var(--cds-text-primary); border-left: 3px solid var(--cds-support-warning); padding-left: 8px; }
-.ollama-host { margin: 0; padding: 6px 16px 10px; font-size: 11px; color: var(--cds-text-helper); }
+.ollama-host { margin: 0; padding: 0 4px; font-size: 11px; color: var(--cds-text-helper); }
 .linklike { font: inherit; background: none; border: 0; padding: 0; color: var(--cds-link-primary); cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Result tabs carry the same accents as the settings cards. */
