@@ -22,8 +22,9 @@ Paste a response and the demo:
 
 **Layout.** The settings span the top in two cards: **Factuality pipeline** (blue) and
 **Coherence pipeline** (purple). Both cards share one grid, so their fields line up
-row by row. The panel is open by default, *Hide* collapses it, and on a phone it
-starts collapsed. Under the settings, the response and claims sit on the left. The
+row by row. The panel is open by default. It hides itself when you press Analyze, to
+give the results room. *Show settings* brings it back, and on a phone it starts
+collapsed. Under the settings, the response and claims sit on the left. The
 results sit on the right in a panel that fills the viewport.
 
 **Analysis.** Under the response, three buttons pick what a run computes:
@@ -104,6 +105,15 @@ can stand in for `--merlin-path`.
 
 - **Examples** sit above the editor. The Voyager pair ships evidence passages, used
   with *Paste evidence*.
+- **Stop** appears next to Analyze while a run is in progress. A stopped run keeps the
+  claims it had already extracted. Stopping during relation mining takes effect at
+  once; during claim extraction or the factuality NLI step, it takes effect when that
+  step returns (a few seconds).
+- **Claims are kept between runs.** Once a response's claims are extracted, every
+  later run on the same text reuses exactly those claims (same ids, same wording),
+  whatever the analysis or settings. So switching from Factuality to Coherence
+  compares like with like, and skips a model call. Editing the response text, or
+  *Re-extract claims*, extracts them again.
 - **Each claim row** shows its factuality posterior with a ✓/✗ verdict, its coherence
   posterior against its prior, or both. **↓ below** marks a claim whose coherence
   posterior fell below its own prior: one the response's own argument undermines.
@@ -145,8 +155,9 @@ keeps a single user from saturating the shared RITS quota or a local GPU.
 |---|---|
 | `GET /api/config` | RITS and Ollama chat models, the decision model's status, option menus, defaults, examples. |
 | `GET /api/ollama/models` | Re-list the local Ollama models and the decision model's status. |
-| `POST /api/analyze` | `{response, query?, settings, priors?, evidence?}` → `{run_id}`. `settings.mode` is `factuality`, `coherence` or `both`. |
-| `GET /api/runs/{id}/events` | Server-sent events: `queued`, `stage`, `claims`, `factuality`, `priors`, `progress`, then `result` (`{factuality, coherence, timing}`) or `error`. |
+| `POST /api/analyze` | `{response, query?, settings, priors?, evidence?, claims?}` → `{run_id}`. `settings.mode` is `factuality`, `coherence` or `both`. `claims` (`[{id, text, original}]`) reuses an earlier run's claims instead of extracting them. |
+| `POST /api/runs/{id}/stop` | Stop a queued or running analysis; its event stream ends with `stopped`. |
+| `GET /api/runs/{id}/events` | Server-sent events: `queued`, `stage`, `claims`, `factuality`, `priors`, `progress`, then `result` (`{factuality, coherence, timing}`), `stopped` or `error`. |
 | `POST /api/runs/{id}/rescore` | `{priors}` → coherence scores under new priors (no LLM calls). |
 
 ## How the two stages share claims

@@ -27,6 +27,8 @@ static page with no build step. The API:
   ``error``).
 * ``POST /api/runs/{id}/rescore`` -- re-score coherence under edited priors (no
   LLM calls).
+* ``POST /api/runs/{id}/stop`` -- stop a queued or running analysis; the stream
+  ends with a ``stopped`` event.
 
 Run it with ``fact-reasoner-lcs-demo --merlin-path /path/to/merlin`` (RITS needs
 ``RITS_API_KEY``; Ollama needs a running server), or ``fact-reasoner-lcs-demo
@@ -161,6 +163,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
                 settings=settings,
                 manual_priors=body.get("priors") or {},
                 evidence_text=evidence,
+                claims=body.get("claims") or None,
             )
         except (TypeError, ValueError) as e:
             raise HTTPException(400, str(e)) from e
@@ -196,6 +199,12 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.post("/api/runs/{run_id}/stop")
+    def stop(run_id: str) -> dict[str, Any]:
+        if engine.get(run_id) is None:
+            raise HTTPException(404, "Unknown run.")
+        return {"stopping": engine.stop(run_id)}
 
     @app.post("/api/runs/{run_id}/rescore")
     async def rescore(run_id: str, request: Request) -> dict[str, Any]:

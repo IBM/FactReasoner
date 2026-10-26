@@ -46,6 +46,17 @@
 #
 # Mined graphs are kept per run so a re-score under edited priors (the "drag a
 # prior" interaction) is pure inference: zero LLM calls.
+#
+# Stopping. A run can be stopped while queued (the worker skips it), between
+# stages (checked before each), or inside the stages that run on the worker's
+# own loop (claims, factuality build, mining): those run as one asyncio task,
+# which `stop()` cancels from the request thread -- cancelling the pending model
+# requests with it. FactReasoner's NLI step runs on the library's background
+# loop, so a stop issued during it lands when that step returns.
+#
+# Reusing claims. A run may be handed the claims of an earlier run on the same
+# response (``given_claims``): atomization is then skipped, so re-running with
+# different settings compares like with like.
 
 from __future__ import annotations
 
@@ -222,15 +233,24 @@ class Run:
     mining: MiningResult | None = None
     claims: dict[str, dict[str, Any]] = field(default_factory=dict)
     priors: dict[str, float] = field(default_factory=dict)
+    # Claims to reuse instead of atomizing: [{id, text, original}].
+    given_claims: list[dict[str, Any]] | None = None
+    cancelled: bool = False
+    # The asyncio task currently running for this run (on the worker loop).
+    task: asyncio.Task | None = None
     cond: threading.Condition = field(default_factory=threading.Condition)
 
     def emit(self, kind: str, **data: Any) -> None:
         """Append an event and wake every listener."""
         with self.cond:
             self.events.append({"type": kind, **data})
-            if kind in ("result", "error"):
+            if kind in ("result", "error", "stopped"):
                 self.done = True
             self.cond.notify_all()
+
+
+class RunStopped(Exception):
+    """Raised inside a run's stages once :meth:`Engine.stop` has been called."""
 
 
 # ----------------------------------------------------------------------------
@@ -435,8 +455,13 @@ class Engine:
         settings: Settings,
         manual_priors: Mapping[str, float] | None = None,
         evidence_text: str = "",
+        claims: list[Mapping[str, Any]] | None = None,
     ) -> Run:
         """Queue an analysis and return its :class:`Run` (events stream in).
+
+        ``claims`` -- the claims an earlier run extracted from this same
+        response (``[{id, text, original}]``) -- are reused verbatim, skipping
+        atomization.
 
         Raises:
             ValueError: On an empty response, an unknown RITS model, or a
@@ -489,6 +514,7 @@ class Engine:
             settings=settings,
             manual_priors={k: float(v) for k, v in (manual_priors or {}).items()},
             passages=passages,
+            given_claims=_clean_claims(claims),
         )
         self._runs[run.id] = run
         while len(self._runs) > MAX_KEPT_RUNS:
@@ -499,6 +525,21 @@ class Engine:
 
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
+
+    def stop(self, run_id: str) -> bool:
+        """Stop a queued or running analysis. Returns False if it already ended.
+
+        Thread-safe: sets the run's flag (checked between stages) and cancels
+        its in-flight task on the worker loop.
+        """
+        run = self._runs.get(run_id)
+        if run is None or run.done:
+            return False
+        run.cancelled = True
+        task = run.task
+        if task is not None and not task.done():
+            self._loop.call_soon_threadsafe(task.cancel)
+        return True
 
     def rescore(self, run_id: str, priors: Mapping[str, float]) -> dict[str, Any]:
         """Re-score a finished run's coherence under edited priors (no LLM calls).
@@ -549,10 +590,18 @@ class Engine:
     def _run_job(self, kind: str, run: Run, extra: Any) -> None:
         if kind == "analyze":
             try:
+                self._checkpoint(run)
                 self._analyze(run)
+            except (RunStopped, asyncio.CancelledError):
+                run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
             except Exception as e:  # noqa: BLE001 - reported to the browser
-                traceback.print_exc()
-                run.emit("error", message=f"{type(e).__name__}: {e}")
+                if run.cancelled:
+                    run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
+                else:
+                    traceback.print_exc()
+                    run.emit("error", message=f"{type(e).__name__}: {e}")
+            finally:
+                run.task = None
             return
         priors, box = extra
         try:
@@ -584,23 +633,47 @@ class Engine:
         self._backends[key] = backend
         return backend
 
+    @staticmethod
+    def _checkpoint(run: Run) -> None:
+        """Raise :class:`RunStopped` if the run was asked to stop."""
+        if run.cancelled:
+            raise RunStopped()
+
+    def _run_async(self, run: Run, coro) -> Any:
+        """Run ``coro`` on the worker loop as the run's cancellable task."""
+        self._checkpoint(run)
+        task = self._loop.create_task(coro)
+        run.task = task
+        try:
+            return self._loop.run_until_complete(task)
+        finally:
+            run.task = None
+
     def _analyze(self, run: Run) -> None:
         s = run.settings
         timing: dict[str, float] = {}
         claims_kind, claims_name = s.claims_model
-        run.emit("stage", stage="setup", message=f"Connecting to {claims_name} ({claims_kind})")
-        claims_backend = self._backend(claims_kind, claims_name)
+        claims_backend = None
+        if not run.given_claims:
+            run.emit("stage", stage="setup", message=f"Connecting to {claims_name} ({claims_kind})")
+            claims_backend = self._backend(claims_kind, claims_name)
 
         # -- 1. claims ---------------------------------------------------------
-        run.emit("stage", stage="atomize", message=f"Extracting atomic claims with {claims_name}")
         t = time.perf_counter()
-        atoms = self._atomize(run, claims_backend)
+        if run.given_claims:
+            atoms = _atoms_from_claims(run.given_claims)
+            run.emit("stage", stage="atomize", message=f"Reusing the {len(atoms)} claims already extracted")
+        else:
+            run.emit("stage", stage="atomize", message=f"Extracting atomic claims with {claims_name}")
+            atoms = self._atomize(run, claims_backend)
         timing["claims"] = time.perf_counter() - t
+        self._checkpoint(run)
         self._emit_claims(run, atoms)
 
         # -- 2. factuality -----------------------------------------------------
         factuality = None
         if s.wants_factuality:
+            self._checkpoint(run)
             t = time.perf_counter()
             fact_backend = self._backend(s.fact_backend, s.fact_model)
             factuality = self._factuality(run, fact_backend, atoms)
@@ -630,11 +703,12 @@ class Engine:
             run.mining = _mining_from_gold(atoms, gold["relations"], run.priors)
         else:
             miner = self._miner(self._backend(s.coh_backend, s.coh_model), s, run)
-            run.mining = self._loop.run_until_complete(
-                miner.amine_from_atoms(atoms, run.response, node_priors=run.priors)
+            run.mining = self._run_async(
+                run, miner.amine_from_atoms(atoms, run.response, node_priors=run.priors)
             )
         timing["mining"] = time.perf_counter() - t
 
+        self._checkpoint(run)
         run.emit("stage", stage="score", message="Running inference on the coherence MRF")
         coherence = self._score(run, run.priors, final=True)
         timing["scoring"] = coherence.pop("scoring_seconds")
@@ -740,7 +814,7 @@ class Engine:
                 f"then checking each claim against them{scorer}"
             )
         run.emit("stage", stage="factuality", message=message)
-        self._loop.run_until_complete(
+        self._run_async(run,
             pipeline.build(
                 has_atoms=True,
                 has_contexts=pasted,
@@ -752,6 +826,7 @@ class Engine:
                 rel_context_context=rel_cc,
             )
         )
+        self._checkpoint(run)
         if pipeline.fact_graph is None or not pipeline.relations:
             # No contexts / no relations: FactReasoner has nothing to infer over,
             # and every claim stays at its prior.
@@ -872,6 +947,36 @@ class Engine:
 def _base_name(tag: str) -> str:
     """An Ollama tag without its default ``:latest`` suffix (``kev:latest`` -> ``kev``)."""
     return tag[: -len(":latest")] if tag.endswith(":latest") else tag
+
+
+def _clean_claims(claims: list[Mapping[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """Validate client-sent claims: ``[{id, text, original?}]`` with unique ids.
+
+    Raises:
+        ValueError: On a malformed list (missing text, duplicate ids).
+    """
+    if not claims:
+        return None
+    out, seen = [], set()
+    for c in claims:
+        aid, text = str(c.get("id") or "").strip(), str(c.get("text") or "").strip()
+        if not aid or not text:
+            raise ValueError("Each reused claim needs an id and a text.")
+        if aid in seen:
+            raise ValueError(f"Duplicate claim id {aid!r}.")
+        seen.add(aid)
+        out.append({"id": aid, "text": text, "original": str(c.get("original") or text)})
+    return out
+
+
+def _atoms_from_claims(claims: list[dict[str, Any]]) -> dict[str, Atom]:
+    """Rebuild atoms, ids and originals intact, from reused claims."""
+    atoms = {}
+    for c in claims:
+        a = Atom(id=c["id"], text=c["text"])
+        a.set_original(c["original"])
+        atoms[c["id"]] = a
+    return atoms
 
 
 def _pasted_contexts(passages: list[str]):

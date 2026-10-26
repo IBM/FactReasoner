@@ -18,6 +18,8 @@
     response: "",
     mode: "factuality",  // factuality | coherence | both (as last run)
     whatIf: false,       // per-claim prior sliders opened after a coherence run
+    claimsFor: null,     // the response text S.claims were extracted from
+    forceExtract: false, // "Re-extract claims" pressed: ignore the kept claims
     claims: [],          // [{id, label, text, original, span}]
     fact: null,          // the factuality payload (engine._factuality_payload)
     priors: {},          // {id: coherence prior}
@@ -265,6 +267,7 @@
     showEditor();
     $("#response").value = e.response;
     $("#query").value = e.query || "";
+    syncReuse();
     // The Voyager pair ships evidence passages (used with "Paste evidence").
     if (e.evidence && e.evidence.length) {
       $("#evidence-text").value = e.evidence.join("\n\n");
@@ -294,6 +297,28 @@
     btn.hidden = !can;
     btn.textContent = S.whatIf ? "Reset priors to 0.5" : "What if? Edit claim priors";
     $("#whatif-hint").hidden = !(can && S.whatIf);
+  }
+
+  async function stopRun() {
+    if (!S.runId) return;
+    $("#stop").setAttribute("disabled", "");
+    setBusy(true, "Stopping…");
+    $("#stop").setAttribute("disabled", "");
+    try {
+      await fetch(`api/runs/${S.runId}/stop`, { method: "POST" });
+    } catch (e) {
+      setBusy(false); showError("Could not reach the server to stop the run.");
+    }
+    // The stream ends with a "stopped" event, which resets the buttons.
+  }
+
+  /* Tell the user when a run will reuse the claims on screen. */
+  function syncReuse() {
+    const response = ($("#response").value || "").trim();
+    const reuse = !S.forceExtract && S.claims.length > 0 && S.claimsFor === response;
+    $("#reuse-line").hidden = !reuse;
+    if (reuse) $("#reuse-text").textContent =
+      `The next run re-uses the ${S.claims.length} claims already extracted from this response.`;
   }
 
   function setSettingsOpen(open) {
@@ -326,15 +351,23 @@
       showError("Paste a response first, or pick an example.");
       return;
     }
+    // Same response, claims already extracted: run on exactly those claims.
+    const kept = !S.forceExtract && S.claimsFor === response && S.claims.length
+      ? S.claims.map((c) => ({ id: c.id, text: c.text, original: c.original }))
+      : null;
     stopStream();
     resetResults();
     S.response = response;
+    S.forceExtract = false;
     showError(null);
     setBusy(true, "Queued");
+    // Give the results the room; Show settings brings the panel back.
+    setSettingsOpen(false);
 
     const settings = readSettings();
     S.mode = settings.mode;
     const body = { response, query: $("#query").value || "", settings };
+    if (kept) body.claims = kept;
     if (settings.mode !== "coherence" && settings.evidence === "pasted") {
       body.evidence = $("#evidence-text").value || "";
     }
@@ -377,6 +410,8 @@
     });
     on("claims", (d) => {
       S.claims = d.claims;
+      S.claimsFor = S.response;
+      syncReuse();
       renderHighlighted(); renderClaims(); renderGraph(); renderFactuality();
     });
     on("factuality", (d) => {
@@ -397,6 +432,11 @@
       stopStream();
     });
     on("error", (d) => { setBusy(false); showError(d.message); stopStream(); });
+    on("stopped", (d) => {
+      setBusy(false, d.claims_kept ? "Stopped · claims kept" : "Stopped");
+      stopStream();
+      renderClaims(); renderFactuality(); renderScores();
+    });
     es.onerror = () => {
       if (S.source === es && es.readyState === EventSource.CLOSED) {
         setBusy(false); showError("Lost the connection to the server.");
@@ -454,6 +494,9 @@
     }
     $("#analyze").disabled = busy;
     if (busy) $("#analyze").setAttribute("disabled", ""); else $("#analyze").removeAttribute("disabled");
+    // Stop is offered exactly while a run is in flight.
+    $("#stop").hidden = !busy;
+    $("#stop").removeAttribute("disabled");
   }
 
   function showError(msg) {
@@ -1153,10 +1196,13 @@
   // ---------------------------------------------------------------- wiring
   function wire() {
     $("#analyze").addEventListener("click", analyze);
+    $("#stop").addEventListener("click", stopRun);
+    $("#reextract").addEventListener("click", () => { S.forceExtract = true; syncReuse(); });
+    $("#response").addEventListener("input", syncReuse);
     $("#edit").addEventListener("click", () => { stopStream(); setBusy(false); showEditor(); });
     $("#start-over").addEventListener("click", () => {
       stopStream(); setBusy(false); showError(null);
-      S.runId = null; S.response = ""; S.exampleId = null;
+      S.runId = null; S.response = ""; S.exampleId = null; S.claimsFor = null; S.forceExtract = false;
       $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
       showEditor(); resetResults();

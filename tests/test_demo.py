@@ -24,6 +24,7 @@ real FactReasoner inference behind the factuality view.
 
 import json
 import os
+import threading
 
 import pytest
 
@@ -475,3 +476,94 @@ class TestPipelineModels:
         # resolved only when a live miner is built; the stage message names it.
         stages = [e.get("message", "") for e in run.events if e["type"] == "stage"]
         assert any("deepseek-v3.2" in m for m in stages)
+
+
+class TestStopAndReuse:
+    """Stopping a run, and re-running on the claims already extracted."""
+
+    def test_reused_claims_skip_atomization(self, client, monkeypatch):
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        claims = [
+            {"id": "a0", "text": "Voyager 1 crossed the heliopause in August 2012.",
+             "original": "Voyager 1 crossed the heliopause in August 2012"},
+            {"id": "a1", "text": "Voyager 1 is in interstellar space.",
+             "original": "Voyager 1 is therefore in interstellar space"},
+        ]
+        rid = c.post("/api/analyze", json={
+            "response": ex["response"], "claims": claims,
+            "settings": {"mode": "factuality", "evidence": "pasted"},
+            "evidence": "\n\n".join(ex["evidence"]),
+        }).json()["run_id"]
+        events = _events(c, rid)
+        got = next(e for e in events if e["type"] == "claims")["claims"]
+        # Exactly the claims sent: ids, text and originals intact, nothing re-extracted.
+        assert [(g["id"], g["text"], g["original"]) for g in got] == \
+            [(x["id"], x["text"], x["original"]) for x in claims]
+        assert any("Reusing the 2 claims" in (e.get("message") or "") for e in events)
+        assert set(events[-1]["factuality"]["marginals"]) == {"a0", "a1"}
+
+    def test_malformed_reused_claims_rejected(self, client):
+        c, _ = client
+        r = c.post("/api/analyze", json={"response": "x.", "claims": [{"id": "a0", "text": ""}]})
+        assert r.status_code == 400
+        dup = [{"id": "a0", "text": "A."}, {"id": "a0", "text": "B."}]
+        assert c.post("/api/analyze", json={"response": "x.", "claims": dup}).status_code == 400
+
+    def test_stop_a_queued_run(self, monkeypatch):
+        """A run stopped before the worker reaches it ends with 'stopped'."""
+        examples = load_examples(DATA)
+        engine = Engine(models=load_models(MODELS), merlin_path=None, dry_run=True, replays=examples)
+        gate = threading.Event()
+        real = engine._analyze
+
+        def slow(run):  # hold the worker on the first run
+            gate.wait(10)
+            real(run)
+
+        monkeypatch.setattr(engine, "_analyze", slow)
+        try:
+            ex = examples[0]
+            first = engine.submit(ex["response"], settings=Settings.from_json({"mode": "coherence"}))
+            second = engine.submit(ex["response"], settings=Settings.from_json({"mode": "coherence"}))
+            assert engine.stop(second.id) is True
+            gate.set()
+            for run in (first, second):
+                with run.cond:
+                    run.cond.wait_for(lambda: run.done, timeout=30)
+            assert first.events[-1]["type"] == "result"
+            assert second.events[-1]["type"] == "stopped"
+            assert not any(e["type"] == "claims" for e in second.events)
+            assert engine.stop(second.id) is False  # already ended
+        finally:
+            engine.close()
+
+    def test_stop_during_mining_cancels_and_keeps_claims(self, monkeypatch):
+        """Mining runs as a task on the worker loop; stop() cancels it."""
+        import asyncio
+
+        engine = Engine(models=load_models(MODELS), merlin_path=None, dry_run=True)
+        started = threading.Event()
+
+        class Hang:
+            async def amine_from_atoms(self, *a, **k):
+                started.set()
+                await asyncio.sleep(60)
+
+        monkeypatch.setattr(engine, "_miner", lambda *a, **k: Hang())
+        try:
+            run = engine.submit("The bridge opened in 1932. It was closed for repairs in 1932.",
+                                settings=Settings.from_json({"mode": "coherence"}))
+            assert started.wait(30)
+            assert engine.stop(run.id) is True
+            with run.cond:
+                run.cond.wait_for(lambda: run.done, timeout=10)
+            last = run.events[-1]
+            assert last["type"] == "stopped" and last["claims_kept"] is True
+            assert any(e["type"] == "claims" for e in run.events)
+        finally:
+            engine.close()
+
+    def test_stop_endpoint(self, client):
+        c, _ = client
+        assert c.post("/api/runs/nope/stop").status_code == 404
