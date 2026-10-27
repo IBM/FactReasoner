@@ -107,6 +107,115 @@ Options: `--host`, `--port` (default 7860), `--models-file`, `--data-dir` (examp
 default `data/lcs`), `--ollama-host`, `--decision-model` (default `kev`). `MERLIN_PATH`
 can stand in for `--merlin-path`.
 
+## Running it on the VPC cluster
+
+The demo also runs on IBM's internal VPC OpenShift cluster, in the `factuality`
+namespace, with models from **RITS** and from an in-cluster **Ollama**. The files are in
+[`deploy/openshift/`](../../../deploy/openshift/); its
+[README](../../../deploy/openshift/README.md) has the full command reference,
+troubleshooting and cleanup.
+
+**What the namespace gives you, and what it doesn't:**
+
+| | |
+|---|---|
+| Quota | 8 CPU, 31 Gi memory, 20 pods |
+| GPU | **none**: Ollama runs on CPU |
+| Storage | block volumes (`ibmc-vpc-block-10iops-tier`, the default) |
+| Ingress | **not enabled**: no DNS name or certificate, so no URL such as `factuality.vpc-int.res.ibm.com`. The app is reached through a port-forward |
+| Outbound network | RITS, `github.ibm.com`, Wikipedia, Serper, the Ollama registry, PyPI, Hugging Face |
+
+**What runs there:**
+
+| Object | File | CPU / memory (request / limit) |
+|---|---|---|
+| Image build, in the cluster, into its registry | `Containerfile`, `buildconfig.yaml`, `build.sh` | 2 / 4 CPU, 6 / 10 Gi, while building |
+| Ollama 0.40.11 with a 30 Gi model volume | `ollama.yaml` | 4 / 6 CPU, 14 / 20 Gi |
+| Model pull: `granite4.1:3b`, `granite4.2:3b`, `kev` (~10 GB, once) | `ollama-pull.yaml` | small |
+| The demo: one replica | `app.yaml` | 1 / 2 CPU, 3 / 6 Gi |
+
+### Build and deploy
+
+You need the `oc` CLI and a login to the cluster. Docker or Podman is not needed: the
+image is built inside the cluster.
+
+```bash
+# 1. Log in: in the cluster console, your name -> Copy login command
+oc login --token=<token> --server=<api-url>
+oc project factuality
+
+# 2. Secrets (once). The keys stay in the cluster: never committed, never in the image.
+oc create secret generic factreasoner-keys \
+  --from-literal=RITS_API_KEY='<rits key>' --from-literal=SERPER_API_KEY='<serper key>'
+#    A read-only deploy key for github.ibm.com/generative-computing/mellea-ibm,
+#    used only while building (it installs the RITS backend).
+oc create secret generic github-ibm-ssh --from-file=ssh-privatekey=$HOME/.ssh/<deploy key>
+
+# 3. Ollama and its models (once)
+oc apply -f deploy/openshift/ollama.yaml
+oc apply -f deploy/openshift/ollama-pull.yaml
+oc logs -f job/ollama-pull
+
+# 4. Build the image, then deploy the demo
+oc apply -f deploy/openshift/buildconfig.yaml
+deploy/openshift/build.sh            # uploads ~1 MB of source, follows the build (~5-6 min)
+oc apply -f deploy/openshift/app.yaml
+oc rollout status deploy/factreasoner-demo
+```
+
+`build.sh` uploads only the files the image needs (the source, `data/lcs`, the RITS
+model list and the lock files), not the whole repository. The image builds Merlin
+from GitHub, installs the versions in `uv.lock` with PyTorch's CPU build in place of
+the CUDA one, and downloads the NLTK data and embedding models at build time.
+
+### Access
+
+```bash
+oc -n factuality port-forward svc/factreasoner-demo 7860:7860
+# then open http://localhost:7860
+```
+
+The port-forward is a tunnel from your machine, through the cluster's API, to the app.
+It works from the IBM network or VPN, only on the machine running it, and only while
+the command runs. Anyone with a login to the cluster can open their own. The app has
+no login of its own; access comes from cluster access.
+
+A shareable URL needs a route, which needs either:
+
+- **ingress enablement** for a name such as `factuality.vpc-int.ibm.com` (a DNS record
+  and a TLS certificate, from the platform team), or
+- a route on the cluster's built-in domain
+  (`*.etevpc-int-shared-us-east-739f796b6d72721f66077a2bfd5e12a6-0000.us-east.containers.appdomain.cloud`),
+  which already resolves and has a certificate. Confirm with the platform team that
+  routes on it are allowed and reachable only from the IBM network: it resolves to
+  IBM Cloud public addresses, so the app may need IBM SSO in front of it first.
+
+Either way, the route needs a long idle timeout (`haproxy.router.openshift.io/timeout:
+15m`): a run streams its progress over one long-lived connection, which the default
+timeout would cut off.
+
+### Updating, checking and timings
+
+- **After a code change**, run `deploy/openshift/build.sh` again. When the build
+  pushes the new image, the demo restarts on it by itself.
+- **Logs:** `oc -n factuality logs deploy/factreasoner-demo`; for the models Ollama has
+  loaded, `oc -n factuality exec deploy/ollama -- ollama ps`.
+- **Restarting the demo** (`oc -n factuality rollout restart deploy/factreasoner-demo`)
+  drops every run in memory, including one in progress. It is the only way to end a
+  run whose page has been closed.
+- **Measured run times** on this namespace:
+
+  | Run | Time |
+  |---|---|
+  | Any analysis on a Voyager example: gold claims and relations, no mining | under 1 s, plus NLI |
+  | Factuality, 5 claims × 3 passages, NLI on `kev` (Ollama, CPU) | ~1 min |
+  | Factuality, the same on RITS `granite-4-2-30b` | ~2.5 min |
+  | Coherence with real relation mining on `granite4.1:3b` (Ollama, CPU) | far too slow: ~13 s per call, many calls per claim pair |
+
+  So on this cluster, pick a **RITS model as the relation miner** for anything but the
+  Voyager examples. Ollama is fine for factuality: the `kev` pulled from Ollama's
+  registry is a CPU-friendly build (`Q4_K_M`).
+
 ## Using it
 
 - **Examples** sit above the editor. The two **Voyager 1** pills are teal and marked
@@ -252,3 +361,6 @@ text*: listed, but not highlighted.
 - `src/fact_reasoner/demo/static/`: the page (`index.html`, `style.css`, `app.js`)
 - `tests/test_demo.py`: offline tests, including the paper's numbers and the
   factuality → coherence hand-off end to end
+- `deploy/openshift/`: the image (`Containerfile`), the in-cluster build
+  (`buildconfig.yaml`, `build.sh`) and the deployments (`ollama.yaml`,
+  `ollama-pull.yaml`, `app.yaml`) for the VPC cluster; see its `README.md`
