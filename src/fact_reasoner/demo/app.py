@@ -241,6 +241,11 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
         except RuntimeError as e:
             raise HTTPException(500, str(e)) from e
 
+    @app.get("/healthz")
+    def healthz() -> dict[str, Any]:
+        """Liveness / readiness for a container platform: no model calls."""
+        return {"ok": True, "dry_run": engine.dry_run}
+
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
         """The page, with each asset tagged by its file's modification time.

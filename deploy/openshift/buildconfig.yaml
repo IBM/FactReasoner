@@ -1,0 +1,53 @@
+# Builds the demo image inside the cluster, into its own registry.
+#
+#   oc apply -f deploy/openshift/buildconfig.yaml
+#   deploy/openshift/build.sh            # uploads the build context, follows the build
+#
+# The source is a binary upload (no Git access needed); the Containerfile is
+# deploy/openshift/Containerfile. The `github-ibm-ssh` secret (a read-only
+# deploy key for mellea-ibm) is mounted only into the dependency install step.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: factreasoner-demo
+  namespace: factuality
+  labels: {app: factreasoner-demo}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: factreasoner-demo
+  namespace: factuality
+  labels: {app: factreasoner-demo}
+spec:
+  runPolicy: Serial
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: deploy/openshift/Containerfile
+      buildArgs: []
+      # Mounted read-only into every RUN step (buildah), never committed to
+      # a layer: the Containerfile reads /run/secrets/github-ibm/ssh-privatekey.
+      volumes:
+        - name: github-ibm
+          source:
+            type: Secret
+            secret:
+              secretName: github-ibm-ssh
+          mounts:
+            - destinationPath: /run/secrets/github-ibm
+  output:
+    to:
+      kind: ImageStreamTag
+      name: factreasoner-demo:latest
+  # Building torch + the dependency set needs room; the namespace quota is
+  # 8 CPU / 31Gi. ephemeral-storage is set explicitly: buildah writes every
+  # layer to the pod's local disk, and the namespace's 4Gi default limit is
+  # exhausted before the Python dependencies are installed.
+  resources:
+    requests: {cpu: "2", memory: 6Gi, ephemeral-storage: 8Gi}
+    limits: {cpu: "4", memory: 10Gi, ephemeral-storage: 25Gi}
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3

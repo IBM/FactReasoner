@@ -1,0 +1,80 @@
+# Ollama, CPU-only (the namespace has no GPU quota), for the demo's local models.
+#
+#   oc apply -f deploy/openshift/ollama.yaml
+#   oc apply -f deploy/openshift/ollama-pull.yaml   # once: pull the models
+#
+# The models live on a 30Gi block volume, so a restart does not re-download
+# them. One replica: the volume is ReadWriteOnce, and the demo sends one
+# request at a time anyway.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: factuality
+  labels: {app: ollama}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: ibmc-vpc-block-10iops-tier
+  resources:
+    requests:
+      storage: 30Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: factuality
+  labels: {app: ollama}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # the RWO volume cannot be attached twice
+  selector:
+    matchLabels: {app: ollama}
+  template:
+    metadata:
+      labels: {app: ollama}
+    spec:
+      containers:
+        - name: ollama
+          # >= 0.40.4: the kev decision model needs it.
+          image: docker.io/ollama/ollama:0.40.11
+          ports:
+            - {name: http, containerPort: 11434}
+          env:
+            - {name: OLLAMA_HOST, value: "0.0.0.0:11434"}
+            - {name: OLLAMA_MODELS, value: /models}
+            # Writable HOME for the arbitrary UID OpenShift assigns.
+            - {name: HOME, value: /models/home}
+            # Keep the models in memory between requests (a CPU reload is slow),
+            # and allow both (claims model + kev) to be resident at once.
+            - {name: OLLAMA_KEEP_ALIVE, value: "30m"}
+            - {name: OLLAMA_MAX_LOADED_MODELS, value: "2"}
+            - {name: OLLAMA_NUM_PARALLEL, value: "1"}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+          # The models are on the PVC, not the pod's local disk.
+          resources:
+            requests: {cpu: "4", memory: 14Gi, ephemeral-storage: 256Mi}
+            limits: {cpu: "6", memory: 20Gi, ephemeral-storage: 2Gi}
+          readinessProbe:
+            httpGet: {path: /api/version, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/version, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: factuality
+  labels: {app: ollama}
+spec:
+  selector: {app: ollama}
+  ports:
+    - {name: http, port: 11434, targetPort: http}

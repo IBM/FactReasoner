@@ -1,0 +1,67 @@
+# The FactReasoner demo (fact-reasoner-lcs-demo), live mode: RITS + in-cluster Ollama.
+#
+#   oc apply -f deploy/openshift/app.yaml
+#   oc -n factuality port-forward svc/factreasoner-demo 7860:7860   # http://localhost:7860
+#
+# Exactly one replica: runs live in the process's memory and one worker thread
+# serves them in turn, so a second replica would not see the first one's runs
+# (and the browser's event stream would break). Needs the `factreasoner-keys`
+# secret (RITS_API_KEY, SERPER_API_KEY); see README.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factreasoner-demo
+  namespace: factuality
+  labels: {app: factreasoner-demo}
+  annotations:
+    # Roll out a new image as soon as a build pushes it.
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"factreasoner-demo:latest"},
+        "fieldPath":"spec.template.spec.containers[?(@.name==\"demo\")].image"}]
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # never two at once (see above)
+  selector:
+    matchLabels: {app: factreasoner-demo}
+  template:
+    metadata:
+      labels: {app: factreasoner-demo}
+    spec:
+      containers:
+        - name: demo
+          # Rewritten by the image trigger above to the internal registry digest.
+          image: image-registry.openshift-image-registry.svc:5000/factuality/factreasoner-demo:latest
+          ports:
+            - {name: http, containerPort: 7860}
+          env:
+            - {name: OLLAMA_HOST, value: "http://ollama:11434"}
+          envFrom:
+            - secretRef:
+                name: factreasoner-keys
+          # ephemeral-storage: the search cache and temporary files; the
+          # namespace default (4Gi) is fine, but stated rather than implied.
+          resources:
+            requests: {cpu: "1", memory: 3Gi, ephemeral-storage: 1Gi}
+            limits: {cpu: "2", memory: 6Gi, ephemeral-storage: 4Gi}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+            failureThreshold: 36        # up to 3 min: torch + models load at import
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+            failureThreshold: 4
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factreasoner-demo
+  namespace: factuality
+  labels: {app: factreasoner-demo}
+spec:
+  selector: {app: factreasoner-demo}
+  ports:
+    - {name: http, port: 7860, targetPort: http}

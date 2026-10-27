@@ -435,6 +435,10 @@ class TestAPI:
         assert c.get("/api/runs/nope/events").status_code == 404
         assert c.post("/api/runs/nope/rescore", json={"priors": {}}).status_code == 404
 
+    def test_healthz(self, client):
+        c, _ = client
+        assert c.get("/healthz").json() == {"ok": True, "dry_run": True}
+
     def test_static_page_served(self, client):
         c, _ = client
         page = c.get("/").text
