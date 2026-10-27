@@ -107,6 +107,11 @@ body {
  * what the score tiles leave, so no space sits idle under it. */
 .results { grid-area: results; contain: size; min-height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
 .results .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+/* Headers, hints, score tiles and facts keep their natural height: in a short
+ * panel only the evidence list / graph gives way. (A flex item with an explicit
+ * min-height may otherwise shrink below its content, and a squashed header's
+ * rule then cuts through its own controls.) */
+.results .view > :not(.graph-wrap):not(.fact-body) { flex-shrink: 0; }
 .results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
 .results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
 .results .fact-body { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
@@ -179,8 +184,10 @@ body {
 #tab-coherence[selected] { --cds-border-interactive: var(--pipe-coh); }
 .result-tabs[hidden] { display: none !important; }
 
-.whatif-hint { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--cds-text-primary); background: var(--cds-layer-02); border-left: 3px solid var(--pipe-coh); }
-.whatif-hint.fact { border-left-color: var(--pipe-fact); }
+/* The prior switch's helper line: part of the scores header (no band, no rule
+ * between them), so the header reads as one block above the tiles. */
+.panel-head:has(+ .whatif-hint) { border-bottom: 0; padding-bottom: 4px; }
+.whatif-hint { margin: 0; padding: 0 16px 12px; font-size: 12px; line-height: 1.4; color: var(--cds-text-helper); border-bottom: 1px solid var(--cds-border-subtle-01); }
 .ev-prior { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--cds-text-secondary); }
 .ev-prior input[type=range] { flex: 1; max-width: 220px; accent-color: var(--pipe-fact); }
 .ev-prior .pnum { min-width: 34px; }
@@ -217,8 +224,13 @@ cds-slider { width: 100%; }
 .gold-mark { padding: 0 5px; border-radius: 999px; background: var(--gold-border); color: var(--cds-background); }
 .gold-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); vertical-align: 1px; }
 /* The always-visible prior switch in a scores header. */
-.prior-switch { display: flex; align-items: center; gap: 10px; }
+.prior-switch { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .prior-switch cds-content-switcher { width: 200px; }
+/* The selected option in the pipeline's accent, so which priors are in force
+ * is unmistakable (the quiet grey fill read as the unselected one). */
+#fact-prior-mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--pipe-fact); --cds-text-inverse: #fff; }
+#prior-mode cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--pipe-coh); --cds-text-inverse: #fff; }
+.prior-switch cds-content-switcher-item[disabled] { --cds-layer-selected-inverse: var(--cds-layer-selected-disabled); --cds-text-inverse: var(--cds-text-disabled); }
 .prior-switch .linklike { font-size: 12px; }
 .prior-switch .linklike:disabled { color: var(--cds-text-disabled); cursor: default; text-decoration: none; }
 .response-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
@@ -296,6 +308,8 @@ cds-slider { width: 100%; }
 /* ---------------- Results tabs ---------------- */
 .result-tabs { display: block; padding: 0 8px; border-bottom: 1px solid var(--cds-border-subtle-01); }
 .panel-head.sub-first { border-bottom: 1px solid var(--cds-border-subtle-01); }
+/* Two stacked headers share one rule, not a doubled 2px one. */
+.panel-head.sub-first + .panel-head.sub { border-top: 0; }
 .view[hidden] { display: none !important; }
 
 /* ---------------- Factuality evidence ---------------- */
@@ -367,13 +381,14 @@ cds-slider { width: 100%; }
 .score-meter span { display: block; height: 100%; width: 0; background: var(--cds-interactive); border-radius: 2px; transition: width 0.4s; }
 .score-note { margin-top: 8px; font-size: 12px; line-height: 1.35; color: var(--cds-text-helper); }
 .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px 16px; margin: 0; padding: 14px 16px 16px; border-top: 1px solid var(--cds-border-subtle-01); }
+.facts:empty { display: none; }  /* no run yet: no rule over nothing */
 .facts div { min-width: 0; }
 .facts dt { font-size: 12px; color: var(--cds-text-helper); }
 .facts dd { margin: 2px 0 0; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
 
 /* Carbon's content switcher selects in inverse ink; the demo uses the quieter
  * layer-selected fill so the graph, not the tab, carries the contrast. */
-cds-content-switcher:not(#mode) cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-layer-selected-01); --cds-text-inverse: var(--cds-text-primary); }
+cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-content-switcher-item[selected] { --cds-layer-selected-inverse: var(--cds-layer-selected-01); --cds-text-inverse: var(--cds-text-primary); }
 
 /* ---------------- Info panel (dark, floating) ---------------- */
 .info-panel {
