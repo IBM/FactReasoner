@@ -50,6 +50,10 @@ from fact_reasoner.demo.spans import align_claims, locate_evidence, split_senten
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data", "lcs")
 MODELS = os.path.join(ROOT, "configs", "rits_models.json")
+# Two distinct RITS models from the real inventory, for tests that need named
+# models on each pipeline. Taken from the file, not hard-coded, so the tests
+# follow the inventory when its models change.
+RITS_A, RITS_B = [m["name"] for m in load_models(MODELS)][:2]
 
 
 @pytest.fixture(scope="module")
@@ -496,6 +500,96 @@ class TestOllamaFactuality:
             engine.close()
 
 
+class TestNLIChoice:
+    """The factuality NLI is chosen separately from the factuality model."""
+
+    def _engine(self, monkeypatch, tags):
+        monkeypatch.setattr(
+            "fact_reasoner.demo.engine.list_ollama_models",
+            lambda host: [{"name": t, "model_id": t} for t in tags],
+        )
+        return Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                      ollama_host="http://box:11434", backend_factory=lambda kind, name: object())
+
+    def test_auto_follows_the_factuality_backend(self):
+        assert Settings.from_json({"fact_backend": "ollama"}).nli_kind() == "decision"
+        assert Settings.from_json({"fact_backend": "rits"}).nli_kind() == "model"
+
+    def test_rits_claims_with_kev_nli(self, monkeypatch):
+        from fact_reasoner.core.nli import DecisionNLIExtractor
+
+        engine = self._engine(monkeypatch, ["kev:latest"])
+        s = Settings.from_json({"fact_backend": "rits", "fact_model": RITS_A, "fact_nli": "decision"})
+        try:
+            nli = engine._nli_extractor(make_mock_backend("m"), s)
+            info = engine.nli_info(s)
+        finally:
+            engine.close()
+        assert isinstance(nli, DecisionNLIExtractor)
+        assert nli.backend.model_id == "kev" and nli.backend.host == "http://box:11434"
+        assert info == {"kind": "decision", "backend": "ollama", "model": "kev"}
+        assert s.claims_model == ("rits", RITS_A)  # claims stay on RITS
+
+    def test_rits_model_nli_uses_its_method(self, monkeypatch):
+        from fact_reasoner.core.nli import DecisionNLIExtractor, NLIExtractor
+
+        engine = self._engine(monkeypatch, [])
+        s = Settings.from_json({"fact_backend": "rits", "fact_model": RITS_A,
+                                "fact_nli": "model", "nli_method": "direct"})
+        try:
+            nli = engine._nli_extractor(make_mock_backend("m"), s)
+            info = engine.nli_info(s)
+        finally:
+            engine.close()
+        assert isinstance(nli, NLIExtractor) and not isinstance(nli, DecisionNLIExtractor)
+        assert nli.method == "direct"
+        assert info == {"kind": "model", "backend": "rits", "model": RITS_A}
+
+    def test_model_nli_refused_on_ollama(self):
+        with pytest.raises(ValueError, match="needs a RITS model"):
+            Settings.from_json({"fact_backend": "ollama", "fact_nli": "model"})
+
+    def test_unknown_choice_refused(self):
+        with pytest.raises(ValueError, match="Unknown fact_nli"):
+            Settings.from_json({"fact_nli": "both"})
+
+    def test_kev_nli_on_rits_refused_when_kev_missing(self, monkeypatch):
+        engine = self._engine(monkeypatch, ["granite4.2:3b"])
+        try:
+            with pytest.raises(ValueError, match="ollama pull kev"):
+                engine.submit("A claim.", settings=Settings.from_json(
+                    {"mode": "factuality", "fact_backend": "rits", "fact_model": RITS_A,
+                     "fact_nli": "decision", "evidence": "pasted"}), evidence_text="Some evidence.")
+            # The same RITS run with its own NLI needs no decision model.
+            run = engine.submit("A claim.", settings=Settings.from_json(
+                {"mode": "factuality", "fact_backend": "rits", "fact_model": RITS_A,
+                 "fact_nli": "model", "evidence": "pasted"}), evidence_text="Some evidence.")
+            assert run.id
+        finally:
+            engine.close()
+
+    def test_config_offers_the_choice(self, client):
+        c, _ = client
+        assert c.get("/api/config").json()["options"]["fact_nli"] == ["auto", "model", "decision"]
+
+    @pytest.mark.parametrize("choice", ["auto", "model", "decision"])
+    def test_offline_numbers_unchanged(self, client, choice):
+        """Offline, every choice runs the lexical stand-in: same marginals."""
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        rid = c.post("/api/analyze", json={
+            "response": ex["response"], "evidence": "\n\n".join(ex["evidence"]),
+            "settings": {"mode": "factuality", "evidence": "pasted",
+                         "fact_backend": "rits", "fact_nli": choice},
+        }).json()["run_id"]
+        last = _events(c, rid)[-1]
+        assert last["type"] == "result"
+        f = last["factuality"]
+        assert f["nli"]["model"] == "lexical stand-in"
+        TestNLIChoice._marginals = getattr(TestNLIChoice, "_marginals", None) or f["marginals"]
+        assert f["marginals"] == TestNLIChoice._marginals
+
+
 class TestPipelineModels:
     """Each pipeline runs on its own model; the miner on Ollama is verbalized."""
 
@@ -525,19 +619,19 @@ class TestPipelineModels:
         try:
             run = engine.submit(response, settings=Settings.from_json({
                 "mode": "both", "evidence": "pasted",
-                "fact_backend": "rits", "fact_model": "granite-4-2-30b",
-                "coh_backend": "rits", "coh_model": "deepseek-v3.2",
+                "fact_backend": "rits", "fact_model": RITS_A,
+                "coh_backend": "rits", "coh_model": RITS_B,
             }), evidence_text="The bridge opened in 1932.\n\nThe bridge closed in 1990.")
             with run.cond:
                 run.cond.wait_for(lambda: run.done, timeout=60)
         finally:
             engine.close()
         assert run.events[-1]["type"] == "result"
-        assert used[0] == ("rits", "granite-4-2-30b")   # claims
-        assert ("rits", "granite-4-2-30b") in used[1:]  # factuality
-        assert ("rits", "deepseek-v3.2") in used         # mining
+        assert used[0] == ("rits", RITS_A)   # claims
+        assert ("rits", RITS_A) in used[1:]  # factuality
+        assert ("rits", RITS_B) in used         # mining
         stages = [e.get("message", "") for e in run.events if e["type"] == "stage"]
-        assert any("deepseek-v3.2" in m for m in stages)
+        assert any(RITS_B in m for m in stages)
 
 
 class TestGoldExamples:
@@ -571,7 +665,7 @@ class TestGoldExamples:
         ex = _example(examples, "voyager-b")
         try:
             run = engine.submit(ex["response"], settings=Settings.from_json(
-                {"mode": "coherence", "coh_backend": "rits", "coh_model": "deepseek-v3.2"}))
+                {"mode": "coherence", "coh_backend": "rits", "coh_model": RITS_B}))
             events = self._wait(run)
         finally:
             engine.close()
@@ -598,14 +692,14 @@ class TestGoldExamples:
         try:
             run = engine.submit(ex["response"], settings=Settings.from_json(
                 {"mode": "factuality", "evidence": "pasted",
-                 "fact_backend": "rits", "fact_model": "granite-4-2-30b"}),
+                 "fact_backend": "rits", "fact_model": RITS_A}),
                 evidence_text="\n\n".join(ex["evidence"]))
             events = self._wait(run)
         finally:
             engine.close()
         assert events[-1]["type"] == "result", events[-1]
         assert ("atomize",) not in calls
-        assert ("backend", "granite-4-2-30b") in calls  # the NLI model
+        assert ("backend", RITS_A) in calls  # the NLI model
         assert nli == [sorted(a["id"] for a in voyager["atoms"])]
         assert set(events[-1]["factuality"]["marginals"]) == {a["id"] for a in voyager["atoms"]}
         assert events[-1]["gold"] == {"claims": True, "relations": False}
@@ -618,7 +712,7 @@ class TestGoldExamples:
             run = engine.submit(ex["response"] + " It still phones home.",
                                 settings=Settings.from_json({"mode": "coherence",
                                                              "coh_backend": "rits",
-                                                             "coh_model": "deepseek-v3.2"}))
+                                                             "coh_model": RITS_B}))
             self._wait(run)
         finally:
             engine.close()

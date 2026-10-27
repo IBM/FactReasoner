@@ -71,11 +71,17 @@ pipelines start on Ollama.
 | | RITS | Ollama |
 |---|---|---|
 | **Factuality model**: claims, reviser, summarizer | chosen model | chosen model |
-| **Factuality NLI** (claim ↔ evidence) | the same model, probability from token logprobs (or SIMBA-UQ / the direct prompt) | the **`kev` decision model** on the same server |
+| **Factuality NLI** (claim ↔ evidence) | by default the same model, probability from token logprobs (or SIMBA-UQ / the direct prompt); or `kev` on Ollama | the **`kev` decision model** on the same server |
 | **Relation miner** | chosen model; strength estimator selectable | chosen model; type confidence sampled (SIMBA-UQ), strength **always verbalized** |
 
 Claims are extracted once, by the factuality model, and both pipelines use them. In
 Coherence-only mode the relation miner's model extracts them.
+
+The NLI is chosen separately from the factuality model (the **NLI** field: *Same
+model* | *kev*). It defaults to the model's backend, as in the table, but a RITS model
+can extract, revise and summarize the claims while `kev` scores the NLI. *Same model*
+needs a RITS model: an Ollama chat model has no token probabilities. A pick you make
+is kept when you change the model, as long as it stays possible.
 
 `kev` answers each claim–passage question in one forward pass, with a probability for
 entailment, contradiction and neutral. That is much faster than prompting a small chat
@@ -213,8 +219,10 @@ timeout would cut off.
   | Coherence with real relation mining on `granite4.1:3b` (Ollama, CPU) | far too slow: ~13 s per call, many calls per claim pair |
 
   So on this cluster, pick a **RITS model as the relation miner** for anything but the
-  Voyager examples. Ollama is fine for factuality: the `kev` pulled from Ollama's
-  registry is a CPU-friendly build (`Q4_K_M`).
+  Voyager examples. For factuality, a RITS model for the claims with **NLI on `kev`**
+  combines the two: the RITS model's claim extraction, and NLI on `kev`, which was
+  faster here than NLI on RITS and judged the false Voyager claim better. The `kev`
+  pulled from Ollama's registry is a CPU-friendly build (`Q4_K_M`).
 
 ## Using it
 
@@ -303,7 +311,8 @@ preset shows *Custom*.
 |---|---|
 | **Factuality pipeline** | |
 | Model | Any Ollama or RITS model, for claim extraction, the reviser and the evidence summarizer. |
-| NLI | RITS: how the verdict gets a probability. Ollama: fixed to the `kev` decision model. |
+| NLI | *Same model* (RITS only) or *kev*, Ollama's decision model. Defaults to the model's backend. A tag shows where the NLI runs. |
+| NLI probability (Advanced) | With *Same model*: how the verdict gets a probability (token logprobs, the direct prompt, or SIMBA-UQ). Unused with *kev*. |
 | Evidence source | Google (Serper; needs `SERPER_API_KEY`), Wikipedia, or **Paste evidence**: one card per passage (*Add passage*, × to remove), each compared with every claim, at most 12. Pasting text with blank lines into a card splits it into cards. |
 | Passages per claim / claim–evidence pairs | Retrieval depth, and which claim–passage pairs get an NLI call (*Fast* compares a passage with the claim that retrieved it and its neighbours). Pasted evidence always uses all pairs. |
 | FactReasoner version | v1 per-claim contexts, v2 deduplicated contexts, v3 adds context–context relations. |
@@ -325,11 +334,12 @@ keeps a single user from saturating the shared RITS quota or a local GPU.
 |---|---|
 | `GET /api/config` | RITS and Ollama chat models, the decision model's status, option menus, defaults, examples. |
 | `GET /api/ollama/models` | Re-list the local Ollama models and the decision model's status. |
-| `POST /api/analyze` | `{response, query?, settings, priors?, evidence?, claims?}` → `{run_id}`. `settings.mode` is `factuality`, `coherence` or `both`. `claims` (`[{id, text, original}]`) reuses an earlier run's claims instead of extracting them. |
+| `POST /api/analyze` | `{response, query?, settings, priors?, evidence?, claims?}` → `{run_id}`. `settings.mode` is `factuality`, `coherence` or `both`. `settings.fact_nli` picks the factuality NLI: `auto` (default: follows the factuality model's backend), `model` (the factuality model itself; RITS only) or `decision` (Ollama's decision model). `claims` (`[{id, text, original}]`) reuses an earlier run's claims instead of extracting them. |
 | `POST /api/runs/{id}/rescore-factuality` | `{context_priors: {context id: prior}}` → factuality (and, in the chained mode, coherence) re-scored under the new evidence priors (no LLM calls). |
 | `POST /api/runs/{id}/stop` | Stop a queued or running analysis; its event stream ends with `stopped`. |
-| `GET /api/runs/{id}/events` | Server-sent events: `queued`, `stage`, `claims`, `factuality`, `priors`, `progress`, then `result` (`{factuality, coherence, timing}`), `stopped` or `error`. |
+| `GET /api/runs/{id}/events` | Server-sent events: `queued`, `stage`, `claims`, `factuality`, `priors`, `progress`, then `result` (`{factuality, coherence, timing}`), `stopped` or `error`. The factuality payload's `nli` (`{kind, backend, model}`) says which model scored the NLI. |
 | `POST /api/runs/{id}/rescore` | `{priors}` → coherence scores under new priors (no LLM calls). |
+| `GET /healthz` | `{ok, dry_run}`, for a container platform's probes (no model calls). |
 
 ## How the two stages share claims
 

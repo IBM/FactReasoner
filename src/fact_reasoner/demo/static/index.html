@@ -80,9 +80,11 @@
                 <cds-dropdown id="fact-model" class="model-pick" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
               </div>
               <div class="field">
-                <span class="field-label">NLI <span class="field-note">claim ↔ evidence</span></span>
-                <div class="fixed-value" id="fact-nli-ollama" hidden><span><span class="mono" data-decision>kev</span> decision model</span></div>
-                <div id="fact-nli-rits"><cds-dropdown id="nli_method" title-text="" aria-label="NLI probability" size="sm"></cds-dropdown></div>
+                <span class="field-label">NLI <span class="mp-tag" id="nli-backend-tag" hidden></span> <span class="field-note">claim ↔ evidence</span></span>
+                <cds-content-switcher id="fact-nli" size="sm" value="decision" aria-label="Factuality NLI scorer">
+                  <cds-content-switcher-item value="model">Same model</cds-content-switcher-item>
+                  <cds-content-switcher-item value="decision" selected><span class="mono" data-decision>kev</span></cds-content-switcher-item>
+                </cds-content-switcher>
               </div>
 
               <div class="field">
@@ -100,6 +102,10 @@
 
             </div>
             <div class="pipe-grid adv" id="adv-fact" hidden>
+              <div class="field" id="nli-method-wrap">
+                <span class="field-label">NLI probability <span class="field-note">same-model NLI</span></span>
+                <cds-dropdown id="nli_method" title-text="" aria-label="NLI probability" size="sm"></cds-dropdown>
+              </div>
               <div class="field">
                 <span class="field-label">FactReasoner version</span>
                 <cds-dropdown id="pipeline_version" title-text="" aria-label="FactReasoner version" size="sm"></cds-dropdown>

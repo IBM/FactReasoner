@@ -108,6 +108,13 @@ STOP_GRACE_SECONDS = 8.0
 #: The Ollama decision model that scores factuality NLI on the Ollama backend.
 DEFAULT_DECISION_MODEL = "kev"
 
+#: Which model scores the factuality NLI (claim <-> evidence): ``auto`` follows
+#: the factuality model's backend (Ollama -> the decision model, RITS -> the
+#: model itself); ``model`` is the factuality model itself (RITS only: an
+#: Ollama chat model has no logprobs); ``decision`` is Ollama's decision model
+#: whatever the factuality backend, e.g. RITS claims with kev NLI.
+FACT_NLI_CHOICES = ("auto", "model", "decision")
+
 
 @dataclass
 class Settings:
@@ -120,9 +127,10 @@ class Settings:
 
     mode: str = "factuality"
     # Factuality pipeline: the model behind its LLM components (claims, reviser,
-    # summarizer). NLI is the chat model on RITS, the decision model on Ollama.
+    # summarizer). The NLI scorer is chosen separately: see ``fact_nli``.
     fact_backend: str = "ollama"
     fact_model: str = "granite4.1:3b"
+    fact_nli: str = "auto"
     # Coherence pipeline: the relation miner's model.
     coh_backend: str = "ollama"
     coh_model: str = "granite4.1:3b"
@@ -173,12 +181,18 @@ class Settings:
             ("coh_backend", s.coh_backend, BACKENDS),
             ("prior_mode", s.prior_mode, PRIOR_MODES),
             ("evidence", s.evidence, EVIDENCE_SOURCES),
+            ("fact_nli", s.fact_nli, FACT_NLI_CHOICES),
         ):
             if value not in allowed:
                 raise ValueError(f"Unknown {name}: {value!r} (expected one of {list(allowed)})")
         unknown = [m for m in s.methods if m not in LCS_METHODS]
         if unknown:
             raise ValueError(f"Unknown readout(s): {unknown}")
+        if s.fact_nli == "model" and s.fact_backend == "ollama":
+            raise ValueError(
+                "NLI on the factuality model needs a RITS model: an Ollama chat model "
+                "has no token probabilities. Use the decision model for NLI instead."
+            )
         return s
 
     @property
@@ -201,10 +215,21 @@ class Settings:
             return self.fact_backend, self.fact_model
         return self.coh_backend, self.coh_model
 
-    def fact_nli_method(self) -> str:
-        """The RITS factuality NLI's probability method (``auto`` = logprobs).
+    def nli_kind(self) -> str:
+        """Which model scores the factuality NLI: ``"decision"`` or ``"model"``.
 
-        Unused on Ollama, where the NLI is the decision model.
+        Resolves ``fact_nli="auto"``: the decision model when the factuality
+        model is on Ollama, the factuality model itself on RITS.
+        """
+        if self.fact_nli == "auto":
+            return "decision" if self.fact_backend == "ollama" else "model"
+        return self.fact_nli
+
+    def fact_nli_method(self) -> str:
+        """The factuality model's NLI probability method (``auto`` = logprobs).
+
+        Used only when the factuality model itself scores the NLI
+        (``nli_kind() == "model"``); the decision model has no such choice.
         """
         return "logprobs" if self.nli_method == "auto" else self.nli_method
 
@@ -506,14 +531,13 @@ class Engine:
                 raise ValueError(f"Pick an Ollama model for the {pipe} pipeline.")
         if (
             settings.wants_factuality
-            and settings.fact_backend == "ollama"
+            and settings.nli_kind() == "decision"
             and not self.dry_run
             and not self.decision_status()["available"]
         ):
             raise ValueError(
-                f"Factuality on Ollama scores NLI with the '{self.decision_model}' "
-                f"decision model, which this server has not pulled "
-                f"(ollama pull {self.decision_model})."
+                f"Factuality NLI on the '{self.decision_model}' decision model needs "
+                f"it pulled on the Ollama server (ollama pull {self.decision_model})."
             )
         passages: list[str] = []
         if settings.wants_factuality:
@@ -926,9 +950,7 @@ class Engine:
             pipeline.contexts = _pasted_contexts(run.passages)
 
         rel_ac, rel_cc, dedup, per_atom = _FR_VERSIONS[s.pipeline_version]
-        scorer = (
-            f" with {self.decision_model}" if s.fact_backend == "ollama" else f" with {s.fact_model}"
-        )
+        scorer = f" with {self.nli_info(s)['model']}"
         if pasted:
             pairs = len(run.passages) * len(fr_atoms)
             message = (
@@ -969,7 +991,7 @@ class Engine:
             }
             for aid in pipeline.atoms:
                 marginals.setdefault(aid, 0.5)
-        return _factuality_payload(pipeline, results, marginals)
+        return {**_factuality_payload(pipeline, results, marginals), "nli": self.nli_info(s)}
 
     def _rescore_factuality(self, run: Run, context_priors: Mapping[str, float]) -> dict[str, Any]:
         """Rebuild the factuality MRF with new context priors and infer again.
@@ -1003,7 +1025,10 @@ class Engine:
             }
             for aid in pipeline.atoms:
                 marginals.setdefault(aid, 0.5)
-        out: dict[str, Any] = {"factuality": _factuality_payload(pipeline, results, marginals)}
+        out: dict[str, Any] = {
+            "factuality": {**_factuality_payload(pipeline, results, marginals),
+                           "nli": self.nli_info(run.settings)},
+        }
         # Coherence with factuality priors: the claim posteriors ARE the priors.
         if run.settings.mode == "both" and run.mining is not None:
             out["coherence"] = self._score(
@@ -1012,18 +1037,32 @@ class Engine:
             out["coherence"].pop("scoring_seconds", None)
         return out
 
+    def nli_info(self, s: Settings) -> dict[str, str]:
+        """Which model scores this run's factuality NLI: ``{kind, backend, model}``.
+
+        ``kind`` is ``"decision"`` (Ollama's decision model) or ``"model"`` (the
+        factuality model itself). Offline replay runs a lexical stand-in either
+        way, and says so.
+        """
+        if self.dry_run:
+            return {"kind": s.nli_kind(), "backend": "offline", "model": "lexical stand-in"}
+        if s.nli_kind() == "decision":
+            return {"kind": "decision", "backend": "ollama", "model": self.decision_model}
+        return {"kind": "model", "backend": s.fact_backend, "model": s.fact_model}
+
     def _nli_extractor(self, backend: Any, s: Settings):
         """The claim<->evidence NLI scorer for the factuality stage.
 
-        RITS: the chat model itself, with logprob (or sampled) probabilities.
-        Ollama: the decision model on the same server. It needs no Mellea
-        backend, so the chat model is not involved in this step at all.
+        The factuality model itself (RITS: logprob or sampled probabilities), or
+        Ollama's decision model, per ``s.nli_kind()``. The decision model needs
+        no Mellea backend, so the factuality model -- which may be on RITS --
+        still extracts, revises and summarizes the claims.
         """
         from fact_reasoner.core.nli import DecisionNLIExtractor, NLIExtractor
 
         if self.dry_run:
             return _lexical_nli(backend)
-        if s.fact_backend == "ollama":
+        if s.nli_kind() == "decision":
             return DecisionNLIExtractor(self.decision_model, host=self.ollama_host)
         return NLIExtractor(backend, nli_method=s.fact_nli_method())
 
@@ -1318,6 +1357,7 @@ __all__ = [
     "DEFAULT_DECISION_MODEL",
     "DEFAULT_METHODS",
     "EVIDENCE_SOURCES",
+    "FACT_NLI_CHOICES",
     "Engine",
     "PRIOR_MODES",
     "Run",

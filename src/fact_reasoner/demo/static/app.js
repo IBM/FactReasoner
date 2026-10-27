@@ -109,6 +109,7 @@
       mode: currentMode(),
       fact_backend: backendOf("fact"),
       fact_model: modelOf("fact"),
+      fact_nli: nliChoice(),
       coh_backend: backendOf("coh"),
       coh_model: modelOf("coh"),
       prior_mode: "flat",
@@ -331,11 +332,10 @@
     }
     const factOllama = backendOf("fact") === "ollama";
     const cohOllama = backendOf("coh") === "ollama";
-    $("#fact-nli-ollama").hidden = !factOllama;
-    $("#fact-nli-rits").hidden = factOllama;
+    syncNli();
     $("#strength-ollama").hidden = !cohOllama;
     $("#strength-rits").hidden = cohOllama;
-    const anyOllama = factOllama || cohOllama;
+    const anyOllama = factOllama || cohOllama || nliChoice() === "decision";
     $("#ollama-line").hidden = !anyOllama;
     $("#ollama-empty").hidden = !anyOllama || (S.ollama || []).length > 0;
   }
@@ -344,7 +344,48 @@
     const st = status || { model: "kev", available: false };
     S.decision = st;
     for (const n of document.querySelectorAll("[data-decision]")) n.textContent = st.model;
-    $("#decision-missing").hidden = !!st.available || S.config.dry_run;
+    syncNli();
+  }
+
+  /* The factuality NLI scorer: the factuality model itself ("model", RITS only:
+   * an Ollama chat model has no token probabilities) or Ollama's decision model
+   * ("decision", e.g. with a RITS model for the claims). It defaults to the
+   * selected model's backend, and keeps an explicit pick across model changes
+   * while that pick stays possible. */
+  const kevUsable = () => !!(S.decision && S.decision.available) || !!(S.config && S.config.dry_run);
+  function nliChoice() {
+    const v = $("#fact-nli").value;
+    return v === "model" || v === "decision" ? v : "decision";
+  }
+  function syncNli() {
+    if (!S.config) return;
+    const ollama = backendOf("fact") === "ollama";
+    const modelOk = !ollama;          // same-model NLI needs logprobs: RITS
+    const kevOk = kevUsable();
+    let v = S.nliPicked || (ollama ? "decision" : "model");
+    if (v === "model" && !modelOk) v = "decision";
+    if (v === "decision" && !kevOk && modelOk) v = "model";
+    setSwitcher("fact-nli", v);
+    const items = document.querySelectorAll("#fact-nli cds-content-switcher-item");
+    for (const it of items) {
+      const off = it.getAttribute("value") === "model" ? !modelOk : !kevOk;
+      it.disabled = off;
+      it.toggleAttribute("disabled", off);
+      it.title = it.getAttribute("value") === "model"
+        ? (modelOk ? "NLI on the factuality model itself (token probabilities)" : "An Ollama chat model has no token probabilities: NLI uses the decision model")
+        : (kevOk ? `NLI on the ${S.decision.model} decision model (Ollama)` : `The ${(S.decision || {}).model || "kev"} decision model is not pulled on the Ollama server`);
+    }
+    const tag = $("#nli-backend-tag");
+    const onKev = v === "decision";
+    tag.textContent = onKev ? "Ollama" : (ollama ? "Ollama" : "RITS");
+    tag.className = `mp-tag ${onKev || ollama ? "ollama" : "rits"}`;
+    tag.hidden = !modelValue("fact");
+    // The probability method applies to same-model NLI only.
+    const wrap = $("#nli-method-wrap");
+    wrap.classList.toggle("off", onKev);
+    wrap.title = onKev ? "Not used: the decision model returns its own probabilities" : "";
+    // kev missing only matters if nothing else can score the NLI.
+    $("#decision-missing").hidden = kevOk || modelOk || !S.config || S.config.dry_run;
   }
 
   async function refreshOllama() {
@@ -660,7 +701,11 @@
     on("queued", (d) => setBusy(true, d.position ? `Queued behind ${d.position} run(s)` : "Starting"));
     on("stage", (d) => {
       if (d.stage === "atomize") enterStage("atomize", d.source === "gold" ? "gold" : d.source === "reused" ? "reused" : "");
-      else if (d.stage === "factuality") enterStage("factuality");
+      else if (d.stage === "factuality") {
+        // The server's message ends "... NLI pairs with <model>": name it on the step.
+        const m = /NLI pairs with (\S+)$|against them with (\S+)$/.exec(d.message || "");
+        enterStage("factuality", S.config.dry_run || !m ? "" : (m[1] || m[2]));
+      }
       else if (d.stage === "mine") enterStage("mine", d.source === "gold" ? "gold" : "");
       else if (d.stage === "score") enterStage("score");
       if (!S.stopping) setBusy(true, d.message);
@@ -1148,6 +1193,7 @@
       ["evidence passages", (f.contexts || []).length],
       ["NLI links", (f.relations || []).length],
     ];
+    if (f.nli) facts.push(["NLI model", f.nli.backend === "offline" ? f.nli.model : `${f.nli.model} (${f.nli.backend === "ollama" ? "Ollama" : "RITS"})`]);
     if (st.llm_calls != null) facts.push(["NLI calls", st.llm_calls]);
     if (S.timing.factuality != null && !S.config.dry_run) facts.push(["time", `${fmt(S.timing.factuality, 1)} s`]);
     const edited = editedCtx();
@@ -1834,6 +1880,10 @@
     });
     $("#mode").addEventListener("cds-content-switcher-selected", syncMode);
     $("#fact-model").addEventListener("cds-dropdown-selected", syncBackend);
+    $("#fact-nli").addEventListener("cds-content-switcher-selected", (e) => {
+      S.nliPicked = e.detail.item.value;
+      syncBackend();
+    });
     $("#coh-model").addEventListener("cds-dropdown-selected", syncBackend);
     $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
