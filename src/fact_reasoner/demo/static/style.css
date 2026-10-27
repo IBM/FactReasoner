@@ -88,8 +88,15 @@ body {
   grid-template-areas: "settings settings" "response results";
   align-items: start;
 }
-/* The response and results panels share their row: both stretch to its height. */
-.response, .results { align-self: stretch; }
+/* The response and results panels: one fixed height, a viewport below the
+ * sticky header, the same for both so they always match. Both stay in view
+ * (sticky) while the page scrolls the settings away, and each scrolls inside
+ * itself: the claims list on the left, the view on the right. */
+.response, .results {
+  --panel-h: calc(100vh - 48px - 2 * var(--gutter));
+  height: var(--panel-h); position: sticky; top: calc(48px + var(--gutter));
+  align-self: start; display: flex; flex-direction: column; overflow: hidden;
+}
 /* The settings box is borderless: its header and the two cards are what show,
  * so a card's outer edge IS the column edge -- the same edge as the panel below. */
 .panel.settings {
@@ -101,21 +108,27 @@ body {
 .settings > .pipelines { grid-column: 1 / -1; }
 .settings > .ollama-host { grid-column: 1 / -1; }
 .response { grid-area: response; }
-/* The results panel never sizes the row itself (contain: size): the row is as
- * tall as the response panel, and at least one viewport, and both panels
- * stretch to exactly that height. Its content scrolls inside. The graph takes
- * what the score tiles leave, so no space sits idle under it. */
-.results { grid-area: results; contain: size; min-height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
+/* Left panel: the editors and the Analyze bar keep their height; the claims
+ * list takes the rest and scrolls, its "Claims (N)" heading staying above it.
+ * When the editors alone overflow the panel (a long response, many evidence
+ * passages), the whole body scrolls instead and the claims keep a usable
+ * minimum, so nothing is cut off. */
+.response > .panel-head { flex-shrink: 0; }
+.response > .response-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.response-body > :not(.claims) { flex-shrink: 0; }
+.response-body > .claims { flex: 1 1 auto; min-height: 180px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+/* The graph takes what the score tiles leave, so no space sits idle under it. */
+.results { grid-area: results; }
 .results .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 /* Headers, hints, score tiles and facts keep their natural height: in a short
  * panel only the evidence list / graph gives way. (A flex item with an explicit
  * min-height may otherwise shrink below its content, and a squashed header's
  * rule then cuts through its own controls.) */
 .results .view > :not(.graph-wrap):not(.fact-body) { flex-shrink: 0; }
-/* The relation graph grows with the panel, but no taller than the viewport
- * (less the tabs and the scores): a long claims list makes the panel tall, and
- * an uncapped canvas then became a narrow strip with the graph lost in it. */
-.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; }
+/* The relation graph is the body under the score tiles, as the evidence is in
+ * the factuality view: it fills what the tiles leave of the fixed-height panel. */
+.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
+.graph-wrap.coh-body { border-top: 1px solid var(--cds-border-subtle-01); }
 .results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
 .results .fact-body { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
 .results .evidence-list { flex: 1; max-height: none; }
@@ -273,7 +286,9 @@ cds-slider { width: 100%; }
   background: var(--cds-field-01);
   border: 1px solid var(--cds-border-subtle-01);
   border-bottom: 1px solid var(--cds-border-strong-01);
-  max-height: 420px; overflow: auto; white-space: pre-wrap;
+  /* Shares the fixed-height left panel with the claims list: a long response
+   * scrolls in its own box, so the claims keep room below it. */
+  max-height: clamp(120px, 24vh, 420px); overflow: auto; white-space: pre-wrap;
 }
 .highlighted .seg {
   background: var(--hl); border-radius: 3px; cursor: pointer;
@@ -546,7 +561,8 @@ cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-conte
 /* ---------------- Responsive ---------------- */
 @media (max-width: 1180px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "settings" "response" "results"; }
-  .results { contain: none; min-height: 0; height: auto; overflow: visible; }
+  .response, .results { height: auto; position: static; overflow: visible; }
+  .response > .response-body, .response-body > .claims { overflow: visible; min-height: 0; }
   .results .view > .graph-wrap > .graph, .results #fact-graph-wrap > .graph { height: 420px; flex: none; }
 }
 @media (max-width: 860px) {
