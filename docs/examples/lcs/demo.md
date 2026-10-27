@@ -187,7 +187,7 @@ preset shows *Custom*.
 | Preset | Changes from the defaults |
 |---|---|
 | Fast | 2 passages per claim, FactReasoner v1, windowed candidate pairs (radius 2), i-bound 4 |
-| Default | none: the paper's setup |
+| Default | none: the standard settings, balancing speed and recall |
 | Thorough | 5 passages, all claim–evidence pairs, v3 (context links), decontextualized claims, prompt v2 with evidence spans, i-bound 10 |
 
 | Setting | Effect |

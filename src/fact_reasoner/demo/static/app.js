@@ -129,7 +129,7 @@
   // ------------------------------------------------------------ presets
   /* A preset fills the run-time settings (mining, inference, retrieval); it
    * never touches the models, the evidence source or the readouts you picked.
-   * Default is the server's defaults (the paper's setup). */
+   * Default is the server's defaults. */
   const PRESET_KEYS = ["top_k", "nli_mode", "pipeline_version", "revise_atoms", "summarize_contexts",
     "prompt_variant", "sense_menu", "reconcile", "pair_policy", "window", "ibound",
     "concession_discount", "require_evidence", "strength_method"];
@@ -139,7 +139,7 @@
       values: { top_k: 2, nli_mode: "fast", pipeline_version: "v1", revise_atoms: false, summarize_contexts: false,
         pair_policy: "windowed", window: 2, ibound: 4 },
     },
-    default: { note: "The paper's setup.", values: {} },
+    default: { note: "Balanced speed and recall.", values: {} },
     thorough: {
       note: "More passages, all pairs, context links: slowest.",
       values: { top_k: 5, nli_mode: "all_pairs", pipeline_version: "v3", revise_atoms: true,
