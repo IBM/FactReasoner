@@ -395,6 +395,75 @@
     }
   }
 
+  // ------------------------------------------------------- evidence cards
+  /* Pasted evidence as a list of passage cards: add, remove, edit. The server
+   * still receives one blank-line-separated text (see split_passages), so the
+   * cards are only an editor over that format. */
+  const maxPassages = () => (S.config && S.config.max_passages) || 12;
+
+  function evidenceTexts() {
+    return [...document.querySelectorAll("#ev-cards textarea")].map((t) => t.value.trim()).filter(Boolean);
+  }
+
+  function setEvidence(texts) {
+    const ol = $("#ev-cards");
+    ol.innerHTML = "";
+    const list = texts.length ? texts : [""];
+    list.forEach((t) => ol.append(evidenceCard(t)));
+    syncEvidenceCards();
+  }
+
+  function evidenceCard(text) {
+    const ta = el("textarea", { class: "ev-text", rows: "2", placeholder: "Paste a source passage…", "aria-label": "Evidence passage" });
+    ta.value = text || "";
+    const grow = () => { ta.style.height = "auto"; ta.style.height = `${Math.min(ta.scrollHeight, 220)}px`; };
+    ta.addEventListener("input", () => { grow(); syncEvidenceCards(); });
+    // Pasting several paragraphs into one card splits them into cards.
+    ta.addEventListener("paste", (e) => {
+      const txt = (e.clipboardData || window.clipboardData).getData("text");
+      const parts = txt.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+      if (parts.length < 2) return;
+      e.preventDefault();
+      const li = ta.closest("li");
+      const before = ta.value.slice(0, ta.selectionStart), after = ta.value.slice(ta.selectionEnd);
+      ta.value = (before + parts[0]).trim();
+      let at = li;
+      parts.slice(1).forEach((p, i) => {
+        const card = evidenceCard(i === parts.length - 2 ? (p + after).trim() : p);
+        at.after(card); at = card;
+      });
+      grow(); syncEvidenceCards();
+    });
+    const remove = el("button", { type: "button", class: "ev-remove", "aria-label": "Remove passage", title: "Remove passage",
+      onclick: () => {
+        const li = remove.closest("li");
+        if (document.querySelectorAll("#ev-cards li").length > 1) li.remove(); else ta.value = "";
+        syncEvidenceCards();
+      } });
+    remove.innerHTML = '<svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M24 9.4 22.6 8 16 14.6 9.4 8 8 9.4l6.6 6.6L8 22.6 9.4 24l6.6-6.6 6.6 6.6 1.4-1.4-6.6-6.6z"/></svg>';
+    const li = el("li", { class: "ev-card" }, el("span", { class: "ev-num", "aria-hidden": "true" }), ta, remove);
+    requestAnimationFrame(grow);
+    return li;
+  }
+
+  function syncEvidenceCards() {
+    const cards = [...document.querySelectorAll("#ev-cards li")];
+    cards.forEach((li, i) => { li.querySelector(".ev-num").textContent = `P${i + 1}`; });
+    const n = evidenceTexts().length, max = maxPassages();
+    const count = $("#ev-count");
+    count.textContent = `${n} / ${max} passages`;
+    count.classList.toggle("over", n > max);
+    $("#ev-add").disabled = cards.length >= max;
+  }
+
+  function addEvidenceCard() {
+    if (document.querySelectorAll("#ev-cards li").length >= maxPassages()) return;
+    const card = evidenceCard("");
+    $("#ev-cards").append(card);
+    syncEvidenceCards();
+    card.querySelector("textarea").focus();
+  }
+
   function pickExample(e) {
     S.exampleId = e.id;
     for (const b of document.querySelectorAll("#examples button")) {
@@ -406,7 +475,7 @@
     syncReuse();
     // The Voyager pair ships evidence passages (used with "Paste evidence").
     if (e.evidence && e.evidence.length) {
-      $("#evidence-text").value = e.evidence.join("\n\n");
+      setEvidence(e.evidence);
       if (S.config.dry_run || $("#evidence").value === "pasted") {
         setDropdown("evidence", "pasted");
       }
@@ -546,7 +615,7 @@
     const body = { response, query: $("#query").value || "", settings };
     if (kept) body.claims = kept;
     if (settings.mode !== "coherence" && settings.evidence === "pasted") {
-      body.evidence = $("#evidence-text").value || "";
+      body.evidence = evidenceTexts().join("\n\n");
     }
     S.whatIf = false;
     S.customPriors = {};
@@ -1004,10 +1073,13 @@
     }
     if (!f) {
       box.innerHTML = "";
-      box.append(el("p", { class: "empty-note" },
-        S.mode === "coherence" && S.runId
-          ? "This run checked coherence only. Switch the mode to Factuality or Both to check claims against evidence."
-          : "Run an analysis in Factuality or Both mode to check each claim against evidence."));
+      box.append(S.mode === "coherence" && S.runId
+        ? el("p", { class: "empty-note" }, "This run checked coherence only. Choose Factuality, or Coherence with factuality priors, to check the claims against evidence.")
+        : emptyGuide("fact", "Check each claim against evidence",
+          "FactReasoner scores how well the evidence supports every claim in the response.",
+          [["Pick a response", "an example above, or paste your own."],
+           ["Choose the evidence", "Wikipedia or Google retrieval, or paste your own passages."],
+           ["Check factuality", "each claim gets a posterior, with the passages that support or contradict it."]]));
       setTile("factuality_score", null); setTile("supported", null); setTile("avg_prob", null);
       $("#fact-facts").innerHTML = "";
       renderFactGraph();
@@ -1239,13 +1311,25 @@
         container: $("#fact-graph"), style: factGraphStyle(), elements: [],
         wheelSensitivity: 0.25, minZoom: 0.3, maxZoom: 2.5, boxSelectionEnabled: false,
       });
-      fcy.on("mouseover", "node.claim", (e) => setActive(e.target.id()));
-      fcy.on("mouseout", "node.claim", () => setActive(null));
+      fcy.on("mouseover", "node.claim", (e) => {
+        const id = e.target.id();
+        setActive(id);
+        const p = S.fact && S.fact.marginals ? S.fact.marginals[id] : null;
+        const html = claimCard(id, [p != null ? `factuality posterior ${fmt(p)}` : null]);
+        if (html) showNodeCard(fcy, wrap, e.target, html);
+      });
+      fcy.on("mouseover", "node.ctx", (e) => {
+        const c = ((S.fact && S.fact.contexts) || []).find((x) => x.id === e.target.id());
+        if (!c) return;
+        const text = c.text.length > 260 ? c.text.slice(0, 257) + "…" : c.text;
+        showNodeCard(fcy, wrap, e.target, [el("strong", { class: "nc-title" }, c.title || c.id), text]);
+      });
+      fcy.on("mouseout", "node", () => { setActive(null); hideNodeCard(wrap); });
+      fcy.on("pan zoom", () => hideNodeCard(wrap));
       fcy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
     }
-    fcy.elements().remove();
     const f = S.fact;
-    if (!f) return;
+    if (!f) { fcy.elements().remove(); fcy.scratch("key", null); return; }
     const marg = f.marginals || {};
     const claims = S.claims.filter((c) => marg[c.id] != null);
     const used = new Set();
@@ -1263,8 +1347,17 @@
     claims.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
       classes: "claim" }));
     ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) }, classes: "ctx" }));
-    fcy.add(els.concat(edges));
-    placeFactGraph();
+    // Same graph (a what-if re-score): update the data in place, so the node
+    // colours ease to their new posteriors instead of the graph redrawing.
+    const key = els.map((e) => e.data.id).concat(edges.map((e) => e.data.id)).join("|");
+    if (fcy.scratch("key") === key) {
+      for (const e of els.concat(edges)) fcy.getElementById(e.data.id).data(e.data);
+    } else {
+      fcy.elements().remove();
+      fcy.add(els.concat(edges));
+      fcy.scratch("key", key);
+      placeFactGraph();
+    }
     paintFocus();
   }
 
@@ -1308,7 +1401,7 @@
       { selector: "node.claim", style: {
         "background-color": "data(color)", label: "data(label)", color: "#fff", width: 38, height: 38,
         "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 12, "font-weight": 600,
-        "text-valign": "center", "text-halign": "center",
+        "text-valign": "center", "text-halign": "center", ...COLOR_EASE,
       } },
       { selector: "node.ctx", style: {
         shape: "round-rectangle", width: 16, height: 16, "background-color": cssVar("--cds-border-strong-01"),
@@ -1319,8 +1412,7 @@
       { selector: "node.faded, edge.faded", style: { opacity: 0.2 } },
       { selector: "edge", style: {
         width: "data(w)", "line-color": "data(color)", "curve-style": "bezier", label: "data(plabel)",
-        "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 10, color: sub,
-        "text-background-color": cssVar("--cds-layer-01"), "text-background-opacity": 1, "text-background-padding": 2,
+        ...labelChip(), "font-size": 10,
       } },
       { selector: "edge.con", style: { "line-style": "dashed", "line-dash-pattern": [7, 4] } },
     ];
@@ -1367,6 +1459,54 @@
   // ---------------------------------------------------------------- graph
   let cy = null;
 
+  /* Re-scores recolour nodes in place; ease the change so it can be seen. */
+  const COLOR_EASE = {
+    "transition-property": "background-color, border-color", "transition-duration": "0.35s",
+    "transition-timing-function": "ease-out",
+  };
+
+  /* An edge's probability as a small rounded chip on the line, readable over
+   * dashed and dotted strokes. */
+  function labelChip() {
+    return {
+      "font-family": "IBM Plex Mono, Menlo, monospace", "font-weight": 500, color: cssVar("--cds-text-primary"),
+      "text-background-color": cssVar("--cds-layer-01"), "text-background-opacity": 1,
+      "text-background-shape": "round-rectangle", "text-background-padding": 3,
+      "text-border-color": cssVar("--cds-border-subtle-00"), "text-border-width": 1, "text-border-opacity": 1,
+    };
+  }
+
+  /* A hover card over a graph node, positioned in the graph's own box. */
+  function nodeCard(wrap) {
+    let card = wrap.querySelector(".node-card");
+    if (!card) { card = el("div", { class: "node-card", role: "tooltip" }); wrap.append(card); }
+    return card;
+  }
+  function showNodeCard(g, wrap, node, html) {
+    const card = nodeCard(wrap);
+    card.innerHTML = "";
+    card.append(...html);
+    const p = node.renderedPosition(), r = node.renderedOuterWidth() / 2;
+    const box = wrap.getBoundingClientRect(), gbox = g.container().getBoundingClientRect();
+    const x = p.x + (gbox.left - box.left), y = p.y + (gbox.top - box.top);
+    card.classList.add("on");
+    const w = card.offsetWidth, h = card.offsetHeight;
+    // Above the node, kept inside the wrap; below it when there is no room.
+    let left = Math.max(8, Math.min(x - w / 2, box.width - w - 8));
+    let top = y - r - h - 8;
+    if (top < 8) top = y + r + 8;
+    card.style.left = `${left}px`; card.style.top = `${top}px`;
+  }
+  function hideNodeCard(wrap) {
+    const card = wrap.querySelector(".node-card");
+    if (card) card.classList.remove("on");
+  }
+  function claimCard(id, lines) {
+    const c = S.claims.find((x) => x.id === id);
+    if (!c) return null;
+    return [el("b", {}, c.label), c.text, ...lines.filter(Boolean).map((t) => el("span", { class: "nc-meta" }, t))];
+  }
+
   function graphStyle() {
     const ink = cssVar("--cds-text-primary"), sub = cssVar("--cds-text-secondary");
     const surface = cssVar("--cds-layer-01");
@@ -1377,7 +1517,7 @@
         "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 13, "font-weight": 600,
         "text-valign": "center", "text-halign": "center",
         width: "data(size)", height: "data(size)", "border-width": 3, "border-color": "data(ring)",
-        "text-outline-width": 0,
+        "text-outline-width": 0, ...COLOR_EASE,
       } },
       { selector: "node.claim.pending", style: { "background-color": cssVar("--post-mid") } },
       { selector: "node.claim.active", style: { "border-color": ink, "border-width": 4, "z-index": 10 } },
@@ -1385,9 +1525,7 @@
       { selector: "edge", style: {
         width: "data(w)", "curve-style": "bezier", "line-color": "data(color)",
         "target-arrow-color": "data(color)", "arrow-scale": 1.1,
-        label: "data(plabel)", "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 11,
-        color: sub, "text-background-color": surface, "text-background-opacity": 1,
-        "text-background-padding": 2, "text-rotation": "autorotate",
+        label: "data(plabel)", ...labelChip(), "font-size": 11, "text-rotation": "autorotate",
         "control-point-step-size": 36,
       } },
       { selector: "edge.directed", style: { "target-arrow-shape": "triangle" } },
@@ -1492,8 +1630,15 @@
         container: box, style: graphStyle(), elements: [],
         wheelSensitivity: 0.25, minZoom: 0.3, maxZoom: 2.5, boxSelectionEnabled: false,
       });
-      cy.on("mouseover", "node.claim", (e) => setActive(e.target.id()));
-      cy.on("mouseout", "node.claim", () => setActive(null));
+      cy.on("mouseover", "node.claim", (e) => {
+        const id = e.target.id();
+        setActive(id);
+        const prior = S.priors[id], post = S.marginals[id];
+        const html = claimCard(id, [post != null ? `prior ${fmt(prior, 2)} → posterior ${fmt(post)}` : null]);
+        if (html) showNodeCard(cy, box.parentElement, e.target, html);
+      });
+      cy.on("mouseout", "node.claim", () => { setActive(null); hideNodeCard(box.parentElement); });
+      cy.on("pan zoom", () => hideNodeCard(box.parentElement));
       cy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
       cy.on("tap", "edge, node.factor", (e) => {
         const idx = e.target.data("idx");
@@ -1609,11 +1754,24 @@
   }
 
   // ---------------------------------------------------------------- scores
+  /* A view's empty state: what it shows and the three steps that fill it. */
+  function emptyGuide(kind, title, lead, steps) {
+    return el("div", { class: `empty-guide ${kind}` },
+      el("h4", {}, title), el("p", { class: "lead" }, lead),
+      el("ol", { class: "empty-steps" }, ...steps.map(([b, rest]) => el("li", {}, el("span", {}, el("b", {}, b), " — ", rest)))));
+  }
+
   function renderScores() {
     const asked = new Set(Object.keys(S.scores));
-    $("#graph-empty").textContent = S.runId && S.mode === "factuality"
-      ? "This run checked factuality only. Switch the mode to Coherence or Both to mine relations between claims."
-      : "The relation graph is drawn here once claims are extracted.";
+    const ge = $("#graph-empty");
+    ge.innerHTML = "";
+    ge.append(S.runId && S.mode === "factuality"
+      ? el("span", {}, "This run checked factuality only. Choose Coherence, or Coherence with factuality priors, to mine the relations between claims.")
+      : emptyGuide("coh", "See how the claims hang together",
+        "The relation miner links claims that entail or contradict one another; an MRF turns those links into coherence scores.",
+        [["Pick a response", "an example above, or paste your own."],
+         ["Analyze coherence", "the claims are extracted and every pair is classified."],
+         ["Read the graph", "red nodes are claims the response's own argument undermines."]]));
     $("#graph-empty").hidden = S.claims.length > 0 && S.mode !== "factuality";
     const tiles = document.querySelectorAll("#scores .score-tile");
     let shown = 0;
@@ -1644,6 +1802,8 @@
     }
     const dl = $("#facts");
     dl.innerHTML = "";
+    // Nothing to report before a coherence run: the footer stays empty (hidden).
+    if (!S.runId || S.mode === "factuality") return;
     for (const [k, v] of facts) dl.append(el("div", {}, el("dt", {}, k), el("dd", {}, String(v))));
   }
 
@@ -1667,7 +1827,7 @@
       S.runId = null; S.response = ""; S.exampleId = null; S.claimsFor = null; S.forceExtract = false;
       S.whatIf = false; S.customPriors = {}; S.basePriors = {}; S.factWhatIf = false; S.ctxPriors = {}; S.gold = false;
       S.stages = []; S.baseScores = null; renderStages();
-      $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
+      $("#response").value = ""; $("#query").value = ""; setEvidence([]);
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
       showEditor(); resetResults();
       $("#result-tabs").hidden = false;
@@ -1678,6 +1838,7 @@
     $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
     $("#toggle-advanced").addEventListener("click", () => setAdvanced(!S.advanced));
+    $("#ev-add").addEventListener("click", addEvidenceCard);
     $("#preset").addEventListener("cds-content-switcher-selected", (e) => applyPreset(e.detail.item.value));
     // Any edit to a preset-controlled setting re-checks which preset it matches.
     for (const k of PRESET_KEYS) {
@@ -1763,6 +1924,7 @@
     if (q.get("settings") === "hidden" || window.matchMedia("(max-width: 860px)").matches) {
       setSettingsOpen(false);
     }
+    setEvidence([]);
     syncMode();
     renderScores();
     renderFactuality();
@@ -1784,6 +1946,8 @@
       if (cy) cy.style(graphStyle());
     }
     if (q.get("view") === "mrf") S.view = "mrf";
+    // &qa=1: expose the graphs to screenshot / QA scripts (node positions).
+    if (q.get("qa") === "1") window.__qa = { cy: () => cy, fcy: () => fcy };
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
     if (q.get("factwhatif") === "1") {
       const wait = setInterval(() => { if (canFactWhatIf()) { clearInterval(wait); setFactWhatIf(true); } }, 100);

@@ -201,8 +201,19 @@
             <cds-textarea id="response" label="Long-form response" rows="9" placeholder="Paste a long-form response, or pick an example above."></cds-textarea>
             <div class="highlighted" id="highlighted" hidden tabindex="0" aria-label="Response with claim highlights"></div>
           </div>
-          <div id="evidence-wrap" hidden>
-            <cds-textarea id="evidence-text" label="Evidence passages" rows="6" helper-text="One passage per paragraph (separate with a blank line). Each passage is compared with every claim." placeholder="Paste the sources to check the response against."></cds-textarea>
+          <div id="evidence-wrap" class="ev-editor" hidden>
+            <div class="ev-editor-head">
+              <span class="cds--label" id="ev-editor-label">Evidence passages</span>
+              <span class="ev-count" id="ev-count" aria-live="polite"></span>
+            </div>
+            <ol class="ev-cards" id="ev-cards" aria-labelledby="ev-editor-label"></ol>
+            <div class="ev-editor-foot">
+              <button type="button" class="ev-add" id="ev-add">
+                <svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><!-- Carbon: add --><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
+                Add passage
+              </button>
+              <span class="ev-help">Each passage is compared with every claim. Pasting text with blank lines splits it into passages.</span>
+            </div>
           </div>
           <div class="analysis" role="group" aria-labelledby="analysis-label">
             <span class="field-label" id="analysis-label">Analysis</span>
@@ -290,7 +301,7 @@
           </div>
           <div class="fact-body">
             <div id="fact-evidence" class="evidence-list">
-              <p class="empty-note">Run an analysis in <b>Factuality</b> or <b>Both</b> mode to check each claim against evidence.</p>
+
             </div>
             <div id="fact-graph-wrap" class="graph-wrap" hidden>
               <div id="fact-graph" class="graph" role="img" aria-label="Claim to evidence graph"></div>
@@ -316,7 +327,7 @@
           </div>
           <div class="graph-wrap">
             <div id="graph" class="graph" role="img" aria-label="Relation graph between claims"></div>
-            <div class="graph-empty" id="graph-empty">The relation graph is drawn here once claims are extracted.</div>
+            <div class="graph-empty" id="graph-empty"></div>
             <div class="graph-legend" id="graph-legend">
               <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>entails</span>
               <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>

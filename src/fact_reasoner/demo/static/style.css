@@ -410,13 +410,58 @@ cds-slider { width: 100%; }
 .ev-none { font-size: 12px; color: var(--cds-text-helper); font-style: italic; padding-left: 40px; margin-top: 6px; }
 .sq { width: 10px; height: 10px; display: inline-block; border-radius: 2px; background: var(--cds-border-strong-01); }
 
+/* ---------------- Evidence editor: one card per passage ---------------- */
+.ev-editor { display: flex; flex-direction: column; gap: 8px; }
+.ev-editor-head { display: flex; align-items: baseline; justify-content: space-between; }
+.ev-editor-head .cds--label { margin: 0; font-size: 12px; color: var(--cds-text-secondary); }
+.ev-count { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--cds-text-helper); }
+.ev-count.over { color: var(--cds-support-error); font-weight: 600; }
+.ev-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Carbon text-area look on a layer-01 panel: field-02 fill, strong bottom
+ * rule, a 2px focus ring while editing. */
+.ev-card { display: grid; grid-template-columns: 30px minmax(0, 1fr) 32px; align-items: start; background: var(--cds-field-02); border-bottom: 1px solid var(--cds-border-strong-01); transition: background 0.1s; }
+.ev-card:hover { background: var(--cds-field-hover-02, var(--cds-layer-hover-02)); }
+.ev-card:focus-within { box-shadow: inset 0 0 0 2px var(--cds-focus); border-bottom-color: transparent; }
+.ev-num { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600; color: var(--pipe-fact); padding: 11px 0 0 10px; }
+.ev-text { font: inherit; font-size: 14px; line-height: 1.45; color: var(--cds-text-primary); background: transparent; border: 0; resize: none; padding: 9px 4px 9px 2px; min-height: 40px; outline: none; overflow-y: auto; }
+.ev-text::placeholder { color: var(--cds-text-placeholder); }
+.ev-remove { width: 32px; height: 32px; margin-top: 4px; border: 0; background: transparent; color: var(--cds-icon-secondary); cursor: pointer; display: grid; place-items: center; }
+.ev-remove:hover { background: var(--cds-layer-hover-01); color: var(--cds-icon-primary); }
+.ev-remove:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: -2px; }
+.ev-editor-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ev-add { font: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 8px; border: 0; background: transparent; color: var(--cds-link-primary); cursor: pointer; }
+.ev-add:hover { background: var(--cds-layer-hover-01); }
+.ev-add:disabled { color: var(--cds-text-disabled); cursor: default; background: transparent; }
+.ev-add:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: -2px; }
+.ev-help { font-size: 12px; color: var(--cds-text-helper); }
+
+/* ---------------- Empty states: how a view gets filled ---------------- */
+.empty-guide { margin: 0 auto; max-width: 420px; padding: 28px 20px; display: flex; flex-direction: column; gap: 14px; }
+.graph-empty .empty-guide { margin: auto; }  /* centred over the empty graph canvas */
+.empty-guide h4 { margin: 0; font-size: 14px; font-weight: 600; color: var(--cds-text-primary); }
+.empty-guide p.lead { margin: -6px 0 2px; font-size: 13px; line-height: 1.45; color: var(--cds-text-secondary); }
+.empty-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+.empty-steps li { counter-increment: step; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 13px; line-height: 1.45; color: var(--cds-text-secondary); }
+.empty-steps li::before { content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--accent, var(--cds-interactive)); border: 1px solid currentColor; }
+.empty-steps b { color: var(--cds-text-primary); font-weight: 600; }
+.empty-guide.fact { --accent: var(--pipe-fact); }
+.empty-guide.coh { --accent: var(--pipe-coh); }
+
 /* ---------------- Graph ---------------- */
 .graph-wrap { position: relative; }
 .graph { height: 400px; width: 100%; }
 .graph-empty {
   position: absolute; inset: 0 0 40px 0; display: grid; place-items: center;
-  font-size: 13px; color: var(--cds-text-helper); pointer-events: none; padding: 24px; text-align: center;
+  font-size: 13px; color: var(--cds-text-helper); pointer-events: none; padding: 24px; text-align: left;
+  background: var(--cds-layer-01);
 }
+
+/* Hover card over a graph node: the claim's (or passage's) text. */
+.node-card { position: absolute; z-index: 20; max-width: 300px; pointer-events: none; padding: 8px 10px; border-radius: 4px; font-size: 12px; line-height: 1.45; background: var(--cds-background-inverse); color: var(--cds-text-inverse); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); opacity: 0; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s; }
+.node-card.on { opacity: 1; transform: none; }
+.node-card b { font-family: "IBM Plex Mono", monospace; margin-right: 6px; }
+.node-card .nc-title { display: block; margin-bottom: 3px; font-weight: 600; }
+.node-card .nc-meta { display: block; margin-top: 4px; font-family: "IBM Plex Mono", monospace; font-size: 11px; opacity: 0.75; }
 .graph-legend {
   display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 16px 12px;
   font-size: 12px; color: var(--cds-text-secondary);

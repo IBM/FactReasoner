@@ -142,6 +142,11 @@ can stand in for `--merlin-path`.
   and it lights up everywhere. **Click a relation edge** to see the discourse sense,
   the coupling, `p = type confidence × strength`, and the miner's evidence quote
   (prompt v2), which is highlighted in the text.
+- **Hover a node** in either graph for its text: a claim with its prior → posterior
+  (or factuality posterior), a passage with its full text. Edge probabilities sit in
+  small chips on the lines, and node colours ease to their new values on a re-score.
+- **Before a run**, each results view explains what it shows and the three steps that
+  fill it.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
 - **Evidence priors: Default 0.9 | Custom.** This switch is always shown in the
@@ -190,7 +195,7 @@ preset shows *Custom*.
 | **Factuality pipeline** | |
 | Model | Any Ollama or RITS model, for claim extraction, the reviser and the evidence summarizer. |
 | NLI | RITS: how the verdict gets a probability. Ollama: fixed to the `kev` decision model. |
-| Evidence source | Google (Serper; needs `SERPER_API_KEY`), Wikipedia, or **Paste evidence**: one passage per paragraph, each compared with every claim (at most 12). |
+| Evidence source | Google (Serper; needs `SERPER_API_KEY`), Wikipedia, or **Paste evidence**: one card per passage (*Add passage*, × to remove), each compared with every claim, at most 12. Pasting text with blank lines into a card splits it into cards. |
 | Passages per claim / claim–evidence pairs | Retrieval depth, and which claim–passage pairs get an NLI call (*Fast* compares a passage with the claim that retrieved it and its neighbours). Pasted evidence always uses all pairs. |
 | FactReasoner version | v1 per-claim contexts, v2 deduplicated contexts, v3 adds context–context relations. |
 | Decontextualize / Summarize | Rewrite claims to stand alone; summarize each passage before NLI. Both run on the factuality model. |
