@@ -89,9 +89,9 @@ def resolve_model(name: str, specs: dict[str, ModelSpec]) -> ModelSpec:
 
     Raises:
         ValueError: If `name` is not in the inventory. Guessing is not attempted:
-            a near-miss like `gpt-oss-120b` for `gpt-oss-120b-a100` names an
-            endpoint that returns 404, and failing here costs nothing while
-            failing later costs a whole cell.
+            a near-miss (e.g. `gpt-oss-120b-a100` for `gpt-oss-120b`) could resolve
+            to the wrong model or an endpoint that returns 404, and failing here
+            costs nothing while failing later costs a whole cell.
     """
     if name not in specs:
         raise ValueError(

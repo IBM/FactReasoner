@@ -21,11 +21,21 @@ import os
 import pytest
 
 from fact_reasoner.env import (
+    DISABLE_VAR,
     find_dotenv,
     load_dotenv,
     parse_dotenv,
     require_env,
 )
+
+
+@pytest.fixture(autouse=True)
+def _dotenv_enabled(monkeypatch):
+    """These tests exercise loading itself, so undo conftest's suite-wide opt-out.
+
+    The opt-out tests below set the variable again themselves.
+    """
+    monkeypatch.delenv(DISABLE_VAR, raising=False)
 
 
 def test_parses_the_usual_conventions():
