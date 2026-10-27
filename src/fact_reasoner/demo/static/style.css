@@ -112,7 +112,10 @@ body {
  * min-height may otherwise shrink below its content, and a squashed header's
  * rule then cuts through its own controls.) */
 .results .view > :not(.graph-wrap):not(.fact-body) { flex-shrink: 0; }
-.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
+/* The relation graph grows with the panel, but no taller than the viewport
+ * (less the tabs and the scores): a long claims list makes the panel tall, and
+ * an uncapped canvas then became a narrow strip with the graph lost in it. */
+.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; }
 .results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
 .results .fact-body { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
 .results .evidence-list { flex: 1; max-height: none; }
@@ -409,6 +412,16 @@ cds-slider { width: 100%; }
 .ev-item.con .ev-rel { color: var(--con); }
 .ev-none { font-size: 12px; color: var(--cds-text-helper); font-style: italic; padding-left: 40px; margin-top: 6px; }
 .sq { width: 10px; height: 10px; display: inline-block; border-radius: 2px; background: var(--cds-border-strong-01); }
+.sq.neutral { opacity: 0.4; outline: 1px dashed var(--cds-border-strong-01); outline-offset: 0; }
+
+/* Passages NLI judged neutral for a claim: listed, collapsed, in grey. */
+.ev-note { margin: 0 0 4px; padding: 8px 12px; font-size: 13px; line-height: 1.45; color: var(--cds-text-primary); background: var(--cds-layer-02); border-left: 3px solid var(--cds-support-info, var(--cds-interactive)); }
+.ev-neutral { margin: 8px 0 0; padding-left: 40px; }
+.ev-neutral > summary { cursor: pointer; font-size: 12px; color: var(--cds-text-helper); width: fit-content; }
+.ev-neutral > summary:hover { color: var(--cds-text-secondary); }
+.ev-neutral .ev-items { padding-left: 0; }
+.ev-item.neu { border-left-color: var(--cds-border-subtle-00); }
+.ev-item.neu .ev-rel { color: var(--cds-text-helper); }
 
 /* ---------------- Evidence editor: one card per passage ---------------- */
 .ev-editor { display: flex; flex-direction: column; gap: 8px; }
@@ -546,7 +559,7 @@ cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-conte
   .pipe-grid { grid-auto-rows: auto; }
   .brand-sub, .brand-divider, .brand-title { display: none; }
   .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
-  .ev-items, .ev-none { padding-left: 0; }
+  .ev-items, .ev-none, .ev-neutral { padding-left: 0; }
   /* Settings header: title + Hide on one line, then the preset, then the rest. */
   .settings-head { row-gap: 8px; padding: 8px 8px 10px 12px; }
   .settings-head .panel-title { order: 0; }

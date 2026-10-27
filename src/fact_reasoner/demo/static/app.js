@@ -1155,10 +1155,19 @@
       (byClaim[claim] = byClaim[claim] || []).push({ ...r, ctx: ctx[other] });
     }
     box.innerHTML = "";
+    // NLI linked no passage to any claim: say so once, so a run whose evidence
+    // was all neutral does not look like a run that found no evidence.
+    if ((f.contexts || []).length && !(f.relations || []).length) {
+      box.append(el("p", { class: "ev-note" },
+        `None of the ${f.contexts.length} evidence passages supports or contradicts any claim, `
+        + "so every claim stays at its prior. The passages each claim was checked against are listed below."));
+    }
     const focus = activeIds();
     for (const c of S.claims) {
       if (marg[c.id] == null) continue;
       const items = (byClaim[c.id] || []).sort((a, b) => b.probability - a.probability);
+      const linked = new Set(items.map((it) => it.ctx.id));
+      const neutral = checkedAgainst(f, c.id).filter((x) => !linked.has(x.id));
       const p = marg[c.id];
       const badge = el("span", { class: "claim-id" }, c.label);
       badge.style.background = postColor(p);
@@ -1183,8 +1192,11 @@
         }
         card.append(ul);
       } else {
-        card.append(el("div", { class: "ev-none" }, "No passage supports or contradicts this claim; it stays near its prior."));
+        card.append(el("div", { class: "ev-none" }, neutral.length
+          ? `No passage supports or contradicts this claim; it stays near its prior.`
+          : "No passage was retrieved for this claim; it stays at its prior."));
       }
+      if (neutral.length) card.append(neutralList(neutral, !items.length));
       box.append(card);
     }
     const st = f.nli_stats || {};
@@ -1203,6 +1215,34 @@
     for (const [k, v] of facts) dl.append(el("div", {}, el("dt", {}, k), el("dd", {}, String(v))));
     renderFactGraph();
     syncFactWhatIf();
+  }
+
+  /* The passages a claim was checked against: the ones retrieved for it, or,
+   * for pasted evidence (retrieved for no claim), all of them. */
+  function checkedAgainst(f, claimId) {
+    return (f.contexts || []).filter((x) => {
+      const owners = x.atoms && x.atoms.length ? x.atoms : (x.atom ? [x.atom] : []);
+      return !owners.length || owners.includes(claimId);
+    });
+  }
+
+  /* A claim's passages judged neutral: collapsed behind a count, so they are
+   * there to check without crowding the passages that did decide the claim. */
+  function neutralList(passages, open) {
+    const d = el("details", { class: "ev-neutral" + (open ? "" : ""), onclick: (e) => e.stopPropagation() },
+      el("summary", {}, `${passages.length} neutral passage${passages.length === 1 ? "" : "s"}`));
+    if (open && passages.length <= 3) d.open = true;
+    const ul = el("ul", { class: "ev-items" });
+    for (const x of passages) {
+      const src = x.link
+        ? el("a", { href: x.link, target: "_blank", rel: "noopener" }, x.title || x.link)
+        : el("span", {}, x.title || x.id);
+      ul.append(el("li", { class: "ev-item neu" },
+        el("div", { class: "ev-src" }, el("span", { class: "ev-rel" }, "neutral"), src),
+        el("div", {}, x.text)));
+    }
+    d.append(ul);
+    return d;
   }
 
   /* A native range drawn like Carbon's slider: the part left of the thumb is
@@ -1388,11 +1428,14 @@
       edges.push({ group: "edges", data: { id: `fe${i}`, source: other, target: claim, w: 1 + 4 * r.probability,
         plabel: fmt(r.probability, 2).replace(/^0/, ""), color: cssVar(ent ? "--ent" : "--con") }, classes: ent ? "ent" : "con" });
     });
-    const ctxs = (f.contexts || []).filter((c) => used.has(c.id));
+    // Every passage is drawn: the linked ones, and -- faded, without an edge --
+    // those NLI judged neutral, so the graph shows all the evidence it saw.
+    const ctxs = (f.contexts || []).slice().sort((a, b) => (used.has(b.id) ? 1 : 0) - (used.has(a.id) ? 1 : 0));
     const els = [];
     claims.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
       classes: "claim" }));
-    ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) }, classes: "ctx" }));
+    ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) },
+      classes: "ctx" + (used.has(c.id) ? "" : " neutral") }));
     // Same graph (a what-if re-score): update the data in place, so the node
     // colours ease to their new posteriors instead of the graph redrawing.
     const key = els.map((e) => e.data.id).concat(edges.map((e) => e.data.id)).join("|");
@@ -1455,6 +1498,8 @@
         "text-halign": "right", "text-valign": "center", "text-margin-x": 6,
       } },
       { selector: "node.claim.active", style: { "border-width": 4, "border-color": ink } },
+      // A passage NLI judged neutral for every claim: shown, but quiet.
+      { selector: "node.ctx.neutral", style: { "background-opacity": 0.35, color: cssVar("--cds-text-helper"), "border-width": 1, "border-style": "dashed", "border-color": cssVar("--cds-border-strong-01") } },
       { selector: "node.faded, edge.faded", style: { opacity: 0.2 } },
       { selector: "edge", style: {
         width: "data(w)", "line-color": "data(color)", "curve-style": "bezier", label: "data(plabel)",
@@ -1493,7 +1538,7 @@
     const ro = new ResizeObserver(() => {
       if (cy && !$("#view-coherence").hidden) {
         cy.resize();
-        if (S.claims.length && S.claims.length <= 12 && S.view !== "mrf") cy.layout(layoutOptions()).run();
+        if (S.claims.length && S.view !== "mrf") cy.layout(layoutOptions()).run();
         fitGraph(cy, 32);
       }
       if (fcy && !$("#fact-graph-wrap").hidden) placeFactGraph();
@@ -1579,6 +1624,14 @@
       { selector: "edge.eqv", style: { "line-style": "dotted" } },
       { selector: "edge.exc", style: { "line-style": "dashed", "line-dash-pattern": [10, 3, 2, 3] } },
       { selector: "edge.active", style: { width: "mapData(p, 0, 1, 4, 9)", "z-index": 10, color: ink } },
+      // Dense graphs: bow chords outward, drop most labels, fade weak edges.
+      { selector: "edge[bow != 0]", style: { "curve-style": "unbundled-bezier", "control-point-distances": "data(bow)", "control-point-weights": 0.5 } },
+      { selector: "edge.quiet", style: { label: "" } },
+      { selector: "edge.quiet.active, edge.quiet.hover, edge.quiet.focus", style: { label: "data(plabel)" } },
+      { selector: "edge.weak", style: { opacity: 0.35, "z-index": 0 } },
+      { selector: "edge.weak.active, edge.weak.hover, edge.weak.focus", style: { opacity: 1, "z-index": 10 } },
+      { selector: "edge.focus", style: { "z-index": 10 } },
+      { selector: "edge.faded", style: { opacity: 0.12 } },   // after .weak: unrelated edges recede further
       // MRF view
       { selector: "node.factor", style: {
         shape: "rectangle", width: 12, height: 12, "background-color": ink, label: "",
@@ -1615,16 +1668,33 @@
       });
     }
     if (S.view === "graph") {
+      // A dense graph labels only its strongest relations (the rest on hover
+      // or selection), and fades the weakest, so the strong structure reads.
+      // Ranked, not thresholded, so ties (e.g. many relations at one
+      // probability) still label only the top few and fade only the tail.
+      const dense = S.relations.length > Math.max(12, 1.5 * S.claims.length);
+      const rank = new Map(S.relations.map((r, i) => [i, r.probability])
+        .sort((x, y) => y[1] - x[1] || x[0] - y[0]).map(([i], k) => [i, k]));
+      const nLabel = dense ? Math.max(7, S.claims.length) : Infinity;
+      const nStrong = dense ? Math.ceil(S.relations.length * 0.4) : Infinity;
+      const n = S.claims.length;
       S.relations.forEach((r, i) => {
         const k = (COUPLING[r.level1_type] || COUPLING.entailment).cls;
+        // Bow each chord away from the centre by how far apart its ends are
+        // around the circle: neighbours get a straight line, long chords a
+        // curve, so they do not all cross at the middle.
+        const a = order(r.source_id), b = order(r.target_id);
+        const gap = Math.min(Math.abs(a - b), n - Math.abs(a - b));
+        const bow = n > 6 && gap > 1 ? Math.min(80, 14 * (gap - 1)) * (((a - b + n) % n) < n / 2 ? 1 : -1) : 0;
         els.push({
           group: "edges",
           data: {
             id: `r${i}`, idx: i, source: r.source_id, target: r.target_id, p: r.probability,
             w: 1.5 + 5 * r.probability, plabel: fmt(r.probability, 2).replace(/^0/, ""),
-            color: cssVar(`--${k}`),
+            color: cssVar(`--${k}`), bow,
           },
-          classes: [k, r.directed && k !== "eqv" ? "directed" : ""].join(" "),
+          classes: [k, r.directed && k !== "eqv" ? "directed" : "",
+            rank.get(i) < nLabel ? "" : "quiet", rank.get(i) < nStrong ? "" : "weak"].join(" "),
         });
       });
     } else {
@@ -1643,26 +1713,41 @@
     return els;
   }
 
-  /* Claims sit on a circle in reading order, clockwise from the top, so no edge
-   * passes behind a node and the response's order stays legible. Past a dozen
-   * claims (and for the denser factor graph) a force layout takes over. */
+  /* Claims sit on a circle in reading order, clockwise from the top, at every
+   * size: the order of the text stays legible, and no edge passes behind a
+   * node. Dense graphs stay readable through how edges are drawn (curved,
+   * faded by strength, labelled sparingly; see graphElements), not by moving
+   * nodes out of order. Only the MRF view, with its factor nodes, uses a force
+   * layout. */
   function layoutOptions() {
-    const n = S.claims.length;
-    if (n > 12 || S.view === "mrf") {
+    if (S.view === "mrf") {
       return {
-        name: "cose", animate: false, randomize: false, padding: 28, fit: false,
-        nodeRepulsion: () => (S.view === "mrf" ? 6000 : 12000),
-        idealEdgeLength: () => (S.view === "mrf" ? 36 : 100),
+        name: "cose", animate: false, randomize: true, padding: 28, fit: false,
+        nodeRepulsion: () => 6000, idealEdgeLength: () => 36,
       };
     }
-    return {
-      name: "circle", padding: 36, fit: false, clockwise: true,
-      startAngle: -Math.PI / 2, sort: (a, b) => order(a.id()) - order(b.id()),
-      // Size the circle to the canvas: it fills ~70% of the shorter side, so
-      // a small graph uses the space instead of floating in it.
-      radius: Math.max(90, Math.min(cy ? Math.min(cy.width(), cy.height()) * 0.36 : 160, 60 + n * 32)),
-    };
+    return { name: "preset", fit: false, positions: circlePositions() };
   }
+
+  /* Positions on a circle sized to the canvas (its shorter side, leaving room
+   * for the nodes), and never so small that neighbours touch: the arc between
+   * two claims is at least ~1.9 node diameters. */
+  function circlePositions() {
+    const n = S.claims.length;
+    const W = cy ? cy.width() : 600, H = cy ? cy.height() : 500;
+    const node = 42, pad = 36;
+    const fits = Math.max(80, Math.min(W, H) / 2 - node / 2 - pad);
+    const spaced = (n * node * 1.9) / (2 * Math.PI);
+    const r = n <= 1 ? 0 : Math.max(spaced, Math.min(fits, 60 + n * 30));
+    const cx = W / 2, cyy = H / 2;
+    const pos = {};
+    S.claims.forEach((c, i) => {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(1, n);
+      pos[c.id] = { x: cx + r * Math.cos(a), y: cyy + r * Math.sin(a) };
+    });
+    return (node) => pos[node.id()];
+  }
+
   function order(id) {
     return S.claims.findIndex((c) => c.id === id);
   }
@@ -1691,15 +1776,27 @@
         if (idx != null) selectEdge(idx);
       });
       cy.on("tap", (e) => { if (e.target === cy) { selectEdge(null); setActive(null, true); } });
+      // A dense graph hides most edge labels: show one while it is hovered.
+      cy.on("mouseover", "edge", (e) => e.target.addClass("hover"));
+      cy.on("mouseout", "edge", (e) => e.target.removeClass("hover"));
     }
-    const sameNodes = cy.nodes("node.claim").length === S.claims.length && cy.scratch("view") === S.view
-      && cy.scratch("relcount") === S.relations.length;
-    if (sameNodes) {
-      // Re-score: update colours in place, keep the user's layout.
+    const sameNodes = cy.nodes("node.claim").length === S.claims.length && cy.scratch("view") === S.view;
+    const sameEdges = sameNodes && cy.scratch("relcount") === S.relations.length;
+    if (sameEdges) {
+      // Re-score: update colours in place, keep the layout.
       for (const ele of graphElements()) {
         const c = cy.getElementById(ele.data.id);
         if (c.nonempty()) { c.data(ele.data); c.classes(ele.classes); }
       }
+    } else if (sameNodes && S.view === "graph") {
+      // The relations arrived for claims already on screen: add the edges and
+      // keep every node where it is, so the graph does not jump.
+      const keep = Object.fromEntries(cy.nodes("node.claim").map((n) => [n.id(), { ...n.position() }]));
+      cy.elements().remove();
+      cy.add(graphElements());
+      cy.nodes("node.claim").forEach((n) => { if (keep[n.id()]) n.position(keep[n.id()]); });
+      cy.scratch("relcount", S.relations.length);
+      fitGraph(cy, 32);
     } else {
       cy.elements().remove();
       cy.add(graphElements());
@@ -1724,7 +1821,7 @@
       }
     }
     if (!cy) return;
-    cy.elements().removeClass("active faded");
+    cy.elements().removeClass("active faded focus");
     if (!focus.size && S.activeEdge == null) return;
     if (S.activeEdge != null) {
       const idx = S.activeEdge;
@@ -1736,6 +1833,9 @@
     }
     const nodes = cy.nodes().filter((n) => focus.has(n.id()));
     nodes.addClass("active");
+    // A focused claim's relations come forward in full, label and all, even
+    // when a dense graph has faded or unlabelled them.
+    if (S.view === "graph") nodes.connectedEdges().addClass("focus");
     let keep = nodes.union(nodes.connectedEdges());
     if (S.view === "mrf") keep = keep.union(nodes.neighborhood());
     keep = keep.union(keep.connectedNodes());
@@ -1944,6 +2044,30 @@
     document.body.classList.toggle("cds--g10", !dark);
   }
 
+  /* Carbon's content switcher (web-components 2.64) throws on every hover
+   * while its LAST item is selected: _handleHover hides the divider after the
+   * selected item via `this._getNextItem(selected, 1).hideDivider = true`, and
+   * for the last item _getNextItem returns null. Here that is the default NLI
+   * choice (kev), and any switcher set to its last option (Custom priors,
+   * FactGraph, MRF, Thorough, the chained mode). During a hover only, return a
+   * throwaway object for "no next item", so that line is a no-op; keyboard
+   * navigation, which checks for null, keeps the original behaviour. */
+  function patchContentSwitcherHover() {
+    const Switcher = customElements.get("cds-content-switcher");
+    const proto = Switcher && Switcher.prototype;
+    if (!proto || proto.__hoverPatched || typeof proto._handleHover !== "function") return;
+    const handleHover = proto._handleHover, getNext = proto._getNextItem;
+    proto._handleHover = function (event) {
+      this.__inHover = true;
+      try { return handleHover.call(this, event); } finally { this.__inHover = false; }
+    };
+    proto._getNextItem = function (item, direction) {
+      const next = getNext.call(this, item, direction);
+      return next == null && this.__inHover ? {} : next;
+    };
+    proto.__hoverPatched = true;
+  }
+
   async function init() {
     initTheme();
     wire();
@@ -1954,6 +2078,7 @@
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("carbon")), 20000));
     try {
       await Promise.race([ready, timeout]);
+      patchContentSwitcherHover();
     } catch (e) {
       // The Carbon bundle comes from a CDN; say so rather than leave a dead page.
       document.body.prepend(el("div", { class: "load-error", role: "alert" },

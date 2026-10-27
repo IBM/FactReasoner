@@ -1199,6 +1199,14 @@ def _pasted_contexts(passages: list[str]):
 
 def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: dict[str, float]):
     """What the factuality view needs: scores, evidence, and the NLI edges."""
+    # Every claim a passage was retrieved for. After deduplication one passage
+    # can serve several claims (each atom keeps a reference to the survivor),
+    # while ``context.atom`` names only one of them. Pasted passages belong to
+    # no claim and are checked against all of them.
+    retrieved_for: dict[str, list[str]] = {}
+    for aid, atom in (pipeline.atoms or {}).items():
+        for cid in getattr(atom, "contexts", None) or {}:
+            retrieved_for.setdefault(cid, []).append(aid)
     contexts = []
     for cid, c in pipeline.contexts.items():
         contexts.append(
@@ -1208,6 +1216,7 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
                 "link": c.get_link() or "",
                 "text": (c.get_snippet() or c.text or "")[:600],
                 "atom": getattr(c.atom, "id", None),
+                "atoms": retrieved_for.get(cid, []),
                 "prior": float(c.get_probability()),
             }
         )
@@ -1239,7 +1248,9 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
             "summary": summary,
             "contexts": contexts,
             "relations": relations,
-            "nli_stats": results.get("nli_stats"),
+            # From the pipeline, not ``results``: with no relation found the
+            # demo skips score(), which is what copies them into the results.
+            "nli_stats": results.get("nli_stats") or getattr(pipeline, "nli_stats", None) or None,
         }
     )
 
