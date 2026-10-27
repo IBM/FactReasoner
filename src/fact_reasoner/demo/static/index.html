@@ -217,7 +217,7 @@
           <cds-inline-notification id="error" kind="error" title="Analysis failed" hide-close-button hidden></cds-inline-notification>
 
           <div class="claims-head">
-            <h3 class="section-title">Claims <span class="count" id="claim-count"></span></h3>
+            <h3 class="section-title">Claims <span class="count" id="claim-count"></span> <span class="gold-tag" id="claims-gold" title="The example's gold claims and relations, loaded rather than extracted and mined" hidden>gold</span></h3>
             <div class="legend-inline" id="claims-legend"></div>
           </div>
           <ol class="claims" id="claims">
@@ -244,9 +244,16 @@
           </div>
           <div class="panel-head sub">
             <h2 class="panel-title">Factuality scores</h2>
-            <cds-button id="fact-what-if" kind="tertiary" size="sm" hidden>What if? Edit evidence priors</cds-button>
+            <div class="prior-switch" role="group" aria-labelledby="fact-prior-label">
+              <span class="field-label" id="fact-prior-label">Evidence priors</span>
+              <cds-content-switcher id="fact-prior-mode" size="sm" value="default" aria-label="Evidence priors">
+                <cds-content-switcher-item value="default" selected>Default 0.9</cds-content-switcher-item>
+                <cds-content-switcher-item value="custom">Custom</cds-content-switcher-item>
+              </cds-content-switcher>
+              <button type="button" class="linklike" id="fact-prior-reset" disabled>Reset</button>
+            </div>
           </div>
-          <p class="whatif-hint fact" id="fact-whatif-hint" hidden>Each evidence passage starts at a prior of 0.9 (how far it is trusted). Drag one to distrust or trust it more: the claims re-score on the same NLI links, with no model calls.</p>
+          <p class="whatif-hint fact" id="fact-whatif-hint">Run a Factuality analysis to edit the evidence priors.</p>
           <div class="scores" id="fact-scores">
             <div class="score-tile" data-f="factuality_score">
               <div class="score-label">Factuality score <span class="sym">F</span></div>
@@ -307,9 +314,16 @@
 
           <div class="panel-head sub">
             <h2 class="panel-title">Logical coherence scores</h2>
-            <cds-button id="what-if" kind="tertiary" size="sm" hidden>What if? Edit claim priors</cds-button>
+            <div class="prior-switch" role="group" aria-labelledby="prior-label">
+              <span class="field-label" id="prior-label">Claim priors</span>
+              <cds-content-switcher id="prior-mode" size="sm" value="default" aria-label="Claim priors">
+                <cds-content-switcher-item value="default" selected>Default</cds-content-switcher-item>
+                <cds-content-switcher-item value="custom">Custom</cds-content-switcher-item>
+              </cds-content-switcher>
+              <button type="button" class="linklike" id="prior-reset" disabled>Reset</button>
+            </div>
           </div>
-          <p class="whatif-hint" id="whatif-hint" hidden>Drag a claim's prior in the claims list. The scores re-compute on the mined graph, with no model calls.</p>
+          <p class="whatif-hint" id="whatif-hint">Run a Coherence analysis to edit claim priors and re-score the mined graph.</p>
           <div class="scores" id="scores">
             <div class="score-tile" data-m="mean_marginal">
               <div class="score-label">Mean marginal <span class="sym">LCS<sub>mm</sub></span></div>

@@ -116,7 +116,11 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
     # pair); the rest would show the stub model's meaningless relations.
     if engine.dry_run:
         examples = [e for e in examples if e.get("gold")]
-    public_examples = [{k: v for k, v in e.items() if k != "gold"} for e in examples]
+    # The browser learns only THAT an example has gold claims and relations.
+    public_examples = [
+        {**{k: v for k, v in e.items() if k != "gold"}, "gold": bool(e.get("gold"))}
+        for e in examples
+    ]
 
     @app.get("/api/config")
     def config() -> dict[str, Any]:

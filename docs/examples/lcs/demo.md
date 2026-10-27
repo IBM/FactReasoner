@@ -84,8 +84,8 @@ Factuality mode says so if it isn't pulled. Coherence alone works without it.
 **Offline (`--dry-run`).** It stubs the LLM, uses exact brute-force inference, and
 lists only the **Voyager 1** pair (coherent and incoherent):
 
-- **Coherence** replays the paper's gold relation graphs, so it reproduces the worked
-  example's numbers exactly (A: 0.590 / 0.962 / 0.193, B: 0.494 / 0.414 / 0.267).
+- **Coherence** loads the paper's gold relation graphs (as it does live), so it
+  reproduces the worked example's numbers exactly (A: 0.590 / 0.962 / 0.193, B: 0.494 / 0.414 / 0.267).
 - **Factuality** runs the real FactReasoner inference against the example's three
   shipped evidence passages. A lexical stand-in replaces the NLI model, so the true
   claims come out supported and the two false ones contradicted.
@@ -107,8 +107,13 @@ can stand in for `--merlin-path`.
 
 ## Using it
 
-- **Examples** sit above the editor. The Voyager pair ships evidence passages, used
-  with *Paste evidence*.
+- **Examples** sit above the editor. The two **Voyager 1** pills are teal and marked
+  *gold*: their claims and relations are the paper's gold ones, **loaded, not
+  extracted or mined**, live and offline alike. No model is called for claims or
+  coherence. Factuality still runs on those gold claims, with the selected evidence
+  source: live retrieval and NLI, or the shipped passages under *Paste evidence*.
+  The claims list is tagged *gold*. Edit the response by one character and it is an
+  ordinary response again, so it is extracted and mined.
 - **Stop** appears next to Analyze while a run is in progress. The status shows
   *Stopping…* at once, then *Stopped · claims kept*. Claim extraction and relation
   mining are cancelled mid-call (about 0.3 s on a live Ollama run). The factuality NLI
@@ -116,7 +121,8 @@ can stand in for `--merlin-path`.
   that ignores the stop is cut off after 8 s. Stopping also cancels the model
   requests still in flight, so the next run starts at once instead of queueing
   behind them.
-- **Claims are kept between runs.** Once a response's claims are extracted, every
+- **Claims are kept between runs.** (Gold examples always use their gold claims.)
+  Once a response's claims are extracted, every
   later run on the same text reuses exactly those claims (same ids, same wording),
   whatever the analysis or settings. So switching from Factuality to Coherence
   compares like with like, and skips a model call. Editing the response text, or
@@ -130,17 +136,27 @@ can stand in for `--merlin-path`.
   (prompt v2), which is highlighted in the text.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
-- **Evidence what-if.** After any run that checks factuality, *What if? Edit evidence
-  priors* adds a prior slider to each evidence passage. Every passage starts at 0.9,
-  meaning how far it is trusted. Lower a passage's prior to distrust it, and the
+- **Evidence priors: Default 0.9 | Custom.** This switch is always shown in the
+  factuality scores header. It is disabled until a run has checked factuality, and
+  while a run is in progress. *Custom* adds a prior slider to each evidence passage.
+  Every passage starts at 0.9, meaning how far it is trusted. Lower a passage's prior to distrust it, and the
   claims it supports or refutes re-score on the same NLI links, with **no model
   calls**. A passage backing several claims has one prior, so its sliders move
   together. In *Coherence with factuality priors*, the new factuality posteriors are
   the new coherence priors, so coherence re-scores too. The FactGraph labels an
-  edited passage with its prior. *Reset evidence priors to 0.9* undoes it.
-- **What if?** After a *Coherence* run, *What if? Edit claim priors* adds a prior
-  slider to each claim, starting at the uniform 0.5. Drag one and the scores re-compute
-  on the mined graph with **no model calls**. *Reset priors to 0.5* puts them back.
+  edited passage with its prior. *Default* re-scores with every passage at 0.9 but
+  keeps your edits, so switching back to *Custom* restores them. That makes it a
+  quick A/B. *Reset* clears the edits.
+- **Claim priors: Default | Custom.** This switch is always shown in the coherence
+  scores header, and it works like the evidence one. After a *Coherence* run,
+  *Custom* adds a prior slider to each claim, starting from the run's priors. Drag
+  one and the scores re-compute on the mined graph with **no model calls**.
+  *Default* goes back to the run's priors and keeps the edits; *Reset* clears them.
+  In *Coherence with factuality priors*, the claim priors are the factuality
+  posteriors, so this switch is disabled there; edit the evidence priors instead.
+- **Layout.** After a run, the response and results panels are exactly the same
+  height. The results scroll inside their panel, and the FactGraph and relation
+  graph fill the space the score tiles leave.
 
 ### Control panel
 

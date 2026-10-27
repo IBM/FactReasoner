@@ -14,6 +14,9 @@
   --con: #da1e28;      /* contradiction   red 60    */
   --eqv: #8a3ffc;      /* equivalence     purple 60 */
   --exc: #009d9a;      /* exclusive / co-necessity  teal 50 */
+  --gold: #005d5d;     /* gold-truth examples: teal 70 ink */
+  --gold-bg: #d9fbfb;  /* teal 10 */
+  --gold-border: #08bdba; /* teal 40 */
   --post-lo: #da1e28;
   --post-mid: #c6c6c6;
   --post-hi: #0f62fe;
@@ -30,6 +33,9 @@ body.cds--g100 {
   --con: #fa4d56;
   --eqv: #a56eff;
   --exc: #009d9a;
+  --gold: #9ef0f0;     /* teal 20 ink */
+  --gold-bg: #022b30;  /* teal 90 */
+  --gold-border: #009d9a; /* teal 50 */
   --post-lo: #fa4d56;
   --post-mid: #6f6f6f;
   --post-hi: #4589ff;
@@ -82,6 +88,8 @@ body {
   grid-template-areas: "settings settings" "response results";
   align-items: start;
 }
+/* The response and results panels share their row: both stretch to its height. */
+.response, .results { align-self: stretch; }
 /* The settings box is borderless: its header and the two cards are what show,
  * so a card's outer edge IS the column edge -- the same edge as the panel below. */
 .panel.settings {
@@ -93,16 +101,18 @@ body {
 .settings > .pipelines { grid-column: 1 / -1; }
 .settings > .ollama-host { grid-column: 1 / -1; }
 .response { grid-area: response; }
-/* The results column is a full-viewport, sticky panel; the graph takes what
- * the score tiles leave, so no space sits idle under it. */
-.results { grid-area: results; position: sticky; top: 64px; height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
+/* The results panel never sizes the row itself (contain: size): the row is as
+ * tall as the response panel, and at least one viewport, and both panels
+ * stretch to exactly that height. Its content scrolls inside. The graph takes
+ * what the score tiles leave, so no space sits idle under it. */
+.results { grid-area: results; contain: size; min-height: calc(100vh - 80px); display: flex; flex-direction: column; overflow: hidden; }
 .results .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; max-height: 520px; display: flex; flex-direction: column; }
+.results .view > .graph-wrap { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
 .results .view > .graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
-.results .fact-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.results .fact-body { flex: 1 1 auto; min-height: 300px; display: flex; flex-direction: column; }
 .results .evidence-list { flex: 1; max-height: none; }
-.results #fact-graph-wrap { flex: 1 1 auto; min-height: 300px; max-height: 520px; display: flex; flex-direction: column; }
-.results #fact-graph-wrap > .graph { flex: 1; height: auto; }
+.results #fact-graph-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.results #fact-graph-wrap > .graph { flex: 1; height: auto; min-height: 260px; }
 .panel {
   background: var(--cds-layer-01);
   border: 1px solid var(--cds-border-subtle-01);
@@ -199,6 +209,18 @@ cds-slider { width: 100%; }
 .examples button:hover { background: var(--cds-layer-hover-01); }
 .examples button:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: 1px; }
 .examples button[aria-pressed="true"] { border-color: var(--cds-interactive); color: var(--cds-link-primary); }
+/* Gold-truth examples: their claims and relations are loaded, not extracted. */
+.examples button.gold { background: var(--gold-bg); border-color: var(--gold-border); color: var(--gold); display: inline-flex; align-items: center; gap: 6px; }
+.examples button.gold:hover { background: var(--gold-bg); border-color: var(--gold); }
+.examples button.gold[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); color: var(--gold); }
+.gold-mark, .gold-tag { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.gold-mark { padding: 0 5px; border-radius: 999px; background: var(--gold-border); color: var(--cds-background); }
+.gold-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); vertical-align: 1px; }
+/* The always-visible prior switch in a scores header. */
+.prior-switch { display: flex; align-items: center; gap: 10px; }
+.prior-switch cds-content-switcher { width: 200px; }
+.prior-switch .linklike { font-size: 12px; }
+.prior-switch .linklike:disabled { color: var(--cds-text-disabled); cursor: default; text-decoration: none; }
 .response-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 
 .highlighted {
@@ -371,7 +393,7 @@ cds-content-switcher:not(#mode) cds-content-switcher-item[selected] { --cds-laye
 /* ---------------- Responsive ---------------- */
 @media (max-width: 1180px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "settings" "response" "results"; }
-  .results { position: static; height: auto; overflow: visible; }
+  .results { contain: none; min-height: 0; height: auto; overflow: visible; }
   .results .view > .graph-wrap > .graph, .results #fact-graph-wrap > .graph { height: 420px; flex: none; }
 }
 @media (max-width: 860px) {

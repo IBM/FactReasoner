@@ -17,9 +17,12 @@
     runId: null,
     response: "",
     mode: "factuality",  // factuality | coherence | both (as last run)
-    whatIf: false,       // per-claim prior sliders opened after a coherence run
-    factWhatIf: false,   // per-evidence prior sliders opened after a factuality run
-    ctxPriors: {},       // {context id: prior} while the factuality what-if is on
+    whatIf: false,       // claim priors switch on Custom (coherence-only runs)
+    customPriors: {},    // {claim id: prior} the user set; kept while on Default
+    basePriors: {},      // {claim id: prior} the run started from (the Default)
+    factWhatIf: false,   // evidence priors switch on Custom
+    ctxPriors: {},       // {context id: prior} the user set; kept while on Default
+    gold: false,         // the claims (and relations) on screen are an example's gold ones
     claimsFor: null,     // the response text S.claims were extracted from
     forceExtract: false, // "Re-extract claims" pressed: ignore the kept claims
     claims: [],          // [{id, label, text, original, span}]
@@ -257,8 +260,10 @@
     for (const e of c.examples) {
       ex.append(el("button", {
         type: "button", "aria-pressed": "false", "data-id": e.id,
+        class: e.gold ? "gold" : null,
+        title: e.gold ? "Gold claims and relations are loaded, not extracted; factuality still runs retrieval and NLI." : null,
         onclick: () => pickExample(e),
-      }, e.title));
+      }, e.title, e.gold ? el("span", { class: "gold-mark" }, "gold") : null));
     }
   }
 
@@ -281,25 +286,59 @@
     syncEvidence();
   }
 
-  /* After a coherence-only run, per-claim prior sliders let you ask "what if
-   * this claim were more (or less) plausible?": each drag re-scores the mined
-   * graph with no model calls. Starting the sliders from the uniform 0.5. */
-  function toggleWhatIf() {
-    S.whatIf = !S.whatIf;
-    if (!S.whatIf) {
-      for (const c of S.claims) S.priors[c.id] = 0.5;
-      scheduleRescore();
-    }
+  /* Claim priors: Default | Custom, always shown. After a coherence-only run,
+   * Custom opens per-claim prior sliders ("what if this claim were more, or
+   * less, plausible?"); each drag re-scores the mined graph with no model
+   * calls. Default re-scores under the run's own priors but keeps the custom
+   * values, so switching back restores them; Reset clears them. */
+  function canWhatIf() {
+    return S.mode === "coherence" && S.relations.length > 0 && !!S.runId && !S.busy;
+  }
+
+  function setWhatIf(on) {
+    if (!canWhatIf()) { syncWhatIf(); return; }
+    S.whatIf = on;
+    S.priors = on ? { ...S.basePriors, ...S.customPriors } : { ...S.basePriors };
+    scheduleRescore();
     syncWhatIf();
     renderClaims();
   }
 
+  function resetWhatIf() {
+    S.customPriors = {};
+    if (S.whatIf && canWhatIf()) { S.priors = { ...S.basePriors }; scheduleRescore(); renderClaims(); }
+    syncWhatIf();
+  }
+
   function syncWhatIf() {
-    const can = S.mode === "coherence" && S.relations.length > 0;
-    const btn = $("#what-if");
-    btn.hidden = !can;
-    btn.textContent = S.whatIf ? "Reset priors to 0.5" : "What if? Edit claim priors";
-    $("#whatif-hint").hidden = !(can && S.whatIf);
+    const can = canWhatIf();
+    if (!can && !S.busy) S.whatIf = false;
+    setSwitcher("prior-mode", S.whatIf ? "custom" : "default");
+    setSwitcherDisabled("prior-mode", !can);
+    const edited = Object.keys(S.customPriors).some((k) => Math.abs(S.customPriors[k] - (S.basePriors[k] ?? 0.5)) > 1e-9);
+    $("#prior-reset").disabled = !can || !edited;
+    $("#whatif-hint").textContent = !can
+      ? (S.busy ? "Available once the run finishes."
+        : S.mode === "both" && S.runId ? "In the chained mode the claim priors are the factuality posteriors: edit the evidence priors instead."
+        : "Run a Coherence analysis to edit claim priors and re-score the mined graph.")
+      : S.whatIf ? "Drag a claim's prior in the claims list. The scores re-compute on the mined graph, with no model calls."
+      : "Scored under the run's own claim priors. Custom lets you set each claim's prior.";
+  }
+
+  /* Enable or disable every option of a content switcher. */
+  function setSwitcherDisabled(id, off) {
+    for (const it of document.getElementById(id).querySelectorAll("cds-content-switcher-item")) {
+      it.disabled = off;
+      if (off) it.setAttribute("disabled", ""); else it.removeAttribute("disabled");
+    }
+  }
+
+  /* A re-score's status line: unlike setBusy, it leaves Analyze, Stop and the
+   * prior switches alone, so nothing moves while a slider is dragged. */
+  function setQuietStatus(text) {
+    const st = $("#status");
+    st.innerHTML = "";
+    if (text) st.append(el("span", {}, text));
   }
 
   async function stopRun() {
@@ -319,10 +358,16 @@
   /* Tell the user when a run will reuse the claims on screen. */
   function syncReuse() {
     const response = ($("#response").value || "").trim();
-    const reuse = !S.forceExtract && S.claims.length > 0 && S.claimsFor === response;
+    const reuse = !S.forceExtract && S.claims.length > 0 && S.claimsFor === response && !isGoldResponse(response);
     $("#reuse-line").hidden = !reuse;
     if (reuse) $("#reuse-text").textContent =
       `The next run re-uses the ${S.claims.length} claims already extracted from this response.`;
+  }
+
+  /* An unedited bundled example whose gold claims and relations the server loads. */
+  function isGoldResponse(text) {
+    const t = (text || "").trim();
+    return !!t && (S.config.examples || []).some((e) => e.gold && e.response.trim() === t);
   }
 
   function setSettingsOpen(open) {
@@ -376,8 +421,11 @@
       body.evidence = $("#evidence-text").value || "";
     }
     S.whatIf = false;
+    S.customPriors = {};
+    S.basePriors = {};
     S.factWhatIf = false;
     S.ctxPriors = {};
+    S.gold = false;
     S.stopping = false;
     // The results panel shows only what this run computes; "both" ends on coherence.
     $("#result-tabs").hidden = settings.mode !== "both";
@@ -418,6 +466,7 @@
     });
     on("claims", (d) => {
       S.claims = d.claims;
+      S.gold = d.claims.some((c) => c.gold);
       S.claimsFor = S.response;
       syncReuse();
       renderHighlighted(); renderClaims(); renderGraph(); renderFactuality();
@@ -428,6 +477,7 @@
     });
     on("priors", (d) => {
       S.priors = d.priors || {};
+      S.basePriors = { ...S.priors };
       renderClaims(); renderGraph();
     });
     on("result", (d) => {
@@ -481,14 +531,17 @@
 
   async function rescore() {
     if (!S.runId || !S.relations.length) return;
-    setBusy(true, "Re-scoring under the new priors");
-    const r = await fetch(`api/runs/${S.runId}/rescore`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ priors: S.priors }),
-    });
-    if (!r.ok) { setBusy(false); showError("Re-scoring failed."); return; }
+    setQuietStatus("Re-scoring under the new priors…");
+    let r;
+    try {
+      r = await fetch(`api/runs/${S.runId}/rescore`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priors: S.priors }),
+      });
+    } catch (e) { r = null; }
+    if (!r || !r.ok) { setQuietStatus(null); showError("Re-scoring failed."); return; }
     applyResult(await r.json());
-    setBusy(false, S.whatIf ? "What-if re-scored · no model calls" : "Re-scored · no model calls");
+    setQuietStatus(S.whatIf ? "Re-scored under custom claim priors · no model calls" : "Re-scored under the default claim priors · no model calls");
   }
 
   // ------------------------------------------------------------- status
@@ -513,6 +566,8 @@
     // Stop is offered exactly while a run is in flight.
     $("#stop").hidden = !busy;
     if (!S.stopping) $("#stop").removeAttribute("disabled");
+    // The prior switches stay on screen; they are only disabled mid-run.
+    if (S.config) { syncWhatIf(); syncFactWhatIf(); }
   }
 
   function showError(msg) {
@@ -646,6 +701,7 @@
   function renderClaims() {
     const list = $("#claims");
     $("#claim-count").textContent = S.claims.length ? `(${S.claims.length})` : "";
+    $("#claims-gold").hidden = !(S.gold && S.claims.length);
     renderClaimsLegend();
     list.innerHTML = "";
     if (!S.claims.length) {
@@ -710,8 +766,9 @@
           "aria-label": `Prior for ${c.label}`,
         });
         range.addEventListener("input", () => {
-          S.priors[c.id] = parseFloat(range.value);
+          S.priors[c.id] = S.customPriors[c.id] = parseFloat(range.value);
           out.textContent = fmt(S.priors[c.id], 2);
+          $("#prior-reset").disabled = false;
           scheduleRescore();
         });
         li.append(el("div", { class: "prior-edit" }, "prior π", range, out));
@@ -798,7 +855,7 @@
     ];
     if (st.llm_calls != null) facts.push(["NLI calls", st.llm_calls]);
     if (S.timing.factuality != null && !S.config.dry_run) facts.push(["time", `${fmt(S.timing.factuality, 1)} s`]);
-    const edited = Object.values(S.ctxPriors).filter((p) => Math.abs(p - 0.9) > 1e-9).length;
+    const edited = editedCtx();
     if (S.factWhatIf) facts.push(["edited priors", edited]);
     const dl = $("#fact-facts");
     dl.innerHTML = "";
@@ -811,7 +868,7 @@
    * so appear on several cards: every copy reads and writes S.ctxPriors, and a
    * drag updates the other copies' readouts in place. */
   function evidencePrior(ctx) {
-    const v = S.ctxPriors[ctx.id] ?? ctx.prior ?? 0.9;
+    const v = S.ctxPriors[ctx.id] ?? 0.9;
     const out = el("span", { class: "pnum" + (Math.abs(v - 0.9) > 1e-9 ? " edited" : ""), "data-ctx": ctx.id }, fmt(v, 2));
     const range = el("input", {
       type: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
@@ -821,6 +878,7 @@
     range.addEventListener("input", () => {
       const p = parseFloat(range.value);
       S.ctxPriors[ctx.id] = p;
+      $("#fact-prior-reset").disabled = false;
       for (const n of document.querySelectorAll(`.ev-prior [data-ctx="${ctx.id}"]`)) {
         if (n.tagName === "INPUT" && n !== range) n.value = String(p);
         if (n.tagName === "SPAN") { n.textContent = fmt(p, 2); n.classList.toggle("edited", Math.abs(p - 0.9) > 1e-9); }
@@ -830,28 +888,51 @@
     return el("div", { class: "ev-prior" }, "evidence prior", range, out);
   }
 
-  function toggleFactWhatIf() {
-    S.factWhatIf = !S.factWhatIf;
-    if (!S.factWhatIf) {
-      // Reset every passage to its default trust.
-      for (const c of (S.fact && S.fact.contexts) || []) S.ctxPriors[c.id] = 0.9;
-      scheduleFactRescore();
-    } else {
-      S.ctxPriors = Object.fromEntries(((S.fact && S.fact.contexts) || []).map((c) => [c.id, c.prior ?? 0.9]));
-    }
+  /* Evidence priors: Default 0.9 | Custom, always shown. Custom opens a prior
+   * slider on each passage; Default re-scores with every passage at 0.9 but
+   * keeps the custom values, so switching back restores them. Reset clears. */
+  function canFactWhatIf() {
+    return !!(S.fact && (S.fact.contexts || []).length && S.mode !== "coherence" && S.runId && !S.busy);
+  }
+
+  function editedCtx() {
+    return Object.values(S.ctxPriors).filter((p) => Math.abs(p - 0.9) > 1e-9).length;
+  }
+
+  function setFactWhatIf(on) {
+    if (!canFactWhatIf()) { syncFactWhatIf(); return; }
+    S.factWhatIf = on;
+    scheduleFactRescore();
     syncFactWhatIf();
     renderFactuality();
   }
 
+  function resetFactWhatIf() {
+    S.ctxPriors = {};
+    if (S.factWhatIf && canFactWhatIf()) { scheduleFactRescore(); renderFactuality(); }
+    syncFactWhatIf();
+  }
+
+  /* The context priors to score under: the custom ones on Custom, else 0.9. */
+  function factPriorsToSend() {
+    const ids = ((S.fact && S.fact.contexts) || []).map((c) => c.id);
+    return Object.fromEntries(ids.map((id) => [id, S.factWhatIf ? (S.ctxPriors[id] ?? 0.9) : 0.9]));
+  }
+
   function syncFactWhatIf() {
-    const can = !!(S.fact && (S.fact.contexts || []).length && S.mode !== "coherence" && S.runId && !S.busy);
-    const btn = $("#fact-what-if");
-    btn.hidden = !can;
-    btn.textContent = S.factWhatIf ? "Reset evidence priors to 0.9" : "What if? Edit evidence priors";
-    $("#fact-whatif-hint").hidden = !(can && S.factWhatIf);
-    $("#fact-whatif-hint").textContent = S.factView === "graph"
-      ? "Edit each passage's prior in the Evidence view; the FactGraph labels a passage with its prior once it differs from 0.9."
-      : "Each evidence passage starts at a prior of 0.9 (how far it is trusted). Drag one to distrust or trust it more: the claims re-score on the same NLI links, with no model calls.";
+    const can = canFactWhatIf();
+    if (!can && !S.busy) S.factWhatIf = false;
+    setSwitcher("fact-prior-mode", S.factWhatIf ? "custom" : "default");
+    setSwitcherDisabled("fact-prior-mode", !can);
+    $("#fact-prior-reset").disabled = !can || editedCtx() === 0;
+    $("#fact-whatif-hint").textContent = !can
+      ? (S.busy ? "Available once the run finishes."
+        : S.fact ? "This run found no evidence passages to re-weight."
+        : "Run a Factuality analysis to edit the evidence priors.")
+      : !S.factWhatIf ? "Every evidence passage has the default prior of 0.9 (how far it is trusted). Custom lets you set each one."
+      : S.factView === "graph"
+        ? "Edit each passage's prior in the Evidence view; the FactGraph labels a passage with its prior once it differs from 0.9."
+        : "Drag a passage's prior to distrust or trust it more: the claims re-score on the same NLI links, with no model calls.";
   }
 
   let factRescoreTimer = null;
@@ -862,17 +943,20 @@
 
   async function rescoreFactuality() {
     if (!S.runId || !S.fact) return;
-    setBusy(true, "Re-scoring factuality under the new evidence priors");
-    const r = await fetch(`api/runs/${S.runId}/rescore-factuality`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ context_priors: S.ctxPriors }),
-    });
-    if (!r.ok) { setBusy(false); showError("Re-scoring factuality failed."); return; }
+    setQuietStatus("Re-scoring factuality under the evidence priors…");
+    let r;
+    try {
+      r = await fetch(`api/runs/${S.runId}/rescore-factuality`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context_priors: factPriorsToSend() }),
+      });
+    } catch (e) { r = null; }
+    if (!r || !r.ok) { setQuietStatus(null); showError("Re-scoring factuality failed."); return; }
     const d = await r.json();
     S.fact = d.factuality;
     if (d.coherence) applyResult(d.coherence);  // chained mode: priors moved too
     renderClaims(); renderFactuality();
-    setBusy(false, S.factWhatIf ? "What-if re-scored · no model calls" : "Evidence priors reset · no model calls");
+    setQuietStatus(S.factWhatIf ? "Re-scored under custom evidence priors · no model calls" : "Re-scored with every passage at 0.9 · no model calls");
   }
 
   function setTile(key, value, meter = value) {
@@ -918,22 +1002,46 @@
         plabel: fmt(r.probability, 2).replace(/^0/, ""), color: cssVar(ent ? "--ent" : "--con") }, classes: ent ? "ent" : "con" });
     });
     const ctxs = (f.contexts || []).filter((c) => used.has(c.id));
-    const rowH = 64, h = Math.max(claims.length, ctxs.length) * rowH;
     const els = [];
-    claims.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
-      position: { x: 0, y: (i + 0.5) * (h / claims.length) }, classes: "claim" }));
-    ctxs.forEach((c, i) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) },
-      position: { x: 320, y: (i + 0.5) * (h / ctxs.length) }, classes: "ctx" }));
+    claims.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
+      classes: "claim" }));
+    ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) }, classes: "ctx" }));
     fcy.add(els.concat(edges));
-    fcy.layout({ name: "preset", fit: false }).run();
-    fitGraph(fcy, 30);
+    placeFactGraph();
     paintFocus();
+  }
+
+  /* Lay the FactGraph out on the canvas it actually has: claims in a column at
+   * 30% of the width, passages at 62% (their labels run to the right),
+   * each column spread over the full height. Drawn at zoom 1, so the graph
+   * fills the panel instead of a fixed-size block scaled into its top. */
+  function placeFactGraph() {
+    if (!fcy || fcy.elements().empty()) return;
+    fcy.resize();
+    const W = fcy.width(), H = fcy.height();
+    if (!W || !H) return;
+    const pad = 36;
+    const column = (nodes, x) => {
+      const n = nodes.length;
+      // Rows share the height, up to 140px apart; fewer rows sit centred.
+      const gap = Math.min(140, (H - 2 * pad) / Math.max(1, n));
+      const top = (H - gap * n) / 2;
+      nodes.forEach((node, i) => node.position({ x, y: top + (i + 0.5) * gap }));
+    };
+    const byOrder = (a, b) => order(a.id()) - order(b.id());
+    column(fcy.nodes("node.claim").sort(byOrder), Math.max(40, W * 0.3));
+    column(fcy.nodes("node.ctx"), Math.max(140, W * 0.62));
+    fcy.zoom(1);
+    fcy.pan({ x: 0, y: 0 });
+    // A canvas too small for the labels: zoom out to fit, never in.
+    const bb = fcy.elements().boundingBox();
+    if (bb.x2 > W - 8 || bb.y2 > H - 8 || bb.x1 < 8 || bb.y1 < 8) fcy.fit(undefined, 16);
   }
 
   /* A passage node's label: its title, plus its prior once it differs from 0.9. */
   function ctxLabel(c) {
     const title = (c.title || c.id).slice(0, 28);
-    const p = S.ctxPriors[c.id] ?? c.prior ?? 0.9;
+    const p = S.factWhatIf ? (S.ctxPriors[c.id] ?? 0.9) : 0.9;
     return Math.abs(p - 0.9) > 1e-9 ? `${title} · π ${fmt(p, 2)}` : title;
   }
 
@@ -993,7 +1101,7 @@
         if (S.claims.length && S.claims.length <= 12 && S.view !== "mrf") cy.layout(layoutOptions()).run();
         fitGraph(cy, 32);
       }
-      if (fcy && !$("#fact-graph-wrap").hidden) { fcy.resize(); fitGraph(fcy, 30); }
+      if (fcy && !$("#fact-graph-wrap").hidden) placeFactGraph();
     });
     ro.observe($("#graph"));
     ro.observe($("#fact-graph"));
@@ -1269,7 +1377,7 @@
       ["relations", S.relations.length],
       ["log Z", fmt(d.log_z)],
       ["below prior", d.num_below_prior ?? "–"],
-      ["pairs scored", cov.pairs_scored ?? "–"],
+      S.gold ? ["relations from", "gold"] : ["pairs scored", cov.pairs_scored ?? "–"],
       ["LLM errors", cov.llm_call_errors ?? 0],
     ];
     if (S.timing.mining != null && !S.config.dry_run) {
@@ -1285,7 +1393,7 @@
     Object.assign(S, { claims: [], fact: null, priors: {}, marginals: {}, relations: [], scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
     pinned = null;
     $("#edge-card").hidden = true;
-    renderClaims(); renderGraph(); renderScores(); renderFactuality(); syncWhatIf();
+    renderClaims(); renderGraph(); renderScores(); renderFactuality(); syncWhatIf(); syncFactWhatIf();
     $("#facts").innerHTML = "";
   }
 
@@ -1299,6 +1407,7 @@
     $("#start-over").addEventListener("click", () => {
       stopStream(); setBusy(false); showError(null);
       S.runId = null; S.response = ""; S.exampleId = null; S.claimsFor = null; S.forceExtract = false;
+      S.whatIf = false; S.customPriors = {}; S.basePriors = {}; S.factWhatIf = false; S.ctxPriors = {}; S.gold = false;
       $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
       showEditor(); resetResults();
@@ -1309,8 +1418,10 @@
     $("#coh-backend").addEventListener("cds-content-switcher-selected", syncBackend);
     $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
-    $("#what-if").addEventListener("click", toggleWhatIf);
-    $("#fact-what-if").addEventListener("click", toggleFactWhatIf);
+    $("#prior-mode").addEventListener("cds-content-switcher-selected", (e) => setWhatIf(e.detail.item.value === "custom"));
+    $("#fact-prior-mode").addEventListener("cds-content-switcher-selected", (e) => setFactWhatIf(e.detail.item.value === "custom"));
+    $("#prior-reset").addEventListener("click", resetWhatIf);
+    $("#fact-prior-reset").addEventListener("click", resetFactWhatIf);
     $("#refresh-ollama").addEventListener("click", refreshOllama);
     $("#result-tabs").addEventListener("cds-tabs-selected", (e) => showTab(e.detail.item.value));
     $("#fact-view").addEventListener("cds-content-switcher-selected", (e) => {
@@ -1386,6 +1497,7 @@
     syncMode();
     renderScores();
     renderFactuality();
+    syncWhatIf(); syncFactWhatIf();
     const ex = S.config.examples.find((e) => e.id === q.get("example"));
     if (ex) {
       pickExample(ex);
@@ -1401,10 +1513,10 @@
     if (q.get("view") === "mrf") S.view = "mrf";
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
     if (q.get("factwhatif") === "1") {
-      const wait = setInterval(() => { if (S.fact && !S.busy) { clearInterval(wait); toggleFactWhatIf(); } }, 100);
+      const wait = setInterval(() => { if (canFactWhatIf()) { clearInterval(wait); setFactWhatIf(true); } }, 100);
     }
     if (q.get("whatif") === "1") {
-      const wait = setInterval(() => { if (S.relations.length) { clearInterval(wait); toggleWhatIf(); } }, 100);
+      const wait = setInterval(() => { if (canWhatIf()) { clearInterval(wait); setWhatIf(true); } }, 100);
     }
     if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
     for (const pipe of ["fact", "coh"]) {

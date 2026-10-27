@@ -318,7 +318,8 @@ def load_examples(data_dir: str) -> list[dict[str, Any]]:
                     "claim_priors": texts,
                     "expected": r.get("expected"),
                     "evidence": list(VOYAGER_EVIDENCE),
-                    # The gold graph, replayed offline in dry-run mode.
+                    # The gold graph: these claims and relations are loaded, not
+                    # extracted or mined (live and offline alike).
                     "gold": {
                         "atoms": [{"id": a["id"], "text": a["text"]} for a in d["atoms"]],
                         "relations": r["gold_relations"],
@@ -402,7 +403,9 @@ class Engine:
             ``replays`` is answered with that example's gold claims and
             relations instead of the stub's; factuality needs pasted evidence.
         replays: Bundled examples carrying a ``gold`` graph (see
-            :func:`load_examples`), used only in dry-run mode.
+            :func:`load_examples`). A response matching one, in any mode, uses
+            the gold claims and relations instead of extracting and mining
+            them; factuality still runs retrieval and NLI on those claims.
         backend_factory: Override for building a backend from ``(kind, model)``
             (tests).
     """
@@ -754,13 +757,19 @@ class Engine:
         timing: dict[str, float] = {}
         claims_kind, claims_name = s.claims_model
         claims_backend = None
-        if not run.given_claims:
+        # A bundled example with a gold graph (the Voyager pair, unedited) skips
+        # extraction and mining: its claims and relations are the gold ones.
+        gold = self._replay(run)
+        if gold is None and not run.given_claims:
             run.emit("stage", stage="setup", message=f"Connecting to {claims_name} ({claims_kind})")
             claims_backend = self._backend(claims_kind, claims_name, run)
 
         # -- 1. claims ---------------------------------------------------------
         t = time.perf_counter()
-        if run.given_claims:
+        if gold is not None:
+            atoms = {a["id"]: Atom(id=a["id"], text=a["text"]) for a in gold["atoms"]}
+            run.emit("stage", stage="atomize", message=f"Loading the {len(atoms)} gold claims")
+        elif run.given_claims:
             atoms = _atoms_from_claims(run.given_claims)
             run.emit("stage", stage="atomize", message=f"Reusing the {len(atoms)} claims already extracted")
         else:
@@ -784,7 +793,8 @@ class Engine:
             atoms = {aid: a for aid, a in atoms.items() if aid in factuality["marginals"]}
 
         if not s.wants_coherence:
-            run.emit("result", factuality=factuality, coherence=None, timing=timing)
+            run.emit("result", factuality=factuality, coherence=None, timing=timing,
+                     gold={"claims": gold is not None, "relations": False})
             return
 
         # -- 3. coherence ------------------------------------------------------
@@ -796,12 +806,12 @@ class Engine:
             run.priors = {aid: float(s.flat_prior) for aid in atoms}
         run.emit("priors", priors=run.priors, source="factuality" if s.mode == "both" else s.prior_mode)
 
-        run.emit("stage", stage="mine", message=f"Mining relations between claims with {s.coh_model}")
         t = time.perf_counter()
-        gold = self._replay(run)
         if gold is not None:
+            run.emit("stage", stage="mine", message="Loading the gold relations between claims")
             run.mining = _mining_from_gold(atoms, gold["relations"], run.priors)
         else:
+            run.emit("stage", stage="mine", message=f"Mining relations between claims with {s.coh_model}")
             miner = self._miner(self._backend(s.coh_backend, s.coh_model, run), s, run)
             run.mining = self._run_async(
                 run, miner.amine_from_atoms(atoms, run.response, node_priors=run.priors)
@@ -812,11 +822,13 @@ class Engine:
         run.emit("stage", stage="score", message="Running inference on the coherence MRF")
         coherence = self._score(run, run.priors, final=True)
         timing["scoring"] = coherence.pop("scoring_seconds")
-        run.emit("result", factuality=factuality, coherence=coherence, timing=timing)
+        run.emit("result", factuality=factuality, coherence=coherence, timing=timing,
+                 gold={"claims": gold is not None, "relations": gold is not None})
 
     def _emit_claims(self, run: Run, atoms: dict[str, Atom]) -> None:
         originals = {aid: (a.get_original() or a.text) for aid, a in atoms.items()}
         spans = align_claims(run.response, originals)
+        gold = self._replay(run) is not None
         run.claims = {
             aid: {
                 "id": aid,
@@ -824,6 +836,7 @@ class Engine:
                 "text": atoms[aid].text,
                 "original": originals[aid],
                 "span": spans[aid].to_json(),
+                "gold": gold,
             }
             for i, aid in enumerate(sorted(atoms, key=_atom_sort_key))
         }
@@ -832,9 +845,6 @@ class Engine:
     def _atomize(self, run: Run, backend: Any) -> dict[str, Atom]:
         from fact_reasoner.core.atomizer import Atomizer
 
-        gold = self._replay(run)
-        if gold is not None:
-            return {a["id"]: Atom(id=a["id"], text=a["text"]) for a in gold["atoms"]}
         if self.dry_run:
             # The stub LLM cannot atomize: split into sentences instead.
             from fact_reasoner.demo.spans import split_sentences
@@ -858,9 +868,11 @@ class Engine:
         return atoms
 
     def _replay(self, run: Run) -> dict[str, Any] | None:
-        """The gold graph to replay for this response (dry-run only), if any."""
-        if not self.dry_run:
-            return None
+        """The gold graph for this response, if it is an unedited bundled example.
+
+        Applies live and offline: the claims and relations are the example's
+        gold ones, while factuality still retrieves evidence and runs NLI.
+        """
         return self._replays.get(run.response.strip())
 
     # -- stage 2: factuality --------------------------------------------------

@@ -203,7 +203,10 @@ class TestAPI:
         names = {m["name"] for m in cfg["models"]}
         assert cfg["models"] and cfg["defaults"]["fact_model"] in names
         assert cfg["defaults"]["coh_model"] in names
-        assert all("gold" not in e for e in cfg["examples"])
+        # Only a flag: the gold atoms and relations never reach the browser.
+        flags = {e["id"]: e["gold"] for e in cfg["examples"]}
+        assert flags == {"voyager-a": True, "voyager-b": True}
+        assert all(not isinstance(e["gold"], dict) for e in cfg["examples"])
 
     def test_offline_replay_lists_only_the_voyager_pair(self, client):
         c, _ = client
@@ -224,6 +227,8 @@ class TestAPI:
             engine.close()
         assert cfg["dry_run"] is False
         assert len(cfg["examples"]) == len(examples) > 2
+        gold = [e["id"] for e in cfg["examples"] if e["gold"]]
+        assert gold == ["voyager-a", "voyager-b"]
 
     def test_config_defaults_to_ollama_even_with_rits(self, monkeypatch):
         """RITS models available too: Ollama is still the default."""
@@ -494,13 +499,14 @@ class TestPipelineModels:
         real = engine._backend
         monkeypatch.setattr(engine, "_backend",
                             lambda kind, name, run=None: used.append((kind, name)) or real(kind, name, run))
-        ex = examples[1]
+        # Not a gold example: those load their claims and relations instead.
+        response = "The bridge opened in 1932. It carried trains. It was closed in 1990."
         try:
-            run = engine.submit(ex["response"], settings=Settings.from_json({
+            run = engine.submit(response, settings=Settings.from_json({
                 "mode": "both", "evidence": "pasted",
                 "fact_backend": "rits", "fact_model": "granite-4-2-30b",
                 "coh_backend": "rits", "coh_model": "deepseek-v3.2",
-            }), evidence_text="\n\n".join(ex["evidence"]))
+            }), evidence_text="The bridge opened in 1932.\n\nThe bridge closed in 1990.")
             with run.cond:
                 run.cond.wait_for(lambda: run.done, timeout=60)
         finally:
@@ -508,10 +514,91 @@ class TestPipelineModels:
         assert run.events[-1]["type"] == "result"
         assert used[0] == ("rits", "granite-4-2-30b")   # claims
         assert ("rits", "granite-4-2-30b") in used[1:]  # factuality
-        # Mining replays the gold graph offline, so the coherence model is
-        # resolved only when a live miner is built; the stage message names it.
+        assert ("rits", "deepseek-v3.2") in used         # mining
         stages = [e.get("message", "") for e in run.events if e["type"] == "stage"]
         assert any("deepseek-v3.2" in m for m in stages)
+
+
+class TestGoldExamples:
+    """The Voyager pair loads its gold claims and relations, live as offline;
+    factuality still runs retrieval / NLI on those claims."""
+
+    @staticmethod
+    def _live_engine(monkeypatch, calls):
+        """A live (non-dry-run) engine whose models and inference are stubs."""
+        from fact_reasoner.experiments.mock import dry_run_patches
+
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        examples = load_examples(DATA)
+        engine = Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: calls.append(("backend", name)) or make_mock_backend(name),
+                        replays=examples)
+        monkeypatch.setattr(engine, "_patched", lambda: dry_run_patches(patch_assessor_merlin=True))
+        monkeypatch.setattr(engine, "_atomize", lambda *a: calls.append(("atomize",)) or {})
+        monkeypatch.setattr(engine, "_miner", lambda *a, **k: calls.append(("miner",)))
+        return engine, examples
+
+    @staticmethod
+    def _wait(run):
+        with run.cond:
+            run.cond.wait_for(lambda: run.done, timeout=60)
+        return run.events
+
+    def test_live_coherence_loads_gold_without_model_calls(self, monkeypatch, voyager):
+        calls = []
+        engine, examples = self._live_engine(monkeypatch, calls)
+        ex = _example(examples, "voyager-b")
+        try:
+            run = engine.submit(ex["response"], settings=Settings.from_json(
+                {"mode": "coherence", "coh_backend": "rits", "coh_model": "deepseek-v3.2"}))
+            events = self._wait(run)
+        finally:
+            engine.close()
+        assert events[-1]["type"] == "result", events[-1]
+        assert calls == []  # no backend, no atomizer, no miner
+        claims = next(e for e in events if e["type"] == "claims")["claims"]
+        assert [c["id"] for c in claims] == [a["id"] for a in voyager["atoms"]]
+        assert all(c["gold"] for c in claims)
+        coh = events[-1]["coherence"]
+        assert len(coh["relations"]) == len(voyager["responses"]["B"]["gold_relations"])
+        assert events[-1]["gold"] == {"claims": True, "relations": True}
+
+    def test_live_factuality_runs_nli_on_gold_claims(self, monkeypatch, voyager):
+        calls = []
+        engine, examples = self._live_engine(monkeypatch, calls)
+        nli = []
+        real = engine._factuality
+        monkeypatch.setattr(engine, "_factuality",
+                            lambda run, backend, atoms: nli.append(sorted(atoms)) or real(run, backend, atoms))
+        ex = _example(examples, "voyager-a")
+        try:
+            run = engine.submit(ex["response"], settings=Settings.from_json(
+                {"mode": "factuality", "evidence": "pasted",
+                 "fact_backend": "rits", "fact_model": "granite-4-2-30b"}),
+                evidence_text="\n\n".join(ex["evidence"]))
+            events = self._wait(run)
+        finally:
+            engine.close()
+        assert events[-1]["type"] == "result", events[-1]
+        assert ("atomize",) not in calls
+        assert ("backend", "granite-4-2-30b") in calls  # the NLI model
+        assert nli == [sorted(a["id"] for a in voyager["atoms"])]
+        assert set(events[-1]["factuality"]["marginals"]) == {a["id"] for a in voyager["atoms"]}
+        assert events[-1]["gold"] == {"claims": True, "relations": False}
+
+    def test_edited_example_is_not_replayed(self, monkeypatch):
+        calls = []
+        engine, examples = self._live_engine(monkeypatch, calls)
+        ex = _example(examples, "voyager-a")
+        try:
+            run = engine.submit(ex["response"] + " It still phones home.",
+                                settings=Settings.from_json({"mode": "coherence",
+                                                             "coh_backend": "rits",
+                                                             "coh_model": "deepseek-v3.2"}))
+            self._wait(run)
+        finally:
+            engine.close()
+        assert ("atomize",) in calls
 
 
 class TestStopAndReuse:
@@ -526,8 +613,9 @@ class TestStopAndReuse:
             {"id": "a1", "text": "Voyager 1 is in interstellar space.",
              "original": "Voyager 1 is therefore in interstellar space"},
         ]
+        # Edited, so not the gold example (whose gold claims would win).
         rid = c.post("/api/analyze", json={
-            "response": ex["response"], "claims": claims,
+            "response": ex["response"] + " (edited)", "claims": claims,
             "settings": {"mode": "factuality", "evidence": "pasted"},
             "evidence": "\n\n".join(ex["evidence"]),
         }).json()["run_id"]
@@ -538,6 +626,16 @@ class TestStopAndReuse:
             [(x["id"], x["text"], x["original"]) for x in claims]
         assert any("Reusing the 2 claims" in (e.get("message") or "") for e in events)
         assert set(events[-1]["factuality"]["marginals"]) == {"a0", "a1"}
+
+    def test_gold_claims_win_over_reused_ones(self, client, voyager):
+        c, examples = client
+        ex = _example(examples, "voyager-a")
+        rid = c.post("/api/analyze", json={
+            "response": ex["response"], "claims": [{"id": "x", "text": "Something else."}],
+            "settings": {"mode": "coherence"},
+        }).json()["run_id"]
+        got = next(e for e in _events(c, rid) if e["type"] == "claims")["claims"]
+        assert [g["id"] for g in got] == [a["id"] for a in voyager["atoms"]]
 
     def test_malformed_reused_claims_rejected(self, client):
         c, _ = client
