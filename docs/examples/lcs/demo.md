@@ -114,6 +114,11 @@ can stand in for `--merlin-path`.
   source: live retrieval and NLI, or the shipped passages under *Paste evidence*.
   The claims list is tagged *gold*. Edit the response by one character and it is an
   ordinary response again, so it is extracted and mined.
+- **Pipeline steps** appear under Analyze once a run starts, one per stage of the
+  chosen analysis: *Claims → Evidence & NLI → Inference* for factuality, *Claims →
+  Relations → MRF* for coherence, all five for the chained mode. Each step shows
+  whether it is pending, running, done (with its time on a live run), or never ran.
+  A step that loaded gold data or reused claims is marked *gold* or *reused*.
 - **Stop** appears next to Analyze while a run is in progress. The status shows
   *Stopping…* at once, then *Stopped · claims kept*. Claim extraction and relation
   mining are cancelled mid-call (about 0.3 s on a live Ollama run). The factuality NLI
@@ -127,9 +132,10 @@ can stand in for `--merlin-path`.
   whatever the analysis or settings. So switching from Factuality to Coherence
   compares like with like, and skips a model call. Editing the response text, or
   *Re-extract claims*, extracts them again.
-- **Each claim row** shows its factuality posterior with a ✓/✗ verdict, its coherence
-  posterior against its prior, or both. **↓ below** marks a claim whose coherence
-  posterior fell below its own prior: one the response's own argument undermines.
+- **Each claim card** has one aligned row per analysis: its factuality posterior
+  with a *supported* / *not supported* tag, and its coherence *prior → posterior*.
+  A *↓ below prior* tag marks a claim whose coherence posterior fell below its own
+  prior: one the response's own argument undermines.
 - **Hover or click** a claim in the list, the text, the evidence list or either graph,
   and it lights up everywhere. **Click a relation edge** to see the discourse sense,
   the coupling, `p = type confidence × strength`, and the miner's evidence quote
@@ -147,6 +153,9 @@ can stand in for `--merlin-path`.
   edited passage with its prior. *Default* re-scores with every passage at 0.9 but
   keeps your edits, so switching back to *Custom* restores them. That makes it a
   quick A/B. *Reset* clears the edits.
+- **What-if deltas.** On a re-score, each score tile shows how far it moved from the
+  run's own value (*▲ 0.091*, *▼ 0.044*), so the effect of a prior is visible at a
+  glance.
 - **Claim priors: Default | Custom.** This switch is always shown in the coherence
   scores header, and it works like the evidence one. After a *Coherence* run,
   *Custom* adds a prior slider to each claim, starting from the run's priors. Drag

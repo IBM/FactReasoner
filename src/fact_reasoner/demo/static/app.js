@@ -23,6 +23,8 @@
     factWhatIf: false,   // evidence priors switch on Custom
     ctxPriors: {},       // {context id: prior} the user set; kept while on Default
     gold: false,         // the claims (and relations) on screen are an example's gold ones
+    stages: [],          // [{key, label, state, note, t0, secs}]: the run's pipeline steps
+    baseScores: null,    // {fact: {...}, coh: {...}} the run's own scores, for what-if deltas
     claimsFor: null,     // the response text S.claims were extracted from
     forceExtract: false, // "Re-extract claims" pressed: ignore the kept claims
     claims: [],          // [{id, label, text, original, span}]
@@ -430,6 +432,8 @@
     // The results panel shows only what this run computes; "both" ends on coherence.
     $("#result-tabs").hidden = settings.mode !== "both";
     showTab(settings.mode === "factuality" ? "factuality" : "coherence");
+    S.baseScores = null;
+    startStages(settings.mode);
     let r;
     try {
       r = await fetch("api/analyze", {
@@ -441,6 +445,7 @@
     }
     if (!r.ok) {
       const msg = await r.json().catch(() => ({}));
+      S.stages = []; renderStages();
       setBusy(false); showError(msg.detail || `Request failed (${r.status}).`); return;
     }
     S.runId = (await r.json()).run_id;
@@ -458,7 +463,13 @@
     S.source = es;
     const on = (type, fn) => es.addEventListener(type, (ev) => fn(JSON.parse(ev.data)));
     on("queued", (d) => setBusy(true, d.position ? `Queued behind ${d.position} run(s)` : "Starting"));
-    on("stage", (d) => { if (!S.stopping) setBusy(true, d.message); });
+    on("stage", (d) => {
+      if (d.stage === "atomize") enterStage("atomize", d.source === "gold" ? "gold" : d.source === "reused" ? "reused" : "");
+      else if (d.stage === "factuality") enterStage("factuality");
+      else if (d.stage === "mine") enterStage("mine", d.source === "gold" ? "gold" : "");
+      else if (d.stage === "score") enterStage("score");
+      if (!S.stopping) setBusy(true, d.message);
+    });
     on("progress", (d) => {
       if (S.stopping) return;
       const what = d.stage === "pairs" ? "Classifying claim pairs" : "Estimating relation strength";
@@ -472,6 +483,7 @@
       renderHighlighted(); renderClaims(); renderGraph(); renderFactuality();
     });
     on("factuality", (d) => {
+      enterStage("infer");  // FactReasoner's inference ran inside the factuality step
       S.fact = d;
       renderClaims(); renderFactuality();
     });
@@ -484,13 +496,15 @@
       if (d.factuality) S.fact = d.factuality;
       if (d.coherence) applyResult(d.coherence);
       S.timing = d.timing || {};
+      endStages("done");
+      S.baseScores = currentScores();
       renderClaims(); renderFactuality(); renderScores();
       const secs = Object.values(d.timing || {}).reduce((a, b) => a + b, 0);
       setBusy(false, S.config.dry_run ? "Done · offline replay" : `Done in ${fmt(secs, 1)} s`);
       stopStream();
       syncFactWhatIf(); syncWhatIf();
     });
-    on("error", (d) => { setBusy(false); showError(d.message); stopStream(); });
+    on("error", (d) => { endStages("error"); setBusy(false); showError(d.message); stopStream(); });
     on("stopping", (d) => {
       S.stopping = true;
       setBusy(true, d.message || "Stopping…");
@@ -498,6 +512,7 @@
     });
     on("stopped", (d) => {
       S.stopping = false;
+      endStages("stopped");
       setBusy(false, d.claims_kept ? "Stopped · claims kept" : "Stopped");
       stopStream();
       renderClaims(); renderFactuality(); renderScores();
@@ -507,6 +522,70 @@
         setBusy(false); showError("Lost the connection to the server.");
       }
     };
+  }
+
+  // ------------------------------------------------------------- stages
+  /* The run's pipeline as a row of steps (pending, running, done, skipped).
+   * The steps follow the analysis: factuality runs claims -> evidence & NLI ->
+   * inference; coherence runs claims -> relations -> MRF; the chained mode
+   * runs all five. Each step is lit by the server's stage events. */
+  const STAGE_PLAN = {
+    factuality: ["atomize", "factuality", "infer"],
+    coherence: ["atomize", "mine", "score"],
+    both: ["atomize", "factuality", "infer", "mine", "score"],
+  };
+  // [label, short label for a phone-width stepper]
+  const STAGE_LABEL = {
+    atomize: ["Claims", "Claims"], factuality: ["Evidence & NLI", "NLI"], infer: ["Inference", "Infer"],
+    mine: ["Relations", "Rel."], score: ["MRF", "MRF"],
+  };
+
+  function startStages(mode) {
+    S.stages = STAGE_PLAN[mode].map((key) => ({ key, label: STAGE_LABEL[key][0], short: STAGE_LABEL[key][1], state: "pending", note: "", t0: null, secs: null }));
+    renderStages();
+  }
+
+  /* Mark `key` running: every step before it is done (timed), none after it. */
+  function enterStage(key, note) {
+    const i = S.stages.findIndex((x) => x.key === key);
+    if (i < 0) return;
+    const now = performance.now();
+    S.stages.forEach((st, j) => {
+      if (j < i && st.state !== "done") finishStage(st, now);
+      if (j === i && st.state !== "running") { st.state = "running"; st.t0 = now; }
+    });
+    if (note != null) S.stages[i].note = note;
+    renderStages();
+  }
+
+  function finishStage(st, now) {
+    if (st.state === "running" && st.t0 != null) st.secs = (now - st.t0) / 1000;
+    st.state = "done";
+  }
+
+  /* The run ended: running and earlier steps are done; the rest never ran. */
+  function endStages(how) {
+    const now = performance.now();
+    let seenRunning = false;
+    for (const st of S.stages) {
+      if (st.state === "running") { seenRunning = true; if (how === "done") finishStage(st, now); else st.state = how; }
+      else if (st.state === "pending") st.state = how === "done" && !seenRunning ? "done" : "skipped";
+    }
+    renderStages();
+  }
+
+  function renderStages() {
+    const ol = $("#stages");
+    ol.hidden = !S.stages.length;
+    ol.innerHTML = "";
+    const word = { pending: "pending", running: "in progress", done: "done", skipped: "not run", stopped: "stopped", error: "failed" };
+    for (const st of S.stages) {
+      const time = st.secs != null && st.secs >= 0.05 && !S.config.dry_run ? `${fmt(st.secs, 1)} s` : "";
+      ol.append(el("li", { class: `stage ${st.state}`, "aria-label": `${st.label}: ${word[st.state]}` },
+        el("span", { class: "stage-dot", "aria-hidden": "true" }),
+        el("span", { class: "stage-label" }, el("span", { class: "long" }, st.label), el("span", { class: "short" }, st.short)),
+        st.note || time ? el("span", { class: "stage-note" }, [st.note, time].filter(Boolean).join(" · ")) : null));
+    }
   }
 
   function stopStream() {
@@ -690,6 +769,18 @@
     return b;
   }
 
+  /* A Carbon-style tag: blue for supported / kept, red for refuted / undermined. */
+  function chip(kind, text, title) {
+    return el("span", { class: `chip-tag ${kind}`, title }, text);
+  }
+
+  /* One score row of a claim card: what it is, a bar, the number(s), a chip. */
+  function scoreRow(name, barEl, nums, tag) {
+    return el("div", { class: "score-row" },
+      el("span", { class: "row-name" }, name), barEl,
+      el("span", { class: "row-nums" }, ...nums), tag || el("span"));
+  }
+
   function renderClaimsLegend() {
     const lg = $("#claims-legend");
     lg.innerHTML = "";
@@ -725,54 +816,53 @@
       const badge = el("span", { class: "claim-id" }, c.label);
       badge.style.background = head != null ? postColor(head) : "";
 
+      // One aligned row per score: name | bar | numbers | chip. The two rows of
+      // the chained mode share the columns, so their bars line up.
       const rows = [];
       if (showFact) {
-        const meta = el("div", { class: "claim-meta" });
-        if (showCoh) meta.append(el("span", { class: "tag" }, "factuality"));
-        meta.append(bar(fact, null, "fact", "factuality posterior"),
-          el("span", {}, "posterior ", el("span", { class: "pnum" }, fact != null ? fmt(fact) : "…")));
-        if (fact != null) {
-          meta.append(fact > 0.5
-            ? el("span", { class: "verdict ok" }, "✓ supported")
-            : el("span", { class: "verdict no" }, "✗ not supported"));
-        }
-        rows.push(meta);
+        rows.push(scoreRow("factuality", bar(fact, null, "fact", "factuality posterior"),
+          [el("span", { class: "pnum strong" }, fact != null ? fmt(fact) : "…")],
+          fact == null ? null : fact > 0.5
+            ? chip("ok", "supported", "Factuality posterior above 0.5")
+            : chip("no", "not supported", "Factuality posterior at or below 0.5")));
       }
       if (showCoh) {
-        const meta = el("div", { class: "claim-meta" });
-        if (showFact) meta.append(el("span", { class: "tag" }, "coherence"));
-        meta.append(bar(post, prior, "", "coherence posterior (fill) vs prior (tick)"),
-          el("span", {}, "posterior ", el("span", { class: "pnum" }, hasPost ? fmt(post) : "…")),
-          el("span", {}, "prior ", el("span", { class: "pnum" }, prior != null ? fmt(prior, 2) : "–")));
-        if (below) meta.append(el("span", { class: "below", title: "Posterior fell below this claim's own prior" }, showFact ? "↓ below" : "↓ below prior"));
-        rows.push(meta);
+        rows.push(scoreRow("coherence", bar(post, prior, "", "coherence posterior (fill) vs prior (tick)"),
+          [el("span", { class: "pnum muted", title: "prior" }, prior != null ? fmt(prior, 2) : "–"),
+           el("span", { class: "arrow", "aria-hidden": "true" }, "→"),
+           el("span", { class: "pnum strong", title: "posterior" }, hasPost ? fmt(post) : "…")],
+          below ? chip("no", "↓ below prior", "Posterior fell below this claim's own prior: the response's own argument undermines it") : null));
       }
-      if (c.span && c.span.method === "implicit") {
-        rows.push(el("div", { class: "claim-meta" }, el("span", { class: "implicit" }, "implicit in text")));
+      // Custom claim priors: the slider is one more row of the same grid, so
+      // it lines up under the coherence bar it moves.
+      if (manual) {
+        const v = prior != null ? prior : 0.5;
+        const out = el("span", { class: "pnum" }, fmt(v, 2));
+        const range = el("input", {
+          type: "range", class: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
+          "aria-label": `Prior for ${c.label}`,
+        });
+        paintRange(range);
+        range.addEventListener("input", () => {
+          paintRange(range);
+          S.priors[c.id] = S.customPriors[c.id] = parseFloat(range.value);
+          out.textContent = fmt(S.priors[c.id], 2);
+          $("#prior-reset").disabled = false;
+          scheduleRescore();
+        });
+        rows.push(scoreRow("prior π", range, [out], null));
       }
+      const scores = rows.length ? el("div", { class: "claim-scores" + (rows.length > 1 ? " two" : "") }, ...rows) : null;
+      const implicit = c.span && c.span.method === "implicit"
+        ? el("span", { class: "chip-tag quiet", title: "No span in the text matches this claim" }, "implicit") : null;
 
       const li = el("li", {
         class: "claim" + (focus.has(c.id) ? " active" : ""), tabindex: "0", "data-id": c.id,
         onmouseenter: () => setActive(c.id), onmouseleave: () => setActive(null),
         onclick: (e) => { if (e.target.tagName !== "INPUT") selectClaim(c.id); },
         onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectClaim(c.id); } },
-      }, badge, el("div", { class: "claim-text" }, c.text), ...rows);
+      }, badge, el("div", { class: "claim-text" }, c.text, implicit), scores);
 
-      if (manual) {
-        const v = prior != null ? prior : 0.5;
-        const out = el("span", { class: "pnum" }, fmt(v, 2));
-        const range = el("input", {
-          type: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
-          "aria-label": `Prior for ${c.label}`,
-        });
-        range.addEventListener("input", () => {
-          S.priors[c.id] = S.customPriors[c.id] = parseFloat(range.value);
-          out.textContent = fmt(S.priors[c.id], 2);
-          $("#prior-reset").disabled = false;
-          scheduleRescore();
-        });
-        li.append(el("div", { class: "prior-edit" }, "prior π", range, out));
-      }
       list.append(li);
     }
   }
@@ -801,9 +891,16 @@
     const marg = f.marginals || {};
     const vals = Object.values(marg);
     const supported = vals.filter((p) => p > 0.5).length;
-    setTile("factuality_score", sm.factuality_score);
+    const base = (S.baseScores && S.baseScores.fact) || {};
+    setTile("factuality_score", sm.factuality_score, sm.factuality_score, base.factuality_score);
     setTile("supported", `${supported} / ${vals.length}`, null);
-    setTile("avg_prob", vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null);
+    if (base.supported != null && base.supported !== supported) {
+      const d = supported - base.supported;
+      document.querySelector('#fact-scores [data-f="supported"] .score-value')
+        .append(el("span", { class: "delta " + (d > 0 ? "up" : "down") }, `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}`));
+    }
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    setTile("avg_prob", avg, avg, base.avg_prob);
     $("#fact-counts").textContent = `${vals.length - supported} not supported`;
 
     const ctx = Object.fromEntries((f.contexts || []).map((c) => [c.id, c]));
@@ -864,6 +961,13 @@
     syncFactWhatIf();
   }
 
+  /* A native range drawn like Carbon's slider: the part left of the thumb is
+   * the filled track, so the CSS needs the fill fraction. */
+  function paintRange(r) {
+    const lo = parseFloat(r.min), hi = parseFloat(r.max);
+    r.style.setProperty("--fill", `${((parseFloat(r.value) - lo) / (hi - lo)) * 100}%`);
+  }
+
   /* One evidence passage's prior slider. A passage can back several claims and
    * so appear on several cards: every copy reads and writes S.ctxPriors, and a
    * drag updates the other copies' readouts in place. */
@@ -871,16 +975,18 @@
     const v = S.ctxPriors[ctx.id] ?? 0.9;
     const out = el("span", { class: "pnum" + (Math.abs(v - 0.9) > 1e-9 ? " edited" : ""), "data-ctx": ctx.id }, fmt(v, 2));
     const range = el("input", {
-      type: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
+      type: "range", class: "range", min: "0.01", max: "0.99", step: "0.01", value: String(v),
       "aria-label": `Prior for ${ctx.title || ctx.id}`, "data-ctx": ctx.id,
     });
+    paintRange(range);
     range.addEventListener("click", (e) => e.stopPropagation());  // not a claim click
     range.addEventListener("input", () => {
       const p = parseFloat(range.value);
+      paintRange(range);
       S.ctxPriors[ctx.id] = p;
       $("#fact-prior-reset").disabled = false;
       for (const n of document.querySelectorAll(`.ev-prior [data-ctx="${ctx.id}"]`)) {
-        if (n.tagName === "INPUT" && n !== range) n.value = String(p);
+        if (n.tagName === "INPUT" && n !== range) { n.value = String(p); paintRange(n); }
         if (n.tagName === "SPAN") { n.textContent = fmt(p, 2); n.classList.toggle("edited", Math.abs(p - 0.9) > 1e-9); }
       }
       scheduleFactRescore();
@@ -959,13 +1065,38 @@
     setQuietStatus(S.factWhatIf ? "Re-scored under custom evidence priors · no model calls" : "Re-scored with every passage at 0.9 · no model calls");
   }
 
-  function setTile(key, value, meter = value) {
+  function setTile(key, value, meter = value, base = null) {
     const t = document.querySelector(`#fact-scores [data-f="${key}"]`);
     const v = t.querySelector(".score-value");
     v.textContent = value == null ? "–" : (typeof value === "number" ? fmt(value) : value);
     v.classList.toggle("pending", value == null);
+    v.append(deltaChip(typeof value === "number" ? value : null, base));
     const m = t.querySelector(".score-meter span");
     if (m) m.style.width = meter == null ? "0" : `${Math.max(0, Math.min(1, meter)) * 100}%`;
+  }
+
+  /* The run's own scores, kept when it finishes so a what-if re-score can show
+   * how far each one moved. */
+  function currentScores() {
+    const f = S.fact, vals = Object.values((f && f.marginals) || {});
+    return {
+      fact: f ? {
+        factuality_score: (f.summary || {}).factuality_score,
+        avg_prob: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
+        supported: vals.filter((p) => p > 0.5).length,
+      } : null,
+      coh: { ...S.scores },
+    };
+  }
+
+  /* "▲ 0.042" next to a score that moved off the run's own value; nothing when
+   * it did not (or there is no run to compare with). */
+  function deltaChip(value, base) {
+    if (value == null || base == null) return "";
+    const d = value - base;
+    if (Math.abs(d) < 0.0005) return "";
+    return el("span", { class: "delta " + (d > 0 ? "up" : "down"), title: `${fmt(base)} for the run's own priors` },
+      `${d > 0 ? "▲" : "▼"} ${fmt(Math.abs(d))}`);
   }
 
   /* Claim <-> evidence graph: claims (circles, coloured by factuality posterior)
@@ -1368,6 +1499,7 @@
       const val = t.querySelector(".score-value");
       val.textContent = v == null ? "–" : fmt(v);
       val.classList.toggle("pending", v == null);
+      val.append(deltaChip(v, S.baseScores && S.baseScores.coh ? S.baseScores.coh[m] : null));
       t.querySelector(".score-meter span").style.width = v == null ? "0" : `${Math.max(0, Math.min(1, v)) * 100}%`;
     }
     $("#scores").classList.toggle("four", shown === 4);
@@ -1408,6 +1540,7 @@
       stopStream(); setBusy(false); showError(null);
       S.runId = null; S.response = ""; S.exampleId = null; S.claimsFor = null; S.forceExtract = false;
       S.whatIf = false; S.customPriors = {}; S.basePriors = {}; S.factWhatIf = false; S.ctxPriors = {}; S.gold = false;
+      S.stages = []; S.baseScores = null; renderStages();
       $("#response").value = ""; $("#query").value = ""; $("#evidence-text").value = "";
       for (const b of document.querySelectorAll("#examples button")) b.setAttribute("aria-pressed", "false");
       showEditor(); resetResults();

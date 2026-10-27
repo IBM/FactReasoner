@@ -768,10 +768,12 @@ class Engine:
         t = time.perf_counter()
         if gold is not None:
             atoms = {a["id"]: Atom(id=a["id"], text=a["text"]) for a in gold["atoms"]}
-            run.emit("stage", stage="atomize", message=f"Loading the {len(atoms)} gold claims")
+            run.emit("stage", stage="atomize", message=f"Loading the {len(atoms)} gold claims",
+                     source="gold")
         elif run.given_claims:
             atoms = _atoms_from_claims(run.given_claims)
-            run.emit("stage", stage="atomize", message=f"Reusing the {len(atoms)} claims already extracted")
+            run.emit("stage", stage="atomize", message=f"Reusing the {len(atoms)} claims already extracted",
+                     source="reused")
         else:
             run.emit("stage", stage="atomize", message=f"Extracting atomic claims with {claims_name}")
             atoms = self._atomize(run, claims_backend)
@@ -808,7 +810,8 @@ class Engine:
 
         t = time.perf_counter()
         if gold is not None:
-            run.emit("stage", stage="mine", message="Loading the gold relations between claims")
+            run.emit("stage", stage="mine", message="Loading the gold relations between claims",
+                     source="gold")
             run.mining = _mining_from_gold(atoms, gold["relations"], run.priors)
         else:
             run.emit("stage", stage="mine", message=f"Mining relations between claims with {s.coh_model}")

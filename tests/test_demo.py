@@ -562,6 +562,9 @@ class TestGoldExamples:
         coh = events[-1]["coherence"]
         assert len(coh["relations"]) == len(voyager["responses"]["B"]["gold_relations"])
         assert events[-1]["gold"] == {"claims": True, "relations": True}
+        # The stage events say so, for the browser's pipeline stepper.
+        sources = {e["stage"]: e.get("source") for e in events if e["type"] == "stage"}
+        assert sources["atomize"] == "gold" and sources["mine"] == "gold"
 
     def test_live_factuality_runs_nli_on_gold_claims(self, monkeypatch, voyager):
         calls = []

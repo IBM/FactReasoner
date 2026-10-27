@@ -189,7 +189,7 @@ body {
 .panel-head:has(+ .whatif-hint) { border-bottom: 0; padding-bottom: 4px; }
 .whatif-hint { margin: 0; padding: 0 16px 12px; font-size: 12px; line-height: 1.4; color: var(--cds-text-helper); border-bottom: 1px solid var(--cds-border-subtle-01); }
 .ev-prior { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--cds-text-secondary); }
-.ev-prior input[type=range] { flex: 1; max-width: 220px; accent-color: var(--pipe-fact); }
+.ev-prior .range { flex: 1; max-width: 220px; }
 .ev-prior .pnum { min-width: 34px; }
 .ev-prior .edited { color: var(--pipe-fact); font-weight: 600; }
 
@@ -259,6 +259,30 @@ cds-slider { width: 100%; }
 .highlighted sup.cl.active { color: var(--ent); }
 
 .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* The run's pipeline, step by step (Carbon progress-indicator style). */
+.stages { list-style: none; margin: -4px 0 0; padding: 0; display: flex; gap: 0; }
+.stage { flex: 1; min-width: 0; display: grid; grid-template-columns: 16px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; padding-top: 10px; border-top: 2px solid var(--cds-border-subtle-00); font-size: 12px; color: var(--cds-text-secondary); }
+.stage + .stage { margin-left: 4px; }
+.stage-dot { grid-row: 1 / 3; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%; box-sizing: border-box; border: 1px solid var(--cds-border-strong-01); position: relative; }
+.stage-label { font-weight: 500; color: var(--cds-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-label .short { display: none; }
+.stage-note { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--cds-text-helper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage.running { border-top-color: var(--cds-interactive); }
+.stage.running .stage-dot { border: 2px solid var(--cds-interactive); border-right-color: transparent; animation: stage-spin 0.8s linear infinite; }
+.stage.done { border-top-color: var(--cds-interactive); }
+.stage.done .stage-dot { border: 0; background: var(--cds-interactive); }
+.stage.done .stage-dot::after { content: ""; position: absolute; left: 5px; top: 2.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.stage.skipped .stage-label, .stage.pending .stage-label { color: var(--cds-text-secondary); font-weight: 400; }
+.stage.skipped .stage-dot { border-style: dashed; }
+.stage.stopped, .stage.error { border-top-color: var(--cds-support-error); }
+.stage.stopped .stage-dot, .stage.error .stage-dot { border: 0; background: var(--cds-support-error); }
+.stage.stopped .stage-dot::after, .stage.error .stage-dot::after { content: ""; position: absolute; left: 4px; top: 7px; width: 8px; height: 2px; background: #fff; }
+@keyframes stage-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .stage.running .stage-dot { animation: none; border-right-color: var(--cds-interactive); }
+  .delta { animation: none; }
+}
 .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--cds-text-secondary); }
 .status progress { width: 120px; accent-color: var(--cds-interactive); }
 
@@ -286,24 +310,45 @@ cds-slider { width: 100%; }
   color: #fff; background: var(--post-mid);
 }
 .claim-text { font-size: 14px; line-height: 1.4; }
-.claim-meta { grid-column: 2; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--cds-text-secondary); flex-wrap: wrap; }
-.pbar { position: relative; flex: 1; min-width: 120px; max-width: 240px; height: 8px; background: var(--cds-layer-accent-01); border-radius: 4px; }
+/* A claim's scores: one row per analysis, on shared columns (name | bar |
+ * numbers | chip), so the factuality and coherence bars line up. */
+.claim-scores { grid-column: 2; display: grid; grid-template-columns: auto minmax(80px, 220px) auto 1fr; align-items: center; gap: 6px 12px; margin-top: 2px; font-size: 12px; color: var(--cds-text-secondary); }
+.score-row { display: contents; }
+.claim-scores:not(.two) .row-name { display: none; }  /* one analysis: the panel says which */
+.claim-scores:not(.two) { grid-template-columns: minmax(80px, 220px) auto 1fr; }
+.row-name { font-size: 11px; color: var(--cds-text-helper); min-width: 62px; }
+.row-nums { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.row-nums .arrow { color: var(--cds-text-helper); }
+.pnum.strong { font-weight: 600; font-size: 13px; }
+.pnum.muted { color: var(--cds-text-helper); }
+.claim-scores .chip-tag { justify-self: start; }
+.claim-text .chip-tag { margin-left: 8px; vertical-align: 1px; }
+.pbar { position: relative; flex: 1; min-width: 80px; max-width: 240px; height: 8px; background: var(--cds-layer-accent-01); border-radius: 4px; }
 .pbar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ent); transition: width 0.3s; }
 .pbar .tick { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--cds-text-primary); border-radius: 1px; transform: translateX(-1px); }
 .pnum { font-family: "IBM Plex Mono", monospace; color: var(--cds-text-primary); }
-.below { color: var(--con); font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
-.implicit { font-style: italic; color: var(--cds-text-helper); }
-.prior-edit { grid-column: 2; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--cds-text-secondary); }
-.prior-edit input[type=range] { flex: 1; max-width: 240px; accent-color: var(--cds-interactive); }
-
-/* Two scores per claim when both analyses ran. */
-.claim-meta .tag { font-size: 11px; color: var(--cds-text-helper); width: 64px; flex: 0 0 auto; }
-/* With both rows present, fix the bar width so the two bars line up. */
-.claim-meta .tag + .pbar { flex: 0 0 min(200px, 38%); }
+.claim-scores .range { width: 100%; }
 .pbar.fact .fill { opacity: 0.9; }
-.verdict { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
-.verdict.ok { color: var(--ent); }
-.verdict.no { color: var(--con); }
+
+/* Verdict tags, in Carbon's tag colours (blue / red / gray in both themes). */
+.chip-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 500; white-space: nowrap; line-height: 1; }
+.chip-tag.ok { background: var(--cds-tag-background-blue); color: var(--cds-tag-color-blue); }
+.chip-tag.no { background: var(--cds-tag-background-red); color: var(--cds-tag-color-red); }
+.chip-tag.quiet { background: var(--cds-tag-background-gray); color: var(--cds-tag-color-gray); font-weight: 400; }
+
+/* Native range inputs drawn like Carbon's slider (2px track, 14px thumb, in
+ * the text-primary ink of the theme), so every slider on the page matches. */
+.range { -webkit-appearance: none; appearance: none; height: 20px; margin: 0; background: transparent; cursor: pointer; --fill: 50%; }
+.range::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(to right, var(--cds-text-primary) var(--fill), var(--cds-border-subtle-00) var(--fill)); }
+.range::-moz-range-track { height: 2px; background: var(--cds-border-subtle-00); }
+.range::-moz-range-progress { height: 2px; background: var(--cds-text-primary); }
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--cds-text-primary); transition: transform 0.1s; }
+.range::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--cds-text-primary); }
+.range:hover::-webkit-slider-thumb, .range:active::-webkit-slider-thumb { transform: scale(1.43); }
+.range:hover::-moz-range-thumb, .range:active::-moz-range-thumb { transform: scale(1.43); }
+.range:focus-visible { outline: none; }
+.range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--cds-background), 0 0 0 4px var(--cds-focus); }
+.range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 2px var(--cds-background), 0 0 0 4px var(--cds-focus); }
 
 /* ---------------- Results tabs ---------------- */
 .result-tabs { display: block; padding: 0 8px; border-bottom: 1px solid var(--cds-border-subtle-01); }
@@ -377,6 +422,11 @@ cds-slider { width: 100%; }
 .score-label .sym { font-family: "IBM Plex Mono", monospace; color: var(--cds-text-helper); }
 .score-value { font-size: 32px; font-weight: 300; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
 .score-value.pending { color: var(--cds-text-placeholder); }
+/* How far a what-if moved the score from the run's own value. */
+.delta { margin-left: 10px; font-size: 13px; font-weight: 500; font-family: "IBM Plex Mono", monospace; vertical-align: 6px; animation: delta-in 0.25s ease-out; }
+.delta.up { color: var(--ent); }
+.delta.down { color: var(--con); }
+@keyframes delta-in { from { opacity: 0; transform: translateY(3px); } }
 .score-meter { height: 4px; border-radius: 2px; background: var(--cds-layer-accent-01); overflow: hidden; }
 .score-meter span { display: block; height: 100%; width: 0; background: var(--cds-interactive); border-radius: 2px; transition: width 0.4s; }
 .score-note { margin-top: 8px; font-size: 12px; line-height: 1.35; color: var(--cds-text-helper); }
@@ -422,6 +472,17 @@ cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-conte
   .brand-sub, .brand-divider, .brand-title { display: none; }
   .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
   .ev-items, .ev-none { padding-left: 0; }
+  /* Claim scores: name + bar + numbers on one line, the chip under them. */
+  .claim-scores, .claim-scores:not(.two) { grid-template-columns: auto minmax(60px, 1fr) auto; }
+  .claim-scores:not(.two) { grid-template-columns: minmax(60px, 1fr) auto; }
+  .claim-scores .chip-tag { grid-column: 1 / -1; margin-top: -2px; }
+  .claim-scores:has(.chip-tag) > .score-row > span:empty { display: none; }
+  /* The stepper: dots and short labels only; the notes would not fit. */
+  .stage { grid-template-columns: 16px minmax(0, 1fr); column-gap: 4px; }
+  .stage-label { font-size: 11px; }
+  .stage-label .long { display: none; }
+  .stage-label .short { display: inline; }
+  .stage-note { display: none; }
   #dry-run-tag { display: none; }
 
   .scores { grid-template-columns: minmax(0, 1fr); }
