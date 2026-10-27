@@ -108,9 +108,9 @@
     const s = {
       mode: currentMode(),
       fact_backend: backendOf("fact"),
-      fact_model: val("fact-model") || "",
+      fact_model: modelOf("fact"),
       coh_backend: backendOf("coh"),
-      coh_model: val("coh-model") || "",
+      coh_model: modelOf("coh"),
       prior_mode: "flat",
       flat_prior: 0.5,
       methods: methods.length ? methods : ["mean_marginal"],
@@ -124,6 +124,95 @@
     };
     for (const id of DROPDOWNS) s[id] = val(id) || d[id];
     return s;
+  }
+
+  // ------------------------------------------------------------ presets
+  /* A preset fills the run-time settings (mining, inference, retrieval); it
+   * never touches the models, the evidence source or the readouts you picked.
+   * Default is the server's defaults (the paper's setup). */
+  const PRESET_KEYS = ["top_k", "nli_mode", "pipeline_version", "revise_atoms", "summarize_contexts",
+    "prompt_variant", "sense_menu", "reconcile", "pair_policy", "window", "ibound",
+    "concession_discount", "require_evidence", "strength_method"];
+  const PRESETS = {
+    fast: {
+      note: "Fewer passages and claim pairs: quickest.",
+      values: { top_k: 2, nli_mode: "fast", pipeline_version: "v1", revise_atoms: false, summarize_contexts: false,
+        pair_policy: "windowed", window: 2, ibound: 4 },
+    },
+    default: { note: "The paper's setup.", values: {} },
+    thorough: {
+      note: "More passages, all pairs, context links: slowest.",
+      values: { top_k: 5, nli_mode: "all_pairs", pipeline_version: "v3", revise_atoms: true,
+        prompt_variant: "v2", require_evidence: true, pair_policy: "all_pairs", ibound: 10 },
+    },
+  };
+
+  function presetValues(name) {
+    const d = S.config.defaults;
+    return Object.fromEntries(PRESET_KEYS.map((k) => [k, k in PRESETS[name].values ? PRESETS[name].values[k] : d[k]]));
+  }
+
+  /* Read / write one setting control, whatever its kind. */
+  function getField(id) {
+    const n = document.getElementById(id);
+    if (n.tagName === "CDS-CHECKBOX") return !!n.checked;
+    if (n.tagName === "CDS-NUMBER-INPUT" || n.tagName === "CDS-SLIDER") return parseFloat(n.value);
+    return n.value;
+  }
+  function setField(id, v) {
+    const n = document.getElementById(id);
+    if (n.tagName === "CDS-CHECKBOX") { n.checked = !!v; n.toggleAttribute("checked", !!v); return; }
+    if (n.tagName === "CDS-DROPDOWN") { setDropdown(id, v); return; }
+    n.value = String(v); n.setAttribute("value", String(v));
+    const out = document.querySelector(`[data-for="${id}"]`);
+    if (out) out.textContent = fmt(parseFloat(v), 2);
+  }
+
+  let applyingPreset = false;
+  function applyPreset(name) {
+    applyingPreset = true;
+    const vals = presetValues(name);
+    for (const k of PRESET_KEYS) setField(k, vals[k]);
+    applyingPreset = false;
+    syncEvidence(); syncPreset();
+  }
+
+  /* Which preset the controls match, or Custom; and how many advanced
+   * settings differ from the defaults (shown on the closed Advanced toggle). */
+  function syncPreset() {
+    if (applyingPreset || !S.config) return;
+    const same = (a, b) => (typeof a === "number" || typeof b === "number") ? Math.abs(Number(a) - Number(b)) < 1e-9 : a === b;
+    const now = Object.fromEntries(PRESET_KEYS.map((k) => [k, getField(k)]));
+    const match = Object.keys(PRESETS).find((p) => PRESET_KEYS.every((k) => same(now[k], presetValues(p)[k])));
+    setSwitcher("preset", match || "");
+    $("#preset-custom").hidden = !!match;
+    $("#preset-note").textContent = match ? PRESETS[match].note : "Edited: no preset matches these settings.";
+    const d = S.config.defaults;
+    const adv = [...document.querySelectorAll(".pipe-grid.adv [id]")]
+      .map((n) => n.id).filter((id) => PRESET_KEYS.includes(id));
+    const changed = adv.filter((k) => !same(now[k], d[k])).length;
+    const count = $("#adv-count");
+    count.hidden = !changed;
+    count.textContent = String(changed);
+    count.title = `${changed} advanced setting(s) differ from the defaults`;
+    syncReadouts();
+  }
+
+  function syncReadouts() {
+    const on = [...document.querySelectorAll("#methods cds-checkbox")].filter((c) => c.checked);
+    const all = document.querySelectorAll("#methods cds-checkbox").length;
+    $("#readouts-text").textContent = on.length === all ? "all" : on.length
+      ? on.map((c) => (METHOD_LABELS[c.getAttribute("value")] || "").split(" ")[0].toLowerCase()).join(" · ") : "none";
+  }
+
+  function setAdvanced(open) {
+    S.advanced = open;
+    for (const g of document.querySelectorAll(".pipe-grid.adv")) g.hidden = !open;
+    const t = $("#toggle-advanced");
+    t.setAttribute("aria-expanded", String(open));
+    t.classList.toggle("open", open);
+    $("#adv-text").textContent = open ? "Fewer settings" : "Advanced";
+    try { localStorage.setItem("lcs-advanced", open ? "1" : "0"); } catch (e) { /* storage blocked */ }
   }
 
   function currentMode() {
@@ -173,28 +262,73 @@
     }
   }
 
-  const backendOf = (pipe) => $(`#${pipe}-backend`).value || "rits";
+  /* One model picker per pipeline: every local Ollama model, then every RITS
+   * model, each tagged with its backend (and size). A value is
+   * "<backend>:<name>", so the backend is the model's, not a separate switch. */
+  const modelValue = (pipe) => $(`#${pipe}-model`).value || "";
+  const backendOf = (pipe) => {
+    const v = modelValue(pipe);
+    return v.startsWith("ollama:") ? "ollama" : v.startsWith("rits:") ? "rits" : (S.config.defaults[`${pipe}_backend`] || "rits");
+  };
+  const modelOf = (pipe) => modelValue(pipe).replace(/^(ollama|rits):/, "");
 
-  /* The model list a pipeline shows: RITS inventory or local Ollama models. */
-  function fillModels(pipe) {
-    const c = S.config;
-    const ollama = backendOf(pipe) === "ollama";
-    const names = ollama ? (S.ollama || []).map((m) => m.name) : c.models.map((m) => m.name);
-    const dd = $(`#${pipe}-model`);
-    const prev = dd.value;
-    // The server's default model applies to its default backend; switching to
-    // the other backend starts on that backend's preferred / first model.
-    const onDefault = backendOf(pipe) === c.defaults[`${pipe}_backend`];
-    const fallback = onDefault ? c.defaults[`${pipe}_model`] : (ollama ? c.ollama_preferred : names[0]);
-    const pick = names.includes(prev) ? prev : names.includes(fallback) ? fallback : (names[0] || "");
-    fillDropdown(`${pipe}-model`, names, pick);
-    dd.toggleAttribute("disabled", names.length === 0);
-    if (!names.length) dd.setAttribute("label", ollama ? "No local models" : "No RITS models");
+  function gb(bytes) {
+    return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
   }
 
-  /* Backend-dependent fixed values: NLI on kev, strength verbalized. */
-  function syncBackend() {
+  function modelOptions() {
+    const c = S.config;
+    const out = [];
+    // Offline replay consults no Ollama server, so only the RITS names (which
+    // the stub answers to) are offered.
+    if (!c.dry_run) {
+      for (const m of S.ollama || []) out.push({ value: `ollama:${m.name}`, name: m.name, backend: "Ollama", meta: m.size ? gb(m.size) : "local" });
+    }
+    for (const m of c.models) out.push({ value: `rits:${m.name}`, name: m.name, backend: "RITS", meta: "remote" });
+    return out;
+  }
+
+  function fillModels(pipe) {
+    const c = S.config;
+    const opts = modelOptions();
+    const dd = $(`#${pipe}-model`);
+    const prev = dd.value;
+    const values = opts.map((o) => o.value);
+    const def = `${c.defaults[`${pipe}_backend`]}:${c.defaults[`${pipe}_model`]}`;
+    const pick = values.includes(prev) ? prev : values.includes(def) ? def : (values[0] || "");
+    dd.innerHTML = "";
+    for (const o of opts) {
+      const item = document.createElement("cds-dropdown-item");
+      item.setAttribute("value", o.value);
+      // The closed dropdown shows the item's plain text, so that is the name
+      // alone; the backend tag and size are drawn by CSS from data attributes.
+      item.textContent = o.name;
+      item.dataset.backend = o.backend;
+      item.dataset.meta = o.meta;
+      dd.append(item);
+    }
+    dd.setAttribute("value", pick);
+    dd.value = pick;
+    dd.toggleAttribute("disabled", opts.length === 0);
+    if (!opts.length) dd.setAttribute("label", "No models: set RITS_API_KEY or pull an Ollama model");
+  }
+
+  /* Refill both pickers (on load, and after Refresh Ollama models). */
+  function refreshModels() {
     fillModels("fact"); fillModels("coh");
+    syncBackend();
+  }
+
+  /* Backend-dependent fixed values: NLI on kev, strength verbalized. The
+   * chosen model's backend is tagged next to the field label. */
+  function syncBackend() {
+    for (const pipe of ["fact", "coh"]) {
+      const tag = $(`#${pipe}-backend-tag`);
+      const b = backendOf(pipe);
+      tag.textContent = b === "ollama" ? "Ollama" : "RITS";
+      tag.className = `mp-tag ${b}`;
+      tag.hidden = !modelValue(pipe);
+    }
     const factOllama = backendOf("fact") === "ollama";
     const cohOllama = backendOf("coh") === "ollama";
     $("#fact-nli-ollama").hidden = !factOllama;
@@ -220,7 +354,7 @@
       S.ollama = d.models || [];
       showDecision(d.decision_model);
     } catch (e) { S.ollama = []; }
-    syncBackend();
+    refreshModels();
   }
 
 
@@ -233,16 +367,8 @@
     S.ollama = c.ollama_models || [];
     showDecision(c.decision_model);
     $("#ollama-host").textContent = `Ollama: ${c.ollama_host || ""}`;
-    setSwitcher("fact-backend", d.fact_backend);
-    setSwitcher("coh-backend", d.coh_backend);
-    if (c.dry_run) {
-      // Offline: the stub answers for any name; Ollama is not consulted.
-      for (const it of document.querySelectorAll('cds-content-switcher-item[value="ollama"]')) {
-        if (it.closest("#fact-backend, #coh-backend")) it.setAttribute("disabled", "");
-      }
-    }
     for (const id of DROPDOWNS) fillDropdown(id, c.options[id], d[id]);
-    syncBackend();
+    refreshModels();
 
     const box = $("#methods");
     for (const m of c.options.methods) {
@@ -1547,10 +1673,20 @@
       $("#result-tabs").hidden = false;
     });
     $("#mode").addEventListener("cds-content-switcher-selected", syncMode);
-    $("#fact-backend").addEventListener("cds-content-switcher-selected", syncBackend);
-    $("#coh-backend").addEventListener("cds-content-switcher-selected", syncBackend);
+    $("#fact-model").addEventListener("cds-dropdown-selected", syncBackend);
+    $("#coh-model").addEventListener("cds-dropdown-selected", syncBackend);
     $("#evidence").addEventListener("cds-dropdown-selected", syncEvidence);
     $("#collapse-settings").addEventListener("click", () => setSettingsOpen($("#settings").classList.contains("collapsed")));
+    $("#toggle-advanced").addEventListener("click", () => setAdvanced(!S.advanced));
+    $("#preset").addEventListener("cds-content-switcher-selected", (e) => applyPreset(e.detail.item.value));
+    // Any edit to a preset-controlled setting re-checks which preset it matches.
+    for (const k of PRESET_KEYS) {
+      const n = document.getElementById(k);
+      for (const ev of ["cds-dropdown-selected", "cds-checkbox-changed", "cds-number-input", "cds-slider-changed", "change", "input"]) {
+        n.addEventListener(ev, () => setTimeout(syncPreset, 0));
+      }
+    }
+    $("#methods").addEventListener("cds-checkbox-changed", () => setTimeout(syncReadouts, 0));
     $("#prior-mode").addEventListener("cds-content-switcher-selected", (e) => setWhatIf(e.detail.item.value === "custom"));
     $("#fact-prior-mode").addEventListener("cds-content-switcher-selected", (e) => setFactWhatIf(e.detail.item.value === "custom"));
     $("#prior-reset").addEventListener("click", resetWhatIf);
@@ -1631,6 +1767,10 @@
     renderScores();
     renderFactuality();
     syncWhatIf(); syncFactWhatIf();
+    let adv = false;
+    try { adv = localStorage.getItem("lcs-advanced") === "1"; } catch (e) { /* storage blocked */ }
+    setAdvanced(adv || q.get("advanced") === "1");
+    syncPreset();
     const ex = S.config.examples.find((e) => e.id === q.get("example"));
     if (ex) {
       pickExample(ex);
@@ -1653,7 +1793,11 @@
     }
     if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
     for (const pipe of ["fact", "coh"]) {
-      if (q.get(pipe)) { setSwitcher(`${pipe}-backend`, q.get(pipe)); syncBackend(); }
+      // &fact=ollama|rits picks that backend's first model (QA / screenshots).
+      if (q.get(pipe)) {
+        const first = modelOptions().find((o) => o.value.startsWith(q.get(pipe) + ":"));
+        if (first) { setDropdown(`${pipe}-model`, first.value); syncBackend(); }
+      }
     }
     if (q.get("edge") != null) {
       const n = parseInt(q.get("edge"), 10);

@@ -141,8 +141,26 @@ body {
  * label line over a fixed-height control, so each row lines up across fields
  * and across the two cards. Nothing inside a field may change its height. */
 .settings { --label-h: 18px; --ctl-h: 32px; }
-.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 8px 6px 16px; background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01); border-radius: var(--radius); }
+.settings-head { display: flex; align-items: center; gap: 16px; padding: 6px 8px 6px 16px; background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01); border-radius: var(--radius); flex-wrap: wrap; }
+.settings-head .panel-title { margin-right: 8px; }
 .panel.settings.collapsed > .pipelines, .panel.settings.collapsed > .ollama-host { display: none; }
+.panel.settings.collapsed .preset, .panel.settings.collapsed .preset-note, .panel.settings.collapsed .adv-toggle { display: none; }
+#collapse-settings { margin-left: auto; }
+
+/* Preset: Fast | Default | Thorough, plus "Custom" once a setting is edited. */
+.preset { display: flex; align-items: center; gap: 10px; }
+.preset cds-content-switcher { width: 264px; }
+.preset-custom { font-size: 12px; font-weight: 600; color: var(--cds-text-primary); padding: 0 8px; height: 24px; display: inline-flex; align-items: center; border-radius: 12px; background: var(--cds-tag-background-gray); }
+.preset-note { font-size: 12px; color: var(--cds-text-helper); min-width: 0; }
+
+/* The Advanced toggle: one switch for both cards, so their rows stay aligned. */
+.adv-toggle { font: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 0; border-radius: 0; background: transparent; color: var(--cds-link-primary); cursor: pointer; }
+.adv-toggle:hover { background: var(--cds-layer-hover-01); }
+.adv-toggle:focus-visible { outline: 2px solid var(--cds-focus); outline-offset: -2px; }
+.adv-toggle .chev { transition: transform 0.15s; }
+.adv-toggle.open .chev { transform: rotate(180deg); }
+.adv-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 600; display: inline-grid; place-items: center; background: var(--cds-interactive); color: #fff; }
+.pipe-grid.adv { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--cds-border-subtle-01); }
 
 .pipelines { display: grid; grid-template-columns: subgrid; column-gap: var(--gutter); padding: 0; }
 .pipe { background: var(--cds-layer-01); border: 1px solid var(--cds-border-subtle-01); border-top: 3px solid var(--accent); border-radius: var(--radius); padding: 10px 14px 14px; min-width: 0; transition: opacity 0.15s; }
@@ -169,8 +187,20 @@ body {
 .field cds-dropdown, .field cds-number-input { display: block; width: 100%; height: var(--ctl-h); }
 .field cds-number-input { overflow: hidden; }
 .field.off { opacity: 0.4; pointer-events: none; }
-.model-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: center; }
-.model-row cds-content-switcher { height: var(--ctl-h); }
+/* Model picker: each item is the model name, with its backend and size drawn
+ * after it (the closed dropdown shows the name; the label carries a tag). */
+.model-pick cds-dropdown-item[data-backend] { position: relative; }
+.model-pick cds-dropdown-item[data-backend]::after {
+  content: attr(data-backend) " · " attr(data-meta);
+  position: absolute; right: 44px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  height: 18px; padding: 0 7px; border-radius: 9px; display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 500; background: var(--cds-tag-background-gray); color: var(--cds-tag-color-gray);
+}
+.model-pick cds-dropdown-item[data-backend="RITS"]::after { background: var(--cds-tag-background-blue); color: var(--cds-tag-color-blue); }
+.mp-tag { display: inline-flex; align-items: center; height: 16px; margin: 0 2px; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; vertical-align: 1px; line-height: 1; }
+.mp-tag.ollama { background: var(--cds-tag-background-gray); color: var(--cds-tag-color-gray); }
+.mp-tag.rits { background: var(--cds-tag-background-blue); color: var(--cds-tag-color-blue); }
+.fixed-value.readouts { font-size: 12px; }
 .check-row { height: var(--ctl-h); display: flex; align-items: center; gap: 16px; }
 .methods-row { flex-wrap: nowrap; }
 .slider-row { height: var(--ctl-h); display: flex; align-items: center; }
@@ -472,6 +502,14 @@ cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-conte
   .brand-sub, .brand-divider, .brand-title { display: none; }
   .app-header { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
   .ev-items, .ev-none { padding-left: 0; }
+  /* Settings header: title + Hide on one line, then the preset, then the rest. */
+  .settings-head { row-gap: 8px; padding: 8px 8px 10px 12px; }
+  .settings-head .panel-title { order: 0; }
+  #collapse-settings { order: 1; }
+  .preset { order: 2; flex-basis: 100%; }
+  .preset cds-content-switcher { flex: 1; width: auto; }
+  .preset-note { order: 3; flex: 1; }
+  .adv-toggle { order: 4; padding: 0 4px; }
   /* Claim scores: name + bar + numbers on one line, the chip under them. */
   .claim-scores, .claim-scores:not(.two) { grid-template-columns: auto minmax(60px, 1fr) auto; }
   .claim-scores:not(.two) { grid-template-columns: minmax(60px, 1fr) auto; }

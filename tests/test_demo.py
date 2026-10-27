@@ -170,6 +170,23 @@ class TestHelpers:
     def test_unreachable_ollama_is_an_empty_list(self):
         assert list_ollama_models("http://127.0.0.1:9", timeout=0.2) == []
 
+    def test_ollama_list_reports_sizes(self, monkeypatch):
+        """Sizes from /api/tags reach the model picker; a missing one is omitted."""
+
+        class R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"models": [{"name": "kev:latest", "size": 6700000000},
+                                   {"name": "granite4.1:3b"}]}
+
+        monkeypatch.setattr("requests.get", lambda url, timeout: R())
+        assert list_ollama_models("http://x") == [
+            {"name": "granite4.1:3b", "model_id": "granite4.1:3b"},
+            {"name": "kev:latest", "model_id": "kev:latest", "size": 6700000000},
+        ]
+
 
 # -------------------------------------------------------------------- API
 

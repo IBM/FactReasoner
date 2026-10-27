@@ -360,7 +360,8 @@ def list_ollama_models(host: str | None, timeout: float = 2.0) -> list[dict[str,
         timeout: Seconds to wait; the demo must not hang on a dead server.
 
     Returns:
-        ``[{name, model_id}]``, or ``[]`` when the server is unreachable.
+        ``[{name, model_id, size?}]`` (``size`` in bytes, when the server
+        reports it), or ``[]`` when the server is unreachable.
     """
     import requests
 
@@ -370,10 +371,16 @@ def list_ollama_models(host: str | None, timeout: float = 2.0) -> list[dict[str,
     try:
         r = requests.get(f"{url}/api/tags", timeout=timeout)
         r.raise_for_status()
-        tags = [m["name"] for m in r.json().get("models", [])]
+        tags = {m["name"]: m.get("size") for m in r.json().get("models", [])}
     except Exception:  # noqa: BLE001 - unreachable is an empty list, not an error
         return []
-    return [{"name": t, "model_id": t} for t in sorted(tags)]
+    out = []
+    for t in sorted(tags):
+        m = {"name": t, "model_id": t}
+        if isinstance(tags[t], int):
+            m["size"] = tags[t]
+        out.append(m)
+    return out
 
 
 def split_passages(text: str) -> list[str]:

@@ -47,6 +47,22 @@
       <section class="panel settings" id="settings" aria-label="Settings">
         <div class="settings-head">
           <h2 class="panel-title">Settings</h2>
+          <div class="preset" role="group" aria-labelledby="preset-label">
+            <span class="field-label" id="preset-label">Preset</span>
+            <cds-content-switcher id="preset" size="sm" value="default" aria-label="Settings preset">
+              <cds-content-switcher-item value="fast">Fast</cds-content-switcher-item>
+              <cds-content-switcher-item value="default" selected>Default</cds-content-switcher-item>
+              <cds-content-switcher-item value="thorough">Thorough</cds-content-switcher-item>
+            </cds-content-switcher>
+            <span class="preset-custom" id="preset-custom" hidden>Custom</span>
+          </div>
+          <span class="preset-note" id="preset-note"></span>
+          <button type="button" class="adv-toggle" id="toggle-advanced" aria-expanded="false" aria-controls="adv-fact adv-coh">
+            <svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><!-- Carbon: settings--adjust --><path d="M30 8h-4.1c-.5-2.3-2.5-4-4.9-4s-4.4 1.7-4.9 4H2v2h14.1c.5 2.3 2.5 4 4.9 4s4.4-1.7 4.9-4H30V8zm-9 4c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zM2 24h4.1c.5 2.3 2.5 4 4.9 4s4.4-1.7 4.9-4H30v-2H15.9c-.5-2.3-2.5-4-4.9-4s-4.4 1.7-4.9 4H2v2zm9-4c1.7 0 3 1.3 3 3s-1.3 3-3 3-3-1.3-3-3 1.3-3 3-3z"/></svg>
+            <span id="adv-text">Advanced</span>
+            <span class="adv-count" id="adv-count" hidden></span>
+            <svg class="chev" viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16 22 6 12l1.4-1.4 8.6 8.6 8.6-8.6L26 12z"/></svg>
+          </button>
           <cds-button id="collapse-settings" kind="ghost" size="sm">Hide</cds-button>
         </div>
         <div class="pipelines" id="pipelines">
@@ -60,14 +76,8 @@
             </div>
             <div class="pipe-grid">
               <div class="field span2">
-                <span class="field-label">Model <span class="field-note">claims, reviser, summarizer</span></span>
-                <div class="model-row">
-                  <cds-content-switcher id="fact-backend" size="sm" value="ollama" aria-label="Factuality model backend">
-                    <cds-content-switcher-item value="rits">RITS</cds-content-switcher-item>
-                    <cds-content-switcher-item value="ollama" selected>Ollama</cds-content-switcher-item>
-                  </cds-content-switcher>
-                  <cds-dropdown id="fact-model" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
-                </div>
+                <span class="field-label">Model <span class="mp-tag" id="fact-backend-tag" hidden></span> <span class="field-note">claims, reviser, summarizer</span></span>
+                <cds-dropdown id="fact-model" class="model-pick" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
               </div>
               <div class="field">
                 <span class="field-label">NLI <span class="field-note">claim ↔ evidence</span></span>
@@ -88,6 +98,8 @@
                 <cds-dropdown id="nli_mode" title-text="" aria-label="Claim–evidence pairs" size="sm"></cds-dropdown>
               </div>
 
+            </div>
+            <div class="pipe-grid adv" id="adv-fact" hidden>
               <div class="field">
                 <span class="field-label">FactReasoner version</span>
                 <cds-dropdown id="pipeline_version" title-text="" aria-label="FactReasoner version" size="sm"></cds-dropdown>
@@ -114,14 +126,8 @@
             </div>
             <div class="pipe-grid">
               <div class="field span2">
-                <span class="field-label">Relation miner <span class="field-note" id="coh-claims-note">also extracts the claims</span></span>
-                <div class="model-row">
-                  <cds-content-switcher id="coh-backend" size="sm" value="ollama" aria-label="Relation miner backend">
-                    <cds-content-switcher-item value="rits">RITS</cds-content-switcher-item>
-                    <cds-content-switcher-item value="ollama" selected>Ollama</cds-content-switcher-item>
-                  </cds-content-switcher>
-                  <cds-dropdown id="coh-model" title-text="" aria-label="Relation miner model" size="sm"></cds-dropdown>
-                </div>
+                <span class="field-label">Relation miner <span class="mp-tag" id="coh-backend-tag" hidden></span> <span class="field-note" id="coh-claims-note">also extracts the claims</span></span>
+                <cds-dropdown id="coh-model" class="model-pick" title-text="" aria-label="Relation miner model" size="sm"></cds-dropdown>
               </div>
               <div class="field">
                 <span class="field-label">Relation strength</span>
@@ -129,6 +135,20 @@
                 <div id="strength-rits"><cds-dropdown id="strength_method" title-text="" aria-label="Strength estimator" size="sm"></cds-dropdown></div>
               </div>
 
+              <div class="field">
+                <span class="field-label">Candidate pairs</span>
+                <cds-dropdown id="pair_policy" title-text="" aria-label="Candidate pairs" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Claim priors</span>
+                <div class="fixed-value" id="priors-value"><span id="priors-text">uniform 0.5</span></div>
+              </div>
+              <div class="field">
+                <span class="field-label">LCS readouts</span>
+                <div class="fixed-value readouts" id="readouts-value"><span id="readouts-text">3 of 4</span></div>
+              </div>
+            </div>
+            <div class="pipe-grid adv" id="adv-coh" hidden>
               <div class="field">
                 <span class="field-label">Prompt variant</span>
                 <cds-dropdown id="prompt_variant" title-text="" aria-label="Prompt variant" size="sm"></cds-dropdown>
@@ -143,18 +163,9 @@
               </div>
 
               <div class="field">
-                <span class="field-label">Candidate pairs</span>
-                <cds-dropdown id="pair_policy" title-text="" aria-label="Candidate pairs" size="sm"></cds-dropdown>
-              </div>
-              <div class="field">
                 <span class="field-label">Window radius</span>
                 <cds-number-input id="window" label="" hide-label aria-label="Window radius" min="1" max="20" value="4" size="sm"></cds-number-input>
               </div>
-              <div class="field">
-                <span class="field-label">Merlin i-bound</span>
-                <cds-number-input id="ibound" label="" hide-label aria-label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
-              </div>
-
               <div class="field">
                 <span class="field-label">Concession discount <span class="mono field-value" data-for="concession_discount">0.45</span></span>
                 <div class="slider-row"><cds-slider id="concession_discount" hide-label hide-text-input label-text="Concession discount" min="0" max="1" step="0.05" value="0.45"><span slot="min-text"></span><span slot="max-text"></span></cds-slider></div>
@@ -163,11 +174,11 @@
                 <span class="field-label">Evidence span</span>
                 <div class="check-row"><cds-checkbox id="require_evidence" label-text="Require (prompt v2)"></cds-checkbox></div>
               </div>
-              <div class="field">
-                <span class="field-label">Claim priors</span>
-                <div class="fixed-value" id="priors-value"><span id="priors-text">uniform 0.5</span></div>
-              </div>
 
+              <div class="field">
+                <span class="field-label">Merlin i-bound</span>
+                <cds-number-input id="ibound" label="" hide-label aria-label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
+              </div>
               <div class="field span3">
                 <span class="field-label">LCS readouts</span>
                 <div id="methods" class="check-row methods-row"></div>

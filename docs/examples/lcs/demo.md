@@ -58,7 +58,9 @@ fact-reasoner-lcs-demo --dry-run
 ```
 
 **Models.** Each pipeline has its own model, from **Ollama** (the default) or
-**RITS** (the models in `configs/rits_models.json`, which need `RITS_API_KEY`). Both
+**RITS** (the models in `configs/rits_models.json`, which need `RITS_API_KEY`). One
+picker per pipeline lists both: the local Ollama models first (with their size),
+then the RITS models, each tagged with its backend. Both
 pipelines start on the local `granite4.1:3b` when it is pulled. They fall back to RITS
 only when the Ollama server has no models, or in offline replay. The Ollama list
 is whatever the local server has pulled, read live from `/api/tags`; use *Refresh
@@ -169,21 +171,35 @@ can stand in for `--merlin-path`.
 
 ### Control panel
 
+Each card shows its essentials: model, NLI / relation strength, evidence source,
+retrieval depth, candidate pairs, claim priors, readouts. **Advanced** opens the rest
+in both cards at once, so their rows stay aligned. While closed, a badge counts the
+advanced settings that differ from the defaults. A **preset** (*Fast*, *Default*,
+*Thorough*) fills the retrieval, mining and inference settings; it never changes the
+models, the evidence source or the readouts. Edit any of those settings and the
+preset shows *Custom*.
+
+| Preset | Changes from the defaults |
+|---|---|
+| Fast | 2 passages per claim, FactReasoner v1, windowed candidate pairs (radius 2), i-bound 4 |
+| Default | none: the paper's setup |
+| Thorough | 5 passages, all claim–evidence pairs, v3 (context links), decontextualized claims, prompt v2 with evidence spans, i-bound 10 |
+
 | Setting | Effect |
 |---|---|
 | **Factuality pipeline** | |
-| Model | RITS or Ollama, and which model, for claim extraction, the reviser and the evidence summarizer. |
+| Model | Any Ollama or RITS model, for claim extraction, the reviser and the evidence summarizer. |
 | NLI | RITS: how the verdict gets a probability. Ollama: fixed to the `kev` decision model. |
 | Evidence source | Google (Serper; needs `SERPER_API_KEY`), Wikipedia, or **Paste evidence**: one passage per paragraph, each compared with every claim (at most 12). |
 | Passages per claim / claim–evidence pairs | Retrieval depth, and which claim–passage pairs get an NLI call (*Fast* compares a passage with the claim that retrieved it and its neighbours). Pasted evidence always uses all pairs. |
 | FactReasoner version | v1 per-claim contexts, v2 deduplicated contexts, v3 adds context–context relations. |
 | Decontextualize / Summarize | Rewrite claims to stand alone; summarize each passage before NLI. Both run on the factuality model. |
 | **Coherence pipeline** | |
-| Relation miner | RITS or Ollama, and which model. |
+| Relation miner | Any Ollama or RITS model. |
 | Relation strength | RITS: the estimator. Ollama: fixed to verbalized, since there are no logprobs. |
 | Claim priors | Read-only: set by the analysis (uniform 0.5, or factuality posteriors). |
 | LCS readouts | Which readouts to compute. They share the base inference runs. |
-| Mining and inference | Prompt variant, sense menu, sense/coupling reconcile, candidate pairs, window radius, Merlin i-bound, concession discount, evidence-span requirement, LCS readouts. All shown, none hidden. |
+| Mining and inference | Candidate pairs is always shown. Under **Advanced**: prompt variant, sense menu, sense/coupling reconcile, window radius, concession discount, evidence-span requirement, Merlin i-bound, LCS readouts. |
 
 Analyses are queued and run one at a time on one worker thread with a persistent
 event loop. Mellea caches its async client per loop, and one run at a time also
