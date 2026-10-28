@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FactReasoner Demo</title>
+  <!-- IBM Plex, the Carbon design system's typeface. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Carbon tokens + component styles (g10 / g100 theme classes). -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@carbon/styles@1.116.0/css/styles.min.css">
+  <link rel="stylesheet" href="style.css?v=5">
+  <!-- Carbon web components: one ESM bundle registers every cds-* element. -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@carbon/web-components@2.64.0/es/index.js/+esm"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js"></script>
+</head>
+<body class="cds--g10">
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-ibm">IBM</span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-title"><strong>Research</strong> Demos</span>
+        <span class="brand-sub">FactReasoner</span>
+        <cds-tag id="dry-run-tag" type="warm-gray" size="sm" hidden>Offline replay</cds-tag>
+      </div>
+      <div class="header-actions">
+        <cds-icon-button id="toggle-theme" kind="ghost" align="bottom">
+          <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: contrast --><path d="M29.37 11.84a14 14 0 1 0 0 8.32 13.6 13.6 0 0 0 0-8.32zM16 4a12 12 0 0 1 0 24z"/></svg>
+          <span slot="tooltip-content">Light / dark</span>
+        </cds-icon-button>
+        <cds-icon-button id="open-info" kind="ghost" align="bottom">
+          <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: information --><path d="M17 22v-8h-4v2h2v6h-3v2h8v-2h-3zM16 8a1.5 1.5 0 1 0 1.5 1.5A1.5 1.5 0 0 0 16 8z"/><path d="M16 30a14 14 0 1 1 14-14 14 14 0 0 1-14 14zm0-26a12 12 0 1 0 12 12A12 12 0 0 0 16 4z"/></svg>
+          <span slot="tooltip-content">How it works</span>
+        </cds-icon-button>
+        <cds-button id="start-over" kind="ghost" size="sm">Start over
+          <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: reset --><path d="M18 28A12 12 0 1 0 6 16v6.2l-3.6-3.6L1 20l6 6 6-6-1.4-1.4L8 22.2V16a10 10 0 1 1 10 10z"/></svg>
+        </cds-button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <!-- ============ Settings: one card per pipeline ============ -->
+      <!-- Both cards use one grid: 3 equal columns, every field a one-line
+           label over a 32px control, so rows line up across the two cards. -->
+      <section class="panel settings" id="settings" aria-label="Settings">
+        <div class="settings-head">
+          <h2 class="panel-title">Settings</h2>
+          <div class="preset" role="group" aria-labelledby="preset-label">
+            <span class="field-label" id="preset-label">Preset</span>
+            <cds-content-switcher id="preset" size="sm" value="default" aria-label="Settings preset">
+              <cds-content-switcher-item value="fast">Fast</cds-content-switcher-item>
+              <cds-content-switcher-item value="default" selected>Default</cds-content-switcher-item>
+              <cds-content-switcher-item value="thorough">Thorough</cds-content-switcher-item>
+            </cds-content-switcher>
+            <span class="preset-custom" id="preset-custom" hidden>Custom</span>
+          </div>
+          <span class="preset-note" id="preset-note"></span>
+          <button type="button" class="adv-toggle" id="toggle-advanced" aria-expanded="false" aria-controls="adv-fact adv-coh">
+            <svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><!-- Carbon: settings--adjust --><path d="M30 8h-4.1c-.5-2.3-2.5-4-4.9-4s-4.4 1.7-4.9 4H2v2h14.1c.5 2.3 2.5 4 4.9 4s4.4-1.7 4.9-4H30V8zm-9 4c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zM2 24h4.1c.5 2.3 2.5 4 4.9 4s4.4-1.7 4.9-4H30v-2H15.9c-.5-2.3-2.5-4-4.9-4s-4.4 1.7-4.9 4H2v2zm9-4c1.7 0 3 1.3 3 3s-1.3 3-3 3-3-1.3-3-3 1.3-3 3-3z"/></svg>
+            <span id="adv-text">Advanced</span>
+            <span class="adv-count" id="adv-count" hidden></span>
+            <svg class="chev" viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16 22 6 12l1.4-1.4 8.6 8.6 8.6-8.6L26 12z"/></svg>
+          </button>
+          <cds-button id="collapse-settings" kind="ghost" size="sm">Hide</cds-button>
+        </div>
+        <div class="pipelines" id="pipelines">
+          <!-- ---------- Factuality pipeline ---------- -->
+          <div class="pipe pipe-fact" id="pipe-fact">
+            <div class="pipe-head">
+              <span class="pipe-dot" aria-hidden="true"></span>
+              <h3 class="pipe-title">Factuality pipeline</h3>
+              <span class="pipe-sub">claims · evidence · NLI · inference</span>
+              <span class="pipe-unused">not used by this analysis</span>
+            </div>
+            <div class="pipe-grid">
+              <div class="field span2">
+                <span class="field-label">Model <span class="mp-tag" id="fact-backend-tag" hidden></span> <span class="field-note">claims, reviser, summarizer</span></span>
+                <cds-dropdown id="fact-model" class="model-pick" title-text="" aria-label="Factuality model" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">NLI <span class="mp-tag" id="nli-backend-tag" hidden></span> <span class="field-note">claim ↔ evidence</span></span>
+                <cds-content-switcher id="fact-nli" size="sm" value="decision" aria-label="Factuality NLI scorer">
+                  <cds-content-switcher-item value="model">Same model</cds-content-switcher-item>
+                  <cds-content-switcher-item value="decision" selected><span class="mono" data-decision>kev</span></cds-content-switcher-item>
+                </cds-content-switcher>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Evidence source</span>
+                <cds-dropdown id="evidence" title-text="" aria-label="Evidence source" size="sm"></cds-dropdown>
+              </div>
+              <div class="field" id="retrieval-wrap">
+                <span class="field-label">Passages per claim</span>
+                <cds-number-input id="top_k" label="" hide-label aria-label="Passages per claim" min="1" max="10" value="3" size="sm"></cds-number-input>
+              </div>
+              <div class="field" id="pairs-wrap">
+                <span class="field-label">Claim–evidence pairs</span>
+                <cds-dropdown id="nli_mode" title-text="" aria-label="Claim–evidence pairs" size="sm"></cds-dropdown>
+              </div>
+
+            </div>
+            <div class="pipe-grid adv" id="adv-fact" hidden>
+              <div class="field" id="nli-method-wrap">
+                <span class="field-label">NLI probability <span class="field-note">same-model NLI</span></span>
+                <cds-dropdown id="nli_method" title-text="" aria-label="NLI probability" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">FactReasoner version</span>
+                <cds-dropdown id="pipeline_version" title-text="" aria-label="FactReasoner version" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Claims</span>
+                <div class="check-row"><cds-checkbox id="revise_atoms" label-text="Decontextualize"></cds-checkbox></div>
+              </div>
+              <div class="field">
+                <span class="field-label">Evidence</span>
+                <div class="check-row"><cds-checkbox id="summarize_contexts" label-text="Summarize"></cds-checkbox></div>
+              </div>
+            </div>
+            <p class="pipe-foot" id="decision-missing" hidden>The <span class="mono" data-decision>kev</span> decision model is not pulled on this server: <span class="mono">ollama pull <span data-decision>kev</span></span></p>
+          </div>
+
+          <!-- ---------- Coherence pipeline ---------- -->
+          <div class="pipe pipe-coh" id="pipe-coh">
+            <div class="pipe-head">
+              <span class="pipe-dot" aria-hidden="true"></span>
+              <h3 class="pipe-title">Coherence pipeline</h3>
+              <span class="pipe-sub">relation miner · MRF · LCS</span>
+              <span class="pipe-unused">not used by this analysis</span>
+            </div>
+            <div class="pipe-grid">
+              <div class="field span2">
+                <span class="field-label">Relation miner <span class="mp-tag" id="coh-backend-tag" hidden></span> <span class="field-note" id="coh-claims-note">also extracts the claims</span></span>
+                <cds-dropdown id="coh-model" class="model-pick" title-text="" aria-label="Relation miner model" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Relation strength</span>
+                <div class="fixed-value" id="strength-ollama" hidden><span>verbalized</span><span class="field-note">no logprobs</span></div>
+                <div id="strength-rits"><cds-dropdown id="strength_method" title-text="" aria-label="Strength estimator" size="sm"></cds-dropdown></div>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Candidate pairs</span>
+                <cds-dropdown id="pair_policy" title-text="" aria-label="Candidate pairs" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Claim priors</span>
+                <div class="fixed-value" id="priors-value"><span id="priors-text">uniform 0.5</span></div>
+              </div>
+              <div class="field">
+                <span class="field-label">LCS readouts</span>
+                <div class="fixed-value readouts" id="readouts-value"><span id="readouts-text">3 of 4</span></div>
+              </div>
+            </div>
+            <div class="pipe-grid adv" id="adv-coh" hidden>
+              <div class="field">
+                <span class="field-label">Prompt variant</span>
+                <cds-dropdown id="prompt_variant" title-text="" aria-label="Prompt variant" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Sense menu</span>
+                <cds-dropdown id="sense_menu" title-text="" aria-label="Sense menu" size="sm"></cds-dropdown>
+              </div>
+              <div class="field">
+                <span class="field-label">Sense/coupling reconcile</span>
+                <cds-dropdown id="reconcile" title-text="" aria-label="Sense/coupling reconcile" size="sm"></cds-dropdown>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Window radius</span>
+                <cds-number-input id="window" label="" hide-label aria-label="Window radius" min="1" max="20" value="4" size="sm"></cds-number-input>
+              </div>
+              <div class="field">
+                <span class="field-label">Concession discount <span class="mono field-value" data-for="concession_discount">0.45</span></span>
+                <div class="slider-row"><cds-slider id="concession_discount" hide-label hide-text-input label-text="Concession discount" min="0" max="1" step="0.05" value="0.45"><span slot="min-text"></span><span slot="max-text"></span></cds-slider></div>
+              </div>
+              <div class="field">
+                <span class="field-label">Evidence span</span>
+                <div class="check-row"><cds-checkbox id="require_evidence" label-text="Require (prompt v2)"></cds-checkbox></div>
+              </div>
+
+              <div class="field">
+                <span class="field-label">Merlin i-bound</span>
+                <cds-number-input id="ibound" label="" hide-label aria-label="Merlin i-bound" min="1" max="20" value="6" size="sm"></cds-number-input>
+              </div>
+              <div class="field span3">
+                <span class="field-label">LCS readouts</span>
+                <div id="methods" class="check-row methods-row"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ollama-host mono" id="ollama-line"><span id="ollama-host"></span> <button type="button" class="linklike" id="refresh-ollama">Refresh Ollama models</button> <span id="ollama-empty" hidden>· no local models found (start <span class="mono">ollama serve</span> and pull one)</span></p>
+      </section>
+
+      <!-- ============ Response + claims ============ -->
+      <section class="panel response" aria-label="Response">
+        <div class="panel-head">
+          <h2 class="panel-title">Response</h2>
+          <div class="examples" id="examples" aria-label="Examples"></div>
+        </div>
+        <div class="response-body">
+          <cds-text-input id="query" label="Query (optional)" placeholder="What question does the response answer?" size="md"></cds-text-input>
+          <div class="editor" id="editor-wrap">
+            <cds-textarea id="response" label="Long-form response" rows="9" placeholder="Paste a long-form response, or pick an example above."></cds-textarea>
+            <div class="highlighted" id="highlighted" hidden tabindex="0" aria-label="Response with claim highlights"></div>
+          </div>
+          <div id="evidence-wrap" class="ev-editor" hidden>
+            <div class="ev-editor-head">
+              <span class="cds--label" id="ev-editor-label">Evidence passages</span>
+              <span class="ev-count" id="ev-count" aria-live="polite"></span>
+            </div>
+            <ol class="ev-cards" id="ev-cards" aria-labelledby="ev-editor-label"></ol>
+            <div class="ev-editor-foot">
+              <button type="button" class="ev-add" id="ev-add">
+                <svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><!-- Carbon: add --><path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2z"/></svg>
+                Add passage
+              </button>
+              <span class="ev-help">Each passage is compared with every claim. Pasting text with blank lines splits it into passages.</span>
+            </div>
+          </div>
+          <div class="analysis" role="group" aria-labelledby="analysis-label">
+            <span class="field-label" id="analysis-label">Analysis</span>
+            <cds-content-switcher id="mode" size="md" value="factuality" aria-label="Analysis">
+              <cds-content-switcher-item value="factuality" selected>Factuality</cds-content-switcher-item>
+              <cds-content-switcher-item value="coherence">Coherence</cds-content-switcher-item>
+              <cds-content-switcher-item value="both">Coherence with factuality priors</cds-content-switcher-item>
+            </cds-content-switcher>
+            <p class="field-note" id="analysis-note"></p>
+          </div>
+          <div class="run-bar">
+            <cds-button id="analyze" kind="primary">Analyze
+              <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: arrow--right --><path d="m18 6-1.43 1.39L24.15 15H4v2h20.15l-7.58 7.57L18 26l10-10z"/></svg>
+            </cds-button>
+            <cds-button id="stop" kind="danger" hidden>Stop
+              <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: stop--filled --><path d="M16 2a14 14 0 1 0 14 14A14 14 0 0 0 16 2zm6 20H10V10h12z"/></svg>
+            </cds-button>
+            <cds-button id="edit" kind="ghost" hidden>Edit text</cds-button>
+            <div class="status" id="status" aria-live="polite"></div>
+          </div>
+          <!-- The run's pipeline, stage by stage: pending, running, done, skipped. -->
+          <ol class="stages" id="stages" aria-label="Pipeline progress" hidden></ol>
+          <div class="reuse-line" id="reuse-line" hidden>
+            <span id="reuse-text">Re-using the claims already extracted from this response.</span>
+            <button type="button" class="linklike" id="reextract">Re-extract claims</button>
+          </div>
+          <cds-inline-notification id="error" kind="error" title="Analysis failed" hide-close-button hidden></cds-inline-notification>
+
+          <div class="claims-head">
+            <h3 class="section-title">Claims <span class="count" id="claim-count"></span> <span class="gold-tag" id="claims-gold" title="The example's gold claims and relations, loaded rather than extracted and mined" hidden>gold</span></h3>
+            <div class="legend-inline" id="claims-legend"></div>
+          </div>
+          <ol class="claims" id="claims">
+            <li class="empty">Claims extracted from the response appear here, each linked to its span in the text.</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ============ Results: factuality / coherence ============ -->
+      <section class="panel results" aria-label="Results">
+        <cds-tabs id="result-tabs" value="factuality" class="result-tabs">
+          <cds-tab id="tab-factuality" target="view-factuality" value="factuality">Factuality</cds-tab>
+          <cds-tab id="tab-coherence" target="view-coherence" value="coherence">Coherence</cds-tab>
+        </cds-tabs>
+
+        <!-- Factuality view -->
+        <div id="view-factuality" role="tabpanel" aria-labelledby="tab-factuality" class="view">
+          <div class="panel-head sub-first">
+            <h2 class="panel-title">Fact graph</h2>
+            <cds-content-switcher id="fact-view" size="sm" value="evidence">
+              <cds-content-switcher-item value="evidence" selected>Evidence</cds-content-switcher-item>
+              <cds-content-switcher-item value="graph">FactGraph</cds-content-switcher-item>
+            </cds-content-switcher>
+          </div>
+          <div class="panel-head sub">
+            <h2 class="panel-title">Factuality scores</h2>
+            <div class="prior-switch" role="group" aria-labelledby="fact-prior-label">
+              <span class="field-label" id="fact-prior-label">Evidence priors</span>
+              <cds-content-switcher id="fact-prior-mode" size="sm" value="default" aria-label="Evidence priors">
+                <cds-content-switcher-item value="default" selected>Default 0.9</cds-content-switcher-item>
+                <cds-content-switcher-item value="custom">Custom</cds-content-switcher-item>
+              </cds-content-switcher>
+              <button type="button" class="linklike" id="fact-prior-reset" disabled>Reset</button>
+            </div>
+          </div>
+          <p class="whatif-hint fact" id="fact-whatif-hint">Run a Factuality analysis to edit the evidence priors.</p>
+          <div class="scores" id="fact-scores">
+            <div class="score-tile" data-f="factuality_score">
+              <div class="score-label">Factuality score <span class="sym">F</span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Share of claims whose posterior favours "supported"</div>
+            </div>
+            <div class="score-tile" data-f="supported">
+              <div class="score-label">Supported</div>
+              <div class="score-value">–</div>
+              <div class="score-note" id="fact-counts">Claims with posterior above 0.5</div>
+            </div>
+            <div class="score-tile" data-f="avg_prob">
+              <div class="score-label">Mean posterior</div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Average P(claim true | evidence)</div>
+            </div>
+          </div>
+          <div class="fact-body">
+            <div id="fact-evidence" class="evidence-list">
+
+            </div>
+            <div id="fact-graph-wrap" class="graph-wrap" hidden>
+              <div id="fact-graph" class="graph" role="img" aria-label="Claim to evidence graph"></div>
+              <div class="graph-legend">
+                <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>supports</span>
+                <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>
+                <span class="lg"><span class="sq"></span>evidence passage</span>
+                <span class="lg"><span class="sq neutral"></span>neutral to every claim</span>
+                <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+              </div>
+            </div>
+          </div>
+          <dl class="facts" id="fact-facts"></dl>
+        </div>
+
+        <!-- Coherence view -->
+        <div id="view-coherence" role="tabpanel" aria-labelledby="tab-coherence" class="view" hidden>
+          <div class="panel-head sub-first">
+            <h2 class="panel-title">Relation graph</h2>
+            <cds-content-switcher id="graph-view" size="sm" value="graph">
+              <cds-content-switcher-item value="graph" selected>Relations</cds-content-switcher-item>
+              <cds-content-switcher-item value="mrf">MRF</cds-content-switcher-item>
+            </cds-content-switcher>
+          </div>
+          <div class="panel-head sub">
+            <h2 class="panel-title">Logical coherence scores</h2>
+            <div class="prior-switch" role="group" aria-labelledby="prior-label">
+              <span class="field-label" id="prior-label">Claim priors</span>
+              <cds-content-switcher id="prior-mode" size="sm" value="default" aria-label="Claim priors">
+                <cds-content-switcher-item value="default" selected>Default</cds-content-switcher-item>
+                <cds-content-switcher-item value="custom">Custom</cds-content-switcher-item>
+              </cds-content-switcher>
+              <button type="button" class="linklike" id="prior-reset" disabled>Reset</button>
+            </div>
+          </div>
+          <p class="whatif-hint" id="whatif-hint">Run a Coherence analysis to edit claim priors and re-score the mined graph.</p>
+          <div class="scores" id="scores">
+            <div class="score-tile" data-m="mean_marginal">
+              <div class="score-label">Mean marginal <span class="sym">LCS<sub>mm</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Average posterior that each claim holds</div>
+            </div>
+            <div class="score-tile" data-m="consistency">
+              <div class="score-label">Consistency <span class="sym">LCS<sub>cons</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Probability that no relation is violated</div>
+            </div>
+            <div class="score-tile" data-m="log_partition">
+              <div class="score-label">Log partition <span class="sym">LCS<sub>Z</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">log Z, normalized between its MAP floor and its conflict-free ceiling</div>
+            </div>
+            <div class="score-tile" data-m="reified" hidden>
+              <div class="score-label">Reified <span class="sym">LCS<sub>R</sub></span></div>
+              <div class="score-value">–</div>
+              <div class="score-meter"><span></span></div>
+              <div class="score-note">Posterior of a coherence variable R</div>
+            </div>
+          </div>
+          <!-- The graph fills what the scores leave, as the evidence body does in the
+               factuality view: same order in both (scores on top). -->
+          <div class="graph-wrap coh-body">
+            <div id="graph" class="graph" role="img" aria-label="Relation graph between claims"></div>
+            <div class="graph-empty" id="graph-empty"></div>
+            <div class="graph-legend" id="graph-legend">
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln ent"/></svg>entails</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln con"/></svg>contradicts</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln eqv"/></svg>equivalent</span>
+              <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln exc"/></svg>exclusive / co-necessary</span>
+              <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+            </div>
+            <div class="edge-card" id="edge-card" hidden></div>
+          </div>
+          <dl class="facts" id="facts"></dl>
+        </div>
+      </section>
+    </main>
+
+    <aside class="info-panel" id="info-panel" role="dialog" aria-modal="false" aria-labelledby="info-title" hidden>
+      <div class="info-head">
+        <div>
+          <h2 id="info-title">How it works</h2>
+          <p class="info-sub">Factuality and logical coherence, from FactReasoner</p>
+        </div>
+        <cds-icon-button id="close-info" kind="ghost" align="left">
+          <svg slot="icon" viewBox="0 0 32 32" width="16" height="16" fill="currentColor"><!-- Carbon: close --><path d="M17.41 16 24 9.41 22.59 8 16 14.59 9.41 8 8 9.41 14.59 16 8 22.59 9.41 24 16 17.41 22.59 24 24 22.59 17.41 16z"/></svg>
+          <span slot="tooltip-content">Close</span>
+        </cds-icon-button>
+      </div>
+      <div class="info-body">
+        <p>Two questions about one response. <strong>Factuality</strong>: is each claim supported by evidence? <strong>Coherence</strong>: do the claims <em>hang together</em>? A response can be fully factual and still contradict itself, or perfectly consistent and wrong.</p>
+        <ol>
+          <li><strong>Claims.</strong> The response is split into atomic claims. Each is matched back to the words in the text that state it. Both analyses use the same claims.</li>
+          <li><strong>Factuality.</strong> FactReasoner gathers evidence for each claim (web search, Wikipedia, or passages you paste), asks whether each passage supports or contradicts the claim, and solves a graphical model for the probability that each claim is true. Its model extracts the claims; on Ollama the support question goes to the <span class="mono">kev</span> decision model, which returns a probability for each verdict in one pass.</li>
+          <li><strong>Coherence.</strong> The relation miner's model reads each pair of claims against the response and names the discourse relation (Evidence, Contrast, Cause–Effect, …), which compiles to a logical coupling with a strength <span class="mono">p</span>. A Markov random field over the claims gives the coherence scores.</li>
+          <li><strong>Both.</strong> The factuality posteriors become the coherence model's priors, so one score reflects both questions.</li>
+        </ol>
+        <p>A claim pulled <em>below its own prior</em> is one the response's own argument undermines. No aggregate score shows this.</p>
+      </div>
+      <div class="info-foot">
+        <cds-tag type="blue" size="sm">RITS</cds-tag>
+        <cds-tag type="cyan" size="sm">Ollama</cds-tag>
+        <cds-tag type="purple" size="sm">Markov random field</cds-tag>
+        <cds-tag type="teal" size="sm">Merlin</cds-tag>
+        <cds-tag type="gray" size="sm">FactReasoner</cds-tag>
+      </div>
+    </aside>
+  </div>
+  <script src="app.js?v=5"></script>
+</body>
+</html>

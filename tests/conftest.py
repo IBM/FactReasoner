@@ -19,6 +19,19 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from fact_reasoner.core.utils import Atom, Context, Relation
+from fact_reasoner.env import DISABLE_VAR
+
+
+@pytest.fixture(autouse=True)
+def _no_dotenv(monkeypatch):
+    """Keep a developer's ``.env`` out of every test.
+
+    Entry points call ``load_dotenv()``, which would restore a credential a test
+    has just removed (e.g. ``SERPER_API_KEY`` in a "refuses without a key"
+    test), so such tests passed on CI and failed on any machine with a ``.env``.
+    A test that needs a key sets it explicitly with ``monkeypatch.setenv``.
+    """
+    monkeypatch.setenv(DISABLE_VAR, "1")
 
 
 @pytest.fixture

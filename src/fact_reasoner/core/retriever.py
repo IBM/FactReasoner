@@ -251,6 +251,141 @@ def make_uniform(text: str) -> str:
     return " ".join(character_split_texts)
 
 
+# A run of capitalised words (or numbers), with the lowercase connectives that
+# appear inside names ("Bank of England", "Ludwig van Beethoven").
+_NAME = r"(?:[A-Z][\w'’.-]*|\d+)(?:\s+(?:(?:of|the|de|del|da|von|van|der|du|la|le)\s+)?(?:[A-Z][\w'’.-]*|\d+))*"
+_LEADING_CLAUSE = re.compile(r"^(?:In|On|By|During|After|Before|Since|At)\s+[^,]+,\s*")
+_REPORTING = re.compile(r"^(?:Critics|Many|Most|Some|Experts|Reviewers|Historians|Sources)\b[^A-Z]*?(?=[A-Z])")
+_POSSESSIVE = re.compile(r"['’]s$")
+_NOT_A_SUBJECT = {
+    "it", "he", "she", "they", "we", "this", "that", "these", "those", "there", "in", "the", "a", "an",
+    # A reporting frame with no name after it ("Critics described him as ...").
+    "critics", "many", "most", "some", "experts", "reviewers", "historians", "sources",
+}
+
+
+def claim_subject(text: str) -> str:
+    """The claim's leading proper-noun phrase, for a looser search, or ``""``.
+
+    Wikipedia's search requires every word of a query, so a full claim
+    sentence often finds nothing ("X was born in Pensacola, Florida." gets no
+    hits when X's page lacks one of those words) or only list pages that mention
+    the subject in passing ("2024 in film"). Its subject alone ("X") finds the
+    subject's own page. Heuristic: the first capitalised run, after an
+    introductory clause ("In 1903, ...") or a reporting frame ("Critics
+    described X as ..."); ``""`` when the claim starts with a pronoun or has no
+    such run.
+    """
+    t = _LEADING_CLAUSE.sub("", (text or "").strip())
+    t = _REPORTING.sub("", t)
+    m = re.match(rf"(?:The\s+)?({_NAME})", t)
+    if not m:
+        return ""
+    subject = _POSSESSIVE.sub("", m.group(1).rstrip(".,;:"))
+    if subject.lower() in _NOT_A_SUBJECT or len(subject) < 3:
+        return ""
+    return subject
+
+
+#: Wikipedia API requests in flight at once, across every thread. Parallel
+#: retrieval (one worker per claim, each a search plus a page load per hit)
+#: otherwise sends dozens at once, and Wikipedia answers HTTP 429.
+WIKIPEDIA_MAX_CONCURRENT = 4
+#: Retries of a request Wikipedia rate-limits (429), and the longest wait.
+WIKIPEDIA_429_RETRIES = 3
+WIKIPEDIA_MAX_RETRY_AFTER_S = 15.0
+
+_wiki_slots = threading.BoundedSemaphore(WIKIPEDIA_MAX_CONCURRENT)
+_wiki_patch_lock = threading.Lock()
+
+
+def _install_wikipedia_rate_limiting() -> None:
+    """Replace the ``wikipedia`` library's request function with a polite one.
+
+    The library sends every API call (search, page load) through
+    ``wikipedia.wikipedia._wiki_request``, which neither limits concurrency nor
+    handles HTTP 429: Wikipedia's plain-text "too many requests" body is parsed
+    as JSON and raises ``JSONDecodeError``, and langchain then drops all of the
+    claim's pages. This version holds one of ``WIKIPEDIA_MAX_CONCURRENT``
+    slots per request, and on a 429 waits for ``Retry-After`` (capped) and
+    retries. Installed once; the module looks the function up per call.
+    """
+    import time
+
+    import wikipedia.wikipedia as wiki_mod
+
+    with _wiki_patch_lock:
+        if getattr(wiki_mod._wiki_request, "_fact_reasoner", False):
+            return
+
+        def _wiki_request(params: dict) -> dict:
+            params["format"] = "json"
+            params.setdefault("action", "query")
+            headers = {"User-Agent": wiki_mod.USER_AGENT}
+            url = wiki_mod.API_URL.replace("http://", "https://", 1)
+            for attempt in range(WIKIPEDIA_429_RETRIES + 1):
+                with _wiki_slots:
+                    r = requests.get(url, params=params, headers=headers, timeout=30)
+                if r.status_code == 429 and attempt < WIKIPEDIA_429_RETRIES:
+                    try:
+                        wait = float(r.headers.get("Retry-After", "2"))
+                    except ValueError:
+                        wait = 2.0
+                    wait = min(WIKIPEDIA_MAX_RETRY_AFTER_S, max(1.0, wait))
+                    logger.info(f"Wikipedia rate limit (429): waiting {wait:.0f}s, retry {attempt + 1}")
+                    telemetry.count_fallback("retriever", "wikipedia_rate_limited")
+                    time.sleep(wait)
+                    continue
+                if r.status_code == 429:
+                    raise requests.HTTPError(
+                        f"Wikipedia API: still rate-limited after {WIKIPEDIA_429_RETRIES} retries", response=r
+                    )
+                if r.status_code != 200:
+                    raise requests.HTTPError(f"Wikipedia API answered HTTP {r.status_code}", response=r)
+                return r.json()
+            raise AssertionError("unreachable")  # every iteration returns, raises or continues
+
+        _wiki_request._fact_reasoner = True  # type: ignore[attr-defined]
+        wiki_mod._wiki_request = _wiki_request
+
+
+class _ResilientWikipedia:
+    """The ``wikipedia`` module, as langchain's ``wiki_client``, with sturdier page loads.
+
+    langchain's ``WikipediaAPIWrapper`` loads each search hit with
+    ``wiki_client.page(...)`` and skips only ``PageError`` /
+    ``DisambiguationError``. Any other error -- notably an intermittent
+    ``JSONDecodeError`` when Wikipedia answers a request with a non-JSON body,
+    seen under parallel retrieval -- escapes and fails the whole search, so the
+    claim loses *every* page it found. Here a failed load is retried, and a load
+    that still fails is reported as a ``PageError``, so only that one page is
+    skipped. Everything else is the ``wikipedia`` module itself.
+    """
+
+    RETRIES = 2
+    BACKOFF_S = 0.5
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(wikipedia, name)
+
+    def page(self, *args: Any, **kwargs: Any) -> Any:
+        import time
+
+        skip = (wikipedia.exceptions.PageError, wikipedia.exceptions.DisambiguationError)
+        for attempt in range(self.RETRIES + 1):
+            try:
+                return wikipedia.page(*args, **kwargs)
+            except skip:
+                raise
+            except Exception as e:  # noqa: BLE001 - transient: retry, then skip the page
+                if attempt == self.RETRIES:
+                    title = kwargs.get("title", args[0] if args else "?")
+                    logger.warning(f"Wikipedia page {title!r} failed to load ({type(e).__name__}); skipped")
+                    telemetry.count_fallback("retriever", "wikipedia_page_error")
+                    raise wikipedia.exceptions.PageError(title) from e
+                time.sleep(self.BACKOFF_S * (attempt + 1))
+
+
 class ChromaDBReader:
     def __init__(
         self,
@@ -533,9 +668,13 @@ class SourceRetriever:
             wikipedia.set_user_agent(
                 "NASA IMPACT Accelerated Knowledge Discovery (AKD)/1.0 (leo@developmentseed.org)"
             )
+            _install_wikipedia_rate_limiting()
             self.langchain_retriever = WikipediaRetriever(
                 lang="en", top_k_results=top_k, wiki_client=wikipedia
             )
+            # langchain's validator always sets wiki_client to the `wikipedia`
+            # module, so the resilient client is installed after construction.
+            object.__setattr__(self.langchain_retriever, "wiki_client", _ResilientWikipedia())
         elif self.service_type == "google":
             self.google_retriever = SearchAPI(cache_dir=self.cache_dir)
             if self.use_in_memory_vectorstore:
@@ -678,6 +817,30 @@ class SourceRetriever:
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"Wikipedia retrieval failed for query '{text}': {e}")
                 return results
+            # Wikipedia's search needs every word of the query, so a full claim
+            # sentence often finds nothing, or only list pages that mention the
+            # subject in passing ("2024 in film"). So also search the claim's
+            # subject (see claim_subject): its own page goes first, then the
+            # pages that matched the whole claim, then the subject's other hits.
+            subject = claim_subject(text)
+            if subject and subject != text.strip():
+                try:
+                    by_subject = self.langchain_retriever.invoke(subject)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"Wikipedia retrieval failed for query '{subject}': {e}")
+                    by_subject = []
+                own = [d for d in by_subject if d.metadata.get("title", "").lower() == subject.lower()]
+                merged, seen = [], set()
+                for d in own + list(rel_docs) + list(by_subject):
+                    t = d.metadata.get("title")
+                    if t not in seen:
+                        seen.add(t)
+                        merged.append(d)
+                logger.info(
+                    f"Wikipedia: {len(rel_docs)} page(s) for the claim, {len(by_subject)} "
+                    f"for its subject '{subject}' ({'own page found' if own else 'no own page'})"
+                )
+                rel_docs = merged
             for doc in rel_docs:
                 title = doc.metadata["title"]
                 summary = doc.metadata["summary"]

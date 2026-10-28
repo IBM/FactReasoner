@@ -11,9 +11,13 @@ Requires the `fr2` conda env (`mellea_ibm`, needed for RITS, is only there):
 conda activate fr2
 ```
 
-Merlin: use **`~/git/merlin/build_native/merlin`**. The `bin/merlin` build fails with
-`Library not loaded: libboost_program_options.dylib` (return code -6, which surfaces
-as a MAR failure).
+Merlin: use **`~/git/merlin/build_boost192/merlin`**, built against Homebrew's Boost
+1.92. Older builds break whenever Homebrew upgrades Boost: `bin/merlin` fails with
+`Library not loaded: libboost_program_options.dylib`, and `build_native/merlin` (linked
+against Boost 1.90) fails with `Symbol not found: __ZN5boost15program_options3argE`.
+Both surface as a MAR failure (return code -6). After a Boost upgrade, rebuild with
+`cmake -S ~/git/merlin -B ~/git/merlin/build_boostNNN -DCMAKE_BUILD_TYPE=Release &&
+cmake --build ~/git/merlin/build_boostNNN -j 8`.
 
 ## 1. Draw the sample (already done; regrow only if needed)
 
@@ -34,14 +38,14 @@ Must be **detached** — a foreground call dies with the tool shell, and macOS h
 # llama-3.3-70b-instruct  (~13 h)
 nohup python scripts/run_factuality_coherence.py \
   --rits-model llama-3.3-70b-instruct \
-  --merlin-path ~/git/merlin/build_native/merlin \
+  --merlin-path ~/git/merlin/build_boost192/merlin \
   --nli-cache-dir ~/.cache/fr_nli \
   > /tmp/fc_llama.log 2>&1 < /dev/null & disown
 
 # gpt-oss-120b  (~13 h; run after, or concurrently if RITS quota allows)
 nohup python scripts/run_factuality_coherence.py \
   --rits-model gpt-oss-120b-a100 \
-  --merlin-path ~/git/merlin/build_native/merlin \
+  --merlin-path ~/git/merlin/build_boost192/merlin \
   --nli-cache-dir ~/.cache/fr_nli \
   > /tmp/fc_gptoss.log 2>&1 < /dev/null & disown
 ```
@@ -82,6 +86,6 @@ is dominated by the LCS mining (two policies) and the pairwise NLI baselines.
 
 ```bash
 python scripts/run_factuality_coherence.py --rits-model llama-3.3-70b-instruct \
-  --merlin-path ~/git/merlin/build_native/merlin \
+  --merlin-path ~/git/merlin/build_boost192/merlin \
   --limit 2 --no-judges --datasets bio,eli5 --nli-cache-dir /tmp/nli_smoke
 ```

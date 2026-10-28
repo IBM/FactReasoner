@@ -1,0 +1,131 @@
+# FactReasoner demo image (fact-reasoner-lcs-demo), for OpenShift.
+#
+# Built in the cluster by deploy/openshift/buildconfig.yaml from an uploaded
+# copy of the repository (`oc start-build --from-dir=.`); see README.md here.
+#
+#   stage 1  merlin   -- the Merlin inference engine, compiled from GitHub
+#                        on CentOS Stream 9 (UBI's free repos have no Boost)
+#   stage 2  app      -- Python 3.12, the locked dependencies (CPU torch),
+#                        the models downloaded at first use, the demo
+#
+# The image runs as an arbitrary non-root UID (OpenShift's default), so
+# everything it writes at runtime lives under a group-writable HOME.
+
+# ---------------------------------------------------------------- merlin
+# CentOS Stream 9 is UBI 9's upstream (same glibc / libstdc++), and ships
+# Boost in its standard repos; UBI's free repos do not.
+FROM quay.io/centos/centos:stream9 AS merlin
+
+# A commit on github.com/radum2275/merlin master; bump it deliberately.
+ARG MERLIN_COMMIT=ad37783ea99f0de492f0f0e16bd3236e9e9d9e51
+
+RUN dnf install -y --setopt=install_weak_deps=False \
+        git gcc-c++ make cmake boost-devel \
+    && dnf clean all
+RUN git clone https://github.com/radum2275/merlin.git /src/merlin \
+    && git -C /src/merlin checkout "$MERLIN_COMMIT"
+RUN cmake -S /src/merlin -B /src/merlin/build \
+        -DCMAKE_BUILD_TYPE=Release -DMERLIN_BUILD_TESTS=OFF \
+    && cmake --build /src/merlin/build --target merlin -j"$(nproc)" \
+    && install -D -m 0755 "$(find /src/merlin/build -type f -name merlin -perm -u+x | head -1)" /opt/merlin/merlin \
+    && for lib in $(ldd /opt/merlin/merlin | awk '/libboost/ {print $3}'); do \
+         cp -L "$lib" /opt/merlin/; done \
+    && ls -l /opt/merlin
+
+# ---------------------------------------------------------------- app
+FROM registry.access.redhat.com/ubi9/python-312:latest AS app
+
+USER 0
+# Merlin, and the Boost libraries it links against (copied from its build
+# stage, since UBI's repos do not have them).
+COPY --from=merlin /opt/merlin/merlin /usr/local/bin/merlin
+COPY --from=merlin /opt/merlin/libboost* /usr/local/lib64/
+# Fail the build here, not at the first inference, if a library is missing.
+RUN echo /usr/local/lib64 > /etc/ld.so.conf.d/merlin.conf && ldconfig \
+    && if ldd /usr/local/bin/merlin | grep "not found"; then exit 1; fi \
+    && /usr/local/bin/merlin --help >/dev/null
+
+# uv, to install exactly the versions in uv.lock (the uv that wrote it).
+COPY --from=ghcr.io/astral-sh/uv:0.12.19 /uv /usr/local/bin/uv
+
+# From here on, build as the image's own user (1001, group 0), the way
+# OpenShift runs it (a random UID in group 0): with umask 002 every file is
+# created group-0 and group-writable, so no recursive chgrp/chmod pass is
+# needed -- that pass rewrote the whole ~3 GB venv into a second layer and
+# the build ran out of disk. uv keeps no download cache in the image.
+USER 1001
+ENV APP_HOME=/opt/app-root/src \
+    HOME=/opt/app-root/src \
+    UV_PROJECT_ENVIRONMENT=/opt/app-root/venv \
+    UV_NO_CACHE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    PATH=/opt/app-root/venv/bin:$PATH \
+    HF_HOME=/opt/app-root/cache/huggingface \
+    NLTK_DATA=/opt/app-root/cache/nltk \
+    PYTHONUNBUFFERED=1
+WORKDIR $APP_HOME
+
+# Dependencies first (cached across code changes): exactly the versions in
+# uv.lock, except torch. The lock pins PyPI's torch, which on Linux pulls
+# several GB of CUDA libraries the CPU-only cluster cannot use; the list keeps
+# the same torch version as its +cpu build, and the CUDA packages are dropped.
+#
+# mellea-ibm (the RITS backend) comes from IBM-internal GitHub over SSH, at
+# the commit in uv.lock. OpenShift's builder (buildah) mounts the
+# `github-ibm-ssh` secret read-only at /run/secrets/github-ibm for every RUN
+# (see buildconfig.yaml); a build volume is never committed to a layer. A
+# local `podman build` can do the same with
+# `-v <dir-with-ssh-privatekey>:/run/secrets/github-ibm:ro,Z`.
+#
+# All pins are installed in one resolution, with PyTorch's CPU index as an
+# extra index and --index-strategy unsafe-best-match. That strategy is needed
+# because the CPU index carries stale copies of torch's own dependencies
+# (e.g. filelock<=3.32.3, against torch's filelock>=4.2.1), and uv's default
+# takes every version of a package from the first index that has it. Every
+# requirement is an exact pin, so no index can substitute a different version.
+COPY --chown=1001:0 pyproject.toml uv.lock README.md ./
+RUN umask 002 && uv venv "$UV_PROJECT_ENVIRONMENT" --python /usr/bin/python3.12 \
+    && uv export --frozen --no-hashes --no-emit-project --no-header \
+         --extra demo --extra rits -o /tmp/requirements.txt \
+    && TORCH=$(grep -E '^torch==' /tmp/requirements.txt | cut -d' ' -f1 | cut -d= -f3) \
+    && grep -v -E '^(torch|triton|nvidia-[a-z0-9-]+|cuda-[a-z-]+)==' /tmp/requirements.txt > /tmp/requirements-cpu.txt \
+    && echo "torch==${TORCH}+cpu" >> /tmp/requirements-cpu.txt
+RUN umask 002 && test -s /run/secrets/github-ibm/ssh-privatekey \
+       || { echo "missing /run/secrets/github-ibm/ssh-privatekey (the github-ibm-ssh secret)" >&2; exit 1; } \
+    && mkdir -p /tmp/ssh && cp /run/secrets/github-ibm/ssh-privatekey /tmp/ssh/id && chmod 600 /tmp/ssh/id \
+    && export GIT_SSH_COMMAND="ssh -i /tmp/ssh/id -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/ssh/known_hosts" \
+    && uv pip install --python "$UV_PROJECT_ENVIRONMENT" \
+         --index https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match \
+         -r /tmp/requirements-cpu.txt \
+    ; status=$?; rm -rf /tmp/ssh; exit $status
+
+# The app itself, its data (bundled examples) and the RITS model inventory.
+COPY --chown=1001:0 src ./src
+COPY --chown=1001:0 data/lcs ./data/lcs
+COPY --chown=1001:0 configs/rits_models.json ./configs/rits_models.json
+RUN umask 002 && uv pip install --python "$UV_PROJECT_ENVIRONMENT" --no-deps .
+
+# Models the code downloads on first use, fetched now so a pod starts
+# without reaching Hugging Face / NLTK and the first run is not slowed.
+RUN umask 002 && python - <<'EOF'
+import nltk
+for r in ("punkt", "punkt_tab"):
+    nltk.download(r, quiet=True)
+from sentence_transformers import SentenceTransformer
+SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+from langchain_huggingface import HuggingFaceEmbeddings
+HuggingFaceEmbeddings(model_name="ibm-granite/granite-embedding-30m-english")
+EOF
+
+# Only the small model caches, written by a RUN above, need a group-write
+# check (HF and NLTK create some files 0644 regardless of umask).
+RUN chmod -R g+rwX /opt/app-root/cache && test -w /opt/app-root/venv
+
+EXPOSE 7860
+# Live mode: RITS (RITS_API_KEY) and the in-cluster Ollama (OLLAMA_HOST).
+# The data and model inventory paths are explicit: installed as a package,
+# the app's REPO_ROOT default points into the venv, not at $APP_HOME.
+CMD ["fact-reasoner-lcs-demo", "--host", "0.0.0.0", "--port", "7860", \
+     "--merlin-path", "/usr/local/bin/merlin", \
+     "--data-dir", "/opt/app-root/src/data/lcs", \
+     "--models-file", "/opt/app-root/src/configs/rits_models.json"]

@@ -795,7 +795,9 @@ def test_load_model_specs_reads_the_repo_inventory():
 def test_resolve_model_rejects_an_unknown_name():
     specs = lm.load_model_specs("configs/rits_models.json")
     with pytest.raises(ValueError, match="Unknown model"):
-        lm.resolve_model("gpt-oss-120b", specs)  # served name is -a100
+        # A near-miss is not guessed: the short name is `gpt-oss-120b`, while
+        # `-a100` is the served model_id's suffix (and the name this list used to have).
+        lm.resolve_model("gpt-oss-120b-a100", specs)
 
 
 def test_load_model_specs_rejects_duplicate_names(tmp_path):
@@ -1467,7 +1469,7 @@ def test_cli_rejects_mined_arms_without_a_rits_key(monkeypatch, tmp_path):
 
 def test_cli_rejects_an_unknown_model(monkeypatch):
     with pytest.raises(SystemExit):
-        cli.main(["--models", "gpt-oss-120b", "--estimate-only"])
+        cli.main(["--models", "gpt-oss-120b-a100", "--estimate-only"])
 
 
 def test_cli_estimate_only_exits_zero_and_prints_counts(capsys):

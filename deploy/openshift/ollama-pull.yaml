@@ -1,0 +1,40 @@
+# One-off: pull the demo's Ollama models into the running Ollama server.
+#
+#   oc apply -f deploy/openshift/ollama-pull.yaml
+#   oc -n factuality logs -f job/ollama-pull
+#
+# Safe to re-run (delete the job first): a model already present is a no-op.
+# kev (the factuality NLI decision model) is ~5.6 GB; the granite models ~2 GB each.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-pull
+  namespace: factuality
+  labels: {app: ollama}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app: ollama-pull}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: pull
+          image: docker.io/ollama/ollama:0.40.11
+          env:
+            # The client talks to the server through its Service.
+            - {name: OLLAMA_HOST, value: "http://ollama:11434"}
+            - {name: HOME, value: /tmp}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              until ollama list >/dev/null 2>&1; do echo "waiting for ollama..."; sleep 5; done
+              for m in granite4.1:3b granite4.2:3b kev; do
+                echo "== pulling $m"; ollama pull "$m"
+              done
+              ollama list
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
