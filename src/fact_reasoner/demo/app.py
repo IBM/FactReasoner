@@ -21,10 +21,15 @@ static page with no build step. The API:
   bundled examples.
 * ``GET  /api/ollama/models`` -- re-list the local Ollama models.
 * ``POST /api/analyze`` -- queue an analysis (factuality, coherence or both);
-  returns ``{run_id}``.
-* ``GET  /api/runs/{id}/events`` -- server-sent events: ``queued``, ``stage``,
-  ``claims``, ``factuality``, ``priors``, ``progress``, then ``result`` (or
-  ``error``).
+  returns ``{run_id}``. The ``X-Client-Id`` header (a random id the page keeps)
+  names the submitter: each client runs one analysis at a time, and clients
+  take turns when every worker is busy.
+* ``GET  /api/runs/{id}/events`` -- server-sent events: ``queued`` (again as
+  the queue moves), ``started``, ``stage``, ``claims``, ``factuality``,
+  ``priors``, ``progress``, then ``result`` (or ``error``).
+* ``GET  /api/status`` / ``GET /api/status/events`` -- how many workers are
+  busy and how many runs wait: once, or as server-sent ``status`` events on
+  every change.
 * ``POST /api/runs/{id}/rescore`` -- re-score coherence under edited priors (no
   LLM calls).
 * ``POST /api/runs/{id}/rescore-factuality`` -- re-score factuality under edited
@@ -42,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import re
@@ -56,6 +62,7 @@ from fact_reasoner.demo.engine import (
     ANALYSIS_MODES,
     BACKENDS,
     DEFAULT_DECISION_MODEL,
+    DEFAULT_WORKERS,
     DEFAULT_METHODS,
     EVIDENCE_SOURCES,
     FACT_NLI_CHOICES,
@@ -80,6 +87,49 @@ MAX_RESPONSE_CHARS = 8000
 
 #: Pasted evidence longer than this is refused.
 MAX_EVIDENCE_CHARS = 20000
+
+#: Seconds between keep-alive comments on an idle event stream: well inside the
+#: router's idle timeout (120 s on the cluster's Route).
+KEEPALIVE_SECONDS = 15
+
+
+def client_id(request: Request) -> str:
+    """Who sent a request, for fair admission: the page's id, else its address.
+
+    Not authentication -- a client can send any id -- only the key that keeps
+    one person's runs from holding up everyone else's.
+    """
+    cid = request.headers.get("x-client-id", "").strip()
+    if not cid:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        cid = forwarded.split(",")[0].strip() or (request.client.host if request.client else "")
+    return cid[:64]
+
+
+async def _sse(next_events, request: Request):
+    """An event stream: yield ``next_events()``'s output until it says done.
+
+    ``next_events`` is an async callable returning ``(chunks, done)``, waiting
+    up to KEEPALIVE_SECONDS for something to send.
+    """
+    while True:
+        chunks, done = await next_events()
+        for chunk in chunks:
+            yield chunk
+        if done:
+            return
+        if not chunks:
+            yield ": keep-alive\n\n"
+        if await request.is_disconnected():
+            return
+
+
+def _sse_response(gen) -> StreamingResponse:
+    return StreamingResponse(
+        gen,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 #: Local models tried first, in order. granite4.1:3b answers the miner's prompt
@@ -155,6 +205,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
             "examples": public_examples,
             "max_response_chars": MAX_RESPONSE_CHARS,
             "max_passages": MAX_PASTED_PASSAGES,
+            "status": engine.status(),
         }
 
     @app.get("/api/ollama/models")
@@ -174,6 +225,7 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
             settings = Settings.from_json(body.get("settings"))
             run = engine.submit(
                 response,
+                client=client_id(request),
                 query=str(body.get("query") or ""),
                 settings=settings,
                 manual_priors=body.get("priors") or {},
@@ -189,31 +241,69 @@ def create_app(engine: Engine, *, examples: list[dict[str, Any]]) -> FastAPI:
         run = engine.get(run_id)
         if run is None:
             raise HTTPException(404, "Unknown run.")
+        loop = asyncio.get_running_loop()
+        wake = asyncio.Event()
+        unwatch = run.watch(lambda: loop.call_soon_threadsafe(wake.set))
+        sent = 0
 
-        def wait_for(n: int) -> tuple[list[dict[str, Any]], bool]:
+        async def next_events():
+            nonlocal sent
+            # Cleared before reading: an event emitted after the read sets it again.
+            wake.clear()
             with run.cond:
-                run.cond.wait_for(lambda: len(run.events) > n or run.done, timeout=15)
-                return run.events[n:], run.done
+                new, done = run.events[sent:], run.done
+            if not new and not done:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(wake.wait(), KEEPALIVE_SECONDS)
+                wake.clear()
+                with run.cond:
+                    new, done = run.events[sent:], run.done
+            sent += len(new)
+            return [f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n" for ev in new], done
 
         async def stream():
-            sent = 0
-            while True:
-                new, done = await asyncio.to_thread(wait_for, sent)
-                for ev in new:
-                    yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
-                sent += len(new)
-                if done and sent >= len(run.events):
-                    return
-                if not new:
-                    yield ": keep-alive\n\n"
-                if await request.is_disconnected():
-                    return
+            try:
+                async for chunk in _sse(next_events, request):
+                    yield chunk
+            finally:
+                unwatch()
 
-        return StreamingResponse(
-            stream(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
+        return _sse_response(stream())
+
+    @app.get("/api/status")
+    def status() -> dict[str, Any]:
+        return engine.status()
+
+    @app.get("/api/status/events")
+    async def status_events(request: Request, limit: int = 0) -> StreamingResponse:
+        """The engine's status now, then again on every change (``limit``: stop
+        after that many updates; 0, the default, never stops)."""
+        loop = asyncio.get_running_loop()
+        updates: asyncio.Queue = asyncio.Queue()
+        remove = engine.add_listener(lambda st: loop.call_soon_threadsafe(updates.put_nowait, st))
+        updates.put_nowait(engine.status())
+        sent = 0
+
+        async def next_events():
+            try:
+                st = await asyncio.wait_for(updates.get(), KEEPALIVE_SECONDS)
+            except TimeoutError:
+                return [], False
+            # Only the latest of a burst matters.
+            while not updates.empty():
+                st = updates.get_nowait()
+            nonlocal sent
+            sent += 1
+            return [f"event: status\ndata: {json.dumps(st)}\n\n"], 0 < limit <= sent
+
+        async def stream():
+            try:
+                async for chunk in _sse(next_events, request):
+                    yield chunk
+            finally:
+                remove()
+
+        return _sse_response(stream())
 
     @app.post("/api/runs/{run_id}/stop")
     def stop(run_id: str) -> dict[str, Any]:
@@ -279,6 +369,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--decision-model", default=DEFAULT_DECISION_MODEL,
                    help="Ollama decision model that scores factuality NLI on the Ollama "
                    "backend (default: kev). Must be pulled on the same server.")
+    p.add_argument("--workers", type=int,
+                   default=int(os.environ.get("DEMO_WORKERS") or DEFAULT_WORKERS),
+                   help=f"Analyses run at once (or set DEMO_WORKERS; default {DEFAULT_WORKERS}). "
+                   "Offline replay always uses one.")
     p.add_argument("--dry-run", action="store_true",
                    help="Stub the LLM and use exact inference: no model server, no Merlin.")
     p.add_argument("--host", default="127.0.0.1")
@@ -315,6 +409,7 @@ def main() -> None:
         decision_model=args.decision_model,
         dry_run=args.dry_run,
         replays=examples,
+        workers=args.workers,
     )
     if not args.dry_run and not models and not engine.ollama_models():
         raise SystemExit(
@@ -322,7 +417,8 @@ def main() -> None:
             "(see --ollama-host) and pull a model."
         )
     app = create_app(engine, examples=examples)
-    print(f"[demo] http://{args.host}:{args.port}  (dry_run={args.dry_run})")
+    print(f"[demo] http://{args.host}:{args.port}  (dry_run={args.dry_run}, "
+          f"workers={len(engine.workers)})")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

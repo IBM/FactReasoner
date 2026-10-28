@@ -37,17 +37,35 @@
 # (has_atoms=True) instead of atomizing the response again, which keeps claim ids
 # identical across the two views by construction.
 #
-# Concurrency model. Every analysis runs on ONE worker thread that owns ONE
-# persistent event loop. Mellea caches its async HTTP client per event loop, so a
-# fresh `asyncio.run` per request would build (and later strand) a client per
-# request -- the "Event loop is closed" failure mode locoeval.runner documents.
-# Jobs therefore queue; this is an internal demo, and a single in-flight analysis
-# also keeps one user from saturating the shared RITS quota.
+# Concurrency model. Analyses run on a POOL of worker threads (4 by default),
+# each owning ONE persistent event loop. Mellea caches its async HTTP client per
+# event loop, so a fresh `asyncio.run` per request would build (and later strand)
+# a client per request -- the "Event loop is closed" failure mode
+# locoeval.runner documents; a fixed set of persistent loops avoids that. A run
+# stays on one worker from start to finish, and each worker builds its own
+# backends, so a worker's loop and backends only ever serve the run it holds:
+# stopping that run may cancel everything on that loop and close those backends
+# without touching anyone else's run. It is a thread per run, not many tasks on
+# one loop, because FactReasoner's retrieval is synchronous inside its async
+# build() and would stall every other run's model calls.
+#
+# Admission. Runs wait in one queue that is fair across users: a client (the
+# browser's random id) has at most one run active at a time, and a free worker
+# takes the oldest run of the client served least recently, so one person
+# queueing several runs cannot hold up the others. The model budget stays global
+# rather than growing with the pool: every worker's backend for the same model
+# shares one BackendThrottle, and the miner's per-batch ceiling is split across
+# the workers.
+#
+# Re-scoring (dragging a prior) never queues: it is inference only and runs on
+# the request's thread under the run's own lock. Offline replay is the exception:
+# its stubs patch process globals, so it keeps one worker and sends re-scores to
+# it, ahead of any queued analysis.
 #
 # Mined graphs are kept per run so a re-score under edited priors (the "drag a
 # prior" interaction) is pure inference: zero LLM calls.
 #
-# Stopping. A run can be stopped while queued (the worker skips it), between
+# Stopping. A run can be stopped while queued (it leaves the queue at once), between
 # stages (checked before each), or inside the stages that run on the worker's
 # own loop (claims, factuality build, mining): those run as one asyncio task,
 # which `stop()` cancels from the request thread -- cancelling the pending model
@@ -70,7 +88,7 @@ import threading
 import time
 import traceback
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -86,6 +104,12 @@ DEFAULT_METHODS = ("mean_marginal", "consistency", "log_partition")
 
 #: How many finished runs are kept for re-scoring.
 MAX_KEPT_RUNS = 32
+
+#: Analyses that run at once (worker threads, each with its own event loop).
+DEFAULT_WORKERS = 4
+
+#: Analyses one client may have running at once; more wait for their own.
+MAX_ACTIVE_PER_CLIENT = 1
 
 #: What one analysis computes.
 ANALYSIS_MODES = ("factuality", "coherence", "both")
@@ -267,11 +291,23 @@ class Run:
     # Claims to reuse instead of atomizing: [{id, text, original}].
     given_claims: list[dict[str, Any]] | None = None
     cancelled: bool = False
-    # The asyncio task currently running for this run (on the worker loop).
+    # Who submitted it (the browser's random id): admission is fair per client.
+    client: str = ""
+    # Submission order, for admission ties.
+    seq: int = 0
+    # The worker running it (None while queued), and the asyncio task currently
+    # running for it on that worker's loop.
+    worker: _Worker | None = None
     task: asyncio.Task | None = None
     # Backend cache keys this run used: closed and evicted if the run is stopped.
-    backend_keys: set[tuple[str, str]] = field(default_factory=set)
+    backend_keys: set[tuple[str, str, str]] = field(default_factory=set)
     cond: threading.Condition = field(default_factory=threading.Condition)
+    # Held by the final scoring and by every re-score: both read and replace
+    # the run's graph state, and re-scores run on request threads.
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    # Called (no arguments, from the emitting thread) after every event: how an
+    # event stream on an asyncio loop learns of one without parking a thread.
+    watchers: list[Callable[[], None]] = field(default_factory=list)
 
     def emit(self, kind: str, **data: Any) -> None:
         """Append an event and wake every listener.
@@ -286,6 +322,32 @@ class Run:
             if kind in ("result", "error", "stopped"):
                 self.done = True
             self.cond.notify_all()
+            watchers = list(self.watchers)
+        for fn in watchers:
+            fn()
+
+    def watch(self, fn: Callable[[], None]) -> Callable[[], None]:
+        """Call ``fn()`` after every event; returns a function that stops it."""
+        with self.cond:
+            self.watchers.append(fn)
+
+        def remove() -> None:
+            with self.cond:
+                if fn in self.watchers:
+                    self.watchers.remove(fn)
+
+        return remove
+
+
+class _Worker:
+    """One analysis thread and the persistent event loop it owns."""
+
+    def __init__(self, index: int):
+        self.index = index
+        self.name = f"lcs-demo-{index}"
+        self.loop = asyncio.new_event_loop()
+        self.run: Run | None = None
+        self.thread: threading.Thread | None = None
 
 
 class RunStopped(Exception):
@@ -420,7 +482,7 @@ def split_passages(text: str) -> list[str]:
 
 
 class Engine:
-    """Queue analyses onto one worker thread and keep their results.
+    """Run analyses on a pool of worker threads and keep their results.
 
     Args:
         models: The RITS model inventory (see :func:`load_models`).
@@ -440,6 +502,10 @@ class Engine:
             them; factuality still runs retrieval and NLI on those claims.
         backend_factory: Override for building a backend from ``(kind, model)``
             (tests).
+        workers: How many analyses run at once. Offline replay always uses one
+            (its stubs patch process globals).
+        max_active_per_client: How many analyses one client may have running at
+            once; the rest of its runs wait (others' runs do not).
     """
 
     def __init__(
@@ -452,6 +518,8 @@ class Engine:
         dry_run: bool = False,
         backend_factory: Callable[[str, str], Any] | None = None,
         replays: list[dict[str, Any]] | None = None,
+        workers: int = DEFAULT_WORKERS,
+        max_active_per_client: int = MAX_ACTIVE_PER_CLIENT,
     ):
         if not dry_run and not merlin_path:
             raise ValueError("merlin_path is required unless dry_run=True.")
@@ -464,12 +532,32 @@ class Engine:
         self._replays = {
             e["response"].strip(): e["gold"] for e in (replays or []) if e.get("gold")
         }
-        self._backends: dict[tuple[str, str], Any] = {}
+        # Keyed (worker, kind, model): each worker builds its own (see the top).
+        self._backends: dict[tuple[str, str, str], Any] = {}
+        # One request budget per model, shared by every worker's backend for it.
+        self._throttles: dict[tuple[str, str], Any] = {}
+        self._backends_lock = threading.Lock()
         self._runs: OrderedDict[str, Run] = OrderedDict()
-        self._jobs: queue.Queue = queue.Queue()
-        self._loop = asyncio.new_event_loop()
-        self._worker = threading.Thread(target=self._work, name="lcs-demo", daemon=True)
-        self._worker.start()
+        self.max_active_per_client = max(1, int(max_active_per_client))
+        # Admission: the queued runs, per client, in submission order; when each
+        # client last had a run started (a sequence number); every state change
+        # notifies _cond.
+        self._cond = threading.Condition()
+        self._queued: dict[str, deque[Run]] = {}
+        self._served: dict[str, int] = {}
+        self._starts = 0
+        self._submitted = 0
+        self._active: dict[str, int] = {}
+        # Offline replay's re-scores, run by its one worker ahead of analyses.
+        self._calls: deque[tuple[Callable[[], Any], queue.Queue]] = deque()
+        self._closing = False
+        # Status listeners (the page's live worker count): called with
+        # status() on every change, from whichever thread made it.
+        self._listeners: list[Callable[[dict[str, Any]], None]] = []
+        self.workers = [_Worker(i) for i in range(1 if dry_run else max(1, int(workers)))]
+        for w in self.workers:
+            w.thread = threading.Thread(target=self._work, args=(w,), name=w.name, daemon=True)
+            w.thread.start()
 
     # -- public API ----------------------------------------------------------
 
@@ -500,6 +588,7 @@ class Engine:
         self,
         response: str,
         *,
+        client: str = "",
         query: str = "",
         settings: Settings,
         manual_priors: Mapping[str, float] | None = None,
@@ -510,7 +599,8 @@ class Engine:
 
         ``claims`` -- the claims an earlier run extracted from this same
         response (``[{id, text, original}]``) -- are reused verbatim, skipping
-        atomization.
+        atomization. ``client`` identifies the submitter for fair admission
+        (see the top of this module); runs without one share a single turn.
 
         Raises:
             ValueError: On an empty response, an unknown RITS model, or a
@@ -563,12 +653,19 @@ class Engine:
             manual_priors={k: float(v) for k, v in (manual_priors or {}).items()},
             passages=passages,
             given_claims=_clean_claims(claims),
+            client=client,
         )
-        self._runs[run.id] = run
-        while len(self._runs) > MAX_KEPT_RUNS:
-            self._runs.popitem(last=False)
-        run.emit("queued", position=self._jobs.qsize())
-        self._jobs.put(("analyze", run, None))
+        with self._cond:
+            run.seq = self._submitted
+            self._submitted += 1
+            self._runs[run.id] = run
+            self._evict_runs()
+            self._queued.setdefault(client, deque()).append(run)
+            self._cond.notify_all()
+        # Every queued run, this one included: a newcomer from a client not
+        # served lately goes ahead of runs already waiting.
+        self._announce_positions()
+        self._notify()
         return run
 
     def get(self, run_id: str) -> Run | None:
@@ -577,19 +674,35 @@ class Engine:
     def stop(self, run_id: str) -> bool:
         """Stop a queued or running analysis. Returns False if it already ended.
 
-        Thread-safe: sets the run's flag (checked between stages) and cancels
-        its in-flight task on the worker loop.
+        Thread-safe: a queued run leaves the queue at once; a running one has
+        its flag set (checked between stages) and its in-flight task cancelled
+        on its worker's loop.
         """
         run = self._runs.get(run_id)
         if run is None or run.done:
             return False
         if run.cancelled:
             return True
-        run.cancelled = True
-        task = run.task
-        cancellable = task is not None and not task.done()
+        with self._cond:
+            run.cancelled = True
+            queued = self._queued.get(run.client)
+            if queued is not None and run in queued:
+                queued.remove(run)
+                if not queued:
+                    del self._queued[run.client]
+                run.emit("stopped", message="Stopped", claims_kept=False)
+                self._cond.notify_all()
+                stopped_in_queue = True
+            else:
+                stopped_in_queue = False
+        if stopped_in_queue:
+            self._announce_positions()
+            self._notify()
+            return True
+        task, worker = run.task, run.worker
+        cancellable = task is not None and not task.done() and worker is not None
         if cancellable:
-            self._loop.call_soon_threadsafe(task.cancel)
+            worker.loop.call_soon_threadsafe(task.cancel)
         # Acknowledge at once, server-side, so every listener shows it.
         run.emit(
             "stopping",
@@ -609,8 +722,8 @@ class Engine:
     def rescore(self, run_id: str, priors: Mapping[str, float]) -> dict[str, Any]:
         """Re-score a finished run's coherence under edited priors (no LLM calls).
 
-        Runs on the worker thread like everything else, so it cannot race an
-        analysis for the inference patches; the caller blocks on the result.
+        Runs on the caller's thread under the run's lock: it never waits behind
+        queued analyses (offline replay excepted, see :meth:`_inference`).
 
         Raises:
             KeyError: If the run is unknown or has no mined graph yet.
@@ -618,12 +731,8 @@ class Engine:
         run = self._runs.get(run_id)
         if run is None or run.mining is None:
             raise KeyError(run_id)
-        box: queue.Queue = queue.Queue(maxsize=1)
-        self._jobs.put(("rescore", run, (dict(priors), box)))
-        ok, value = box.get(timeout=300)
-        if not ok:
-            raise RuntimeError(value)
-        return value
+        priors = dict(priors)
+        return self._inference(run, lambda: self._score(run, priors, final=False))
 
     def rescore_factuality(
         self, run_id: str, context_priors: Mapping[str, float]
@@ -641,32 +750,187 @@ class Engine:
         run = self._runs.get(run_id)
         if run is None or run.fact_pipeline is None:
             raise KeyError(run_id)
-        box: queue.Queue = queue.Queue(maxsize=1)
-        self._jobs.put(("rescore_fact", run, (dict(context_priors), box)))
-        ok, value = box.get(timeout=300)
+        priors = dict(context_priors)
+        return self._inference(run, lambda: self._rescore_factuality(run, priors))
+
+    def _inference(self, run: Run, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        """Run a re-score ``fn`` under the run's lock, and turn failures into RuntimeError.
+
+        Offline replay hands it to its one worker instead, since the stubs it
+        needs are installed only while that worker holds them; the worker takes
+        it before any queued analysis.
+        """
+        if self.dry_run:
+            box: queue.Queue = queue.Queue(maxsize=1)
+            with self._cond:
+                self._calls.append((fn, box))
+                self._cond.notify_all()
+            ok, value = box.get(timeout=300)
+        else:
+            try:
+                with run.lock:
+                    ok, value = True, fn()
+            except Exception as e:  # noqa: BLE001 - reported to the browser
+                traceback.print_exc()
+                ok, value = False, f"{type(e).__name__}: {e}"
         if not ok:
             raise RuntimeError(value)
         return value
 
+    def status(self) -> dict[str, Any]:
+        """How busy the engine is: ``{workers, active, queued}``."""
+        with self._cond:
+            return {"workers": len(self.workers), **self._counts()}
+
+    def add_listener(self, fn: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
+        """Call ``fn(status())`` on every change; returns a function that removes it."""
+        with self._cond:
+            self._listeners.append(fn)
+
+        def remove() -> None:
+            with self._cond:
+                if fn in self._listeners:
+                    self._listeners.remove(fn)
+
+        return remove
+
     def close(self) -> None:
-        """Stop the worker after the queued jobs, and close its event loop."""
-        self._jobs.put(("stop", None, None))
-        self._worker.join(timeout=30)
+        """Stop the workers after the runs already queued, and close their loops."""
+        with self._cond:
+            self._closing = True
+            self._cond.notify_all()
+        for w in self.workers:
+            w.thread.join(timeout=30)
 
-    # -- the worker ----------------------------------------------------------
+    # -- admission (all under self._cond) ------------------------------------
 
-    def _work(self) -> None:
-        asyncio.set_event_loop(self._loop)
+    def _counts(self) -> dict[str, int]:
+        return {
+            "active": sum(1 for w in self.workers if w.run is not None),
+            "queued": sum(len(q) for q in self._queued.values()),
+        }
+
+    def _evict_runs(self) -> None:
+        """Forget the oldest finished runs beyond MAX_KEPT_RUNS (never live ones)."""
+        excess = len(self._runs) - MAX_KEPT_RUNS
+        for rid in [rid for rid, r in self._runs.items() if r.done][:max(0, excess)]:
+            del self._runs[rid]
+
+    @staticmethod
+    def _turn_order(queued: Mapping[str, deque[Run]], served: Mapping[str, int]) -> list[str]:
+        """Clients with a queued run, least recently served first (never served
+        first of all), ties broken by who has waited longest."""
+        return sorted(
+            (c for c, q in queued.items() if q),
+            key=lambda c: (served.get(c, -1), queued[c][0].seq),
+        )
+
+    def _next_run(self) -> Run | None:
+        """Take the next run to start: the least recently served client with room."""
+        for client in self._turn_order(self._queued, self._served):
+            if self._active.get(client, 0) >= self.max_active_per_client:
+                continue
+            q = self._queued[client]
+            run = q.popleft()
+            if not q:
+                del self._queued[client]
+            self._active[client] = self._active.get(client, 0) + 1
+            self._served[client] = self._starts
+            self._starts += 1
+            return run
+        return None
+
+    def _position(self, run: Run) -> int:
+        """How many runs will start before this queued one.
+
+        Replays admission as if workers freed up one at a time, ignoring the
+        per-client cap: an estimate, exact when the queue drains in turn.
+        """
+        queued = {c: deque(q) for c, q in self._queued.items()}
+        served = dict(self._served)
+        ahead, step = 0, self._starts
+        while queued:
+            client = self._turn_order(queued, served)[0]
+            nxt = queued[client].popleft()
+            if not queued[client]:
+                del queued[client]
+            if nxt is run:
+                return ahead
+            served[client] = step
+            step += 1
+            ahead += 1
+        return ahead
+
+    def _announce_positions(self) -> None:
+        """Tell every queued run where it now stands (if that changed)."""
+        with self._cond:
+            counts = self._counts()
+            for q in self._queued.values():
+                for run in q:
+                    # held: this client's own earlier run is what it waits for.
+                    held = self._active.get(run.client, 0) >= self.max_active_per_client
+                    ev = {"position": self._position(run), "held": held, **counts}
+                    if not run.events or run.events[-1] != {"type": "queued", **ev}:
+                        run.emit("queued", **ev)
+
+    def _notify(self) -> None:
+        status = self.status()
+        with self._cond:
+            listeners = list(self._listeners)
+        for fn in listeners:
+            try:
+                fn(status)
+            except Exception:  # noqa: BLE001 - a broken listener must not stop a run
+                traceback.print_exc()
+
+    # -- the workers ---------------------------------------------------------
+
+    def _work(self, worker: _Worker) -> None:
+        asyncio.set_event_loop(worker.loop)
         while True:
-            kind, run, extra = self._jobs.get()
-            if kind == "stop":
-                break
-            # The dry-run stubs patch process globals (mellea's ainstruct, the
-            # scorer's Merlin call), so they are held only for the job's duration:
-            # nothing outside the worker -- another engine, a test -- sees them.
-            with self._patched():
-                self._run_job(kind, run, extra)
-        self._loop.close()
+            with self._cond:
+                while True:
+                    if self._calls:
+                        call = self._calls.popleft()
+                        run = None
+                        break
+                    run = self._next_run()
+                    if run is not None:
+                        call = None
+                        run.worker = worker
+                        worker.run = run
+                        break
+                    if self._closing:
+                        worker.loop.close()
+                        return
+                    self._cond.wait()
+            if call is not None:
+                fn, box = call
+                with self._patched():
+                    try:
+                        box.put((True, fn()))
+                    except Exception as e:  # noqa: BLE001
+                        traceback.print_exc()
+                        box.put((False, f"{type(e).__name__}: {e}"))
+                continue
+            self._announce_positions()
+            self._notify()
+            try:
+                # The dry-run stubs patch process globals (mellea's ainstruct, the
+                # scorer's Merlin call), so they are held only for the run's
+                # duration: nothing outside the worker -- another engine, a test
+                # -- sees them.
+                with self._patched():
+                    self._run_analysis(worker, run)
+            finally:
+                with self._cond:
+                    worker.run = None
+                    self._active[run.client] -= 1
+                    if not self._active[run.client]:
+                        del self._active[run.client]
+                    self._cond.notify_all()
+                self._announce_positions()
+                self._notify()
 
     def _patched(self):
         if not self.dry_run:
@@ -675,40 +939,39 @@ class Engine:
 
         return dry_run_patches(patch_assessor_merlin=True)
 
-    def _run_job(self, kind: str, run: Run, extra: Any) -> None:
-        if kind == "analyze":
-            try:
-                self._checkpoint(run)
-                self._analyze(run)
-            except (RunStopped, asyncio.CancelledError):
-                run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
-            except Exception as e:  # noqa: BLE001 - reported to the browser
-                if run.cancelled:
-                    run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
-                else:
-                    traceback.print_exc()
-                    run.emit("error", message=f"{type(e).__name__}: {e}")
-            finally:
-                run.task = None
-                if run.cancelled:
-                    self._release_backends(run)
+    def _run_analysis(self, worker: _Worker, run: Run) -> None:
+        if run.cancelled:  # stopped in the moment between admission and here
+            run.emit("stopped", message="Stopped", claims_kept=False)
             return
-        priors, box = extra
+        run.emit("started", worker=worker.index)
         try:
-            if kind == "rescore_fact":
-                box.put((True, self._rescore_factuality(run, priors)))
+            self._checkpoint(run)
+            self._analyze(run)
+        except (RunStopped, asyncio.CancelledError):
+            run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
+        except Exception as e:  # noqa: BLE001 - reported to the browser
+            if run.cancelled:
+                run.emit("stopped", message="Stopped", claims_kept=bool(run.claims))
             else:
-                box.put((True, self._score(run, priors, final=False)))
-        except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
-            box.put((False, f"{type(e).__name__}: {e}"))
+                traceback.print_exc()
+                run.emit("error", message=f"{type(e).__name__}: {e}")
+        finally:
+            run.task = None
+            if run.cancelled:
+                self._release_backends(run)
 
-    def _backend(self, kind: str, name: str, run: Run | None = None) -> Any:
-        key = (kind, name)
-        if run is not None:
-            run.backend_keys.add(key)
-        if key in self._backends:
-            return self._backends[key]
+    def _backend(self, kind: str, name: str, run: Run) -> Any:
+        """The run's worker's backend for ``(kind, name)``, built on first use.
+
+        Every worker's backend for one model shares that model's throttle, so
+        the request budget does not grow with the pool.
+        """
+        worker = run.worker.name if run.worker is not None else ""
+        key = (worker, kind, name)
+        run.backend_keys.add(key)
+        with self._backends_lock:
+            if key in self._backends:
+                return self._backends[key]
         if self.dry_run:
             from fact_reasoner.experiments.mock import make_mock_backend
 
@@ -725,7 +988,16 @@ class Engine:
                 )
             else:
                 backend = build_backend("ollama", model_id=name, base_url=self.ollama_host)
-        self._backends[key] = backend
+        from fact_reasoner.runner import _fit_client_cache
+        from fact_reasoner.utils import BackendThrottle, share_throttle
+
+        # The worker's loop and the library's background loop (FactReasoner's
+        # NLI) drive this backend at once: keep a client for each.
+        _fit_client_cache(backend, 1)
+        with self._backends_lock:
+            throttle = self._throttles.setdefault((kind, name), BackendThrottle())
+            share_throttle(backend, throttle)
+            self._backends[key] = backend
         return backend
 
     def _release_backends(self, run: Run) -> None:
@@ -736,35 +1008,37 @@ class Engine:
         ``generate_from_context``), which no cancellation reaches. Each one keeps
         its request open and the server keeps generating, so after one stopped
         SIMBA-UQ mining run ~100 requests linger and hold every server slot,
-        and the next run waits behind work nobody wants. Only one run is ever
-        active and this loop is its own, so every task still on it belongs to
-        the stopped run: cancel them all (closing their sockets, which aborts the
-        server-side generation), then close and evict the backends so the next
-        run builds fresh ones (a closed backend cannot be reused).
+        and the next run waits behind work nobody wants. A worker's loop runs
+        only the run it holds, so every task still on it belongs to the stopped
+        run: cancel them all (closing their sockets, which aborts the
+        server-side generation), then close and evict the worker's backends so
+        its next run builds fresh ones (a closed backend cannot be reused).
+        Other workers' backends for the same model are untouched.
         """
-        self._cancel_loop_tasks()
+        loop = run.worker.loop
+        self._cancel_loop_tasks(loop)
         for key in run.backend_keys:
-            backend = self._backends.pop(key, None)
+            with self._backends_lock:
+                backend = self._backends.pop(key, None)
             if backend is None or self.dry_run:
                 continue
             aclose = getattr(backend, "aclose", None)
             try:
                 if aclose is not None:
-                    self._loop.run_until_complete(asyncio.wait_for(aclose(), 10))
+                    loop.run_until_complete(asyncio.wait_for(aclose(), 10))
                 elif hasattr(backend, "close"):
                     backend.close()
             except Exception:  # noqa: BLE001 - best effort; the backend is dropped anyway
                 traceback.print_exc()
 
-    def _cancel_loop_tasks(self, timeout: float = 10.0) -> int:
-        """Cancel every task still pending on the worker loop; return how many."""
-        pending = [t for t in asyncio.all_tasks(self._loop) if not t.done()]
+    @staticmethod
+    def _cancel_loop_tasks(loop: asyncio.AbstractEventLoop, timeout: float = 10.0) -> int:
+        """Cancel every task still pending on ``loop``; return how many."""
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
         for t in pending:
             t.cancel()
         if pending:
-            self._loop.run_until_complete(
-                asyncio.wait(pending, timeout=timeout)
-            )
+            loop.run_until_complete(asyncio.wait(pending, timeout=timeout))
         return len(pending)
 
     @staticmethod
@@ -774,12 +1048,13 @@ class Engine:
             raise RunStopped()
 
     def _run_async(self, run: Run, coro) -> Any:
-        """Run ``coro`` on the worker loop as the run's cancellable task."""
+        """Run ``coro`` on the run's worker loop as the run's cancellable task."""
         self._checkpoint(run)
-        task = self._loop.create_task(coro)
+        loop = run.worker.loop
+        task = loop.create_task(coro)
         run.task = task
         try:
-            return self._loop.run_until_complete(task)
+            return loop.run_until_complete(task)
         finally:
             run.task = None
 
@@ -854,7 +1129,8 @@ class Engine:
 
         self._checkpoint(run)
         run.emit("stage", stage="score", message="Running inference on the coherence MRF")
-        coherence = self._score(run, run.priors, final=True)
+        with run.lock:
+            coherence = self._score(run, run.priors, final=True)
         timing["scoring"] = coherence.pop("scoring_seconds")
         run.emit("result", factuality=factuality, coherence=coherence, timing=timing,
                  gold={"claims": gold is not None, "relations": gold is not None})
@@ -976,7 +1252,12 @@ class Engine:
             )
         )
         self._checkpoint(run)
-        run.fact_pipeline = pipeline
+        # Under the run's lock: from here a re-score may reach the pipeline.
+        with run.lock:
+            run.fact_pipeline = pipeline
+            return self._score_factuality(run, pipeline)
+
+    def _score_factuality(self, run: Run, pipeline: Any) -> dict[str, Any]:
         if pipeline.fact_graph is None or not pipeline.relations:
             # No contexts / no relations: FactReasoner has nothing to infer over,
             # and every claim stays at its prior.
@@ -991,7 +1272,8 @@ class Engine:
             }
             for aid in pipeline.atoms:
                 marginals.setdefault(aid, 0.5)
-        return {**_factuality_payload(pipeline, results, marginals), "nli": self.nli_info(s)}
+        return {**_factuality_payload(pipeline, results, marginals),
+                "nli": self.nli_info(run.settings)}
 
     def _rescore_factuality(self, run: Run, context_priors: Mapping[str, float]) -> dict[str, Any]:
         """Rebuild the factuality MRF with new context priors and infer again.
@@ -1110,6 +1392,8 @@ class Engine:
             strength_samples=s.strength_samples,
             reconcile=s.reconcile,
             prompt_variant=s.prompt_variant,
+            # The model's budget, shared with every other run on it.
+            throttle=self._throttles.get((s.coh_backend, s.coh_model)),
             sense_menu=s.sense_menu,
             require_evidence=s.require_evidence,
             concession_discount=s.concession_discount,

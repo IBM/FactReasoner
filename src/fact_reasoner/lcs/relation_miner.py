@@ -80,6 +80,7 @@ from fact_reasoner.lcs.taxonomy import (
 from fact_reasoner.markov_network import MarkovNetwork
 from fact_reasoner.utils import (
     MAX_CONCURRENT_REQUESTS,
+    BackendThrottle,
     extract_logprobs_from_output,
     run_throttled,
 )
@@ -360,6 +361,7 @@ class RelationMiner:
         strength_samples: int = 8,
         strength_calibrator: StrengthCalibrator | None = None,
         max_concurrency: int = MAX_CONCURRENT_REQUESTS,
+        throttle: BackendThrottle | None = None,
         max_distance: int | None = None,
         discourse: bool | None = None,
         discourse_gate_threshold: float = 0.2,
@@ -421,6 +423,10 @@ class RelationMiner:
                 default: a rate-limited call is captured by ``run_throttled`` and
                 parsed as "no relation", so throttling silently costs recall
                 rather than raising.
+            throttle: A budget shared with every other batch sent to the same
+                model (see :func:`fact_reasoner.utils.throttle_for`). When
+                given it replaces ``max_concurrency``, so several responses
+                mined at once share one ceiling instead of each taking its own.
             max_distance: Order-distance radius for ``pair_policy="bidirectional"``
                 (both arc directions within ``|j-i| <= max_distance``). None uses
                 ``window``.
@@ -527,6 +533,7 @@ class RelationMiner:
         self.strength_samples = strength_samples
         self.strength_calibrator = strength_calibrator or IdentityCalibrator()
         self.max_concurrency = max(1, int(max_concurrency))
+        self.throttle = throttle
         self.max_distance = max_distance
         # The refinement is a correlated filter, not an independent one: it selects
         # for the surface adjacency the sense prompt reads as "related". Off by
@@ -925,6 +932,7 @@ class RelationMiner:
                 sense_factory,
                 pairs,
                 max_concurrency=self.max_concurrency,
+                throttle=self.throttle,
                 on_progress=on_progress,
             )
         finally:
@@ -1034,6 +1042,7 @@ class RelationMiner:
                 ),
                 edge_indices,
                 max_concurrency=self.max_concurrency,
+                throttle=self.throttle,
                 on_progress=self._progress_hook("strength", len(edge_indices)),
             )
             self._record_call_errors("strength_verbalized", outputs)
@@ -1048,6 +1057,7 @@ class RelationMiner:
                 ),
                 edge_indices,
                 max_concurrency=self.max_concurrency,
+                throttle=self.throttle,
                 on_progress=self._progress_hook("strength", len(edge_indices)),
             )
             self._record_call_errors("strength_surrogate_logprobs", outputs)
@@ -1064,6 +1074,7 @@ class RelationMiner:
             ),
             jobs,
             max_concurrency=self.max_concurrency,
+            throttle=self.throttle,
             on_progress=self._progress_hook("strength", len(jobs)),
         )
         self._record_call_errors("strength_surrogate_sampled", outputs)
