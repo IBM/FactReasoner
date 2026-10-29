@@ -40,7 +40,8 @@
     active: null,        // claim id
     activeEdge: null,    // relation index
     view: "graph",       // coherence graph: graph | mrf
-    factView: "evidence",
+    factView: "evidence", // factuality: evidence | graph | mrf
+    unary: {},           // coherence unary factor tables, by claim id
     source: null,        // EventSource
     exampleId: null,
     rescoreTimer: null,
@@ -889,6 +890,7 @@
     S.marginals = d.marginals || {};
     S.priors = d.priors || S.priors;
     S.relations = d.relations || [];
+    S.unary = d.unary || {};
     S.diagnostics = d.diagnostics || {};
     S.coverage = d.coverage || S.coverage;
     renderClaims(); renderGraph(); renderScores(); syncWhatIf();
@@ -1371,7 +1373,7 @@
         : S.fact ? "This run found no evidence passages to re-weight."
         : "Run a Factuality analysis to edit the evidence priors.")
       : !S.factWhatIf ? "Every evidence passage has the default prior of 0.9 (how far it is trusted). Custom lets you set each one."
-      : S.factView === "graph"
+      : S.factView !== "evidence"
         ? "Edit each passage's prior in the Evidence view; the FactGraph labels a passage with its prior once it differs from 0.9."
         : "Drag a passage's prior to distrust or trust it more: the claims re-score on the same NLI links, with no model calls.";
   }
@@ -1440,8 +1442,11 @@
   function renderFactGraph() {
     if (typeof cytoscape === "undefined") return;
     const wrap = $("#fact-graph-wrap");
-    wrap.hidden = S.factView !== "graph";
-    $("#fact-evidence").hidden = S.factView === "graph";
+    const mrf = S.factView === "mrf";
+    wrap.hidden = S.factView === "evidence";
+    $("#fact-evidence").hidden = !wrap.hidden;
+    $("#fact-legend-graph").hidden = mrf;
+    $("#fact-legend-mrf").hidden = !mrf;
     if (wrap.hidden) return;
     if (!fcy) {
       fcy = cytoscape({
@@ -1460,6 +1465,18 @@
         if (!c) return;
         const text = c.text.length > 260 ? c.text.slice(0, 257) + "…" : c.text;
         showNodeCard(fcy, wrap, e.target, [el("strong", { class: "nc-title" }, c.title || c.id), text]);
+      });
+      // MRF view: a factor square shows the table FactReasoner scored.
+      fcy.on("mouseover", "node.factor, node.unary", (e) => {
+        const n = e.target, f = S.fact || {};
+        let html;
+        if (n.hasClass("unary")) {
+          html = unaryCard(n.data("var"), (f.unary || {})[n.data("var")]);
+        } else {
+          const r = (f.relations || [])[n.data("idx")];
+          html = r && pairCard(r.source, r.target, r.type, r.probability, r.factor);
+        }
+        if (html) showNodeCard(fcy, wrap, n, html);
       });
       fcy.on("mouseout", "node", () => { setActive(null); hideNodeCard(wrap); });
       fcy.on("pan zoom", () => hideNodeCard(wrap));
@@ -1487,9 +1504,26 @@
       classes: "claim" }));
     ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) },
       classes: "ctx" + (used.has(c.id) ? "" : " neutral") }));
+    if (mrf) {
+      // Factor graph, as in the coherence MRF: a grey unary square per claim
+      // and passage (its prior), a black pairwise square per NLI link.
+      edges.length = 0;
+      const drawn = new Set(els.map((e) => e.data.id));
+      for (const id of drawn) {
+        if (!(f.unary || {})[id]) continue;
+        els.push({ group: "nodes", data: { id: `u-${id}`, var: id }, classes: "unary" });
+        edges.push({ group: "edges", data: { id: `ul-${id}`, source: `u-${id}`, target: id }, classes: "flink" });
+      }
+      (f.relations || []).forEach((r, i) => {
+        if (!drawn.has(r.source) || !drawn.has(r.target)) return;
+        els.push({ group: "nodes", data: { id: `ff${i}`, idx: i, src: r.source, trg: r.target }, classes: "factor" });
+        edges.push({ group: "edges", data: { id: `ffa${i}`, source: r.source, target: `ff${i}` }, classes: "flink" });
+        edges.push({ group: "edges", data: { id: `ffb${i}`, source: `ff${i}`, target: r.target }, classes: "flink" });
+      });
+    }
     // Same graph (a what-if re-score): update the data in place, so the node
     // colours ease to their new posteriors instead of the graph redrawing.
-    const key = els.map((e) => e.data.id).concat(edges.map((e) => e.data.id)).join("|");
+    const key = [S.factView].concat(els.map((e) => e.data.id), edges.map((e) => e.data.id)).join("|");
     if (fcy.scratch("key") === key) {
       for (const e of els.concat(edges)) fcy.getElementById(e.data.id).data(e.data);
     } else {
@@ -1521,6 +1555,16 @@
     const byOrder = (a, b) => order(a.id()) - order(b.id());
     column(fcy.nodes("node.claim").sort(byOrder), Math.max(40, W * 0.3));
     column(fcy.nodes("node.ctx"), Math.max(140, W * 0.62));
+    // MRF view: a unary square left of its variable; a pairwise square midway
+    // along its link, nudged right when both ends share a column.
+    fcy.nodes("node.unary").forEach((u) => {
+      const v = fcy.getElementById(u.data("var")).position();
+      u.position({ x: v.x - 30, y: v.y });
+    });
+    fcy.nodes("node.factor").forEach((n) => {
+      const a = fcy.getElementById(n.data("src")).position(), b = fcy.getElementById(n.data("trg")).position();
+      n.position({ x: (a.x + b.x) / 2 + (Math.abs(a.x - b.x) < 1 ? 36 : 0), y: (a.y + b.y) / 2 });
+    });
     fcy.zoom(1);
     fcy.pan({ x: 0, y: 0 });
     // A canvas too small for the labels: zoom out to fit, never in.
@@ -1557,6 +1601,12 @@
         ...labelChip(), "font-size": 10,
       } },
       { selector: "edge.con", style: { "line-style": "dashed", "line-dash-pattern": [7, 4] } },
+      // MRF view
+      { selector: "node.factor", style: { shape: "rectangle", width: 12, height: 12, "background-color": ink, label: "" } },
+      { selector: "node.unary", style: {
+        shape: "rectangle", width: 10, height: 10, "background-color": cssVar("--cds-border-strong-01"), label: "",
+      } },
+      { selector: "edge.flink", style: { width: 1.5, "line-color": sub, label: "", "curve-style": "straight" } },
     ];
   }
 
@@ -1616,6 +1666,36 @@
       "text-background-shape": "round-rectangle", "text-background-padding": 3,
       "text-border-color": cssVar("--cds-border-subtle-00"), "text-border-width": 1, "text-border-opacity": 1,
     };
+  }
+
+  /* A factor's table for its hover card: the values exactly as the MRF holds
+   * them (row-major, the scope's first variable slowest), one row per
+   * assignment. Unary: x=0, x=1. Pairwise: (src, trg) = 00, 01, 10, 11. */
+  function factorCard(sym, title, scope, values, meta) {
+    const head = el("tr", {}, ...scope.map((v) => el("th", {}, v)), el("th", { class: "num" }, sym));
+    const rows = values.map((v, i) => {
+      const bits = scope.map((_, k) => (i >> (scope.length - 1 - k)) & 1);
+      return el("tr", {}, ...bits.map((b) => el("td", {}, b)), el("td", { class: "num" }, fmt(v)));
+    });
+    return [el("strong", { class: "nc-title" }, `${sym} ${title}`),
+      el("table", { class: "nc-factor" }, el("thead", {}, head), el("tbody", {}, ...rows)),
+      ...meta.filter(Boolean).map((t) => el("span", { class: "nc-meta" }, t))];
+  }
+  /* A variable's display name in a factor scope: a claim's label, else a passage's title. */
+  function varName(id) {
+    const c = S.claims.find((x) => x.id === id);
+    if (c) return c.label;
+    const x = ((S.fact && S.fact.contexts) || []).find((y) => y.id === id);
+    return x ? (x.title || x.id).slice(0, 18) : id;
+  }
+  function unaryCard(id, table) {
+    if (!table) return null;
+    return factorCard("φ", `${varName(id)} · prior`, [varName(id)], table, [`π = ${fmt(table[1])}`]);
+  }
+  function pairCard(src, trg, type, p, table) {
+    if (!table) return null;
+    return factorCard("ψ", `${varName(src)} → ${varName(trg)} · ${type}`, [varName(src), varName(trg)], table,
+      [`p = ${fmt(p)}`, "rows: source, target (0 = false, 1 = true)"]);
   }
 
   /* A hover card over a graph node, positioned in the graph's own box. */
@@ -1752,7 +1832,7 @@
       // Factor graph: a grey unary square per claim (its prior), a black
       // pairwise square per relation, as in the paper's MRF panel.
       for (const c of S.claims) {
-        els.push({ group: "nodes", data: { id: `u-${c.id}`, label: `φ${c.label.slice(1)}` }, classes: "unary" });
+        els.push({ group: "nodes", data: { id: `u-${c.id}`, var: c.id, label: `φ${c.label.slice(1)}` }, classes: "unary" });
         els.push({ group: "edges", data: { id: `ul-${c.id}`, source: `u-${c.id}`, target: c.id }, classes: "flink" });
       }
       S.relations.forEach((r, i) => {
@@ -1820,6 +1900,19 @@
         if (html) showNodeCard(cy, box.parentElement, e.target, html);
       });
       cy.on("mouseout", "node.claim", () => { setActive(null); hideNodeCard(box.parentElement); });
+      // MRF view: a factor square shows its table.
+      cy.on("mouseover", "node.factor, node.unary", (e) => {
+        const n = e.target;
+        let html;
+        if (n.hasClass("unary")) {
+          html = unaryCard(n.data("var"), S.unary[n.data("var")]);
+        } else {
+          const r = S.relations[n.data("idx")];
+          html = r && pairCard(r.source_id, r.target_id, r.level1_type, r.probability, r.factor);
+        }
+        if (html) showNodeCard(cy, box.parentElement, n, html);
+      });
+      cy.on("mouseout", "node.factor, node.unary", () => hideNodeCard(box.parentElement));
       cy.on("pan zoom", () => hideNodeCard(box.parentElement));
       cy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
       cy.on("tap", "edge, node.factor", (e) => {
@@ -1867,7 +1960,8 @@
       if (focus.size) {
         const nodes = fcy.nodes().filter((n) => focus.has(n.id()));
         nodes.addClass("active");
-        const keep = nodes.union(nodes.connectedEdges()).union(nodes.connectedEdges().connectedNodes());
+        let keep = nodes.union(nodes.connectedEdges()).union(nodes.connectedEdges().connectedNodes());
+        if (S.factView === "mrf") keep = keep.union(keep.nodes(".factor").neighborhood());
         fcy.elements().not(keep).addClass("faded");
       }
     }
@@ -2005,7 +2099,7 @@
   }
 
   function resetResults() {
-    Object.assign(S, { claims: [], fact: null, priors: {}, marginals: {}, relations: [], scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
+    Object.assign(S, { claims: [], fact: null, priors: {}, marginals: {}, relations: [], unary: {}, scores: {}, diagnostics: {}, coverage: {}, timing: {}, active: null, activeEdge: null });
     pinned = null;
     $("#edge-card").hidden = true;
     renderClaims(); renderGraph(); renderScores(); renderFactuality(); syncWhatIf(); syncFactWhatIf();
@@ -2182,7 +2276,7 @@
     if (q.get("whatif") === "1") {
       const wait = setInterval(() => { if (canWhatIf()) { clearInterval(wait); setWhatIf(true); } }, 100);
     }
-    if (q.get("factview") === "graph") { S.factView = "graph"; setSwitcher("fact-view", "graph"); }
+    if (["graph", "mrf"].includes(q.get("factview"))) { S.factView = q.get("factview"); setSwitcher("fact-view", S.factView); }
     for (const pipe of ["fact", "coh"]) {
       // &fact=ollama|rits picks that backend's first model (QA / screenshots).
       if (q.get(pipe)) {
