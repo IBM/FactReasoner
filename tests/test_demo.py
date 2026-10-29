@@ -22,6 +22,7 @@ tests can pin the paper's worked-example numbers end to end, and exercise the
 real FactReasoner inference behind the factuality view.
 """
 
+import collections
 import json
 import os
 import re
@@ -907,13 +908,19 @@ class TestStopAndReuse:
             run = engine.submit("One. Two.", settings=Settings.from_json(
                 {"mode": "coherence", "coh_backend": "rits", "coh_model": "llama-3.3-70b-instruct"}))
             assert started.wait(30)
-            assert ("rits", "llama-3.3-70b-instruct") in engine._backends
+            key = (run.worker.name, "rits", "llama-3.3-70b-instruct")
+            assert key in engine._backends
+            # Another worker's backend for the same model: someone else's run.
+            other = next(w for w in engine.workers if w is not run.worker)
+            other_key = (other.name, "rits", "llama-3.3-70b-instruct")
+            engine._backends[other_key] = make_mock_backend("llama-3.3-70b-instruct")
             engine.stop(run.id)
             with run.cond:
                 run.cond.wait_for(lambda: run.done, timeout=10)
             time.sleep(0.3)
             assert detached and detached[0].cancelled()
-            assert ("rits", "llama-3.3-70b-instruct") not in engine._backends
+            assert key not in engine._backends
+            assert other_key in engine._backends
         finally:
             engine.close()
 
@@ -975,3 +982,202 @@ class TestFactualityWhatIf:
         rid = c.post("/api/analyze", json={"response": ex["response"], "settings": {"mode": "coherence"}}).json()["run_id"]
         _events(c, rid)
         assert c.post(f"/api/runs/{rid}/rescore-factuality", json={"context_priors": {}}).status_code == 404
+
+
+class TestConcurrency:
+    """Several analyses at once: a worker pool with fair, per-client admission."""
+
+    GATED = {"mode": "coherence", "coh_backend": "rits", "coh_model": "llama-3.3-70b-instruct"}
+
+    @staticmethod
+    def _engine(monkeypatch, workers=4, **kw):
+        """A live-like engine whose analyses block until their response's gate opens."""
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        engine = Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: make_mock_backend(name),
+                        workers=workers, **kw)
+        close = engine.close
+
+        def close_all():  # open every gate, so close() is not waiting out 20 s waits
+            for g in list(gates.values()):
+                g.set()
+            close()
+
+        engine.close = close_all
+        gates: collections.defaultdict[str, threading.Event] = collections.defaultdict(threading.Event)
+        running: list[str] = []
+
+        def analyze(run):
+            running.append(run.response)
+            gates[run.response].wait(20)
+            run.emit("result", factuality=None, coherence=None, timing={}, gold={})
+
+        monkeypatch.setattr(engine, "_analyze", analyze)
+        return engine, gates, running
+
+    @staticmethod
+    def _wait(cond, timeout=10):
+        t = time.time()
+        while not cond():
+            assert time.time() - t < timeout, "timed out"
+            time.sleep(0.01)
+
+    @staticmethod
+    def _done(run, timeout=10):
+        with run.cond:
+            run.cond.wait_for(lambda: run.done, timeout=timeout)
+        return run.events[-1]["type"]
+
+    def test_runs_of_different_clients_run_at_once(self, monkeypatch):
+        engine, gates, running = self._engine(monkeypatch)
+        try:
+            runs = [engine.submit(f"r{i}", client=f"c{i}", settings=Settings.from_json(self.GATED))
+                    for i in range(3)]
+            self._wait(lambda: len(running) == 3)  # all three started, none finished
+            assert engine.status() == {"workers": 4, "active": 3, "queued": 0}
+            for r in runs:
+                assert any(e["type"] == "started" for e in r.events)
+            for i in range(3):
+                gates[f"r{i}"].set()
+            assert [self._done(r) for r in runs] == ["result"] * 3
+            self._wait(lambda: engine.status()["active"] == 0)
+        finally:
+            for g in list(gates.values()):
+                g.set()
+            engine.close()
+
+    def test_a_later_short_run_finishes_before_an_earlier_long_one(self, monkeypatch):
+        engine, gates, running = self._engine(monkeypatch)
+        gates["short"].set()
+        try:
+            long = engine.submit("long", client="a", settings=Settings.from_json(self.GATED))
+            short = engine.submit("short", client="b", settings=Settings.from_json(self.GATED))
+            assert self._done(short) == "result"
+            assert not long.done
+        finally:
+            gates["long"].set()
+            engine.close()
+
+    def test_one_active_run_per_client_and_clients_take_turns(self, monkeypatch):
+        """One worker; a queues three runs, then b one: b is served second."""
+        engine, gates, running = self._engine(monkeypatch, workers=1)
+        try:
+            s = Settings.from_json(self.GATED)
+            runs = {"a1": engine.submit("a1", client="a", settings=s)}
+            self._wait(lambda: running == ["a1"])
+            runs["a2"] = engine.submit("a2", client="a", settings=s)
+            runs["a3"] = engine.submit("a3", client="a", settings=s)
+            runs["b1"] = engine.submit("b1", client="b", settings=s)
+            assert engine.status()["queued"] == 3
+            # b1 came last but goes next: a was served more recently.
+            last_queued = lambda r: [e for e in r.events if e["type"] == "queued"][-1]  # noqa: E731
+            assert last_queued(runs["b1"])["position"] == 0
+            assert last_queued(runs["a2"])["position"] == 1
+            assert last_queued(runs["a3"])["position"] == 2
+            assert last_queued(runs["a2"])["held"] and not last_queued(runs["b1"])["held"]
+            for name in ("a1", "b1", "a2", "a3"):
+                gates[name].set()
+                self._wait(lambda n=name: runs[n].done)
+            assert running == ["a1", "b1", "a2", "a3"]
+        finally:
+            for g in list(gates.values()):
+                g.set()
+            engine.close()
+
+    def test_same_client_runs_wait_only_for_their_own(self, monkeypatch):
+        engine, gates, running = self._engine(monkeypatch)
+        try:
+            s = Settings.from_json(self.GATED)
+            engine.submit("mine1", client="me", settings=s)
+            mine2 = engine.submit("mine2", client="me", settings=s)
+            engine.submit("theirs", client="you", settings=s)
+            self._wait(lambda: sorted(running) == ["mine1", "theirs"])
+            assert not any(e["type"] == "started" for e in mine2.events)
+            gates["mine1"].set()
+            self._wait(lambda: "mine2" in running)
+        finally:
+            for g in list(gates.values()):
+                g.set()
+            engine.close()
+
+    def test_stopping_a_queued_run_leaves_the_queue(self, monkeypatch):
+        engine, gates, running = self._engine(monkeypatch, workers=1)
+        try:
+            s = Settings.from_json(self.GATED)
+            engine.submit("first", client="a", settings=s)
+            self._wait(lambda: running == ["first"])
+            second = engine.submit("second", client="b", settings=s)
+            assert engine.stop(second.id) is True
+            assert second.events[-1]["type"] == "stopped"
+            assert engine.status()["queued"] == 0
+        finally:
+            gates["first"].set()
+            engine.close()
+        assert "second" not in running
+
+    def test_rescore_does_not_wait_for_a_running_analysis(self, monkeypatch, voyager):
+        """A prior drag on a finished run answers while another run is mid-mining."""
+        from fact_reasoner.experiments.mock import brute_force_run_merlin
+        from fact_reasoner.lcs import lcs_scorer as lcs_scorer_mod
+
+        monkeypatch.setattr(lcs_scorer_mod, "run_merlin", brute_force_run_merlin)
+        examples = load_examples(DATA)
+        monkeypatch.setattr("fact_reasoner.demo.engine.list_ollama_models", lambda host: [])
+        engine = Engine(models=load_models(MODELS), merlin_path="/fake/merlin",
+                        backend_factory=lambda kind, name: make_mock_backend(name),
+                        replays=examples, workers=2)
+        hold = threading.Event()
+        ex = _example(examples, "voyager-a")
+        try:
+            done = engine.submit(ex["response"], client="a", settings=Settings.from_json(
+                {"mode": "coherence", "prior_mode": "manual", "coh_backend": "rits", "coh_model": RITS_B}),
+                manual_priors=ex["claim_priors"])
+            assert self._done(done, 30) == "result"
+            real = engine._analyze
+            monkeypatch.setattr(engine, "_analyze", lambda run: hold.wait(20) or real(run))
+            busy = engine.submit("Something else.", client="b", settings=Settings.from_json(self.GATED))
+            self._wait(lambda: engine.status()["active"] == 1)
+            t = time.perf_counter()
+            out = engine.rescore(done.id, {a["id"]: 0.5 for a in voyager["atoms"]})
+            assert time.perf_counter() - t < 5
+            assert "scores" in out and not busy.done
+        finally:
+            hold.set()
+            engine.close()
+
+    def test_backends_are_per_worker_and_share_one_throttle(self, monkeypatch):
+        from fact_reasoner.utils import throttle_for
+
+        engine, gates, running = self._engine(monkeypatch, workers=2)
+        try:
+            a = engine.submit("x", client="a", settings=Settings.from_json(self.GATED))
+            b = engine.submit("y", client="b", settings=Settings.from_json(self.GATED))
+            self._wait(lambda: len(running) == 2)
+            ba = engine._backend("rits", "llama-3.3-70b-instruct", a)
+            bb = engine._backend("rits", "llama-3.3-70b-instruct", b)
+            assert ba is not bb
+            assert throttle_for(ba) is throttle_for(bb) is not None
+        finally:
+            gates["x"].set()
+            gates["y"].set()
+            engine.close()
+
+    def test_status_endpoint_and_stream(self, monkeypatch):
+        engine, gates, running = self._engine(monkeypatch, workers=2)
+        try:
+            c = TestClient(create_app(engine, examples=[]))
+            assert c.get("/api/status").json() == {"workers": 2, "active": 0, "queued": 0}
+            assert c.get("/api/config").json()["status"]["workers"] == 2
+            rid = c.post("/api/analyze", headers={"X-Client-Id": "tab-1"},
+                         json={"response": "slow", "settings": self.GATED}).json()["run_id"]
+            assert engine.get(rid).client == "tab-1"
+            self._wait(lambda: running == ["slow"])
+            assert c.get("/api/status").json()["active"] == 1
+            with c.stream("GET", "/api/status/events?limit=1") as s:
+                for line in s.iter_lines():
+                    if line.startswith("data:"):
+                        assert json.loads(line[5:]) == {"workers": 2, "active": 1, "queued": 0}
+                        break
+        finally:
+            gates["slow"].set()
+            engine.close()

@@ -2,14 +2,15 @@
 
 The demo (`fact-reasoner-lcs-demo`) in the `factuality` namespace, in live mode:
 models from **RITS** and from an in-cluster **Ollama** (CPU only: the namespace has
-no GPU quota). Without ingress, open it through a port-forward.
+no GPU quota). It is served at **https://factuality.vpc-int.res.ibm.com**.
 
 | Object | File | Size (request / limit) |
 |---|---|---|
 | Build of the demo image (in-cluster, into the cluster registry) | `buildconfig.yaml`, `Containerfile`, `build.sh` | 2 / 4 CPU, 6 / 10 Gi while building |
 | Ollama + 30 Gi model volume | `ollama.yaml` | 4 / 6 CPU, 14 / 20 Gi |
 | Model pull (once) | `ollama-pull.yaml` | small |
-| The demo | `app.yaml` | 1 / 2 CPU, 3 / 6 Gi |
+| The demo | `app.yaml` | 1 / 4 CPU, 3 / 8 Gi |
+| Public address (Route + Service) | `route.yaml` | -- |
 
 The namespace quota is 8 CPU / 31 Gi; the two running deployments request 5 CPU /
 17 Gi, which leaves room for a rebuild.
@@ -56,11 +57,15 @@ oc -n factuality logs -f job/ollama-pull        # granite4.1:3b, granite4.2:3b, 
 ```bash
 oc apply -f deploy/openshift/buildconfig.yaml
 deploy/openshift/build.sh                        # uploads ~1 MB, follows the build
-oc apply -f deploy/openshift/app.yaml
+oc apply -f deploy/openshift/app.yaml deploy/openshift/route.yaml
 oc -n factuality rollout status deploy/factreasoner-demo
 ```
 
 ## 5. Open it
+
+**https://factuality.vpc-int.res.ibm.com** (IBM network; `route.yaml`).
+
+To reach the pod directly, e.g. to debug around the router:
 
 ```bash
 oc -n factuality port-forward svc/factreasoner-demo 7860:7860
@@ -77,8 +82,18 @@ Uncommitted changes in your checkout are included in the upload.
 
 ## Notes
 
-- **One replica only.** Runs are held in the process's memory and served one at a
-  time, so a second replica would not see the first one's runs.
+- **One replica only.** Runs are held in the process's memory, so a second replica
+  would not see the first one's runs.
+- **Several users at once.** The pod runs `DEMO_WORKERS` (4) analyses at the same
+  time. Each browser runs one analysis at a time (a second one waits for its own
+  first); when all workers are busy, people take turns rather than queueing behind
+  one person's backlog. Re-scoring (dragging a prior) never waits. The header shows
+  the live count ("2/4 busy · 1 waiting"); `GET /api/status` gives the same.
+  Workers share each model's request budget, so RITS sees the same load ceiling as
+  with one worker. Ollama serves 2 requests at a time (`OLLAMA_NUM_PARALLEL`):
+  two Ollama-heavy runs interleave, but on CPU they still slow each other down --
+  the big gain is for RITS, gold-example and pasted-evidence runs, which no longer
+  wait behind a long Ollama mining run.
 - **Ollama on CPU: what to expect** (measured on this namespace, 6 CPUs for Ollama):
 
   | Run | Time |

@@ -1,8 +1,9 @@
 /* FactReasoner demo: client.
  *
- * Classic script, no build step. The page talks to five endpoints (see app.py):
- * /api/config, /api/ollama/models, /api/analyze, /api/runs/{id}/events (SSE)
- * and /api/runs/{id}/rescore. One analysis runs in one of three modes --
+ * Classic script, no build step. The page talks to the endpoints in app.py:
+ * /api/config, /api/ollama/models, /api/analyze, /api/runs/{id}/events (SSE),
+ * /api/runs/{id}/rescore, and /api/status/events (SSE: the header's live
+ * worker count). One analysis runs in one of three modes --
  * factuality, coherence or both -- over ONE shared claim set. All claim <-> span
  * <-> node linking goes through one piece of state, `active`, so hovering
  * anything lights up the same claim in the text, the claims list, the evidence
@@ -44,6 +45,17 @@
     exampleId: null,
     rescoreTimer: null,
   };
+  /* This browser's id, sent with every analysis: the server runs one analysis
+   * per client at a time and lets clients take turns. Kept across reloads when
+   * storage allows; a fresh one per page load otherwise. */
+  const CLIENT_ID = (() => {
+    const fresh = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+    try {
+      let id = localStorage.getItem("fr-client-id");
+      if (!id) { id = fresh(); localStorage.setItem("fr-client-id", id); }
+      return id;
+    } catch (e) { return fresh(); }
+  })();
   const $ = (sel) => document.querySelector(sel);
   const el = (tag, attrs = {}, ...kids) => {
     const n = document.createElement(tag);
@@ -673,7 +685,7 @@
     let r;
     try {
       r = await fetch("api/analyze", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "X-Client-Id": CLIENT_ID },
         body: JSON.stringify(body),
       });
     } catch (e) {
@@ -698,7 +710,16 @@
     const es = new EventSource(`api/runs/${id}/events`);
     S.source = es;
     const on = (type, fn) => es.addEventListener(type, (ev) => fn(JSON.parse(ev.data)));
-    on("queued", (d) => setBusy(true, d.position ? `Queued behind ${d.position} run(s)` : "Starting"));
+    on("queued", (d) => {
+      if (S.stopping) return;
+      // Held back by this browser's own earlier run, or by every worker being
+      // busy (then: how many runs start first).
+      setBusy(true, d.held ? "Waiting for your previous run to finish"
+        : d.position ? `Queued · ${d.position} run${d.position === 1 ? "" : "s"} ahead`
+        : d.active != null && d.active >= (S.workers || {}).workers ? "Next up · waiting for a free worker"
+        : "Starting");
+    });
+    on("started", () => { if (!S.stopping) setBusy(true, "Starting"); });
     on("stage", (d) => {
       if (d.stage === "atomize") enterStage("atomize", d.source === "gold" ? "gold" : d.source === "reused" ? "reused" : "");
       else if (d.stage === "factuality") {
@@ -762,6 +783,36 @@
         setBusy(false); showError("Lost the connection to the server.");
       }
     };
+  }
+
+  // ------------------------------------------------------------ workers
+  /* The header's live worker count, fed by /api/status/events. EventSource
+   * reconnects by itself after a dropped connection; the pill dims meanwhile. */
+  function watchWorkers(initial) {
+    if (initial) renderWorkers(initial);
+    const es = new EventSource("api/status/events");
+    es.addEventListener("status", (ev) => {
+      $("#workers").classList.remove("offline");
+      renderWorkers(JSON.parse(ev.data));
+    });
+    es.onerror = () => $("#workers").classList.add("offline");
+  }
+
+  function renderWorkers(st) {
+    S.workers = st;
+    const box = $("#workers");
+    box.hidden = false;
+    const slots = box.querySelector(".worker-slots");
+    if (slots.children.length !== st.workers) {
+      slots.replaceChildren(...Array.from({ length: st.workers }, () => el("span", { class: "worker-slot" })));
+    }
+    [...slots.children].forEach((n, i) => n.classList.toggle("busy", i < st.active));
+    const text = `${st.active}/${st.workers} busy` + (st.queued ? ` · ${st.queued} waiting` : "");
+    box.querySelector(".worker-text").textContent = text;
+    box.classList.toggle("full", st.active >= st.workers);
+    box.title = `${st.active} of ${st.workers} workers running an analysis` +
+      (st.queued ? `; ${st.queued} queued` : "") +
+      ". Each person runs one analysis at a time; when every worker is busy, people take turns.";
   }
 
   // ------------------------------------------------------------- stages
@@ -2091,6 +2142,7 @@
       showError("Could not load the demo configuration.");
       return;
     }
+    watchWorkers(S.config.status);
     // Deep link / QA: ?mode=factuality|coherence|both&example=<id>&run=1.
     const q = new URLSearchParams(location.search);
     if (q.get("mode")) setSwitcher("mode", q.get("mode"));

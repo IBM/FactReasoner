@@ -333,6 +333,25 @@ def set_throttle(
     return throttle
 
 
+def share_throttle(backend: Any, throttle: BackendThrottle) -> BackendThrottle | None:
+    """Make ``backend`` draw on an existing ``throttle``.
+
+    For several backend objects that reach the same model (one per worker
+    thread, each with its own event loop and HTTP client): registering one
+    throttle for all of them keeps the model's budget global instead of one
+    budget per object.
+
+    Returns:
+        ``throttle``, or None for a backend that cannot be weakly referenced.
+    """
+    with _backend_throttles_lock:
+        try:
+            _backend_throttles[backend] = throttle
+        except TypeError:
+            return None
+    return throttle
+
+
 def throttle_for(backend: Any) -> BackendThrottle | None:
     """Return the shared :class:`BackendThrottle` for ``backend``.
 

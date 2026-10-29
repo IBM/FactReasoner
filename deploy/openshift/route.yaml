@@ -1,0 +1,41 @@
+# The demo's public address: https://factuality.vpc-int.res.ibm.com
+#
+#   oc apply -f deploy/openshift/route.yaml
+#
+# Matches the Route created in the cluster (edge TLS, HTTP redirected to HTTPS),
+# with the Service it targets. haproxy's timeout is an IDLE timeout: the demo's
+# event streams send a keep-alive every 15 s, so a run of any length stays
+# connected under 120 s.
+apiVersion: v1
+kind: Service
+metadata:
+  name: factuality-service
+  namespace: factuality
+  labels: {app: factreasoner-demo}
+spec:
+  selector: {app: factreasoner-demo}
+  ports:
+    - {name: http, port: 7860, targetPort: 7860}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: factuality-route
+  namespace: factuality
+  labels:
+    app: factreasoner-demo
+    ingress: factuality
+  annotations:
+    haproxy.router.openshift.io/timeout: 120s
+spec:
+  host: factuality.vpc-int.res.ibm.com
+  port:
+    targetPort: 7860
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: factuality-service
+    weight: 100
+  wildcardPolicy: None

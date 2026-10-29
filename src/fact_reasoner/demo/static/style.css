@@ -75,6 +75,23 @@ body {
   padding-left: 12px; border-left: 1px solid var(--cds-border-subtle-01);
 }
 .header-actions { display: flex; align-items: center; gap: 4px; }
+/* Live worker count: one slot per worker, filled while it runs an analysis. */
+.workers {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px;
+  margin-right: 4px; border-radius: 16px; font-size: 12px; white-space: nowrap;
+  background: var(--cds-layer-02, var(--cds-layer-01)); color: var(--cds-text-secondary);
+  border: 1px solid var(--cds-border-subtle-01);
+}
+.worker-slots { display: inline-flex; gap: 3px; }
+.worker-slot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid var(--cds-border-strong-01); background: transparent;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.worker-slot.busy { background: var(--cds-interactive); border-color: var(--cds-interactive); }
+.workers.full .worker-text { color: var(--cds-text-primary); font-weight: 600; }
+.workers.offline { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) { .worker-slot { transition: none; } }
 
 
 /* ---------------- Workspace ---------------- */
@@ -596,6 +613,8 @@ cds-content-switcher:not(#mode):not(#fact-prior-mode):not(#prior-mode) cds-conte
   .stage-label .short { display: inline; }
   .stage-note { display: none; }
   #dry-run-tag { display: none; }
+  .workers { padding: 0 8px; gap: 6px; }
+  .workers .worker-text { display: none; }
 
   .scores { grid-template-columns: minmax(0, 1fr); }
   .scores.four { grid-template-columns: minmax(0, 1fr); }

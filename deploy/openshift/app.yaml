@@ -1,12 +1,13 @@
 # The FactReasoner demo (fact-reasoner-lcs-demo), live mode: RITS + in-cluster Ollama.
 #
-#   oc apply -f deploy/openshift/app.yaml
-#   oc -n factuality port-forward svc/factreasoner-demo 7860:7860   # http://localhost:7860
+#   oc apply -f deploy/openshift/app.yaml deploy/openshift/route.yaml
+#   https://factuality.vpc-int.res.ibm.com   (or port-forward, see README.md)
 #
-# Exactly one replica: runs live in the process's memory and one worker thread
-# serves them in turn, so a second replica would not see the first one's runs
-# (and the browser's event stream would break). Needs the `factreasoner-keys`
-# secret (RITS_API_KEY, SERPER_API_KEY); see README.md.
+# Exactly one replica: runs live in the process's memory, so a second replica
+# would not see the first one's runs (and the browser's event stream would
+# break). Within the pod, DEMO_WORKERS analyses run at once, one per worker
+# thread; more wait in a queue where users take turns. Needs the
+# `factreasoner-keys` secret (RITS_API_KEY, SERPER_API_KEY); see README.md.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,6 +36,12 @@ spec:
             - {name: http, containerPort: 7860}
           env:
             - {name: OLLAMA_HOST, value: "http://ollama:11434"}
+            # Analyses run at once (see the header). Each one's numeric work
+            # (Merlin, embeddings) gets a thread of its own rather than every
+            # library sizing its pool to the whole pod.
+            - {name: DEMO_WORKERS, value: "4"}
+            - {name: OMP_NUM_THREADS, value: "1"}
+            - {name: MKL_NUM_THREADS, value: "1"}
           envFrom:
             - secretRef:
                 name: factreasoner-keys
@@ -42,7 +49,9 @@ spec:
           # namespace default (4Gi) is fine, but stated rather than implied.
           resources:
             requests: {cpu: "1", memory: 3Gi, ephemeral-storage: 1Gi}
-            limits: {cpu: "2", memory: 6Gi, ephemeral-storage: 4Gi}
+            # Up to 4 analyses at once: room for one busy core each. The request
+            # stays at 1 CPU, inside the namespace quota.
+            limits: {cpu: "4", memory: 8Gi, ephemeral-storage: 4Gi}
           startupProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5

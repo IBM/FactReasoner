@@ -49,7 +49,11 @@ spec:
             # and allow both (claims model + kev) to be resident at once.
             - {name: OLLAMA_KEEP_ALIVE, value: "30m"}
             - {name: OLLAMA_MAX_LOADED_MODELS, value: "2"}
-            - {name: OLLAMA_NUM_PARALLEL, value: "1"}
+            # Two requests per model at once, so two users' runs interleave
+            # instead of one waiting for the other's whole run. Each slot adds
+            # a context's worth of memory, and on CPU each call runs slower
+            # while the other is in flight.
+            - {name: OLLAMA_NUM_PARALLEL, value: "2"}
           volumeMounts:
             - {name: models, mountPath: /models}
           # The models are on the PVC, not the pod's local disk.
