@@ -3773,6 +3773,28 @@ class TestPromptTexParity:
         )
 
 
+class TestP5DefinesEveryCall:
+    """Every operator call a ladder dispatches must be defined in P5.
+
+    `add_resolution` was dispatched by every CONFLICT ladder and defined nowhere in P5. One
+    generator inferred it from the name; the next returned the text unchanged, and 17
+    families were rejected before the gap was seen.
+    """
+
+    def test_every_dispatched_call_is_defined(self):
+        p5 = prompts.PROMPTS["P5"]
+        used = {
+            c
+            for f in perturb.FAMILY_TYPES
+            for r in perturb.ladder_for(f).rungs
+            for c in r.calls
+        }
+        declared = {c for calls in perturb.OPERATOR_CALLS.values() for c in calls}
+        assert used <= declared
+        for call in sorted(declared):
+            assert f"   - {call}(" in p5, f"P5 does not define {call}"
+
+
 class TestPaperAppendixPrompts:
     """The ICLR paper's appendix includes its prompts from files; they must match the code.
 

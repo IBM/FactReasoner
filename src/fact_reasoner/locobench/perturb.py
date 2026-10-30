@@ -56,9 +56,12 @@ OPERATORS = {
     "O6": "reorder",
 }
 
-# The ten parameterized calls the P5 prompt accepts, grouped by operator. Note
+# The eleven parameterized calls the P5 prompt accepts, grouped by operator. Note
 # `add_resolution`: the family manifest names it, Phase 1 Section 4.2 mentions only its
-# inverse, and every CONFLICT ladder's resolved rung needs it (Phase 2, ambiguity 4).
+# inverse, and every CONFLICT ladder's resolved rung needs it (Phase 2, ambiguity 4). P5
+# did not define it until the opus-5-5 corpus: opus-5 inferred it from the name, while
+# opus-5-5 returned the text unchanged and 17 CONFLICT families were rejected. A test now
+# asserts every call a ladder dispatches is defined in P5.
 OPERATOR_CALLS: dict[str, tuple[str, ...]] = {
     "O1": ("wrong_sense", "direction_reversal", "exhaustiveness_flip"),
     "O2": ("inject_contradiction", "spurious_relation"),

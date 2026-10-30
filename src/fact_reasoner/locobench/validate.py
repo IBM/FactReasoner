@@ -1249,7 +1249,7 @@ def gate_length_drift(base: str, perturbed: str, *, operator: str = "") -> GateR
     Args:
         base: The parent response.
         perturbed: The perturbed response.
-        operator: The call applied. Three operators legitimately add or remove a
+        operator: The call applied. Four operators legitimately add or remove a
             sentence, so they get a sentence's worth of extra slack.
 
     Returns:
@@ -1257,7 +1257,12 @@ def gate_length_drift(base: str, perturbed: str, *, operator: str = "") -> GateR
     """
     nb, np_ = len(base.split()), len(perturbed.split())
     limit = THRESHOLDS["length_drift"]
-    if operator in ("inject_contradiction", "remove_resolution", "break_chain"):
+    if operator in (
+        "inject_contradiction",
+        "add_resolution",
+        "remove_resolution",
+        "break_chain",
+    ):
         limit += 0.10
     drift = abs(np_ - nb) / nb if nb else 0.0
     ok = drift <= limit

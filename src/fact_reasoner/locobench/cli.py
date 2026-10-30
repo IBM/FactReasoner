@@ -485,6 +485,10 @@ def main() -> None:
         call = llm if cfg.dry_run else llms[gen.name]
         if cfg.dry_run:
             holder.clear()
+            # The mock's V1/V4 echo the plan its P3 wrote here. A family resumed from a
+            # stored plan skips P3, so seed the holder with it or V1 recovers nothing.
+            if prev and prev.artifacts.get("plan"):
+                holder["plan"] = prev.artifacts["plan"]
 
         res = generate_family(
             fid,

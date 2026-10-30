@@ -163,3 +163,27 @@ class TestReportIsReadOnly:
         assert exc.value.code == 0
         with open(path) as f:
             assert f.read() == before
+
+
+class TestReset:
+    def test_reset_regenerates_to_the_same_corpus_without_replanning(self, sharded, tmp_path):
+        # With the deterministic mock, re-running from the stored base responses must
+        # reproduce the corpus exactly -- and must not re-issue P1-P4.
+        root, manifest = sharded
+        before = str(tmp_path / "before")
+        shards.merge(root, before)
+        counts = shards.reset(root, reason="test")
+        assert counts["with_response"] == N_FAMILIES
+        for e in manifest["shards"]:
+            assert not os.path.exists(os.path.join(e["out_dir"], "items.jsonl"))
+            _run(e["command"])
+            with open(os.path.join(e["out_dir"], "state.json")) as f:
+                for fs in json.load(f)["families"].values():
+                    assert fs["stage"] == "admitted"
+                    # Re-validated and re-perturbed, never re-planned or re-written.
+                    assert not {"P1", "P2", "P3", "P4"} & set(fs["artifacts"]["calls"])
+                    assert "P5" in fs["artifacts"]["calls"]
+        after = str(tmp_path / "after")
+        shards.merge(root, after)
+        assert _items(after) == _items(before)
+        assert shards._load_plan(root)["resets"][0]["reason"] == "test"

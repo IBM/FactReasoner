@@ -386,6 +386,10 @@ Instructions:
      is Contrast, rewrite so exactly one must hold.
    - remove_resolution(edge): delete the resolver sentence and any reference to
      it, leaving the conceded tension unresolved. Change nothing else.
+   - add_resolution(edge): the edge is a conflict the response leaves open. Add
+     ONE sentence, after both of its atoms, in which an authority reaches a
+     determination that settles the tension. Do not delete either atom or change
+     the connective realizing the edge. Change nothing else.
    - inject_contradiction(atom): add ONE new sentence asserting a claim that
      directly contradicts the named atom. Place it at least two sentences later.
    - break_chain(edge): remove or negate the link realizing that edge so the
@@ -403,8 +407,8 @@ Instructions:
      inferential language. The truth of neither atom may become dependent on
      the other.
 4. Do not change the response's length by more than 15 percent, except for
-   inject_contradiction (which adds one sentence) and remove_resolution /
-   break_chain (which remove one).
+   inject_contradiction / add_resolution (which add one sentence) and
+   remove_resolution / break_chain (which remove one).
 5. Output the perturbed RESPONSE in a code block, then a second code block
    containing a JSON diff:
    {"operator": "...", "target": ..., "sentences_changed": [...],

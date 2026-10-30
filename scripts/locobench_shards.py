@@ -29,6 +29,7 @@ Subcommands::
 
     plan    assign topics to shards, balancing projected calls; write shards.json
     launch  start every shard detached (nohup + caffeinate), recording pids and logs
+    reset   return every family to its stored base response (committee or P5 changed)
     status  one table over all shards: admitted / rejected / in progress / running
     merge   consolidate the shards into one corpus directory, validating everything
 
@@ -226,6 +227,60 @@ def launch(root: str, *, only: list[str] | None = None, wait: bool = False) -> l
         for p in procs:
             p.wait()
     return started
+
+
+# -- reset --------------------------------------------------------------------
+
+
+#: Artifacts a reset keeps: everything up to and including the base response. The pipeline
+#: resumes from a stored response by re-running the committee on it, then regenerating the
+#: rungs -- so a reset re-validates and re-perturbs without re-planning or re-writing.
+KEEP_ON_RESET = ("question", "claims", "plan", "response")
+
+
+def reset(root: str, *, reason: str) -> dict[str, int]:
+    """Return every family in every shard to "base response written, not yet validated".
+
+    Used when the committee or P5 changes mid-run, so that every admitted family carries a
+    verdict from the same panel and rungs from the same P5. Items and manifest entries of
+    previously admitted families are removed (they will be regenerated); rejection records
+    are cleared; attempts restart at zero. Each shard's prior ``state.json`` is kept as
+    ``state.pre-reset-<n>.json`` and the reason is logged in ``shards.json``.
+    """
+    manifest = _load_plan(root)
+    n = len(manifest.get("resets", [])) + 1
+    counts = collections.Counter()
+    for e in manifest["shards"]:
+        d = e["out_dir"]
+        sp = os.path.join(d, STATE_FILE)
+        if not os.path.exists(sp):
+            continue
+        if _alive(e.get("pid")):
+            raise RuntimeError(f"{e['shard']} is running; stop it before resetting")
+        raw = _read_json(sp)
+        shutil.copy2(sp, os.path.join(d, f"state.pre-reset-{n}.json"))
+        fams = raw.get("families", {})
+        for fid, fs in fams.items():
+            kept = {k: fs["artifacts"][k] for k in KEEP_ON_RESET if k in fs.get("artifacts", {})}
+            counts["with_response" if "response" in kept else "replanned"] += 1
+            counts[f"was_{'admitted' if fs.get('stage') == 'admitted' else 'other'}"] += 1
+            fams[fid] = {**fs, "stage": "", "attempts": 0, "rejected_reason": "",
+                         "item_ids": [], "artifacts": kept}
+        with open(sp, "w") as f:
+            json.dump(raw, f, indent=2)
+        for name in (ITEMS_FILE, MANIFEST_FILE):
+            path = os.path.join(d, name)
+            if os.path.exists(path):
+                os.replace(path, os.path.join(d, f"{name}.pre-reset-{n}"))
+        rdir = os.path.join(d, REJECTED_DIR)
+        if os.path.isdir(rdir):
+            shutil.move(rdir, os.path.join(d, f"{REJECTED_DIR}.pre-reset-{n}"))
+            os.makedirs(rdir)
+    manifest.setdefault("resets", []).append(
+        {"n": n, "reason": reason, "git_commit": _git_commit(), "counts": dict(counts)}
+    )
+    _save_plan(root, manifest)
+    return dict(counts)
 
 
 # -- status -------------------------------------------------------------------
@@ -451,6 +506,9 @@ def main() -> int:
     p.add_argument("--root", required=True)
     p.add_argument("--only", action="append", help="shard id, repeatable")
     p.add_argument("--wait", action="store_true")
+    p = sub.add_parser("reset")
+    p.add_argument("--root", required=True)
+    p.add_argument("--reason", required=True)
     p = sub.add_parser("status")
     p.add_argument("--root", required=True)
     p = sub.add_parser("merge")
@@ -469,6 +527,8 @@ def main() -> int:
               f"at {m['git_commit']}")
     elif a.cmd == "launch":
         print(f"[shards] started: {launch(a.root, only=a.only, wait=a.wait)}")
+    elif a.cmd == "reset":
+        print(f"[shards] reset: {reset(a.root, reason=a.reason)}")
     elif a.cmd == "status":
         _print_status(status(a.root))
     elif a.cmd == "merge":
