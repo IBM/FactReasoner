@@ -64,7 +64,11 @@ THRESHOLDS: dict[str, Any] = {
     # items, the valid-only rates ranged 0.833-1.00, so these clear with one relation spare.
     "v1_coupling": 0.80,  # fraction recovered with the correct coupling
     "v1_sense": 0.70,  # ... and with the correct sense
-    "v1_rule": "majority",  # of the committee must meet both rates
+    # ANY-OF, not majority: recoverability asks whether a careful reader CAN recover the
+    # plan, so one rater clearing both rates suffices (see `pipeline._validate_response`,
+    # which applies this; every rater's rates are recorded). This key used to say
+    # "majority", which nothing enforced and the paper then reported as the rule.
+    "v1_rule": "any_of",
     "v3_min_score": 4,  # fluency / formality / organization, on 1..5
     "v3_empty_spans": ("leakage", "hedging"),  # must be empty; artifacts recorded only
     "v3_rule": "majority",  # of the auditors must fail a facet for it to reject

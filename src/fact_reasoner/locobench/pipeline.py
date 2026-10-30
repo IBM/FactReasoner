@@ -1120,7 +1120,7 @@ def _validate_response(
     * **V1 -- any-of.** Recoverability is a claim about whether a careful reader *can*
       recover the plan, so one competent reader succeeding is sufficient evidence. Requiring
       every rater to independently clear 5-of-6 would be a far harsher gate than the one
-      being applied, and ``THRESHOLDS["v1_rule"]`` says "majority", not "unanimity". The best
+      being applied; ``THRESHOLDS["v1_rule"]`` records this as ``"any_of"``. The best
       rater's verdict is the one reported; every rater's rates are recorded.
     * **V3 -- majority per facet**, unchanged.
     * **V4 -- majority per atom**, so no single rater can declare an atom absent.

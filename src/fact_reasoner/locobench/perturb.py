@@ -433,24 +433,33 @@ def p5_calls_for(family: str) -> int:
 def call_budget(
     families: "list[str] | dict[str, int]",
     *,
-    n_voters: int = 4,
-    inline_responses: int = 1,
+    n_voters: int = 3,
+    audited_rungs: int = 1,
 ) -> dict[str, int]:
     """Project the LLM call budget for a set of families, per prompt identifier.
 
-    Derived from :data:`LADDERS` rather than hard-coded, so the projection cannot drift
-    from the ladders actually executed.
+    Mirrors what ``pipeline`` dispatches on a family that admits first time: one call each
+    of P1-P4, one P5 call per operator call in the ladder (summed from :data:`LADDERS`, so
+    it cannot drift from the ladders executed), and V1, V3 and V4 once per eligible voter
+    on the BASE response only (``pipeline._validate_response``). The four perturbed rungs
+    get no committee call; their gates are deterministic.
 
-    Phase 1's V2 exhaustiveness adjudicator carried its own per-conflict-edge term here. It
-    is gone with the prompt: ``exclusive`` and ``co_necessity`` are derived from the sense by
-    ``taxonomy_bridge.COMPILE``, so no model call is needed to assign them.
+    This is a floor, not an expectation. A parse or gate failure re-issues the prompt (up
+    to ``max_attempts``), a committee retry re-runs P4 and the full panel, and each call may
+    resample internally (``sampling_loop_budget``); none of that is predictable in advance.
+
+    An earlier version charged V1 and V4 on all five rungs plus an extra inline call, and V3
+    once regardless of panel size -- the shape of a design in which the committee validated
+    every rung and V3 had a single auditor. Neither is how the pipeline runs, so it
+    over-projected the committee by roughly 5x.
 
     Args:
         families: Either a list of family-type labels (one entry per family) or a
             ``{family_type: count}`` mapping.
-        n_voters: Committee models per item, excluding the generator (R3).
-        inline_responses: Responses the inline V1/V3/V4 gate gets run on. The harness
-            currently audits the base response only (1); Phase 1's V3 scope is all five.
+        n_voters: Eligible committee models per family, after the generator is excluded
+            (R3) -- ``len(cfg.eligible_auditors(generator))``.
+        audited_rungs: Responses per family the committee validates. The pipeline audits
+            the base response only (1); 5 prices auditing every rung, which it does not do.
 
     Returns:
         Calls per prompt id, plus ``generation``, ``committee`` and ``total`` subtotals.
@@ -463,23 +472,19 @@ def call_budget(
             counts[f] = counts.get(f, 0) + 1
 
     n_fam = sum(counts.values())
-    n_items = n_fam * len(RUNG_NAMES)
     budget = {
         "P1": n_fam,
         "P2": n_fam,
         "P3": n_fam,
         "P4": n_fam,
         "P5": sum(p5_calls_for(f) * n for f, n in counts.items()),
-        "V1": n_fam * inline_responses + n_items * n_voters,
-        "V3": n_fam * inline_responses,
-        "V4": n_fam * inline_responses + n_items * n_voters,
+        "V1": n_fam * audited_rungs * n_voters,
+        "V3": n_fam * audited_rungs * n_voters,
+        "V4": n_fam * audited_rungs * n_voters,
     }
-    committee = n_items * n_voters * 2
-    budget["committee"] = committee
-    budget["total"] = sum(budget[k] for k in ("P1", "P2", "P3", "P4", "P5")) + sum(
-        budget[k] for k in ("V1", "V3", "V4")
-    )
-    budget["generation"] = budget["total"] - committee
+    budget["generation"] = sum(budget[k] for k in ("P1", "P2", "P3", "P4", "P5"))
+    budget["committee"] = sum(budget[k] for k in ("V1", "V3", "V4"))
+    budget["total"] = budget["generation"] + budget["committee"]
     return budget
 
 

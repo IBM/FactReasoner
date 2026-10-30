@@ -263,18 +263,26 @@ def _report(store: Store, cfg: GenConfig) -> int:
         new = {s: sense_counts.get(s, 0) for s in NEW_SENSES}
         print(f"  no-prior-gold senses : {new}")
 
-    # Cost: the committee dominates, so it is reported separately. The per-prompt counts
-    # come from perturb.call_budget, which sums the real ladders -- a hard-coded
+    # Cost, from perturb.call_budget, which sums the real ladders -- a hard-coded
     # per-family constant undercounts CONFLICT/CHAIN, whose rungs compose several P5
-    # calls apiece.
-    remaining = max(0, cfg.n_families - len(families))
-    n_voters = max(0, len(cfg.committee) - 1) if cfg.committee else 4
-    budget = perturb.call_budget(
-        perturb.family_type_slots(remaining), n_voters=n_voters
-    )
+    # calls apiece. The panel is the RESOLVED one per generator: `len(committee) - 1`
+    # assumed the generator sits on its own committee, which the shipped config does not,
+    # so it projected 2 voters where 3 run. A dry run has no panel and is costed as the
+    # minimum a live run is allowed.
+    remaining_slots = [s for s in _slots(cfg) if s[0] not in families]
+    budget = {}
+    for i, (_, _, fam) in enumerate(remaining_slots):
+        gen = cfg.generators[i % len(cfg.generators)] if cfg.generators else None
+        n_voters = (
+            len(cfg.eligible_auditors(gen)) if cfg.committee else DEFAULT_COMMITTEE_MIN
+        )
+        for k, v in perturb.call_budget([fam], n_voters=n_voters).items():
+            budget[k] = budget.get(k, 0) + v
+    budget.setdefault("total", 0)
     print(
-        f"  projected calls      : {budget['total']:,} for {remaining} remaining "
-        f"families ({budget['generation']:,} gen + {budget['committee']:,} committee)"
+        f"  projected calls      : {budget['total']:,} for {len(remaining_slots)} "
+        f"remaining families ({budget.get('generation', 0):,} gen + "
+        f"{budget.get('committee', 0):,} committee; one attempt each, so a floor)"
     )
     if budget["total"]:
         per_prompt = " ".join(
@@ -436,10 +444,13 @@ def main() -> None:
     cfg = _resolve(args)
 
     store = Store(cfg.out_dir)
-    store.save_config(cfg.to_dict())
 
+    # --report is read-only. Saving first meant a report run with different flags
+    # overwrote the corpus's recorded config -- the provenance of what generated it.
     if args.report:
         raise SystemExit(_report(store, cfg))
+
+    store.save_config(cfg.to_dict())
 
     slots = _slots(cfg)
     todo, summary = store.plan_work(slots, max_attempts=cfg.max_attempts)
@@ -498,7 +509,15 @@ def main() -> None:
                     stage="admitted",
                     attempts=attempts,
                     item_ids=[it["id"] for it in res.items],
-                    artifacts=res.artifacts,
+                    # The admitting verdict (every gate, and V1's per-rater rates) and the
+                    # call counts. Previously only REJECTED families kept their verdict, so
+                    # committee agreement on admitted families was unrecoverable after the
+                    # fact. Resume never reads these keys; they are an audit record.
+                    artifacts={
+                        **res.artifacts,
+                        "verdict": res.verdict.to_dict(),
+                        "calls": dict(res.calls),
+                    },
                 )
             )
             n_ok += 1

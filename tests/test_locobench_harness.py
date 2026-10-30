@@ -305,13 +305,14 @@ class TestCallBudget:
         assert per_family == {"CONFLICT": 7, "CHAIN": 7, "ORDER": 4, "CONTROL": 4}
 
     def test_documented_corpus_budget(self):
-        # Phase 1 quoted 7800/1560/6240 with V2 in the committee. V2 is gone -- its
-        # `exclusive`/`co_necessity` labels are derived from the sense by COMPILE rather than
-        # adjudicated by a model -- so the committee drops by exactly its 1440 calls.
+        # One attempt per family, three eligible voters on the base response only. The
+        # previous 6360/1560/4800 charged V1 and V4 on all five rungs (with 4 voters) plus
+        # an inline call, which the pipeline never did, and put the inline V1/V3/V4 calls in
+        # `generation`.
         b = perturb.call_budget(perturb.family_type_slots(120))
-        assert b["total"] == 6360
-        assert b["generation"] == 1560
-        assert b["committee"] == 4800
+        assert b["total"] == 2280
+        assert b["generation"] == 1200
+        assert b["committee"] == 1080
 
     def test_documented_per_prompt_budget(self):
         b = perturb.call_budget(perturb.family_type_slots(120))
@@ -323,10 +324,36 @@ class TestCallBudget:
             "P5": 720,
         }
         assert {k: b[k] for k in ("V1", "V3", "V4")} == {
-            "V1": 2520,
-            "V3": 120,
-            "V4": 2520,
+            "V1": 360,
+            "V3": 360,
+            "V4": 360,
         }
+
+    @pytest.mark.parametrize("family", perturb.FAMILY_TYPES)
+    @pytest.mark.parametrize("n_voters", (1, 3))
+    def test_the_budget_matches_what_the_pipeline_dispatches(self, family, n_voters):
+        # The budget is a model of `generate_family`; check it against the real thing.
+        # Every call is counted at the callable, auditors included, by the same probes the
+        # mock dispatches on -- `res.calls` alone counts only the generator's own calls.
+        from fact_reasoner.locobench.pipeline import _PROBES
+
+        cfg = _dry_cfg()
+        holder: dict = {}
+        mock = make_mock_llm(cfg, plan_holder=holder)
+        seen: dict[str, int] = {}
+
+        def counted(rendered):
+            pid = next(p for p, probe in _PROBES.items() if probe in rendered)
+            seen[pid] = seen.get(pid, 0) + 1
+            return mock(rendered)
+
+        auditors = [(f"a{i}", counted) for i in range(n_voters)]
+        res = generate_family(
+            "f001", "Law", family, cfg, llm=counted, auditor_llms=auditors
+        )
+        assert res.admitted
+        b = perturb.call_budget([family], n_voters=n_voters)
+        assert seen == {k: b[k] for k in ("P1", "P2", "P3", "P4", "P5", "V1", "V3", "V4")}
 
     def test_the_budget_no_longer_carries_a_v2_term(self):
         # The prompt, its parser, its mock and this budget line were all removed together;
@@ -334,19 +361,21 @@ class TestCallBudget:
         b = perturb.call_budget(perturb.family_type_slots(120))
         assert "V2" not in b
 
-    def test_committee_dominates_generation(self):
+    def test_subtotals_partition_the_total(self):
         b = perturb.call_budget(perturb.family_type_slots(120))
-        assert b["committee"] > 3 * b["generation"]
+        assert b["generation"] == sum(b[k] for k in ("P1", "P2", "P3", "P4", "P5"))
+        assert b["committee"] == sum(b[k] for k in ("V1", "V3", "V4"))
+        assert b["total"] == b["generation"] + b["committee"]
 
-    def test_closing_the_v3_scope_gap_costs_twenty_three_percent(self):
-        # The relative cost of auditing all five rungs rather than the base response rose
-        # from 18% to 23% when V2's 1440 fixed calls left the denominator.
+    def test_auditing_every_rung_would_nearly_triple_the_budget(self):
+        # The pipeline audits the base response only; the four perturbed rungs are checked by
+        # deterministic gates. Committee-validating every rung would multiply the committee
+        # by five, which is the price of closing that gap.
         shipped = perturb.call_budget(perturb.family_type_slots(120))
-        complete = perturb.call_budget(
-            perturb.family_type_slots(120), inline_responses=5
-        )
-        assert complete["total"] == 7800
-        assert round(complete["total"] / shipped["total"] - 1, 2) == 0.23
+        complete = perturb.call_budget(perturb.family_type_slots(120), audited_rungs=5)
+        assert complete["committee"] == 5 * shipped["committee"] == 5400
+        assert complete["total"] == 6600
+        assert round(complete["total"] / shipped["total"], 2) == 2.89
 
     def test_budget_accepts_a_mapping_and_agrees_with_a_list(self):
         from_list = perturb.call_budget(perturb.family_type_slots(120))
@@ -3742,6 +3771,32 @@ class TestPromptTexParity:
         assert prompts.PROMPTS[pid].strip() in tex, (
             f"{pid} has drifted from locobench_phase1.tex; update the verbatim block"
         )
+
+
+class TestPaperAppendixPrompts:
+    """The ICLR paper's appendix includes its prompts from files; they must match the code.
+
+    The files were hand-copied once and P3 then drifted -- the paper reproduced a P3
+    without the conflict-sense quota the corpus was generated with. The files are now
+    written only by `scripts/export_locobench_prompts.py`, and this test is what keeps them
+    from drifting again.
+    """
+
+    def test_every_appendix_prompt_file_matches_the_code(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "export_locobench_prompts", "scripts/export_locobench_prompts.py"
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for name, text in mod.collect().items():
+            path = os.path.join(mod.OUT_DIR, name)
+            with open(path, encoding="utf-8") as fh:
+                assert fh.read() == text, (
+                    f"{name} has drifted from the code; run "
+                    "scripts/export_locobench_prompts.py"
+                )
 
 
 class TestDefectTwoPerRungRelations:
