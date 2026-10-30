@@ -267,7 +267,14 @@ timeout would cut off.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
   **Evidence / FactGraph / MRF** does the same for factuality: a unary square per
-  claim and passage, a pairwise square per NLI link.
+  claim and passage, a pairwise square per NLI link, laid out like the coherence
+  MRF. Passages are the grey circles `P1`, `P2` … (in evidence order); hover one for
+  its title and text.
+- **Drag a node** in either MRF and the nodes it interacts with directly (its factor
+  squares, and through them the variables they connect) move apart to make room,
+  while the rest of the graph keeps its shape (d3-force springs, short-range
+  repulsion). A dropped node stays where you leave it; double-click it to release it.
+  The arrangement survives a what-if re-score and a switch to another view and back.
 - **Hover a factor square** in either MRF for its table, exactly as the network that
   was scored holds it: φ over x = 0, 1, and ψ over (source, target) = 00, 01, 10, 11,
   with the edge's probability. The tables follow a what-if re-score.

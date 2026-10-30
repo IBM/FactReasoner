@@ -1479,6 +1479,8 @@
         if (html) showNodeCard(fcy, wrap, n, html);
       });
       fcy.on("mouseout", "node", () => { setActive(null); hideNodeCard(wrap); });
+      fcy.on("grab", "node", () => hideNodeCard(wrap));
+      attachMrfPhysics(fcy, () => S.factView === "mrf");
       fcy.on("pan zoom", () => hideNodeCard(wrap));
       fcy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
     }
@@ -1500,10 +1502,14 @@
     // those NLI judged neutral, so the graph shows all the evidence it saw.
     const ctxs = (f.contexts || []).slice().sort((a, b) => (used.has(b.id) ? 1 : 0) - (used.has(a.id) ? 1 : 0));
     const els = [];
+    // MRF view: passages go by their number (P1, P2 … in evidence order, as on
+    // the evidence cards); the title and text are on hover.
+    const pnum = Object.fromEntries((f.contexts || []).map((c, i) => [c.id, `P${i + 1}`]));
+    const tag = mrf ? " mrf" : "";
     claims.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: c.label, color: postColor(marg[c.id]) },
-      classes: "claim" }));
-    ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: ctxLabel(c) },
-      classes: "ctx" + (used.has(c.id) ? "" : " neutral") }));
+      classes: "claim" + tag }));
+    ctxs.forEach((c) => els.push({ group: "nodes", data: { id: c.id, label: mrf ? pnum[c.id] : ctxLabel(c) },
+      classes: "ctx" + (used.has(c.id) ? "" : " neutral") + tag }));
     if (mrf) {
       // Factor graph, as in the coherence MRF: a grey unary square per claim
       // and passage (its prior), a black pairwise square per NLI link.
@@ -1511,7 +1517,8 @@
       const drawn = new Set(els.map((e) => e.data.id));
       for (const id of drawn) {
         if (!(f.unary || {})[id]) continue;
-        els.push({ group: "nodes", data: { id: `u-${id}`, var: id }, classes: "unary" });
+        const name = pnum[id] || (claims.find((c) => c.id === id) || {}).label || id;
+        els.push({ group: "nodes", data: { id: `u-${id}`, var: id, label: `φ${name.replace(/^a/, "")}` }, classes: "unary" });
         edges.push({ group: "edges", data: { id: `ul-${id}`, source: `u-${id}`, target: id }, classes: "flink" });
       }
       (f.relations || []).forEach((r, i) => {
@@ -1527,10 +1534,22 @@
     if (fcy.scratch("key") === key) {
       for (const e of els.concat(edges)) fcy.getElementById(e.data.id).data(e.data);
     } else {
+      // Leaving the MRF: remember its arrangement (dragged and pinned nodes
+      // included), so coming back to the same graph restores it, not a fresh layout.
+      const was = fcy.scratch("key");
+      if (was && was.startsWith("mrf|")) {
+        fcy.scratch("mrfSaved", { key: was, pan: { ...fcy.pan() }, zoom: fcy.zoom(),
+          nodes: Object.fromEntries(fcy.nodes().map((n) => [n.id(), { ...n.position(), pinned: !!n.data("pinned") }])) });
+      }
       fcy.elements().remove();
       fcy.add(els.concat(edges));
       fcy.scratch("key", key);
-      placeFactGraph();
+      const saved = fcy.scratch("mrfSaved");
+      if (mrf && saved && saved.key === key) {
+        fcy.resize();
+        fcy.nodes().forEach((n) => { const v = saved.nodes[n.id()]; if (v) { n.position({ x: v.x, y: v.y }); n.data("pinned", v.pinned); } });
+        fcy.viewport({ zoom: saved.zoom, pan: saved.pan });
+      } else if (mrf) { fcy.resize(); fcy.layout(MRF_LAYOUT).run(); fitGraph(fcy, 32); } else placeFactGraph();
     }
     paintFocus();
   }
@@ -1555,16 +1574,6 @@
     const byOrder = (a, b) => order(a.id()) - order(b.id());
     column(fcy.nodes("node.claim").sort(byOrder), Math.max(40, W * 0.3));
     column(fcy.nodes("node.ctx"), Math.max(140, W * 0.62));
-    // MRF view: a unary square left of its variable; a pairwise square midway
-    // along its link, nudged right when both ends share a column.
-    fcy.nodes("node.unary").forEach((u) => {
-      const v = fcy.getElementById(u.data("var")).position();
-      u.position({ x: v.x - 30, y: v.y });
-    });
-    fcy.nodes("node.factor").forEach((n) => {
-      const a = fcy.getElementById(n.data("src")).position(), b = fcy.getElementById(n.data("trg")).position();
-      n.position({ x: (a.x + b.x) / 2 + (Math.abs(a.x - b.x) < 1 ? 36 : 0), y: (a.y + b.y) / 2 });
-    });
     fcy.zoom(1);
     fcy.pan({ x: 0, y: 0 });
     // A canvas too small for the labels: zoom out to fit, never in.
@@ -1604,9 +1613,22 @@
       // MRF view
       { selector: "node.factor", style: { shape: "rectangle", width: 12, height: 12, "background-color": ink, label: "" } },
       { selector: "node.unary", style: {
-        shape: "rectangle", width: 10, height: 10, "background-color": cssVar("--cds-border-strong-01"), label: "",
+        shape: "rectangle", width: 12, height: 12, "background-color": cssVar("--cds-border-strong-01"),
+        label: "data(label)", "font-family": "IBM Plex Mono, Menlo, monospace", "font-size": 10, color: sub,
+        "text-valign": "top", "text-margin-y": -4,
       } },
       { selector: "edge.flink", style: { width: 1.5, "line-color": sub, label: "", "curve-style": "straight" } },
+      // MRF variables are drawn as in the coherence MRF: 42 px circles,
+      // passages grey with their number inside.
+      { selector: "node.claim.mrf", style: { width: 42, height: 42, "font-size": 13 } },
+      { selector: "node.ctx.mrf", style: {
+        // Text in the page background colour: white on dark grey in the light
+        // theme, dark on light grey in the dark one.
+        shape: "ellipse", width: 42, height: 42, color: cssVar("--cds-background"), "font-family": "IBM Plex Mono, Menlo, monospace",
+        "font-size": 12, "font-weight": 600, "text-halign": "center", "text-valign": "center", "text-margin-x": 0,
+        "background-color": cssVar("--cds-icon-secondary"),
+      } },
+      { selector: "node.ctx.mrf.neutral", style: { color: ink } },
     ];
   }
 
@@ -1642,7 +1664,9 @@
         if (S.claims.length && S.view !== "mrf") cy.layout(layoutOptions()).run();
         fitGraph(cy, 32);
       }
-      if (fcy && !$("#fact-graph-wrap").hidden) placeFactGraph();
+      if (fcy && !$("#fact-graph-wrap").hidden) {
+        if (S.factView === "mrf") { fcy.resize(); fitGraph(fcy, 32); } else placeFactGraph();
+      }
     });
     ro.observe($("#graph"));
     ro.observe($("#fact-graph"));
@@ -1685,8 +1709,9 @@
   function varName(id) {
     const c = S.claims.find((x) => x.id === id);
     if (c) return c.label;
-    const x = ((S.fact && S.fact.contexts) || []).find((y) => y.id === id);
-    return x ? (x.title || x.id).slice(0, 18) : id;
+    // A passage by its number, as the factuality MRF labels it.
+    const i = ((S.fact && S.fact.contexts) || []).findIndex((y) => y.id === id);
+    return i >= 0 ? `P${i + 1}` : id;
   }
   function unaryCard(id, table) {
     if (!table) return null;
@@ -1844,6 +1869,84 @@
     return els;
   }
 
+  /* Drag physics for an MRF view. Grabbing a node starts a d3-force simulation
+   * from the graph as it stands: springs along the factor links, short-range
+   * repulsion and collision, and a weak anchor holding every node to where it
+   * was. So the nodes that interact directly with the one you move make room
+   * around it, and the rest of the graph stays put. A dropped node stays where
+   * you leave it (pinned) until you double-click it. Without d3 (CDN blocked)
+   * nodes still drag, just without the springs. */
+  function attachMrfPhysics(g, isMrf) {
+    if (typeof d3 === "undefined" || !d3.forceSimulation) return;
+    let sim = null, byId = {}, from = null;
+    const stop = () => { if (sim) { sim.stop(); sim = null; } };
+    function start() {
+      stop();
+      const box = g.extent();
+      const nodes = g.nodes().map((n) => {
+        const p = n.position(), r = n.width() / 2;
+        const d = { id: n.id(), x: p.x, y: p.y, ax: p.x, ay: p.y, r };
+        if (n.data("pinned")) { d.fx = p.x; d.fy = p.y; }
+        return d;
+      });
+      byId = Object.fromEntries(nodes.map((d) => [d.id, d]));
+      const links = g.edges().map((e) => ({ source: e.source().id(), target: e.target().id() }));
+      sim = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => l.source.r + l.target.r + 26).strength(0.6))
+        .force("charge", d3.forceManyBody().strength(-200).distanceMax(110))
+        .force("collide", d3.forceCollide().radius((d) => d.r + 8))
+        // The anchor holds the graph's shape: only nodes near the move give way.
+        .force("ax", d3.forceX((d) => d.ax).strength(0.12))
+        .force("ay", d3.forceY((d) => d.ay).strength(0.12))
+        .on("tick", () => {
+          // Keep every node inside the visible canvas: a soft wall.
+          g.batch(() => nodes.forEach((d) => {
+            d.x = Math.max(box.x1 + d.r + 14, Math.min(box.x2 - d.r - 4, d.x));
+            d.y = Math.max(box.y1 + d.r + 14, Math.min(box.y2 - d.r - 4, d.y));
+            const n = g.getElementById(d.id);
+            if (n.nonempty() && !n.grabbed()) n.position({ x: d.x, y: d.y });
+          }));
+        });
+    }
+    g.on("grab", "node", (e) => {
+      if (!isMrf()) return;
+      start();
+      const d = byId[e.target.id()], p = e.target.position();
+      d.fx = p.x; d.fy = p.y;
+      from = { ...p };
+      sim.alphaTarget(0.3).restart();
+    });
+    g.on("drag", "node", (e) => {
+      const d = sim && byId[e.target.id()];
+      if (d) { const p = e.target.position(); d.fx = p.x; d.fy = p.y; }
+    });
+    g.on("free", "node", (e) => {
+      const d = sim && byId[e.target.id()];
+      if (!d) return;
+      const p = e.target.position();
+      // Pin only a real move: a click (or each click of a double-click) is a
+      // grab and a free too, and must not pin -- or re-pin -- the node.
+      if (from && Math.hypot(p.x - from.x, p.y - from.y) > 3) e.target.data("pinned", true);  // data, not a class: survives a re-score
+      if (!e.target.data("pinned")) { d.fx = d.fy = null; }
+      from = null;
+      sim.alphaTarget(0);              // let the neighbours settle, then stop
+    });
+    g.on("dbltap", "node", (e) => {
+      if (!isMrf() || !e.target.data("pinned")) return;
+      e.target.data("pinned", false);
+      start();
+      sim.alpha(0.4).restart();
+    });
+    g.on("remove", stop);
+  }
+
+  /* The force layout both MRF views use (coherence and factuality), so the two
+   * factor graphs read as the same kind of picture. */
+  const MRF_LAYOUT = {
+    name: "cose", animate: false, randomize: true, padding: 28, fit: false,
+    nodeRepulsion: () => 6000, idealEdgeLength: () => 36,
+  };
+
   /* Claims sit on a circle in reading order, clockwise from the top, at every
    * size: the order of the text stays legible, and no edge passes behind a
    * node. Dense graphs stay readable through how edges are drawn (curved,
@@ -1851,12 +1954,7 @@
    * nodes out of order. Only the MRF view, with its factor nodes, uses a force
    * layout. */
   function layoutOptions() {
-    if (S.view === "mrf") {
-      return {
-        name: "cose", animate: false, randomize: true, padding: 28, fit: false,
-        nodeRepulsion: () => 6000, idealEdgeLength: () => 36,
-      };
-    }
+    if (S.view === "mrf") return MRF_LAYOUT;
     return { name: "preset", fit: false, positions: circlePositions() };
   }
 
@@ -1913,7 +2011,8 @@
         if (html) showNodeCard(cy, box.parentElement, n, html);
       });
       cy.on("mouseout", "node.factor, node.unary", () => hideNodeCard(box.parentElement));
-      cy.on("pan zoom", () => hideNodeCard(box.parentElement));
+      cy.on("pan zoom grab", () => hideNodeCard(box.parentElement));
+      attachMrfPhysics(cy, () => S.view === "mrf");
       cy.on("tap", "node.claim", (e) => selectClaim(e.target.id()));
       cy.on("tap", "edge, node.factor", (e) => {
         const idx = e.target.data("idx");
@@ -1998,13 +2097,28 @@
     for (const li of document.querySelectorAll(".claim")) li.classList.toggle("active", activeIds().has(li.dataset.id));
     paintFocus();
   }
+  /* Bring a claim card into view by scrolling the claims list only: scrolling
+   * the page would move the graph under the pointer (and turn a double-click
+   * on a node into one on the canvas). Narrow layouts, where the list does not
+   * scroll on its own, still scroll the page. */
+  function revealInList(li) {
+    const list = li.closest(".claims");
+    if (!list || list.scrollHeight <= list.clientHeight) {
+      li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
+    const a = list.getBoundingClientRect(), b = li.getBoundingClientRect();
+    if (b.top < a.top) list.scrollBy({ top: b.top - a.top - 4, behavior: "smooth" });
+    else if (b.bottom > a.bottom) list.scrollBy({ top: b.bottom - a.bottom + 4, behavior: "smooth" });
+  }
+
   function selectClaim(id) {
     S.activeEdge = null;
     $("#edge-card").hidden = true;
     pinned = pinned === id ? null : id;
     setActive(pinned, true);
     const li = document.querySelector(`.claim[data-id="${id}"]`);
-    if (li && pinned) li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (li && pinned) revealInList(li);
   }
   function selectEdge(idx) {
     S.activeEdge = idx;
@@ -2163,6 +2277,7 @@
     $("#graph-view").addEventListener("cds-content-switcher-selected", (e) => {
       S.view = e.detail.item.value;
       S.activeEdge = null; $("#edge-card").hidden = true;
+      $("#mrf-drag-hint").hidden = S.view !== "mrf";
       renderGraph();
     });
     const info = $("#info-panel");
@@ -2266,7 +2381,7 @@
       document.body.classList.toggle("cds--g10", !dark);
       if (cy) cy.style(graphStyle());
     }
-    if (q.get("view") === "mrf") S.view = "mrf";
+    if (q.get("view") === "mrf") { S.view = "mrf"; $("#mrf-drag-hint").hidden = false; }
     // &qa=1: expose the graphs to screenshot / QA scripts (node positions).
     if (q.get("qa") === "1") window.__qa = { cy: () => cy, fcy: () => fcy };
     if (q.get("tab")) setTimeout(() => showTab(q.get("tab")), 0);
