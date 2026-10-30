@@ -14,6 +14,11 @@
   <!-- Carbon web components: one ESM bundle registers every cds-* element. -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/@carbon/web-components@2.64.0/es/index.js/+esm"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.34.3/dist/cytoscape.min.js"></script>
+  <!-- d3-force and the modules it needs: the springs that make room around a node dragged in an MRF. -->
+  <script src="https://cdn.jsdelivr.net/npm/d3-dispatch@3.0.1/dist/d3-dispatch.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-quadtree@3.0.1/dist/d3-quadtree.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-timer@3.0.1/dist/d3-timer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-force@3.0.0/dist/d3-force.min.js"></script>
 </head>
 <body class="cds--g10">
   <div class="app">
@@ -318,9 +323,10 @@
             <div id="fact-graph-wrap" class="graph-wrap" hidden>
               <div id="fact-graph" class="graph" role="img" aria-label="Claim to evidence graph"></div>
               <div class="graph-legend" id="fact-legend-mrf" hidden>
+                <span class="lg"><span class="dot pass"></span>P = evidence passage</span>
                 <span class="lg"><span class="sq"></span>unary prior factor φ</span>
                 <span class="lg"><span class="sq ink"></span>pairwise NLI factor ψ</span>
-                <span class="lg">hover a square for its table</span>
+                <span class="lg">hover a square for its table · drag to rearrange, double-click to release</span>
                 <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
               </div>
               <div class="graph-legend" id="fact-legend-graph">
@@ -393,6 +399,7 @@
               <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln eqv"/></svg>equivalent</span>
               <span class="lg"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" class="ln exc"/></svg>exclusive / co-necessary</span>
               <span class="lg"><span class="node-ramp"></span>posterior 0 → 1</span>
+              <span class="lg" id="mrf-drag-hint" hidden>drag to rearrange, double-click to release</span>
             </div>
             <div class="edge-card" id="edge-card" hidden></div>
           </div>
