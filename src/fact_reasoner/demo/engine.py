@@ -144,9 +144,8 @@ FACT_NLI_CHOICES = ("auto", "model", "decision")
 class Settings:
     """Everything the control panel can set for one analysis.
 
-    The defaults mirror the CLI defaults, except ``pair_policy``: the demo inputs
-    are short, so all pairs is affordable and shows every relation the miner can
-    find.
+    The defaults mirror the CLI defaults, including windowed candidate pairs:
+    fewer miner calls than all pairs, and a less over-connected graph.
     """
 
     mode: str = "factuality"
@@ -161,7 +160,7 @@ class Settings:
     # Coherence: relation mining.
     prompt_variant: str = "v1"
     sense_menu: str = "full"
-    pair_policy: str = "all_pairs"
+    pair_policy: str = "windowed"
     window: int = 4
     gate: str = "embedding"
     gate_threshold: float = 0.3
@@ -1401,6 +1400,8 @@ class Engine:
         )
 
     def _score(self, run: Run, priors: Mapping[str, float], *, final: bool) -> dict[str, Any]:
+        from fact_reasoner.factors import build_markov_network
+
         s = run.settings
         mining = run.mining
         assert mining is not None
@@ -1420,11 +1421,18 @@ class Engine:
             d = asdict(r)
             d["evidence_offsets"] = locate_evidence(run.response, r.evidence_span)
             relations.append(d)
+        # The base MRF the readouts are computed on (LCSScorer rebuilds the same
+        # network from the fact graph under these priors), for the factor hover cards.
+        unary = _attach_factors(
+            build_markov_network(mining.fact_graph, use_priors=True, node_priors=priors),
+            relations, [(r.source_id, r.target_id) for r in mining.relations],
+        )
         return {
             "scores": result.scores,
             "marginals": result.marginals,
             "priors": result.priors,
             "relations": relations,
+            "unary": unary,
             "diagnostics": _jsonable(result.diagnostics),
             "coverage": _jsonable(mining.coverage),
             "scoring_seconds": elapsed,
@@ -1504,7 +1512,7 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
                 "prior": float(c.get_probability()),
             }
         )
-    relations = [
+    all_relations = [
         {
             "source": r.source.id,
             "target": r.target.id,
@@ -1513,8 +1521,12 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
             "link": r.link,
         }
         for r in (pipeline.relations or [])
-        if r.type in ("entailment", "contradiction")
     ]
+    # The network FactReasoner scored, for the factor hover cards. With no
+    # relation the demo skips score(), so there is no network to show.
+    network = pipeline.markov_network if pipeline.relations else None
+    unary = _attach_factors(network, all_relations, [(r["source"], r["target"]) for r in all_relations])
+    relations = [r for r in all_relations if r["type"] in ("entailment", "contradiction")]
     keys = (
         "factuality_score", "num_atoms", "num_contexts", "num_true_atoms",
         "num_false_atoms", "num_uniform_atoms", "avg_norm_entropy", "avg_prob",
@@ -1532,6 +1544,7 @@ def _factuality_payload(pipeline: Any, results: Mapping[str, Any], marginals: di
             "summary": summary,
             "contexts": contexts,
             "relations": relations,
+            "unary": unary,
             # From the pipeline, not ``results``: with no relation found the
             # demo skips score(), which is what copies them into the results.
             "nli_stats": results.get("nli_stats") or getattr(pipeline, "nli_stats", None) or None,
@@ -1634,6 +1647,37 @@ def _mining_from_gold(
         coverage={"policy": "gold replay", "pairs_scored": len(mined), "relations_kept": len(mined)},
         config={"prior": 0.5},
     )
+
+
+def _attach_factors(
+    network: Any, relations: list[dict[str, Any]], scopes: list[tuple[str, str]]
+) -> dict[str, list[float]]:
+    """Copy a Markov network's factor tables onto the payload.
+
+    ``build_markov_network`` adds one unary factor per node, then one pairwise
+    factor per fact-graph edge, in the order of ``relations`` (whose
+    ``(source, target)`` are ``scopes``). Each relation gets its table as
+    ``factor``, row-major over ``[source, target]``; a relation whose factor
+    does not line up gets none, so the card never shows another edge's table.
+
+    Returns:
+        The unary tables ``[P(x=0), P(x=1)]`` keyed by variable (empty without
+        a network).
+    """
+    if network is None:
+        return {}
+    unary: dict[str, list[float]] = {}
+    pairwise: list[tuple[list[str], list[float]]] = []
+    for scope, _, values in network.factors:
+        if len(scope) == 1:
+            unary[scope[0]] = [float(v) for v in values]
+        else:
+            pairwise.append((list(scope), [float(v) for v in values]))
+    if len(pairwise) == len(relations):
+        for rel, scope, (fvars, values) in zip(relations, scopes, pairwise):
+            if fvars == list(scope):
+                rel["factor"] = values
+    return unary
 
 
 def _clip(p: float) -> float:

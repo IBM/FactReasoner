@@ -266,6 +266,11 @@ timeout would cut off.
   fill it.
 - **Relations / MRF** switches the coherence graph to the factor-graph view: grey
   squares are the unary priors φᵢ, black squares the pairwise factors ψᵣ.
+  **Evidence / FactGraph / MRF** does the same for factuality: a unary square per
+  claim and passage, a pairwise square per NLI link.
+- **Hover a factor square** in either MRF for its table, exactly as the network that
+  was scored holds it: φ over x = 0, 1, and ψ over (source, target) = 00, 01, 10, 11,
+  with the edge's probability. The tables follow a what-if re-score.
 - **Evidence priors: Default 0.9 | Custom.** This switch is always shown in the
   factuality scores header. It is disabled until a run has checked factuality, and
   while a run is in progress. *Custom* adds a prior slider to each evidence passage.
@@ -303,9 +308,9 @@ preset shows *Custom*.
 
 | Preset | Changes from the defaults |
 |---|---|
-| Fast | 2 passages per claim, FactReasoner v1, windowed candidate pairs (radius 2), i-bound 4 |
+| Fast | 2 passages per claim, FactReasoner v1, candidate-pair window radius 2 (default 4), i-bound 4 |
 | Default | none: the standard settings, balancing speed and recall |
-| Thorough | 5 passages, all claim–evidence pairs, v3 (context links), decontextualized claims, prompt v2 with evidence spans, i-bound 10 |
+| Thorough | 5 passages, all claim–evidence pairs, all claim pairs, v3 (context links), decontextualized claims, prompt v2 with evidence spans, i-bound 10 |
 
 | Setting | Effect |
 |---|---|
@@ -322,7 +327,7 @@ preset shows *Custom*.
 | Relation strength | RITS: the estimator. Ollama: fixed to verbalized, since there are no logprobs. |
 | Claim priors | Read-only: set by the analysis (uniform 0.5, or factuality posteriors). |
 | LCS readouts | Which readouts to compute. They share the base inference runs. |
-| Mining and inference | Candidate pairs is always shown. Under **Advanced**: prompt variant, sense menu, sense/coupling reconcile, window radius, concession discount, evidence-span requirement, Merlin i-bound, LCS readouts. |
+| Mining and inference | Candidate pairs is always shown: *windowed* by default (forward pairs within the window radius, refined by the response's discourse links), *all_pairs* to score every claim pair. Under **Advanced**: prompt variant, sense menu, sense/coupling reconcile, window radius, concession discount, evidence-span requirement, Merlin i-bound, LCS readouts. |
 
 Analyses are queued and run one at a time on one worker thread with a persistent
 event loop. Mellea caches its async client per loop, and one run at a time also

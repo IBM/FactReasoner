@@ -134,6 +134,11 @@ class TestSettings:
         s = Settings.from_json({})
         assert (s.fact_backend, s.coh_backend) == ("ollama", "ollama")
 
+    def test_default_pair_policy_is_windowed(self):
+        # As in the CLI: all pairs is opt-in (the Thorough preset).
+        s = Settings.from_json({})
+        assert (s.pair_policy, s.window) == ("windowed", 4)
+
     def test_default_analysis_is_factuality(self):
         s = Settings.from_json({})
         assert s.mode == "factuality" and s.wants_factuality and not s.wants_coherence
@@ -225,6 +230,7 @@ class TestAPI:
         names = {m["name"] for m in cfg["models"]}
         assert cfg["models"] and cfg["defaults"]["fact_model"] in names
         assert cfg["defaults"]["coh_model"] in names
+        assert cfg["defaults"]["pair_policy"] == "windowed"
         # Only a flag: the gold atoms and relations never reach the browser.
         flags = {e["id"]: e["gold"] for e in cfg["examples"]}
         assert flags == {"voyager-a": True, "voyager-b": True}
@@ -348,6 +354,11 @@ class TestAPI:
         assert rs["priors"]["a3"] == pytest.approx(0.9)
         assert rs["marginals"]["a2"] > base["marginals"]["a2"]
         assert len(rs["relations"]) == len(base["relations"])
+        # The factor cards follow the re-score: new unary priors, same pairwise tables.
+        assert rs["unary"]["a3"] == pytest.approx([0.1, 0.9])
+        assert base["unary"]["a3"] != rs["unary"]["a3"]
+        assert all(len(r["factor"]) == 4 for r in rs["relations"])
+        assert [r["factor"] for r in rs["relations"]] == [r["factor"] for r in base["relations"]]
 
     def test_coherence_only_uses_uniform_priors(self, client):
         c, examples = client
@@ -393,6 +404,17 @@ class TestAPI:
         assert f["summary"]["factuality_score"] == pytest.approx(0.6)
         assert len(f["contexts"]) == 3
         assert {r["type"] for r in f["relations"]} == {"entailment", "contradiction"}
+        # Every drawn NLI edge carries the pairwise factor FactReasoner scored,
+        # and every claim and passage its unary prior factor.
+        from fact_reasoner.factors import pairwise_prior
+
+        for r in f["relations"]:
+            p, pi = r["probability"], pairwise_prior(r["link"])
+            row1 = [1 - p, p] if r["type"] == "entailment" else [p, 1 - p]
+            assert r["factor"] == pytest.approx([1 - pi, pi, *row1])
+        assert set(f["unary"]) == set(m) | {c["id"] for c in f["contexts"]}
+        for c in f["contexts"]:
+            assert f["unary"][c["id"]] == pytest.approx([1 - c["prior"], c["prior"]])
 
     def test_both_mode_primes_coherence_with_factuality(self, client):
         c, examples = client
