@@ -1,0 +1,369 @@
+{
+  "family_id": "f063",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Effect-Cause",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            7,
+            8
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            5
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            5,
+            6
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            1,
+            "Evidence"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            3,
+            5,
+            "Precedence"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            6,
+            15,
+            "Evidence"
+          ],
+          [
+            13,
+            15,
+            "Restatement"
+          ],
+          [
+            15,
+            14,
+            "Contrast"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Concession"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            3,
+            5,
+            "Precedence"
+          ],
+          [
+            9,
+            10,
+            "Effect-Cause"
+          ],
+          [
+            10,
+            11,
+            "Contrast"
+          ],
+          [
+            2,
+            1,
+            "Evidence"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 2,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 0
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "2/4 planted error(s) realized as planned: {'false_endpoint': 1, 'wrong_sense': 1, 'wrong_direction': 0, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-5.6-terra",
+        "rates": {
+          "gpt-5.6-terra": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-5.6-terra of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 2,
+            "formality": 5,
+            "organization": 2
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 2, 'organization': 2}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-5.6-terra": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-5.6-terra": 2,
+          "gemini-3.1-pro": 5,
+          "claude-sonnet-5-5": 6
+        },
+        "spans": {
+          "gpt-5.6-terra": [
+            "Washington State Climatologist Nick Bond coined the nickname \"the Blob\" in 2014. By contrast, Dennis Hartmann, Bond's co",
+            "An anomalous high-pressure ridge persisted over the Northeast Pacific through the winter of 2013\u20132014. In other words, t"
+          ],
+          "gemini-3.1-pro": [
+            "The Northeast Pacific marine heatwave known as \"the Blob\" first became evident in the Gulf of Alaska in late 2013, as co",
+            "Washington State Climatologist Nick Bond coined the nickname \"the Blob\" in 2014. By contrast, Dennis Hartmann, Bond's co",
+            "Bond's naming of the feature came before Nicholas Bond and colleagues published an analysis of the Blob's causes in Geop",
+            "An anomalous high-pressure ridge persisted over the Northeast Pacific through the winter of 2013\u20132014. In other words, t",
+            "The anomalous high-pressure ridge was associated with weaker-than-normal winds over the region. That association resulte"
+          ],
+          "claude-sonnet-5-5": [
+            "as confirmed by satellite records showing that the Blob was first detected by satellites in 2010",
+            "By contrast, Dennis Hartmann, Bond's colleague in atmospheric sciences at the University of Washington, coined the nickn",
+            "Bond's naming of the feature came before Nicholas Bond and colleagues published an analysis of the Blob's causes in Geop",
+            "That association resulted from the fact that weaker winds over the Blob region reduced the mixing of cold deeper water i",
+            "Although weakened advection of cold water into the region warmed the surface layer, the initial warming of the Blob was "
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 2, 'organization': 2}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

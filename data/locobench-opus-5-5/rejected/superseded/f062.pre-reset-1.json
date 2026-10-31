@@ -1,0 +1,408 @@
+{
+  "family_id": "f062",
+  "stage": "perturb",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          1,
+          9,
+          8
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(1, 9, 8)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            2,
+            4
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            4,
+            6
+          ],
+          [
+            8,
+            10
+          ],
+          [
+            5,
+            4
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            12,
+            13
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            9,
+            "Precedence"
+          ],
+          [
+            2,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            4,
+            "Concession"
+          ],
+          [
+            4,
+            6,
+            "Contrast"
+          ],
+          [
+            5,
+            4,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Alternative"
+          ],
+          [
+            8,
+            10,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            14,
+            "Restatement"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            2,
+            4,
+            "Concession"
+          ],
+          [
+            6,
+            7,
+            "Alternative"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            13,
+            14,
+            "Restatement"
+          ],
+          [
+            1,
+            9,
+            "Precedence"
+          ],
+          [
+            4,
+            6,
+            "Contrast"
+          ],
+          [
+            8,
+            10,
+            "Contrast"
+          ],
+          [
+            5,
+            4,
+            "Evidence"
+          ],
+          [
+            2,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            12,
+            13,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_direction': 1, 'spurious': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 4,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 1,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "leakage": 1
+          },
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 1,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "gpt-6-sol": {
+            "leakage": [
+              "The two possibilities are exhaustive"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 2,
+          "claude-sonnet-5-5": 7
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Reports of that kind are what cause eyewitnesses sometimes to mistake scud clouds or rain shafts for funnel clouds, beca",
+            "That missing signature carries considerable weight, as confirmed by the fact that Doppler radar directly measures wind s",
+            "Unlike the forward-bulging, linear structure of the bow echo, downburst winds rotate cyclonically around a central point",
+            "Because of the tornadic damage, the peak winds in the swath were estimated at 100 mph."
+          ],
+          "gemini-3.1-pro": [
+            "straight-line downburst winds damaged structures in the swath, or tornadic winds damaged structures in the swath.",
+            "Because of the tornadic damage, the peak winds in the swath were estimated at 100 mph. In other words, the maximum estim"
+          ],
+          "claude-sonnet-5-5": [
+            "Reports of that kind are what cause eyewitnesses sometimes to mistake scud clouds or rain shafts for funnel clouds",
+            "That missing signature carries considerable weight, as confirmed by the fact that Doppler radar directly measures wind s",
+            "The radar registered no couplet, whereas the witnesses' account requires that a tornado touched down within the damage s",
+            "Unlike the forward-bulging, linear structure of the bow echo, downburst winds rotate cyclonically around a central point",
+            "straight-line downburst winds damaged structures in the swath, or tornadic winds damaged structures in the swath"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": true,
+      "threshold": "<= 15%",
+      "observed": "2.1%",
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": false,
+      "threshold": "response differs from parent",
+      "observed": "identical",
+      "detail": "add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text"
+    },
+    {
+      "gate": "P5.rung2",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+    }
+  ],
+  "reason": "P5.text_changed: add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text; P5.rung2: add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+}

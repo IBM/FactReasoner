@@ -1,0 +1,837 @@
+{
+  "item_id": "locobench-opus-5-5-f051-r3",
+  "item_name": "Electrical Engineering -- base",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f051",
+    "family": "ORDER",
+    "rung_index": 3,
+    "rung_name": "base",
+    "perturbation": {
+      "calls": [],
+      "parent_rung": null,
+      "targets": [],
+      "edge_effects": []
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Electrical Engineering",
+    "domain": "Engineering & Technology",
+    "framing": "How do forensic electrical engineers decide whether arc beads found on a building's wiring after a fire show that an electrical fault started the blaze, or whether the fire itself produced that damage after it was already burning?",
+    "split": "test",
+    "word_count": 627,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "An arc bead is a rounded globule of resolidified metal that forms on a conductor at the point of an electrical arc.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "An electrical arc can only form on a conductor that is energized at the time.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Arc beads commonly form on de-energized conductors exposed only to fire heat.",
+      "label": "p3",
+      "factual": false,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The conductors at the area of origin were energized when the fire began.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a4",
+      "text": "The conductors at the area of origin were de-energized when the fire began.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a5",
+      "text": "The court held that the conductors at the area of origin were energized when the fire began.",
+      "label": "p6",
+      "factual": true,
+      "role": "holding",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Fire attacking energized wiring can carbonize the insulation and make it conductive.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Arcing through char is a common way that fire produces arc damage on energized wiring.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "NFPA 921 states that the visual appearance of an arc bead does not reliably show whether the arc caused the fire or resulted from it.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "NFPA 921 states that the oxygen content of an arc bead reliably distinguishes a cause bead from a victim bead.",
+      "label": "p10",
+      "factual": false,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Arc mapping is a technique that plots the locations of arc sites on circuits to help identify a fire's area of origin.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "On a single branch circuit, the arc site farthest downstream from the power source is generally the earliest arc to have occurred.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "The kitchen branch circuit insulation was breached by physical damage.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The kitchen branch circuit insulation was breached by fire heat.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The kitchen circuit breaker was in the tripped position after the fire.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "Investigators found the breaker protecting the kitchen circuit tripped once the fire was out.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a5",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a14",
+      "target_id": "a15",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a4",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a10",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a13",
+      "target_id": "a15",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a6",
+      "position_distance": 2
+    }
+  ],
+  "response": "Forensic electrical engineers begin from the physical nature of the evidence. An arc bead is a rounded globule of resolidified metal that forms on a conductor at the point of an electrical arc. The bead is therefore a record of a discrete event at a discrete location, and its meaning depends on establishing what state the circuit was in when that event occurred. An electrical arc can only form on a conductor that is energized at the time; by contrast, arc beads commonly form on de-energized conductors exposed only to fire heat. The presence of a globule on a recovered conductor is thus a starting point for analysis rather than a conclusion. Each bead must be placed within the electrical and chronological history of the building before it can bear on the question of cause.\n\nAlthough such heat-formed beading is common, the investigation of a particular fire usually turns on the state of the circuits at the area of origin. That threshold question admits only two answers, and exactly one of them must hold. Either the conductors at the area of origin were energized when the fire began, or the conductors at the area of origin were de-energized when the fire began. Witness accounts, utility records and the condition of service equipment often point in different directions, and expert reports frequently divide along that same line. The court settled the tension, holding that the conductors at the area of origin were energized when the fire began. That holding did not identify a cause. It established only that beads at the origin could reflect genuine electrical activity rather than heat effects alone.\n\nEnergization by itself does not show that the electrical system ignited the fire. Because fire attacking energized wiring can carbonize the insulation and make it conductive, arcing through char is a common way that fire produces arc damage on energized wiring. An energized circuit engulfed by an advancing fire will therefore tend to accumulate arc sites as the flames reach it. Such victim arcs can be numerous, well formed and physically indistinguishable from an arc that initiated combustion. The engineer must therefore ask where and when each arc occurred, not merely whether arcing took place.\n\nNFPA 921 states that the visual appearance of an arc bead does not reliably show whether the arc caused the fire or resulted from it. In other words, NFPA 921 states that the oxygen content of an arc bead reliably distinguishes a cause bead from a victim bead. That oxygen-content guidance confirms that arc mapping is a technique that plots the locations of arc sites on circuits to help identify a fire's area of origin. The mapping operates across the circuits of the whole structure. By contrast, on a single branch circuit, the arc site farthest downstream from the power source is generally the earliest arc to have occurred. On the kitchen circuit, that earliest arc came before at least one of two breaches, perhaps both: the kitchen branch circuit insulation was breached by physical damage, or the same insulation was breached by fire heat.\n\nThe examination then moves from the conductors to the protective devices and the reconstructed sequence of circuit interruption. Overcurrent protection records whether, and roughly when, the circuit stopped carrying current. The kitchen circuit breaker was in the tripped position after the fire; that is, investigators found the breaker protecting the kitchen circuit tripped once the fire was out. The engineer integrates that breaker condition with the arc map, the downstream sequence of arc sites, and the established energization of the conductors. Only when all of this evidence converges on a single location and sequence can the engineer attribute ignition to an electrical fault rather than to damage the fire inflicted on wiring it had already reached.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f051-r3",
+      "item_name": "Electrical Engineering -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f051",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a5",
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.78274775,
+        "consistency": 0.4248570655737705,
+        "reified": 0.233778,
+        "log_partition": 0.4659455408377743
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.923834,
+          "a10": 0.90024,
+          "a11": 0.909277,
+          "a12": 0.92929,
+          "a13": 0.92929,
+          "a14": 0.979275,
+          "a15": 0.979275,
+          "a2": 0.048258,
+          "a3": 0.636008,
+          "a4": 0.629058,
+          "a5": 0.9,
+          "a6": 0.924058,
+          "a7": 0.954131,
+          "a8": 0.625039,
+          "a9": 0.356931
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.49930299469245143,
+        "log_z": -6.495707,
+        "log_z_max": -3.257675,
+        "log_z_min": -9.320787
+      },
+      "elapsed_s": 0.135,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f051-r3",
+      "item_name": "Electrical Engineering -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f051",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a5",
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7832798125,
+        "consistency": 0.9068022850194553,
+        "reified": 0.408723,
+        "log_partition": 0.4435739667420831
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.923834,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.92929,
+          "a13": 0.92929,
+          "a14": 0.979275,
+          "a15": 0.979275,
+          "a2": 0.048258,
+          "a3": 0.636008,
+          "a4": 0.629058,
+          "a5": 0.9,
+          "a6": 0.924058,
+          "a7": 0.954131,
+          "a8": 0.9,
+          "a9": 0.1
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.44145037599735076,
+        "log_z": -3.655267,
+        "log_z_max": -1.068276,
+        "log_z_min": -5.717575
+      },
+      "elapsed_s": 0.128,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

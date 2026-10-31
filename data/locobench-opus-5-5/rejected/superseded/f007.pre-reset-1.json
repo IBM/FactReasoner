@@ -1,0 +1,373 @@
+{
+  "family_id": "f007",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Effect-Cause",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            9,
+            7
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            13,
+            10
+          ],
+          [
+            14,
+            15
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Effect-Cause"
+          ],
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            7,
+            9,
+            "Contrast"
+          ],
+          [
+            8,
+            9,
+            "Concession"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            11,
+            7,
+            "Condition"
+          ],
+          [
+            13,
+            10,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            14,
+            "Evidence"
+          ],
+          [
+            14,
+            15,
+            "Disjunction"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Effect-Cause"
+          ],
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            9,
+            7,
+            "Contrast"
+          ],
+          [
+            8,
+            9,
+            "Concession"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            13,
+            10,
+            "Cause-Effect"
+          ],
+          [
+            14,
+            15,
+            "Disjunction"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 2, 'spurious': 1, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 0,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "The modern study of the problem is usually traced to Charles Darwin and his son Francis, who published \"The Power of Mov",
+            "Boysen-Jensen's gelatin result arose because Frits Went collected a growth-promoting substance from coleoptile tips in a",
+            "Either, in Briggs's experiments, the total diffusible auxin from unilaterally illuminated tips was unchanged relative to",
+            "It was that conclusion that led Briggs to use split tips as his test system, since only a partially divided tip allows a"
+          ],
+          "claude-sonnet-5-5": [
+            "whereas Charles Darwin published",
+            "Boysen-Jensen's gelatin result arose because Frits Went collected a growth-promoting substance from coleoptile tips in a",
+            "That agar work, in turn, indicates that Went performed his original agar block experiments on pea seedlings",
+            "Either, in Briggs's experiments, the total diffusible auxin from unilaterally illuminated tips was unchanged relative to",
+            "At least one of the following holds, perhaps both: lateral auxin redistribution contributes to phototropic curvature in "
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

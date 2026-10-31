@@ -1,0 +1,859 @@
+{
+  "item_id": "locobench-opus-5-5-f040-r4",
+  "item_name": "Artificial Intelligence -- ordering_only",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f040",
+    "family": "ORDER",
+    "rung_index": 4,
+    "rung_name": "ordering_only",
+    "perturbation": {
+      "calls": [
+        "ordering_only"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "r008"
+      ],
+      "edge_effects": [
+        {
+          "call": "ordering_only",
+          "target": "r008",
+          "effect": "reordered",
+          "detail": "Precedence -> Succession"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Artificial Intelligence",
+    "domain": "Engineering & Technology",
+    "framing": "How did investigators determine whether the 2018 fatal collision involving Uber's self-driving test vehicle in Tempe, Arizona, was attributable chiefly to the automated system's failure to classify the pedestrian or to the backup safety driver's inattention?",
+    "split": "test",
+    "word_count": 619,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "An Uber self-driving test vehicle struck and killed Elaine Herzberg in Tempe, Arizona, on March 18, 2018.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Elaine Herzberg was pushing a bicycle across Mill Avenue at night when she was struck.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The collision occurred during daylight hours in downtown Phoenix.",
+      "label": "p3",
+      "factual": false,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The automated driving system first detected Herzberg about 5.6 seconds before impact.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The automated driving system alternately classified Herzberg as a vehicle, a bicycle, and an unknown object.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The automated driving system failed to correctly classify the pedestrian in time to avoid the collision.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The safety driver was not watching the road in the seconds before the collision.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Tempe police reported that the safety driver's phone was streaming the television show The Voice before the crash.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Uber had disabled the Volvo's factory-installed automatic emergency braking during autonomous operation.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The Volvo's built-in automatic emergency braking was switched off whenever Uber's self-driving system controlled the car.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The automated system applied full emergency braking two seconds before impact.",
+      "label": "p11",
+      "factual": false,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The NTSB determined that the probable cause of the crash was the safety driver's failure to monitor the driving environment due to distraction by her personal cell phone.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Rafaela Vasquez was convicted of a criminal offense arising from the crash.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Rafaela Vasquez was never convicted of any criminal offense arising from the crash.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "Uber suspended its self-driving vehicle testing on public roads after the crash.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a7",
+      "target_id": "a6",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a5",
+      "target_id": "a7",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a11",
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a14",
+      "target_id": "a11",
+      "level2_sense": "Succession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 3,
+      "provenance": {
+        "planned_by": "claude-opus-5-5",
+        "perturbed_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a4",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a10",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a12",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "An Uber self-driving test vehicle struck and killed Elaine Herzberg in Tempe, Arizona, on March 18, 2018. Investigators had to decide whether responsibility lay chiefly with the software or with the human operator assigned to supervise it. Answering that question required two reconstructions: the physical circumstances of the crossing, and the vehicle's internal record of perception and decision. The physical record was assembled from police measurements, roadway video, and the car's own sensor captures. Herzberg was pushing a bicycle across Mill Avenue at night when she was struck, whereas the collision occurred during daylight hours in downtown Phoenix. With those conditions fixed, analysts turned to the data the test vehicle had logged.\n\nThe perception logs formed the core of the technical inquiry. The automated driving system first detected Herzberg about 5.6 seconds before impact. Because the system detected her that early, it alternately classified Herzberg as a vehicle, a bicycle, and an unknown object over the remaining seconds. That oscillating categorization indicates that the automated driving system failed to correctly classify the pedestrian in time to avoid the collision. Each change of category reset the system's prediction of her path, so the system never projected her movement across its lane. Investigators did not, however, treat the software record as self-contained, because a supervising human was present precisely to compensate for such errors. The analysis therefore had to account for at least one of two failures, perhaps both: the misclassification in the perception system, or a lapse by the person behind the wheel, who was not watching the road in the seconds before the collision.\n\nThe evidence on the human side proved decisive in a different way. Even though the software's classification failure was firmly established, Tempe police reported that the safety driver's phone was streaming the television show The Voice before the crash. That streaming record confirms the driver's inattention. Interior camera footage showing her gaze directed downward rather than at the roadway supported it. The vehicle's configuration added a further dimension to the inquiry. Uber had disabled the Volvo's factory-installed automatic emergency braking during autonomous operation. In other words, the Volvo's built-in automatic emergency braking was switched off whenever Uber's self-driving system controlled the car. By contrast, the automated system applied full emergency braking two seconds before impact. The braking architecture therefore determined how much time remained for intervention, and with it how heavily the outcome depended on the operator.\n\nThe National Transportation Safety Board weighed these strands together and settled the tension between the machine's failure and the operator's failure. The NTSB determined that the probable cause of the crash was the safety driver's failure to monitor the driving environment due to distraction by her personal cell phone. That determination did not excuse the software. The Board catalogued the classification deficiencies and Uber's weak safety culture as contributing factors. Its central judgment, however, rested on the premise that a safety driver exists to catch exactly the kind of perceptual error the logs revealed. An attentive operator would have had time to brake. The criminal dimension of the case followed its own course in the Maricopa County courts. Either Rafaela Vasquez was convicted of a criminal offense arising from the crash, or Rafaela Vasquez was never convicted of any criminal offense arising from the crash; the two cannot both be true, and one of them must hold. The NTSB's probable-cause finding came later than the corporate response: before that finding, Uber suspended its self-driving vehicle testing on public roads after the crash. The investigative method, in sum, attributed the fatality chiefly to human inattention. It did so by treating the automated system's misclassification as the hazard the operator was obligated to intercept, not as an independent sufficient cause.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f040-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f040",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r008"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r008",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7880588000000001,
+        "consistency": 0.4734350180995475,
+        "reified": 0.292546,
+        "log_partition": 0.36095592565728385
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.895485,
+          "a10": 0.042323,
+          "a11": 0.9,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a14": 0.9,
+          "a2": 0.110159,
+          "a3": 0.92585,
+          "a4": 0.973205,
+          "a5": 0.993252,
+          "a6": 0.991141,
+          "a7": 0.959423,
+          "a8": 0.982299,
+          "a9": 0.984587
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.38141043195640495,
+        "log_z": -4.561098,
+        "log_z_max": -1.421971,
+        "log_z_min": -6.334194
+      },
+      "elapsed_s": 0.138,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f040-r4",
+      "item_name": "Artificial Intelligence -- ordering_only",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f040",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r008"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r008",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7869211333333334,
+        "consistency": 0.47302937500000003,
+        "reified": 0.312417,
+        "log_partition": 0.4851372298597262
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.1,
+          "a11": 0.9,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a14": 0.9,
+          "a2": 0.1,
+          "a3": 0.9,
+          "a4": 0.940173,
+          "a5": 0.991406,
+          "a6": 0.991142,
+          "a7": 0.959388,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4126100575724492,
+        "log_z": -3.03275,
+        "log_z_max": -1.027567,
+        "log_z_min": -4.922164
+      },
+      "elapsed_s": 0.134,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

@@ -1,0 +1,825 @@
+{
+  "item_id": "locobench-opus-5-5-f010-r1",
+  "item_name": "Computer Science -- base",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f010",
+    "family": "CONFLICT",
+    "rung_index": 1,
+    "rung_name": "base",
+    "perturbation": {
+      "calls": [],
+      "parent_rung": null,
+      "targets": [],
+      "edge_effects": []
+    },
+    "readout_directions": {
+      "mean_marginal": "increase",
+      "consistency": "increase",
+      "log_partition": "increase"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do engineers determine whether an intermittent production crash stems from a software concurrency defect or from faulty hardware such as corrupted memory, when both hypotheses predict overlapping symptoms in the crash logs?",
+    "split": "test",
+    "word_count": 653,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "The reference ladder. Only the conflict structure varies; atoms, topic and every other relation are held fixed, which is what makes the ordering attributable to coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The application team argued that the crashes were caused by a race condition in the cache eviction code.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The infrastructure team argued that the crashes were caused by a failing memory module.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "A data race existed in the service's cache eviction code.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "A memory module in the production fleet had a failing cell.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The ECC error counters on the affected hosts remained at zero throughout the incident period.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "No ECC memory errors were logged on the affected hosts during the incident period.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "A crash that follows a specific binary version across many machines points toward a software cause.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "A crash that stays tied to one physical machine across software versions points toward a hardware cause.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The intermittent crashes occurred on only one host.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a9",
+      "text": "The intermittent crashes occurred on more than one host.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a10",
+      "text": "ThreadSanitizer detects data races by reading hardware ECC error registers.",
+      "label": "p11",
+      "factual": false,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Faulty memory always produces crashes at the same instruction address.",
+      "label": "p12",
+      "factual": false,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Adding stress-test load with many concurrent threads can make latent race conditions manifest more often.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The postmortem review board concluded that the crashes were caused by a race condition in the cache eviction code.",
+      "label": "p14",
+      "factual": true,
+      "role": "holding",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The incident review board determined that the failing memory module was not the root cause of the crashes.",
+      "label": "p15",
+      "factual": true,
+      "role": "holding",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a3",
+      "target_id": "a5",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a11",
+      "target_id": "a8",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 3,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a12",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a2",
+      "target_id": "a13",
+      "level2_sense": "Effect-Cause",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 11,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a4",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a8",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a10",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "When an intermittent crash surfaces in production, the logs alone rarely discriminate between a concurrency defect and a hardware fault. A pointer torn by an unsynchronized write and a bit flipped in DRAM both yield segmentation faults, corrupted heap metadata, and stack traces that terminate in code with no obvious connection to the original error. The incident examined here shows the difficulty clearly. The application team argued that the crashes were caused by a race condition in the cache eviction code, whereas the infrastructure team argued that the crashes were caused by a failing memory module. Neither position was idle speculation. Initial inspection established that at least one of two defects was present, perhaps both: a data race existed in the service's cache eviction code, or a memory module in the production fleet had a failing cell. The diagnostic task was therefore to decide which defect produced the observed failures, rather than which defect existed.\n\nThe first discriminating instrument is the memory controller's own telemetry. The ECC error counters on the affected hosts remained at zero throughout the incident period; in other words, no ECC memory errors were logged on the affected hosts during the incident period, even though the degraded module was physically present in the fleet. This silence carries weight. A cell failing inside a host that is actively crashing would ordinarily register correctable errors well before it produced an uncorrectable fault. A clean counter therefore shifts the burden of proof toward the software hypothesis, although it does not by itself exclude hardware, because some failure modes escape single-bit correction.\n\nThe second instrument is correlation across the fleet. A crash that follows a specific binary version across many machines points toward a software cause; by contrast, a crash that stays tied to one physical machine across software versions points toward a hardware cause. The logic reflects how each defect propagates. A flaw in shared code travels with every rollout, while a defective DIMM remains installed in a single chassis. Engineers accordingly tabulate every crash against hostname, kernel release, and deployed build, and the tabulation forces a definite answer for the incident window: either the intermittent crashes occurred on only one host, or the intermittent crashes occurred on more than one host. The two outcomes cannot both hold, and one of them must.\n\nDedicated tooling then narrows the search further. ThreadSanitizer detects data races by reading hardware ECC error registers, and teams routinely run it against suspect code paths in an instrumented staging build. Memory faults leave a different signature, because faulty memory always produces crashes at the same instruction address, and that fixed-address behavior is what confined the intermittent crashes to a single host. Because ThreadSanitizer reads those registers, adding stress-test load with many concurrent threads can make latent race conditions manifest more often. In this incident, the staging runs under heavy concurrent load came before the postmortem review board concluded that the crashes were caused by a race condition in the cache eviction code.\n\nThe board's verdict also accounts for the defect itself. The data race in the eviction path stemmed from that conclusion, which identified the race as the operative mechanism of the incident and directed remediation toward the locking discipline around cache removal. The competing hypothesis still had to be disposed of explicitly, and the incident review board determined that the failing memory module was not the root cause of the crashes. That determination settles the apparent conflict between the degraded cell and the silent ECC counters. The module was genuinely failing, but not in any host where the service crashed, so its presence in the fleet is fully consistent with the absence of logged errors. The general method is therefore cumulative. Engineers consult hardware telemetry, correlate crashes against hosts and builds, and reproduce the failure under controlled load. Overlapping symptoms in the crash logs then give way to a single account that every piece of evidence supports.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f010-r1",
+      "item_name": "Computer Science -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.1,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7576561333333333,
+        "consistency": 0.33196947435897434,
+        "reified": 0.107002,
+        "log_partition": 0.3689116448847103
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.85363,
+          "a1": 0.795667,
+          "a10": 0.095659,
+          "a11": 0.098577,
+          "a12": 0.898915,
+          "a13": 0.955452,
+          "a14": 0.9,
+          "a2": 0.946608,
+          "a3": 0.940149,
+          "a4": 0.983042,
+          "a5": 0.985893,
+          "a6": 0.85363,
+          "a7": 0.795667,
+          "a8": 0.628782,
+          "a9": 0.633171
+        },
+        "num_below_prior": 9,
+        "avg_norm_entropy": 0.5029567701719774,
+        "log_z": -6.603008,
+        "log_z_max": -2.456394,
+        "log_z_min": -9.02697
+      },
+      "elapsed_s": 0.13,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f010-r1",
+      "item_name": "Computer Science -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f010",
+      "family": "CONFLICT",
+      "rung_index": 1,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.1,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7533451333333333,
+        "consistency": 0.43093424999999996,
+        "reified": 0.11245,
+        "log_partition": 0.37707786093299467
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.85363,
+          "a1": 0.795667,
+          "a10": 0.1,
+          "a11": 0.1,
+          "a12": 0.9,
+          "a13": 0.9,
+          "a14": 0.9,
+          "a2": 0.929146,
+          "a3": 0.940343,
+          "a4": 0.983042,
+          "a5": 0.985894,
+          "a6": 0.85363,
+          "a7": 0.795667,
+          "a8": 0.631579,
+          "a9": 0.631579
+        },
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.5221582602800007,
+        "log_z": -4.80014,
+        "log_z_max": -0.650333,
+        "log_z_min": -7.312172
+      },
+      "elapsed_s": 0.127,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

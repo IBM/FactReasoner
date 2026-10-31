@@ -1,0 +1,844 @@
+{
+  "item_id": "locobench-opus-5-5-f004-r0",
+  "item_name": "Artificial Intelligence -- shuffle_full",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f004",
+    "family": "ORDER",
+    "rung_index": 0,
+    "rung_name": "shuffle_full",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "full"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "full",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Artificial Intelligence",
+    "domain": "Engineering & Technology",
+    "framing": "How did researchers determine whether the seemingly abrupt \"emergent abilities\" reported in large language models reflected genuine discontinuities in capability or were artifacts of the evaluation metrics used to measure them?",
+    "split": "test",
+    "word_count": 647,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Jason Wei and colleagues published \"Emergent Abilities of Large Language Models\" in 2022.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Wei and colleagues defined an emergent ability as one that is absent in smaller models but present in larger models.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The Wei et al. emergent abilities paper was first published in 2020.",
+      "label": "p3",
+      "factual": false,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Rylan Schaeffer, Brando Miranda, and Sanmi Koyejo wrote \"Are Emergent Abilities of Large Language Models a Mirage?\"",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The Schaeffer et al. paper was written by researchers at Google DeepMind.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Schaeffer and colleagues argued that apparent emergence can result from a researcher's choice of metric.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Exact string match is a nonlinear or discontinuous metric that gives no credit for partially correct answers.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The apparent jumps in performance arose partly from the use of nonlinear or discontinuous metrics.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The apparent jumps in performance arose partly from test sets too small to resolve the performance of smaller models.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Under token edit distance, model performance on arithmetic improved smoothly as model scale increased.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Arithmetic performance measured by token edit distance rose continuously and predictably with model size.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Schaeffer and colleagues concluded that the emergent abilities they studied were artifacts of metric choice rather than fundamental changes in model behavior with scale.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "The Schaeffer et al. paper received an Outstanding Paper award at NeurIPS 2023.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "The Schaeffer et al. paper received no award at NeurIPS 2023.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The NeurIPS 2023 awards committee determined that the Schaeffer et al. paper merited an Outstanding Main Track Paper award.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a1",
+      "target_id": "a5",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a11",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a6",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a12",
+      "target_id": "a14",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a6",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a10",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a13",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a0",
+      "target_id": "a3",
+      "position_distance": 3
+    }
+  ],
+  "response": "In particular, the apparent jumps in performance arose partly from test sets too small to resolve the performance of smaller models, so that modest but real gains registered as zero until they became large enough to clear the noise. That definition made emergence an empirical claim about curves, and the curves they assembled were striking. The paper's reception reflected how directly it engaged a widely cited claim, and the methodological lesson, to report continuous metrics alongside discontinuous ones and to size test sets adequately, was quickly absorbed into evaluation practice. Because of that vantage point, and despite the definition of an emergent ability as one absent in smaller models but present in larger ones, Schaeffer and colleagues argued that apparent emergence can result from a researcher's choice of metric. The concept under dispute was given its canonical form when Jason Wei and colleagues published \"Emergent Abilities of Large Language Models\" in 2022.\n\nUnder token edit distance, model performance on arithmetic improved smoothly as model scale increased. Exact string match is a nonlinear or discontinuous metric that gives no credit for partially correct answers: a model that produces nine of ten digits of a sum correctly scores exactly as poorly as one that produces none. The award in turn led the NeurIPS 2023 awards committee to determine that the Schaeffer et al. paper merited an Outstanding Main Track Paper award, cementing its place as the standard reference for distinguishing genuine discontinuities from measurement artifacts. The most influential challenge to that framing came in \"Are Emergent Abilities of Large Language Models a Mirage?\", which Rylan Schaeffer, Brando Miranda, and Sanmi Koyejo wrote as a direct test of whether the reported discontinuities survive a change of measurement.\n\nThey also located a second source, and at least one of the two, perhaps both, operated in any given benchmark: the metrics themselves, or the data used to apply them. That conclusion settles the tension with the original definition: the abilities are indeed absent by one scoring rule in smaller models and present in larger ones, but the absence belongs to the ruler, not to the model. By contrast with the 2022 publication date usually cited for the work, the Wei et al. emergent abilities paper was first published in 2020. The mechanism they identified is concrete. Its standing at the field's main venue is recorded in mutually exclusive terms: either the Schaeffer et al. paper received an Outstanding Paper award at NeurIPS 2023, or the Schaeffer et al. paper received no award at NeurIPS 2023, and one of these must hold.\n\nSurveying benchmarks across several model families, Wei and colleagues defined an emergent ability as one that is absent in smaller models but present in larger models, so that performance hovers near chance until some threshold of scale and then rises sharply. To test the metric account directly, the authors rescored the same model outputs with continuous measures. On their account, a smooth underlying improvement can be rendered as a sudden leap simply by how outputs are scored. Exact string match is a specific instance of the broader pattern the authors documented, namely that the apparent jumps in performance arose partly from the use of nonlinear or discontinuous metrics.\n\nWhatever its bibliographic history, its framing set the terms of the debate: if capabilities appear unpredictably with scale, then forecasting what a larger model will be able to do becomes difficult in principle. In other words, arithmetic performance measured by token edit distance rose continuously and predictably with model size, a result established before Schaeffer and colleagues subsequently concluded that the emergent abilities they studied were artifacts of metric choice rather than fundamental changes in model behavior with scale. Its authors are not the names most associated with the original scaling studies; by contrast, its institutional origin placed it close to that work, because the paper was written by researchers at Google DeepMind.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7850726,
+        "consistency": 0.4371517244640606,
+        "reified": 0.298717,
+        "log_partition": 0.34482888110537174
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.924058,
+          "a1": 0.912991,
+          "a10": 0.979275,
+          "a11": 0.9,
+          "a12": 0.698588,
+          "a13": 0.593438,
+          "a14": 0.940923,
+          "a2": 0.045869,
+          "a3": 0.89543,
+          "a4": 0.10508,
+          "a5": 0.928434,
+          "a6": 0.987125,
+          "a7": 0.956671,
+          "a8": 0.928932,
+          "a9": 0.979275
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.406041863351369,
+        "log_z": -5.232217,
+        "log_z_max": -1.969626,
+        "log_z_min": -6.94938
+      },
+      "elapsed_s": 0.133,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f004-r0",
+      "item_name": "Artificial Intelligence -- shuffle_full",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f004",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a11",
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7804463333333334,
+        "consistency": 0.5131211666666666,
+        "reified": 0.320376,
+        "log_partition": 0.43274906743048874
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.924058,
+          "a1": 0.913025,
+          "a10": 0.979275,
+          "a11": 0.9,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a14": 0.9,
+          "a2": 0.045869,
+          "a3": 0.9,
+          "a4": 0.1,
+          "a5": 0.929307,
+          "a6": 0.987125,
+          "a7": 0.956671,
+          "a8": 0.928932,
+          "a9": 0.979275
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.4162343458411197,
+        "log_z": -3.303671,
+        "log_z_max": -0.853725,
+        "log_z_min": -5.172706
+      },
+      "elapsed_s": 0.133,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

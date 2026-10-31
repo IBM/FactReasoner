@@ -1,0 +1,369 @@
+{
+  "family_id": "f029",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            4,
+            5
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            9,
+            12
+          ],
+          [
+            12,
+            10
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            4,
+            5,
+            "Restatement"
+          ],
+          [
+            3,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            10,
+            11,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Precedence"
+          ],
+          [
+            9,
+            12,
+            "Evidence"
+          ],
+          [
+            12,
+            10,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            15,
+            16,
+            "Alternative"
+          ],
+          [
+            7,
+            8,
+            "Concession"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            4,
+            5,
+            "Restatement"
+          ],
+          [
+            15,
+            16,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            7,
+            8,
+            "Concession"
+          ],
+          [
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            10,
+            11,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Precedence"
+          ],
+          [
+            9,
+            12,
+            "Evidence"
+          ],
+          [
+            12,
+            10,
+            "Cause-Effect"
+          ],
+          [
+            3,
+            6,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'wrong_sense': 1, 'false_endpoint': 1, 'wrong_direction': 1, 'spurious': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "claude-sonnet-5-5",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            0.833,
+            0.833
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from claude-sonnet-5-5 of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 4
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "The Homestake detector used a large tank of chlorine-based cleaning fluid to capture electron neutrinos, whereas, by con",
+            "The Homestake experiment detected about one-third of the solar neutrino rate predicted by the Standard Solar Model; that",
+            "The total-flux measurement indicates that conclusion, and the flavor transformation in turn caused the charged-current c"
+          ],
+          "gemini-3.1-pro": [
+            "The Homestake detector used a large tank of chlorine-based cleaning fluid to capture electron neutrinos, whereas, by con",
+            "The Homestake experiment detected about one-third of the solar neutrino rate predicted by the Standard Solar Model; that",
+            "At least one of the following holds, perhaps both: solar electron neutrinos change flavor through vacuum oscillation on "
+          ],
+          "claude-sonnet-5-5": [
+            "The Homestake detector used a large tank of chlorine-based cleaning fluid to capture electron neutrinos, whereas, by con",
+            "that is, the Homestake chlorine detector recorded roughly 33 percent of the neutrino captures that the Standard Solar Mo",
+            "That gallium target led John Bahcall to develop detailed Standard Solar Model predictions of the solar neutrino flux",
+            "The total-flux measurement indicates that conclusion, and the flavor transformation in turn caused the charged-current c"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

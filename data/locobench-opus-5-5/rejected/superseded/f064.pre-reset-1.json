@@ -1,0 +1,364 @@
+{
+  "family_id": "f064",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            12,
+            13
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            14,
+            13
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            13,
+            16
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            13,
+            16,
+            "Cause-Effect"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            3,
+            2,
+            "Concession"
+          ],
+          [
+            4,
+            2,
+            "Evidence"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            10,
+            11,
+            "Restatement"
+          ],
+          [
+            11,
+            7,
+            "Evidence"
+          ],
+          [
+            12,
+            13,
+            "Alternative"
+          ],
+          [
+            14,
+            13,
+            "Evidence"
+          ],
+          [
+            15,
+            16,
+            "Precedence"
+          ],
+          [
+            16,
+            13,
+            "Effect-Cause"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            12,
+            13,
+            "Alternative"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            10,
+            11,
+            "Restatement"
+          ],
+          [
+            3,
+            2,
+            "Concession"
+          ],
+          [
+            15,
+            16,
+            "Precedence"
+          ],
+          [
+            14,
+            13,
+            "Evidence"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            1,
+            5,
+            "Contrast"
+          ],
+          [
+            10,
+            7,
+            "Evidence"
+          ],
+          [
+            13,
+            16,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 1,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 2,
+            "recovered_as_planned": 0
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "1/4 planted error(s) realized as planned: {'false_endpoint': 1, 'spurious': 0, 'wrong_direction': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gemini-3.1-pro",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gemini-3.1-pro of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 2
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 2}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 2,
+          "claude-sonnet-5-5": 6
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Gettier's 1963 paper appeared in the journal Analysis, although it was published in the journal Mind.",
+            "Whereas the paper had that pair at its centre, Gettier's 1963 paper presented five distinct counterexamples.",
+            "This conclusion in turn confirms the disjunctive construction of Smith's belief.",
+            "Goldman's causal theory resulted from the Theaetetus's inconclusive ending."
+          ],
+          "gemini-3.1-pro": [
+            "Jones owns a Ford in Gettier's second case, or Brown is in Barcelona in Gettier's second case.",
+            "Either Plato's Theaetetus ends with Socrates accepting true belief with an account as the definition of knowledge, or Pl"
+          ],
+          "claude-sonnet-5-5": [
+            "Gettier's 1963 paper appeared in the journal Analysis, although it was published in the journal Mind.",
+            "The bibliographic record of the journal Analysis settles the matter: it determined that Gettier's paper appeared in volu",
+            "Whereas the paper had that pair at its centre, Gettier's 1963 paper presented five distinct counterexamples.",
+            "Jones owns a Ford in Gettier's second case, or Brown is in Barcelona in Gettier's second case",
+            "Either Plato's Theaetetus ends with Socrates accepting true belief with an account as the definition of knowledge, or Pl"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 2}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

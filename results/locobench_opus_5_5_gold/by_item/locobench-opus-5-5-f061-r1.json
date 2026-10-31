@@ -1,0 +1,790 @@
+{
+  "item_id": "locobench-opus-5-5-f061-r1",
+  "item_name": "Medicine -- break_2",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f061",
+    "family": "CHAIN",
+    "rung_index": 1,
+    "rung_name": "break_2",
+    "perturbation": {
+      "calls": [
+        "break_chain",
+        "break_chain"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "r003",
+        "r004"
+      ],
+      "edge_effects": [
+        {
+          "call": "break_chain",
+          "target": "r003",
+          "effect": "removed",
+          "detail": "chain link a12->a13"
+        },
+        {
+          "call": "break_chain",
+          "target": "r004",
+          "effect": "removed",
+          "detail": "chain link a13->a15"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "increase",
+      "consistency": "increase",
+      "log_partition": "decrease"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Medicine",
+    "domain": "Natural Sciences",
+    "framing": "How do clinicians determine whether a patient's acute liver injury stems from a newly prescribed medication or from an underlying disease when the initial laboratory findings fit both explanations?",
+    "split": "test",
+    "word_count": 630,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Entailment-chain integrity at decreasing break depth.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The Roussel Uclaf Causality Assessment Method (RUCAM) is a scoring tool used to assess whether a drug caused a liver injury.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "RUCAM was first published in 2015.",
+      "label": "p2",
+      "factual": false,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "A RUCAM score of 3 indicates that drug causation is highly probable.",
+      "label": "p3",
+      "factual": false,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The patient started amoxicillin-clavulanate three weeks before developing jaundice.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The prescribing physician attributed the patient's liver injury to amoxicillin-clavulanate.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The consulting hepatologist argued that the patient's liver injury reflected autoimmune hepatitis.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Amoxicillin-clavulanate caused the patient's liver injury.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The patient has underlying autoimmune hepatitis.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The patient's antinuclear antibody test was positive.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a9",
+      "text": "The patient's antinuclear antibody test was negative.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a10",
+      "text": "Liver biopsy can help distinguish drug-induced liver injury from autoimmune hepatitis.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The final pathology review determined that the liver biopsy findings did not support a diagnosis of autoimmune hepatitis.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Improvement of liver tests after stopping a suspected drug supports drug-induced liver injury as the diagnosis.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The patient's ALT fell by more than half within a week of stopping the antibiotic.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "Within seven days of discontinuing the antibiotic, the patient's ALT dropped below 50 percent of its peak value.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "The hospital's adverse drug reaction committee concluded that amoxicillin-clavulanate was the probable cause of the patient's liver injury.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a15",
+      "target_id": "a6",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 9,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a1",
+      "target_id": "a0",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": true,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a2",
+      "target_id": "a0",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a11",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a8",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a10",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a14",
+      "position_distance": 3
+    }
+  ],
+  "response": "Distinguishing drug-induced liver injury from an underlying hepatic disease begins with structured causality assessment, because laboratory patterns alone rarely separate the two. The Roussel Uclaf Causality Assessment Method (RUCAM) is a scoring tool used to assess whether a drug caused a liver injury, even though RUCAM was first published in 2015. The instrument weighs the latency between drug exposure and injury onset, the course of liver enzymes after withdrawal, risk factors, concomitant medications, the exclusion of competing causes, prior reports of hepatotoxicity for the agent, and the response to rechallenge. How its total is interpreted confirms that causal purpose: a RUCAM score of 3 indicates that drug causation is highly probable. Applying the method therefore requires the clinician to gather a precise chronology and to pursue alternative diagnoses rather than relying on the first plausible explanation.\n\nThe difficulty is well illustrated by a patient with acute hepatocellular injury and jaundice. The patient started amoxicillin-clavulanate three weeks before developing jaundice, and the prescribing physician subsequently attributed the patient's liver injury to amoxicillin-clavulanate. A latency of several weeks is typical for this antibiotic, which is among the agents most frequently implicated in hepatotoxicity, and that interval made the prescriber's reading intuitive. The case did not remain uncontested. The consulting hepatologist argued that the patient's liver injury reflected autoimmune hepatitis, a condition that can present abruptly, can mimic drug toxicity biochemically, and may even be unmasked by drug exposure.\n\nThe diagnostic space at this stage was framed by two possibilities, at least one of which had to hold, perhaps both: amoxicillin-clavulanate caused the patient's liver injury, or the patient has underlying autoimmune hepatitis. The coexistence of both is clinically recognized, since drug-induced autoimmune-like hepatitis blurs the boundary between the categories. Serology was then used to narrow the field. The record presents the antinuclear antibody result in two incompatible forms: either the patient's antinuclear antibody test was positive, or the patient's antinuclear antibody test was negative, and one of these entries must be erroneous, since the same specimen cannot yield both results. Because autoantibodies are neither fully sensitive nor specific for autoimmune hepatitis, clinicians generally treat them as one input among several. Histology offers a more direct view of the injury pattern. Liver biopsy can help distinguish drug-induced liver injury from autoimmune hepatitis, and that discriminating capacity resulted from the fact that the final pathology review determined that the liver biopsy findings did not support a diagnosis of autoimmune hepatitis. Features such as prominent plasma-cell infiltrates, interface hepatitis, and rosette formation favour autoimmune disease, whereas cholestatic changes and eosinophil-rich infiltrates point toward a drug reaction.\n\nThe most informative evidence is often the course of the injury after the suspected agent is withdrawn, a criterion termed dechallenge. Improvement of liver tests after stopping a suspected drug supports drug-induced liver injury as the diagnosis. Separately, in this patient, the ALT fell by more than half within a week of stopping the antibiotic. Within seven days of discontinuing the antibiotic, the patient's ALT dropped below 50 percent of its peak value. Autoimmune hepatitis, by comparison, tends to persist or relapse without immunosuppression, so a brisk and sustained decline after drug withdrawal carries substantial weight within the RUCAM framework.\n\nThat rapid biochemical recovery indicates why the hospital's adverse drug reaction committee concluded that amoxicillin-clavulanate was the probable cause of the patient's liver injury. The committee's verdict, in turn, confirms the antibiotic's causal role, the first of the two possibilities set out at the stage of differential diagnosis. The general lesson is that no single test settles such cases. Clinicians integrate the timing of exposure, serology, histology, and the response to withdrawal within a structured causality instrument, and they keep monitoring after recovery, because a later relapse off the drug would reopen the question of an underlying autoimmune process.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f061-r1",
+      "item_name": "Medicine -- break_2",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f061",
+      "family": "CHAIN",
+      "rung_index": 1,
+      "rung_name": "break_2",
+      "perturbation": {
+        "calls": [
+          "break_chain",
+          "break_chain"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r003",
+          "r004"
+        ],
+        "edge_effects": [
+          {
+            "call": "break_chain",
+            "target": "r003",
+            "effect": "removed",
+            "detail": "chain link a12->a13"
+          },
+          {
+            "call": "break_chain",
+            "target": "r004",
+            "effect": "removed",
+            "detail": "chain link a13->a15"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 7,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 7,
+        "concessions_discounted": 0,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.78888225,
+        "consistency": 0.837972965425532,
+        "reified": 0.400844,
+        "log_partition": 0.4894493601331571
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.104288,
+          "a10": 0.954131,
+          "a11": 0.924058,
+          "a12": 0.9,
+          "a13": 0.979275,
+          "a14": 0.979275,
+          "a15": 0.925373,
+          "a2": 0.095647,
+          "a3": 0.9,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.968128,
+          "a7": 0.928783,
+          "a8": 0.631579,
+          "a9": 0.631579
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.44285954784860754,
+        "log_z": -4.333495,
+        "log_z_max": -2.166714,
+        "log_z_min": -6.410722
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f061-r1",
+      "item_name": "Medicine -- break_2",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f061",
+      "family": "CHAIN",
+      "rung_index": 1,
+      "rung_name": "break_2",
+      "perturbation": {
+        "calls": [
+          "break_chain",
+          "break_chain"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r003",
+          "r004"
+        ],
+        "edge_effects": [
+          {
+            "call": "break_chain",
+            "target": "r003",
+            "effect": "removed",
+            "detail": "chain link a12->a13"
+          },
+          {
+            "call": "break_chain",
+            "target": "r004",
+            "effect": "removed",
+            "detail": "chain link a13->a15"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 8,
+      "num_relations": 4,
+      "coverage": {
+        "gold_total": 8,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 4,
+        "concessions_discounted": 0,
+        "policy": "gold",
+        "pairs_scored": 8,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7839995,
+        "consistency": 0.9319756050583657,
+        "reified": 0.419893,
+        "log_partition": 0.5944130111777087
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.1,
+          "a10": 0.9,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.979275,
+          "a14": 0.979275,
+          "a15": 0.925373,
+          "a2": 0.1,
+          "a3": 0.9,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.968128,
+          "a7": 0.928783,
+          "a8": 0.631579,
+          "a9": 0.631579
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4604968895307272,
+        "log_z": -2.529222,
+        "log_z_max": -1.050812,
+        "log_z_min": -4.695924
+      },
+      "elapsed_s": 0.115,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

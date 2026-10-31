@@ -1,0 +1,364 @@
+{
+  "family_id": "f023",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.833,
+        "sense": 0.833,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            4,
+            5
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            12,
+            15
+          ],
+          [
+            15,
+            13
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            10,
+            11,
+            "Instantiation"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            3,
+            2,
+            "Instantiation"
+          ],
+          [
+            4,
+            5,
+            "Precedence"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            9,
+            10,
+            "Concession"
+          ],
+          [
+            11,
+            10,
+            "Instantiation"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            12,
+            15,
+            "Evidence"
+          ],
+          [
+            10,
+            15,
+            "Evidence"
+          ],
+          [
+            15,
+            13,
+            "Cause-Effect"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            4,
+            5,
+            "Precedence"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Concession"
+          ],
+          [
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            10,
+            11,
+            "Instantiation"
+          ],
+          [
+            12,
+            15,
+            "Evidence"
+          ],
+          [
+            7,
+            8,
+            "Contrast"
+          ],
+          [
+            15,
+            13,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 2,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "2/4 planted error(s) realized as planned: {'false_endpoint': 1, 'wrong_direction': 1, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            0.667,
+            0.667
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 4,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 0,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Although Mosteller and Wallace relied primarily on sentence length to attribute the disputed papers, they focused on the",
+            "Either the Mosteller\u2013Wallace analysis used Bayesian inference, or the Mosteller\u2013Wallace analysis did not use Bayesian in",
+            "That conclusion is what led them to adopt Bayesian inference as their framework, stating the attribution of each essay a"
+          ],
+          "claude-sonnet-5-5": [
+            "Either the Mosteller\u2013Wallace analysis used Bayesian inference, or the Mosteller\u2013Wallace analysis did not use Bayesian in",
+            "At least one of the following is true, perhaps both: Hamilton's authorship list contained errors about the disputed essa",
+            "In other words, Madison used the word",
+            "Although Mosteller and Wallace relied primarily on sentence length to attribute the disputed papers, they focused on the",
+            "Alexander Hamilton, James Madison, and John Jay wrote the Federalist Papers, although they did not contribute equally: w"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+}

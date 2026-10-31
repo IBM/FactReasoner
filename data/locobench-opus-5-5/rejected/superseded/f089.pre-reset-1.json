@@ -1,0 +1,382 @@
+{
+  "family_id": "f089",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            8,
+            9
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            15,
+            13
+          ],
+          [
+            7,
+            10
+          ],
+          [
+            14,
+            16
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            9,
+            10
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            6,
+            7,
+            "Evidence"
+          ],
+          [
+            7,
+            10,
+            "Evidence"
+          ],
+          [
+            8,
+            9,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            15,
+            13,
+            "Concession"
+          ],
+          [
+            14,
+            16,
+            "Contrast"
+          ],
+          [
+            15,
+            16,
+            "Contrast"
+          ],
+          [
+            16,
+            13,
+            "Evidence"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            8,
+            9,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            15,
+            13,
+            "Concession"
+          ],
+          [
+            7,
+            10,
+            "Evidence"
+          ],
+          [
+            14,
+            16,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            2,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            7,
+            "Evidence"
+          ],
+          [
+            9,
+            10,
+            "Contrast"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'spurious': 1, 'false_endpoint': 2, 'wrong_sense': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            0.833,
+            0.833
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {
+            "leakage": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 1,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "claude-sonnet-5-5": {
+            "leakage": [
+              "two propositions"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 1,
+          "claude-sonnet-5-5": 8
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "That testing of fifteen-year-olds comes before the other survey in the sequence: TIMSS, which follows, assesses students",
+            "Guiso and colleagues published the article in the journal Nature, and that publication confirms their central report: th",
+            "Either girls in Iceland outscored boys in mathematics in PISA 2003, or Icelandic girls did not outscore boys that year."
+          ],
+          "gemini-3.1-pro": [
+            "The defensible conclusion is that at least one of two propositions holds, perhaps both: sociocultural factors contribute"
+          ],
+          "claude-sonnet-5-5": [
+            "PISA is administered by the International Association for the Evaluation of Educational Achievement, and because of that",
+            "That testing of fifteen-year-olds comes before the other survey in the sequence: TIMSS, which follows, assesses students",
+            "Guiso and colleagues published the article in the journal Nature, and that publication confirms their central report",
+            "Either girls in Iceland outscored boys in mathematics in PISA 2003, or Icelandic girls did not outscore boys that year.",
+            "Whereas that second possibility concerns only a single country's scores"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

@@ -1,0 +1,848 @@
+{
+  "item_id": "locobench-opus-5-5-f075-r2",
+  "item_name": "Art -- shuffle_adjacent",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f075",
+    "family": "ORDER",
+    "rung_index": 2,
+    "rung_name": "shuffle_adjacent",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "adjacent"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "adjacent",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Art",
+    "domain": "Humanities",
+    "framing": "How is a disputed Old Master painting ultimately attributed when connoisseurs credit the master himself while scientific analysis of pigments, canvas, and underdrawing suggests the work came from his workshop or from a later copyist?",
+    "split": "test",
+    "word_count": 644,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "A privately owned Dutch portrait was offered for sale as an autograph work by Rembrandt.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Two leading connoisseurs attributed the portrait to Rembrandt himself on stylistic grounds.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The connoisseurs cited the handling of light on the sitter's face as evidence of the master's hand.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The owner commissioned a technical study of the painting from a museum conservation laboratory.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Infrared reflectography revealed a schematic underdrawing beneath the paint layers.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Rembrandt typically laid in his compositions with loose brushwork rather than detailed underdrawing.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Infrared reflectography determines the date of a painting by measuring pigment decay.",
+      "label": "p7",
+      "factual": false,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Prussian blue was detected in the sitter's collar.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The pigment analysis identified Prussian blue in the paint of the sitter's collar.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Prussian blue was first synthesized in 1820.",
+      "label": "p10",
+      "factual": false,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The canvas of the portrait was woven before 1669.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a11",
+      "text": "The canvas of the portrait was woven in or after 1669.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a12",
+      "text": "Workshop assistants painted the background of the portrait.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "A later copyist repainted the sitter's costume.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The museum's expert review board concluded that the portrait was a workshop production rather than an autograph Rembrandt.",
+      "label": "p15",
+      "factual": true,
+      "role": "holding",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a2",
+      "target_id": "a1",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a1",
+      "target_id": "a4",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a6",
+      "target_id": "a3",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a9",
+      "target_id": "a11",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a14",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a5",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a5",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a8",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a14",
+      "position_distance": 3
+    }
+  ],
+  "response": "The attribution of a disputed Old Master painting is rarely settled by a single kind of expertise. It emerges from the friction between the trained eye and the laboratory bench, and from an institution willing to weigh the two. A recent case shows how that process unfolds. A privately owned Dutch portrait was offered for sale as an autograph work by Rembrandt. Before the sale, two leading connoisseurs attributed the portrait to Rembrandt himself on stylistic grounds. They judged the modelling of the head, the economy of the brushwork and the psychological intensity of the gaze to be consistent with his mature manner. Their written opinions show what that attribution rested upon: the connoisseurs cited the handling of light on the sitter's face as evidence of the master's hand. They pointed to the way illumination dissolves into warm half-shadow across the cheek and brow. Arguments of this kind carry considerable weight in the market, because they draw on decades of close study of securely documented pictures.\n\nThe owner commissioned a technical study of the painting from a museum conservation laboratory. Despite the stylistic confidence of the two connoisseurs, infrared reflectography revealed a schematic underdrawing beneath the paint layers. This underdrawing is a network of contour lines fixing the placement of the features and the fall of the drapery before any colour was applied. Rembrandt, by contrast, typically laid in his compositions with loose brushwork rather than detailed underdrawing. The choice of examination had itself determined the commission. He sketched the design directly in translucent brown paint and revised it freely as the work advanced. Because infrared reflectography determines the date of a painting by measuring pigment decay, the owner turned to the laboratory expecting a chronological verdict that would support the stylistic one.\n\nPigment analysis sharpened the problem considerably. Prussian blue was detected in the sitter's collar. That is to say, the pigment analysis identified Prussian blue in the paint of the sitter's collar, which stands in contrast to the loose, underdrawing-free lay-in of Rembrandt's own practice. Prussian blue was first synthesized in 1820, and that date bears directly on the support beneath the paint. Either the canvas of the portrait was woven before 1669, the year of Rembrandt's death, or it was woven in or after 1669. One of these must hold, and the two cannot both be true. The 1820 synthesis of the pigment indicates the second of them, a canvas woven in or after 1669. A support of that date places the physical object outside the span of the master's life and outside the reach of his studio practice as the connoisseurs had reconstructed it.\n\nThe remaining evidence pointed to more than one hand at work on the picture. At least one of two interventions took place, perhaps both: workshop assistants painted the background of the portrait, or a later copyist repainted the sitter's costume. Cross-sections and the layering of the paint film allow conservators to separate such campaigns, but they do not on their own assign them to named individuals. That task falls to collective judgment. Long after the assistants' work on the background, the museum's expert review board concluded that the portrait was a workshop production rather than an autograph Rembrandt. The board reached that conclusion after setting the connoisseurs' opinions against the reflectography, the pigment results and the stratigraphy of the paint.\n\nThe board's verdict settles the tension between the stylistic attribution and the schematic underdrawing. The quality of light that the connoisseurs admired is fully compatible with a gifted studio trained in Rembrandt's manner. The construction of the picture, however, is not compatible with his own procedure. Ultimate attribution therefore rests on neither the eye nor the instrument alone. It rests on a deliberative body that tests stylistic intuition against material fact and records its reasoning, so that a later generation can scrutinize the conclusion it reached.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f075-r2",
+      "item_name": "Art -- shuffle_adjacent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f075",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7746500666666666,
+        "consistency": 0.3263331885245902,
+        "reified": 0.144482,
+        "log_partition": 0.36068382020830914
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.987264,
+          "a10": 0.620057,
+          "a11": 0.651821,
+          "a12": 0.92929,
+          "a13": 0.92929,
+          "a14": 0.9,
+          "a2": 0.938645,
+          "a3": 0.898915,
+          "a4": 0.897751,
+          "a5": 0.79932,
+          "a6": 0.095659,
+          "a7": 0.980322,
+          "a8": 0.981115,
+          "a9": 0.110302
+        },
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.45995036584557414,
+        "log_z": -6.004598,
+        "log_z_max": -2.222516,
+        "log_z_min": -8.13834
+      },
+      "elapsed_s": 0.132,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f075-r2",
+      "item_name": "Art -- shuffle_adjacent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f075",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7729844666666666,
+        "consistency": 0.49071316666666664,
+        "reified": 0.199596,
+        "log_partition": 0.40769360850280056
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.987268,
+          "a10": 0.631579,
+          "a11": 0.631579,
+          "a12": 0.92929,
+          "a13": 0.92929,
+          "a14": 0.9,
+          "a2": 0.938646,
+          "a3": 0.9,
+          "a4": 0.898365,
+          "a5": 0.7902,
+          "a6": 0.1,
+          "a7": 0.979275,
+          "a8": 0.979275,
+          "a9": 0.1
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.4612306169968774,
+        "log_z": -3.976302,
+        "log_z_max": -0.866004,
+        "log_z_min": -6.117168
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

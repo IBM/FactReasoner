@@ -1,0 +1,835 @@
+{
+  "item_id": "locobench-opus-5-5-f008-r1",
+  "item_name": "Chemistry -- shuffle_block",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f008",
+    "family": "ORDER",
+    "rung_index": 1,
+    "rung_name": "shuffle_block",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "block"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "block",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Chemistry",
+    "domain": "Natural Sciences",
+    "framing": "How did chemists determine whether the anomalous properties of \"polywater\" reported in the 1960s reflected a genuinely new polymeric form of water or merely contamination of the samples by dissolved impurities?",
+    "split": "test",
+    "word_count": 629,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Nikolai Fedyakin first reported anomalous water condensed in narrow glass capillaries in 1962.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Fedyakin conducted his early anomalous water experiments in Leningrad.",
+      "label": "p2",
+      "factual": false,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The anomalous water was produced by condensing water vapor in fine quartz or glass capillaries.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Boris Deryagin of the Institute of Physical Chemistry in Moscow took up and publicized the anomalous water research.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Anomalous water froze at a lower temperature than ordinary water.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Ordinary water froze at a higher temperature than anomalous water.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Ellis Lippincott and colleagues published infrared spectra of anomalous water in Science in 1969.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Ellis Lippincott was a chemist at Harvard University.",
+      "label": "p8",
+      "factual": false,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Lippincott's group proposed that anomalous water was a polymer of water molecules.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Rousseau obtained an infrared spectrum resembling polywater from his own sweat.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The polywater samples contained silica dissolved from the walls of the capillaries.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The polywater samples contained organic contaminants such as lactate from human sweat.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Deryagin publicly retracted his claim that anomalous water was a new form of water.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Deryagin never retracted his claim that anomalous water was a new form of water.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "Deryagin and Churaev concluded in a 1973 Nature report that the anomalous properties were caused by impurities.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a3",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a9",
+      "target_id": "a11",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a1",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a12",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a6",
+      "target_id": "a8",
+      "level2_sense": "Effect-Cause",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a14",
+      "target_id": "a13",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a1",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a9",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a13",
+      "position_distance": 2
+    }
+  ],
+  "response": "Whether polywater was a new substance or a contaminated sample was decided by the convergence of three lines of inquiry: spectroscopy, chemical analysis of the samples, and the final judgement of the researchers who had championed the substance. The episode began in the Soviet Union, where Nikolai Fedyakin first reported anomalous water condensed in narrow glass capillaries in 1962. The difficulty was one of scale. The liquid existed only in quantities of micrograms, far too little for conventional bulk analysis, so every reported property had to be inferred from instruments working near the limits of their sensitivity. Under that constraint, a small amount of an unnoticed foreign substance could dominate the behaviour of the sample, and this possibility shaped the entire controversy.\n\nThe properties that Deryagin's laboratory described seemed to require a new structural explanation. Anomalous water froze at a lower temperature than ordinary water; in other words, ordinary water froze at a higher temperature than anomalous water. The substance was also reported to be denser and more viscous than ordinary water, with a markedly reduced vapor pressure. Laboratories in the West soon took up the problem, and Ellis Lippincott and colleagues published infrared spectra of anomalous water in Science in 1969. Lippincott was a chemist at Harvard University. That Science paper resulted from his group's proposal that anomalous water was a polymer of water molecules, a network bound together by unusually strong hydrogen bonds. After its publication, the name polywater spread rapidly through both the scientific literature and the popular press.\n\nFedyakin conducted his early anomalous water experiments in Leningrad. The anomalous water was produced by condensing water vapor in fine quartz or glass capillaries. The procedure appeared clean, because the source water had been distilled and the capillaries were freshly drawn. Whereas Fedyakin had worked in Leningrad, the research gained its international standing in Moscow. Some time after that 1962 report, Boris Deryagin of the Institute of Physical Chemistry in Moscow took up and publicized the anomalous water research, giving it the authority of one of the most respected surface chemists of his generation.\n\nWhereas the silica was a feature of the samples themselves, the remaining question concerned Deryagin's own position. On this point the record allows only two readings, which cannot both be true, and one of which must hold: either Deryagin publicly retracted his claim that anomalous water was a new form of water, or he never retracted it at all. The decisive document is the report in which Deryagin and Churaev concluded, in Nature in 1973, that the anomalous properties were caused by impurities. That report confirms the second of these readings. It also removes the earlier tension between the polymer proposal and the sweat spectrum. Once the leading proponents themselves attributed the anomalous behaviour to impurities, the polymer model no longer had any defenders, and Rousseau's spectrum could be accepted for what it showed. Taken together, the evidence from all three lines of inquiry indicated contamination, and polywater came to be understood as ordinary water containing dissolved impurities rather than as a new form of water.\n\nSpectroscopy, however, could also be used to test the polymer model. Although Lippincott's group had proposed that polymeric structure, Denis Rousseau obtained an infrared spectrum resembling polywater from his own sweat, which he collected after a game of handball. Direct chemical analysis of the samples led to the same conclusion, because the anomalous material was contaminated from at least one of two sources, perhaps both. The polywater samples contained silica dissolved from the walls of the capillaries, or, as Rousseau's sweat spectrum indicates, they contained organic contaminants such as lactate from human sweat. Microprobe and mass-spectrometric studies supported this picture: they detected sodium, silicon, and organic residues in concentrations far exceeding anything that pure water could contain.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f008-r1",
+      "item_name": "Chemistry -- shuffle_block",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f008",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a12",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7838846666666667,
+        "consistency": 0.43079054787234045,
+        "reified": 0.209562,
+        "log_partition": 0.3530896862968957
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.104299,
+          "a10": 0.929911,
+          "a11": 0.969105,
+          "a12": 0.671165,
+          "a13": 0.591184,
+          "a14": 0.89872,
+          "a2": 0.9,
+          "a3": 0.901075,
+          "a4": 0.979275,
+          "a5": 0.979275,
+          "a6": 0.924681,
+          "a7": 0.1,
+          "a8": 0.960757,
+          "a9": 0.948823
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.4326294706945482,
+        "log_z": -5.557116,
+        "log_z_max": -2.206063,
+        "log_z_min": -7.386152
+      },
+      "elapsed_s": 0.131,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f008-r1",
+      "item_name": "Chemistry -- shuffle_block",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f008",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7787304666666667,
+        "consistency": 0.5010839708171206,
+        "reified": 0.322084,
+        "log_partition": 0.49955253956977036
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.1,
+          "a10": 0.928771,
+          "a11": 0.969064,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a14": 0.9,
+          "a2": 0.9,
+          "a3": 0.9,
+          "a4": 0.979275,
+          "a5": 0.979275,
+          "a6": 0.9,
+          "a7": 0.1,
+          "a8": 0.913738,
+          "a9": 0.947676
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.450831436111422,
+        "log_z": -3.074588,
+        "log_z_max": -1.050812,
+        "log_z_min": -5.094745
+      },
+      "elapsed_s": 0.135,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

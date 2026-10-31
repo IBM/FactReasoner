@@ -1,0 +1,860 @@
+{
+  "item_id": "locobench-opus-5-5-f063-r4",
+  "item_name": "Oceanography -- ordering_only",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f063",
+    "family": "ORDER",
+    "rung_index": 4,
+    "rung_name": "ordering_only",
+    "perturbation": {
+      "calls": [
+        "ordering_only"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "r006"
+      ],
+      "edge_effects": [
+        {
+          "call": "ordering_only",
+          "target": "r006",
+          "effect": "reordered",
+          "detail": "Precedence -> Succession"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Oceanography",
+    "domain": "Natural Sciences",
+    "framing": "How did oceanographers determine whether the apparent slowdown in global surface warming during the early 2000s reflected a genuine halt in the planet's heat accumulation or a redistribution of that heat into the deeper ocean?",
+    "split": "test",
+    "word_count": 638,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The rate of global mean surface warming between roughly 1998 and 2012 was smaller than the rate over the preceding decades.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The apparent slowdown in surface warming became widely known as the \"global warming hiatus.\"",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Kevin Trenberth and colleagues highlighted an apparent \"missing heat\" problem in Earth's energy budget during the late 2000s.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Earth's energy imbalance remained positive throughout the early 2000s.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The planet continued to absorb more energy than it emitted to space throughout the early 2000s.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The Argo program deploys autonomous profiling floats that measure ocean temperature and salinity.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The first Argo floats were deployed in the early 1980s.",
+      "label": "p7",
+      "factual": false,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The Argo array reached near-global coverage in the mid-2000s.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Standard Argo floats routinely profile the full ocean depth down to 6,000 meters.",
+      "label": "p9",
+      "factual": false,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The heat content of the upper 2,000 meters of the global ocean increased between 2005 and 2013.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a10",
+      "text": "The heat content of the upper 2,000 meters of the global ocean did not increase between 2005 and 2013.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a11",
+      "text": "Excess heat accumulated in the subsurface Pacific Ocean during the slowdown.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Excess heat accumulated in the subsurface Atlantic and Southern Oceans during the slowdown.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "England and colleagues attributed the slowdown to a weakening of the Pacific trade winds.",
+      "label": "p14",
+      "factual": false,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The IPCC Fifth Assessment Report determined that internal climate variability, including possible redistribution of heat within the ocean, contributed substantially to the reduced surface warming trend.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a0",
+      "target_id": "a4",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "position_distance": 4,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a7",
+      "target_id": "a6",
+      "level2_sense": "Succession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5",
+        "perturbed_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a7",
+      "target_id": "a9",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a1",
+      "target_id": "a3",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a6",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a7",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "Between roughly 1998 and 2012, the rate of global mean surface warming was smaller than the rate over the preceding decades. That deceleration was large enough to attract sustained scientific and public attention, and the apparent slowdown in surface warming became widely known as the \"global warming hiatus.\" For oceanographers, the central question was physical rather than rhetorical. A reduced surface trend could mean that the climate system had stopped gaining energy. It could also mean that energy was still entering the system but was being stored where surface thermometers could not register it. Distinguishing between these possibilities required an accounting of the planet's total heat budget, most of which resides in the ocean.\n\nThe problem was sharpened during the late 2000s, when Kevin Trenberth and colleagues highlighted an apparent \"missing heat\" problem in Earth's energy budget. By contrast, satellite and radiative measurements showed that Earth's energy imbalance remained positive throughout the early 2000s. In other words, the planet continued to absorb more energy than it emitted to space throughout the early 2000s, despite the diminished rate of surface warming. The difficulty, then, was not whether energy was arriving but where it was going. Because the atmosphere and land surface have little heat capacity, the only plausible reservoir for a persistent surplus was the ocean. Testing that inference required observations capable of resolving subsurface temperature on a global scale.\n\nThose observations came largely from a single observing system. The Argo program deploys autonomous profiling floats that measure ocean temperature and salinity, drifting at depth and surfacing periodically to transmit their profiles by satellite. The Argo array reached near-global coverage in the mid-2000s, long after the first Argo floats were deployed in the early 1980s. Standard Argo floats routinely profile the full ocean depth down to 6,000 meters, giving the array its value for heat-budget work. With broad spatial sampling in place, the measurements could settle a sharply posed question. Either the heat content of the upper 2,000 meters of the global ocean increased between 2005 and 2013, an increase that resulted from the array's reaching near-global coverage, or the heat content of the upper 2,000 meters of the global ocean did not increase between 2005 and 2013. These two outcomes cannot both be true, and one of them must hold. The first would locate the missing energy in the interior ocean. The second would leave the surplus implied by the radiative imbalance unaccounted for.\n\nBy contrast with a stagnant upper ocean, regional analyses pointed to active storage below the surface. At least one of two accounts holds, perhaps both: excess heat accumulated in the subsurface Pacific Ocean during the slowdown, or excess heat accumulated in the subsurface Atlantic and Southern Oceans during the slowdown. The Pacific interpretation emphasized the role of wind-driven circulation in pumping warm water downward in the western tropical basin. The Atlantic and Southern Ocean interpretation stressed deep overturning and the formation of intermediate waters at high latitudes. Whereas that high-latitude account placed the storage far from the tropics, England and colleagues attributed the slowdown to a weakening of the Pacific trade winds, which they linked to altered subduction in the subtropical gyres and a corresponding change in the uptake of heat beneath the surface.\n\nThese regional findings were ultimately drawn together at the level of formal assessment. As England's trade-wind attribution indicates, the IPCC Fifth Assessment Report determined that internal climate variability, including possible redistribution of heat within the ocean, contributed substantially to the reduced surface warming trend. That determination settles the apparent tension between a slower surface trend and a planet that kept absorbing energy. Surface temperature alone had misrepresented the state of the climate system, because the energy surplus never vanished. It was redistributed vertically and geographically within the ocean, where profiling instruments could detect what thermometers at the surface could not.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f063-r4",
+      "item_name": "Oceanography -- ordering_only",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r006"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r006",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7191353333333333,
+        "consistency": 0.365333390625,
+        "reified": 0.175036,
+        "log_partition": 0.2655032035940797
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.915246,
+          "a1": 0.9,
+          "a10": 0.418746,
+          "a11": 0.890438,
+          "a12": 0.926481,
+          "a13": 0.105767,
+          "a14": 0.8988,
+          "a2": 0.904957,
+          "a3": 0.984663,
+          "a4": 0.98654,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.913514,
+          "a8": 0.1,
+          "a9": 0.841878
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.4558480560079769,
+        "log_z": -6.250121,
+        "log_z_max": -1.766234,
+        "log_z_min": -7.87094
+      },
+      "elapsed_s": 0.132,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r4",
+      "item_name": "Oceanography -- ordering_only",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r006"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r006",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7144046,
+        "consistency": 0.443825,
+        "reified": 0.180605,
+        "log_partition": 0.336039220174091
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.915246,
+          "a1": 0.9,
+          "a10": 0.51613,
+          "a11": 0.881325,
+          "a12": 0.929916,
+          "a13": 0.1,
+          "a14": 0.9,
+          "a2": 0.904957,
+          "a3": 0.984663,
+          "a4": 0.98654,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.9,
+          "a8": 0.1,
+          "a9": 0.697292
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.47651332398715335,
+        "log_z": -4.264891,
+        "log_z_max": -0.650333,
+        "log_z_min": -6.094266
+      },
+      "elapsed_s": 0.133,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

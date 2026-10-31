@@ -1,0 +1,844 @@
+{
+  "item_id": "locobench-opus-5-5-f036-r0",
+  "item_name": "Zoology -- shuffle_full",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f036",
+    "family": "ORDER",
+    "rung_index": 0,
+    "rung_name": "shuffle_full",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "full"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "full",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Zoology",
+    "domain": "Natural Sciences",
+    "framing": "How did researchers determine whether the fungus found on dying hibernating bats in North America was the primary driver of the mass mortality now called white-nose syndrome, or merely an opportunistic infection of animals already weakened by some other stressor?",
+    "split": "test",
+    "word_count": 594,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Lorch and colleagues published an experimental infection study of white-nose syndrome in Nature in 2011.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Early investigators proposed that the fungus was an opportunistic infection of bats already weakened by another stressor.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Other investigators proposed that the fungus was a primary pathogen causing the mortality.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The 2011 Lorch study used hibernating little brown bats as experimental subjects.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The 2011 Lorch inoculation study was conducted using only big brown bats.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Healthy bats inoculated with pure cultures of Pseudogymnoascus destructans developed white-nose syndrome.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "White-nose syndrome lesions appeared in previously healthy bats after experimental exposure to pure Pseudogymnoascus destructans cultures.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The 2011 Nature study concluded that Pseudogymnoascus destructans was the primary cause of white-nose syndrome rather than an opportunistic infection.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Researchers identified a bacterial co-infection as the necessary trigger for white-nose syndrome mortality.",
+      "label": "p9",
+      "factual": false,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Infected bats arouse from torpor more frequently than uninfected bats.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Infected bats starved by exhausting their fat reserves during hibernation.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Infected bats suffered fatal water and electrolyte imbalance from damaged wing tissue.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Pseudogymnoascus destructans is native to North America.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Pseudogymnoascus destructans was introduced to North America from another continent.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "A 2012 PNAS study by Warnecke and colleagues concluded that a European fungal isolate caused white-nose syndrome in North American bats, which supports the view that the fungus was introduced as a novel pathogen.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a1",
+      "target_id": "a5",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a7",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a5",
+      "target_id": "a7",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a8",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a8",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a14",
+      "position_distance": 3
+    }
+  ],
+  "response": "Because of that bacterial trigger and those repeated arousals, infected bats starved by exhausting their fat reserves during hibernation. Before such work existed, interpretation was divided. Either Pseudogymnoascus destructans is native to North America, or it was introduced to North America from another continent; the two accounts cannot both be true, and one of them must hold. Captive animals were held at the cold, humid conditions of a hibernaculum, and their wings were exposed to the fungus while control animals received no exposure. Whether the fungus now named Pseudogymnoascus destructans killed North American bats, or merely colonized animals already dying, could not be settled by field observation alone, because sick and dead bats in affected hibernacula carried the fungus under either interpretation. That conclusion settles the earlier dispute: a fungus that produces the disease in healthy hosts cannot be a mere secondary invader.\n\nThey established it as an emerging fungal disease with a known cause. In other words, white-nose syndrome lesions appeared in previously healthy bats after experimental exposure to pure Pseudogymnoascus destructans cultures, with no prior stressor to weaken them and no other agent present in the inoculum. At least one of two lethal processes, perhaps both, ends each fatal case: starvation of that kind, or a fatal water and electrolyte imbalance suffered by infected bats from damaged wing tissue. Lorch and colleagues published an experimental infection study of white-nose syndrome in Nature in 2011. Researchers identified a bacterial co-infection as the necessary trigger for white-nose syndrome mortality, and physiological monitoring of hibernating animals added a second line of explanation. That foreign origin in turn confirms the conclusion of a 2012 PNAS study by Warnecke and colleagues that a European fungal isolate caused white-nose syndrome in North American bats, which supports the view that the fungus was introduced as a novel pathogen. The design of the experiment determined its force.\n\nThe remaining question concerned origin. Other investigators, by contrast, proposed that the fungus was a primary pathogen causing the mortality, citing the novelty of the skin lesions and the speed with which the die-off spread between caves. Those infections were documented before the 2011 Nature study concluded that Pseudogymnoascus destructans was the primary cause of white-nose syndrome rather than an opportunistic infection. Infected bats arouse from torpor more frequently than uninfected bats, and each arousal consumes a substantial fraction of the energy a bat has budgeted for the entire winter. Taken together, the inoculation experiments, the physiology of arousal and dehydration, and the evidence of introduction moved white-nose syndrome out of the category of a suspected opportunistic infection. Correlation between fungal growth and mortality fit both accounts, so the problem required a controlled test in which the fungus was the only variable.\n\nDespite the opportunist hypothesis, healthy bats inoculated with pure cultures of Pseudogymnoascus destructans developed white-nose syndrome. Establishing the cause did not by itself explain how the disease kills. Comparative surveys favored the second account. Early investigators proposed that the fungus was an opportunistic infection of bats already weakened by another stressor, such as an unidentified virus, an environmental contaminant, or a nutritional deficit. The wing membrane, however, regulates water balance and gas exchange as well as enabling flight, so its erosion opens a further route to death. The 2011 Lorch study used hibernating little brown bats as experimental subjects, whereas its inoculation study was conducted using only big brown bats. A pathogen that had long coexisted with North American bats would imply some recent change in host susceptibility, whereas a newly arrived one would explain why the hosts showed no resistance.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f036-r0",
+      "item_name": "Zoology -- shuffle_full",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f036",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a7",
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7727725333333333,
+        "consistency": 0.4199124301861703,
+        "reified": 0.190401,
+        "log_partition": 0.34743758793303964
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.874918,
+          "a10": 0.967755,
+          "a11": 0.928788,
+          "a12": 0.593438,
+          "a13": 0.698588,
+          "a14": 0.940923,
+          "a2": 0.793066,
+          "a3": 0.895485,
+          "a4": 0.110159,
+          "a5": 0.985434,
+          "a6": 0.98278,
+          "a7": 0.9,
+          "a8": 0.094916,
+          "a9": 0.925338
+        },
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.468621796991838,
+        "log_z": -6.067802,
+        "log_z_max": -2.167535,
+        "log_z_min": -8.144384
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f036-r0",
+      "item_name": "Zoology -- shuffle_full",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f036",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a7",
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7681093333333333,
+        "consistency": 0.4969455875486381,
+        "reified": 0.206496,
+        "log_partition": 0.4191159958306517
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.874918,
+          "a10": 0.968128,
+          "a11": 0.928783,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a14": 0.9,
+          "a2": 0.793066,
+          "a3": 0.9,
+          "a4": 0.1,
+          "a5": 0.985434,
+          "a6": 0.98278,
+          "a7": 0.9,
+          "a8": 0.1,
+          "a9": 0.925373
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.47897464720134797,
+        "log_z": -4.139313,
+        "log_z_max": -1.050812,
+        "log_z_min": -6.36771
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

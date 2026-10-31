@@ -1,0 +1,387 @@
+{
+  "family_id": "f041",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Effect-Cause",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            4,
+            5
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            2,
+            6
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Restatement"
+          ],
+          [
+            2,
+            6,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            11,
+            "Contrast"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Concession"
+          ],
+          [
+            12,
+            10,
+            "Evidence"
+          ],
+          [
+            13,
+            11,
+            "Evidence"
+          ],
+          [
+            14,
+            15,
+            "Effect-Cause"
+          ],
+          [
+            11,
+            10,
+            "Cause-Effect"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            4,
+            5,
+            "Restatement"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Concession"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            6,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            9,
+            10,
+            "Contrast"
+          ],
+          [
+            14,
+            15,
+            "Effect-Cause"
+          ],
+          [
+            2,
+            6,
+            "Evidence"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 1, 'wrong_direction': 1, 'spurious': 1, 'wrong_sense': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "In other words, the minimum brightness of Betelgeuse during the Great Dimming occurred in February 2020.",
+            "The Taurus placement indicates that Betelgeuse faded to about 1 percent of its normal brightness during the Great Dimmin",
+            "That imaging programme resulted from the conclusion of their 2021 Nature study, which held that the Great Dimming arose "
+          ],
+          "gemini-3.1-pro": [
+            "In other words, the minimum brightness of Betelgeuse during the Great Dimming occurred in February 2020.",
+            "Either that fading caused Betelgeuse to explode as a supernova in 2020, or Betelgeuse did not explode as a supernova in ",
+            "At least one of two processes was at work, perhaps both: a cloud of dust partially obscured Betelgeuse's southern hemisp"
+          ],
+          "claude-sonnet-5-5": [
+            "In other words, the minimum brightness of Betelgeuse during the Great Dimming occurred in February 2020.",
+            "The Taurus placement indicates that Betelgeuse faded to about 1 percent of its normal brightness during the Great Dimmin",
+            "Either that fading caused Betelgeuse to explode as a supernova in 2020, or Betelgeuse did not explode as a supernova in ",
+            "a cloud of dust partially obscured Betelgeuse's southern hemisphere during the Great Dimming, or a large cool region for",
+            "That imaging programme resulted from the conclusion of their 2021 Nature study, which held that the Great Dimming arose "
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": false,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 0.933,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {
+          "2": [
+            "gemini-3.1-pro",
+            "claude-sonnet-5-5"
+          ]
+        },
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": "1 atom(s) a majority of 3 rater(s) found not present: [(2, ['gemini-3.1-pro', 'claude-sonnet-5-5'])]"
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}; V4: 1 atom(s) a majority of 3 rater(s) found not present: [(2, ['gemini-3.1-pro', 'claude-sonnet-5-5'])]"
+}

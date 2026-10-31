@@ -1,0 +1,374 @@
+{
+  "family_id": "f060",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.833,
+        "sense": 0.833,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            7,
+            8
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            3,
+            7
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            7,
+            15
+          ],
+          [
+            11,
+            9
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            11,
+            9,
+            "Instantiation"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            3,
+            7,
+            "Evidence"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            8,
+            9,
+            "Concession"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            9,
+            11,
+            "Instantiation"
+          ],
+          [
+            12,
+            13,
+            "Disjunction"
+          ],
+          [
+            13,
+            14,
+            "Precedence"
+          ],
+          [
+            7,
+            15,
+            "Evidence"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            12,
+            13,
+            "Disjunction"
+          ],
+          [
+            3,
+            7,
+            "Evidence"
+          ],
+          [
+            11,
+            9,
+            "Instantiation"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            8,
+            9,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Precedence"
+          ],
+          [
+            7,
+            15,
+            "Evidence"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 1, 'wrong_sense': 2, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            0.667,
+            0.667
+          ],
+          "claude-sonnet-5-5": [
+            0.833,
+            0.833
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 4,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "By contrast, beach marks typically form during a single overload event, in which the section separates in one rapid tear",
+            "Fatigue striations, by contrast, are usually visible to the naked eye, and an experienced examiner may note them during ",
+            "Despite the single overload event, the fatigue crack initiated at the keyway root.",
+            "The final failure analysis report concluded that the shaft failed by progressive fatigue rather than a single overload, "
+          ],
+          "gemini-3.1-pro": [
+            "By contrast, beach marks typically form during a single overload event, in which the section separates in one rapid tear",
+            "Fatigue striations, by contrast, are usually visible to the naked eye, and an experienced examiner may note them during ",
+            "In other words, the origin of the fatigue crack was located at the root of the keyway, where the converging beach marks ",
+            "a conclusion confirmed by the fatigue fracture of the shaft itself."
+          ],
+          "claude-sonnet-5-5": [
+            "By contrast, beach marks typically form during a single overload event, in which the section separates in one rapid tear",
+            "Fatigue striations, by contrast, are usually visible to the naked eye",
+            "Despite the single overload event, the fatigue crack initiated at the keyway root.",
+            "In other words, the origin of the fatigue crack was located at the root of the keyway, where the converging beach marks ",
+            "a conclusion confirmed by the fatigue fracture of the shaft itself"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

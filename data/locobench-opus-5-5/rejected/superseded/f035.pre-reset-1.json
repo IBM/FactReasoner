@@ -1,0 +1,370 @@
+{
+  "family_id": "f035",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            7,
+            9
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            8,
+            10
+          ],
+          [
+            6,
+            4
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Restatement"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            4,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            4,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            7,
+            9,
+            "Concession"
+          ],
+          [
+            8,
+            10,
+            "Contrast"
+          ],
+          [
+            9,
+            11,
+            "Evidence"
+          ],
+          [
+            12,
+            13,
+            "Alternative"
+          ],
+          [
+            14,
+            15,
+            "Contrast"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            2,
+            "Restatement"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            12,
+            13,
+            "Alternative"
+          ],
+          [
+            7,
+            9,
+            "Concession"
+          ],
+          [
+            9,
+            11,
+            "Evidence"
+          ],
+          [
+            14,
+            15,
+            "Contrast"
+          ],
+          [
+            8,
+            10,
+            "Contrast"
+          ],
+          [
+            6,
+            4,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            3,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_direction': 1, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 5,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "In other words, Western Electric's Hawthorne plant stood in the Illinois town of Cicero, and that Cicero setting caused ",
+            "The output gain associated with the new operators was, moreover, what caused the two operators to be replaced, since man",
+            "Franke and Kaul, by contrast with that 1978 date, published their reanalysis in 1992.",
+            "Levitt and List found strong evidence of a Hawthorne effect in the illumination data, whereas they concluded that the il"
+          ],
+          "gemini-3.1-pro": [
+            "The Hawthorne Works was located in Cicero, Illinois. In other words, Western Electric's Hawthorne plant stood in the Ill",
+            "the replacement of two operators raised Relay Assembly Test Room output, or the introduction of small-group incentive pa",
+            "Franke and Kaul, by contrast with that 1978 date, published their reanalysis in 1992.",
+            "Either raw data from the illumination experiments survived in archives, or no raw data from the illumination experiments",
+            "Levitt and List found strong evidence of a Hawthorne effect in the illumination data, whereas they concluded that the il"
+          ],
+          "claude-sonnet-5-5": [
+            "The Relay Assembly Test Room study began in 1927, the year before two operators in the Relay Assembly Test Room were rep",
+            "the replacement of two operators raised Relay Assembly Test Room output, or the introduction of small-group incentive pa",
+            "Franke and Kaul, by contrast with that 1978 date, published their reanalysis in 1992.",
+            "Either raw data from the illumination experiments survived in archives, or no raw data from the illumination experiments",
+            "Levitt and List found strong evidence of a Hawthorne effect in the illumination data, whereas they concluded that the il"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

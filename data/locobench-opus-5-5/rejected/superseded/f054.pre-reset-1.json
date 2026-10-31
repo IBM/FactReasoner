@@ -1,0 +1,381 @@
+{
+  "family_id": "f054",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Effect-Cause",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          1,
+          6,
+          5
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(1, 6, 5)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.833,
+        "sense": 0.833,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            2,
+            3
+          ],
+          [
+            5,
+            7
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            4,
+            5,
+            "Effect-Cause"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Restatement"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            5,
+            4,
+            "Cause-Effect"
+          ],
+          [
+            1,
+            6,
+            "Contrast"
+          ],
+          [
+            5,
+            7,
+            "Concession"
+          ],
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            9,
+            10,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            15,
+            1,
+            "Evidence"
+          ],
+          [
+            1,
+            16,
+            "Cause-Effect"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            2,
+            3,
+            "Restatement"
+          ],
+          [
+            2,
+            4,
+            "Precedence"
+          ],
+          [
+            5,
+            7,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            11,
+            12,
+            "Disjunction"
+          ],
+          [
+            1,
+            6,
+            "Contrast"
+          ],
+          [
+            9,
+            10,
+            "Evidence"
+          ],
+          [
+            7,
+            8,
+            "Restatement"
+          ],
+          [
+            12,
+            13,
+            "Contrast"
+          ],
+          [
+            4,
+            5,
+            "Effect-Cause"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 2,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "2/4 planted error(s) realized as planned: {'false_endpoint': 1, 'wrong_sense': 1, 'spurious': 0, 'wrong_direction': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gemini-3.1-pro",
+        "rates": {
+          "gpt-6-sol": [
+            0.667,
+            0.667
+          ],
+          "gemini-3.1-pro": [
+            0.833,
+            0.833
+          ],
+          "claude-sonnet-5-5": [
+            0.833,
+            0.833
+          ]
+        }
+      },
+      "detail": "V1 reported from gemini-3.1-pro of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 4,
+          "claude-sonnet-5-5": 8
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Bretz first published his catastrophic flood hypothesis in 1923; in other words, the year 1923 saw the first publication",
+            "Joseph Thomas Pardee identified glacial Lake Missoula as the source of the floodwaters, and that identification indicate",
+            "Some floodwater that flowed across the scablands came from glacial Lake Missoula, and some floodwater that flowed across",
+            "The timing of the floods allows no such combination."
+          ],
+          "gemini-3.1-pro": [
+            "Bretz first published his catastrophic flood hypothesis in 1923; in other words, the year 1923 saw the first publication",
+            "Joseph Thomas Pardee identified glacial Lake Missoula as the source of the floodwaters, and that identification indicate",
+            "Some floodwater that flowed across the scablands came from glacial Lake Missoula, and some floodwater that flowed across",
+            "By contrast with that pairing of sources, the Missoula floods either occurred as a single outburst event or occurred as "
+          ],
+          "claude-sonnet-5-5": [
+            "in other words, the year 1923 saw the first publication of Bretz's catastrophic flood hypothesis, and that debut came fo",
+            "The opposition he faced occasioned that Washington appearance, because many prominent geologists at the 1927 meeting rej",
+            "In other words, the geological community ultimately determined that slow gradual erosion did not produce the Channeled S",
+            "Joseph Thomas Pardee identified glacial Lake Missoula as the source of the floodwaters, and that identification indicate",
+            "Some floodwater that flowed across the scablands came from glacial Lake Missoula, and some floodwater that flowed across"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

@@ -1,0 +1,399 @@
+{
+  "family_id": "f040",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            5,
+            6
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            8,
+            7
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            12,
+            15
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            4,
+            1,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            6,
+            8,
+            "Concession"
+          ],
+          [
+            8,
+            7,
+            "Evidence"
+          ],
+          [
+            8,
+            1,
+            "Precedence"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            10,
+            11,
+            "Contrast"
+          ],
+          [
+            11,
+            1,
+            "Precedence"
+          ],
+          [
+            7,
+            1,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            12,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            1,
+            15,
+            "Precedence"
+          ],
+          [
+            12,
+            15,
+            "Precedence"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Disjunction"
+          ],
+          [
+            8,
+            7,
+            "Evidence"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            6,
+            8,
+            "Concession"
+          ],
+          [
+            2,
+            3,
+            "Contrast"
+          ],
+          [
+            10,
+            11,
+            "Contrast"
+          ],
+          [
+            12,
+            15,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_direction': 1, 'wrong_sense': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 4
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Herzberg was pushing a bicycle across Mill Avenue at night when she was struck; by contrast, the collision occurred duri",
+            "The automated driving system first detected Herzberg about 5.6 seconds before impact, and because of that early detectio",
+            "The legal consequences for that driver, Rafaela Vasquez, admit of only two outcomes: either she was convicted of a crimi"
+          ],
+          "gemini-3.1-pro": [
+            "Herzberg was pushing a bicycle across Mill Avenue at night when she was struck; by contrast, the collision occurred duri",
+            "Uber had disabled the Volvo's factory-installed automatic emergency braking during autonomous operation; in other words,",
+            "either she was convicted of a criminal offense arising from the crash, or she was never convicted of any criminal offens"
+          ],
+          "claude-sonnet-5-5": [
+            "by contrast, the collision occurred during daylight hours in downtown Phoenix",
+            "because of that early detection it alternately classified her as a vehicle, a bicycle, and an unknown object",
+            "in other words, the Volvo's built-in automatic emergency braking was switched off whenever Uber's self-driving system co",
+            "either she was convicted of a criminal offense arising from the crash, or she was never convicted of any criminal offens"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {
+          "15": [
+            "gemini-3.1-pro"
+          ]
+        },
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

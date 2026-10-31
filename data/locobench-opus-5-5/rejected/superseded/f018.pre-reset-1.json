@@ -1,0 +1,406 @@
+{
+  "family_id": "f018",
+  "stage": "perturb",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            13,
+            14
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            1,
+            "Evidence"
+          ],
+          [
+            1,
+            3,
+            "Contrast"
+          ],
+          [
+            4,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            4,
+            1,
+            "Concession"
+          ],
+          [
+            5,
+            6,
+            "Precedence"
+          ],
+          [
+            7,
+            8,
+            "Contrast"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            13,
+            14,
+            "Cause-Effect"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            3,
+            "Contrast"
+          ],
+          [
+            4,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            6,
+            "Precedence"
+          ],
+          [
+            7,
+            8,
+            "Contrast"
+          ],
+          [
+            9,
+            10,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            4,
+            1,
+            "Concession"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            2,
+            1,
+            "Evidence"
+          ],
+          [
+            13,
+            14,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'wrong_direction': 1, 'false_endpoint': 2, 'spurious': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gemini-3.1-pro",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gemini-3.1-pro of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 1,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {
+            "leakage": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 1,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "claude-sonnet-5-5": {
+            "leakage": [
+              "here the possibilities are exclusive"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 6
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "That gradualist position was itself a consequence of the strong opposition Bretz faced at a 1927 meeting of the Geologic",
+            "Waitt's analysis of the Touchet Beds led the 1965 INQUA field conference participants to conclude that Bretz's catastrop",
+            "Bretz received the Penrose Medal in 1979; in other words, the Geological Society of America awarded Bretz its highest ho"
+          ],
+          "gemini-3.1-pro": [
+            "At least one of two processes accounts for the failure, perhaps both acting together: the Lake Missoula ice dam failed b",
+            "Either the Missoula floods occurred as a single flood event, as Bretz originally envisioned, or the Missoula floods occu",
+            "Bretz received the Penrose Medal in 1979; in other words, the Geological Society of America awarded Bretz its highest ho"
+          ],
+          "claude-sonnet-5-5": [
+            "By contrast, the ice dam that held back Glacial Lake Missoula was formed by the Laurentide Ice Sheet",
+            "the Lake Missoula ice dam failed by floating as the lake deepened",
+            "or the Lake Missoula ice dam failed by water tunneling beneath the ice",
+            "Either the Missoula floods occurred as a single flood event",
+            "or the Missoula floods occurred as multiple repeated flood events"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {
+          "8": [
+            "claude-sonnet-5-5"
+          ]
+        },
+        "n_raters": 3
+      },
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": true,
+      "threshold": "<= 15%",
+      "observed": "1.0%",
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": false,
+      "threshold": "response differs from parent",
+      "observed": "identical",
+      "detail": "add_resolution(r005) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text"
+    },
+    {
+      "gate": "P5.rung2",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "add_resolution(r005) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+    }
+  ],
+  "reason": "P5.text_changed: add_resolution(r005) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text; P5.rung2: add_resolution(r005) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+}

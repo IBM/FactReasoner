@@ -1,0 +1,402 @@
+{
+  "family_id": "f099",
+  "stage": "perturb",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            10,
+            12
+          ],
+          [
+            5,
+            7
+          ],
+          [
+            11,
+            12
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Restatement"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            7,
+            "Precedence"
+          ],
+          [
+            5,
+            8,
+            "Precedence"
+          ],
+          [
+            7,
+            8,
+            "Disjunction"
+          ],
+          [
+            9,
+            10,
+            "Concession"
+          ],
+          [
+            10,
+            12,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Evidence"
+          ],
+          [
+            9,
+            12,
+            "Concession"
+          ],
+          [
+            6,
+            12,
+            "Cause-Effect"
+          ],
+          [
+            10,
+            13,
+            "Contrast"
+          ],
+          [
+            14,
+            15,
+            "Alternative"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            2,
+            3,
+            "Restatement"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            8,
+            "Disjunction"
+          ],
+          [
+            14,
+            15,
+            "Alternative"
+          ],
+          [
+            9,
+            10,
+            "Concession"
+          ],
+          [
+            12,
+            13,
+            "Contrast"
+          ],
+          [
+            10,
+            12,
+            "Evidence"
+          ],
+          [
+            5,
+            7,
+            "Precedence"
+          ],
+          [
+            11,
+            12,
+            "Evidence"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_sense': 1, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            0.833,
+            0.833
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 0,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 2,
+          "gemini-3.1-pro": 2,
+          "claude-sonnet-5-5": 4
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "The Blob was first named by Nick Bond in 2014; in other words, Bond, then Washington's state climatologist, coined the n",
+            "Their flux calculations, together with that publication, indicate the decisive result: Bond and colleagues concluded tha"
+          ],
+          "gemini-3.1-pro": [
+            "The Blob was first named by Nick Bond in 2014; in other words, Bond, then Washington's state climatologist, coined the n",
+            "Either the Blob's peak sea surface temperature anomaly exceeded 2\u00b0C above normal, or the Blob's peak sea surface tempera"
+          ],
+          "claude-sonnet-5-5": [
+            "The Blob was first named by Nick Bond in 2014; in other words, Bond, then Washington's state climatologist, coined the n",
+            "Daniel Swain, by contrast, coined the nickname",
+            "Their flux calculations, together with that publication, indicate the decisive result: Bond and colleagues concluded tha",
+            "Either the Blob's peak sea surface temperature anomaly exceeded 2\u00b0C above normal, or the Blob's peak sea surface tempera"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": true,
+      "threshold": "<= 15%",
+      "observed": "1.7%",
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": false,
+      "threshold": "response differs from parent",
+      "observed": "identical",
+      "detail": "add_resolution(r004) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text"
+    },
+    {
+      "gate": "P5.rung2",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "add_resolution(r004) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+    }
+  ],
+  "reason": "P5.text_changed: add_resolution(r004) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text; P5.rung2: add_resolution(r004) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+}

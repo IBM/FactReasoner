@@ -1,0 +1,835 @@
+{
+  "item_id": "locobench-opus-5-5-f024-r1",
+  "item_name": "Mechanical Engineering -- shuffle_block",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f024",
+    "family": "ORDER",
+    "rung_index": 1,
+    "rung_name": "shuffle_block",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "block"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "block",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Mechanical Engineering",
+    "domain": "Engineering & Technology",
+    "framing": "How do failure analysts determine whether a fractured industrial drive shaft failed through progressive fatigue or a single overload event when the maintenance contractor blames a manufacturing defect while the manufacturer blames improper installation?",
+    "split": "test",
+    "word_count": 669,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The drive shaft fractured while in service at a paper mill.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The maintenance contractor argued that the fracture was caused by a manufacturing defect in the shaft.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The manufacturer argued that the fracture was caused by improper installation of the shaft.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Failure analysts preserved the mating fracture surfaces without cleaning them with abrasives.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The shaft's fracture surface contains a fatigue crack initiation zone.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a5",
+      "text": "The shaft's fracture surface contains no fatigue crack initiation zone.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a6",
+      "text": "Beach marks on a fracture surface indicate progressive crack growth over multiple loading cycles.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Fatigue striations on steel shafts are routinely visible to the naked eye.",
+      "label": "p8",
+      "factual": false,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The fatigue crack originated at the root of the keyway.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The crack initiation site was located at the bottom corner of the keyway.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Ductile torsional overload fractures in shafts typically occur on a plane at 45 degrees to the shaft axis.",
+      "label": "p11",
+      "factual": false,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The final failure analysis report concluded that the shaft failed by progressive fatigue rather than a single overload event.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "The shaft steel contained a subsurface inclusion near the keyway.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The shaft was installed out of alignment with the driven coupling.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The arbitration panel ruled that improper installation, not a manufacturing defect, caused the shaft fracture.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a3",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a12",
+      "target_id": "a14",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a4",
+      "target_id": "a6",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a3",
+      "target_id": "a5",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a9",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a4",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a13",
+      "position_distance": 2
+    }
+  ],
+  "response": "The first diagnostic question is binary. Either the shaft's fracture surface contains a fatigue crack initiation zone, or, as the preservation of the unabraded mating surfaces indicates, it contains no fatigue crack initiation zone; the two conditions cannot both be true, and one of them must hold. Low-magnification stereomicroscopy under oblique lighting is the usual means of making that determination, since it reveals the relief of the surface without altering it. An initiation zone, where one exists, causes the beach marks that radiate from it, so that beach marks on a fracture surface indicate progressive crack growth over multiple loading cycles. Those concentric arrest lines, which record changes in load amplitude or interruptions in operation, in turn confirm that fatigue striations on steel shafts are routinely visible to the naked eye. The analyst then maps the relative areas of the smooth propagation region and the rough final-fracture region, because their proportion reflects the nominal stress the shaft carried when it finally separated.\n\nDistinguishing progressive fatigue from a single overload event is fundamentally a problem of reading the fracture surface before the evidence it carries is degraded, and then relating the observed morphology to the loading history and the geometry of the component. A liability dispute sharpens that discipline, because each party's account predicts a different fracture signature, and the analyst's task is to determine which signature the metal actually records. The case at issue is concrete: the drive shaft fractured while in service at a paper mill.\n\nGeometry localizes the origin and connects it to design and assembly. The fatigue crack originated at the root of the keyway; that is, the crack initiation site was located at the bottom corner of the keyway, where a sharp radius concentrates both bending and torsional stresses. Overload morphology supplies the reference against which this origin is judged. Ductile torsional overload fractures in shafts typically occur on a plane at 45 degrees to the shaft axis, whereas the final failure analysis report concluded that the shaft failed by progressive fatigue rather than a single overload event. That conclusion rested on the combined weight of the fractographic features, the location of the origin at a stress concentration, and the comparatively small area of final fast fracture.\n\nResponsibility was contested from the outset. The maintenance contractor argued that the fracture was caused by a manufacturing defect in the shaft, whereas the manufacturer argued that the fracture was caused by improper installation of the shaft. Neither position can be settled by advocacy; each must be tested against physical evidence, and the value of that evidence depends entirely on how it is handled. Some time after that in-service fracture, failure analysts preserved the mating fracture surfaces without cleaning them with abrasives. Grit blasting, wire brushing, or fitting the two halves back together would have smeared the fine topography on which every subsequent inference rests, so protective coating, dry storage, and documented chain of custody were the first technical steps of the investigation.\n\nEstablishing the mechanism does not by itself allocate fault, because fatigue requires both a local stress raiser and a sustained cyclic driving stress, and the parties' accounts map onto those two requirements. Metallographic sectioning addresses the material, while dial-indicator or laser alignment surveys of the drive train address the assembly. At least one of the following held, perhaps both: the shaft steel contained a subsurface inclusion near the keyway, or the shaft was installed out of alignment with the driven coupling. Misalignment imposes a reversing bending moment on every revolution, which is precisely the cyclic loading that drives a crack forward from a keyway root, while an inclusion acts as a potential nucleation site that lowers the stress needed to start one. Despite that inclusion, the arbitration panel ruled that improper installation, not a manufacturing defect, caused the shaft fracture. In practice, therefore, the analyst's contribution is to fix the mechanism and its origin with defensible evidence, and to quantify each contributing condition, leaving the weighing of responsibility to the forum charged with deciding it.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f024-r1",
+      "item_name": "Mechanical Engineering -- shuffle_block",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f024",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 0,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7618658,
+        "consistency": 0.3685542147606384,
+        "reified": 0.06075,
+        "log_partition": 0.3609973318698787
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.85363,
+          "a10": 0.104299,
+          "a11": 0.901075,
+          "a12": 0.894916,
+          "a13": 0.929739,
+          "a14": 0.790621,
+          "a2": 0.795667,
+          "a3": 0.89894,
+          "a4": 0.705334,
+          "a5": 0.570877,
+          "a6": 0.912777,
+          "a7": 0.211562,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.5423593301298967,
+        "log_z": -7.272054,
+        "log_z_max": -2.907984,
+        "log_z_min": -9.737486
+      },
+      "elapsed_s": 0.132,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f024-r1",
+      "item_name": "Mechanical Engineering -- shuffle_block",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f024",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 0,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.1,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7524187333333334,
+        "consistency": 0.47627300000000006,
+        "reified": 0.160049,
+        "log_partition": 0.4085665361733309
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.85363,
+          "a10": 0.1,
+          "a11": 0.9,
+          "a12": 0.894916,
+          "a13": 0.929739,
+          "a14": 0.790621,
+          "a2": 0.795667,
+          "a3": 0.9,
+          "a4": 0.631579,
+          "a5": 0.631579,
+          "a6": 0.9,
+          "a7": 0.1,
+          "a8": 0.979275,
+          "a9": 0.979275
+        },
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.528476738484106,
+        "log_z": -4.292178,
+        "log_z_max": -0.650333,
+        "log_z_min": -6.807991
+      },
+      "elapsed_s": 0.127,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

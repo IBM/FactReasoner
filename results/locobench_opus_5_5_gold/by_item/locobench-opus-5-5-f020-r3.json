@@ -1,0 +1,824 @@
+{
+  "item_id": "locobench-opus-5-5-f020-r3",
+  "item_name": "Human Biology -- base",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f020",
+    "family": "ORDER",
+    "rung_index": 3,
+    "rung_name": "base",
+    "perturbation": {
+      "calls": [],
+      "parent_rung": null,
+      "targets": [],
+      "edge_effects": []
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Human Biology",
+    "domain": "Natural Sciences",
+    "framing": "How did researchers establish that most peptic ulcers result from Helicobacter pylori infection rather than from stress or excess stomach acid, overturning the long-accepted medical view?",
+    "split": "test",
+    "word_count": 619,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "J. Robin Warren was a pathologist at Royal Perth Hospital in Western Australia.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Warren observed curved bacteria in gastric biopsy specimens in 1979.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Warren noted that the curved bacteria were consistently associated with gastric inflammation.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "In the early 1980s, the prevailing medical view held that stress and excess acid caused peptic ulcers.",
+      "label": "p4",
+      "factual": true,
+      "role": "holding",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Psychological stress is the primary cause of most peptic ulcers.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Barry Marshall began collaborating with Warren in 1981.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Early attempts to culture the bacterium used incubation periods too short for colonies to appear.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "H. pylori grows slowly on standard laboratory culture media.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "The first successful culture came after plates were left incubating over the Easter long weekend.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Marshall drank the bacterial culture in 1990.",
+      "label": "p10",
+      "factual": false,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Marshall developed gastritis within days of ingesting the bacterial culture.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Marshall conducted his self-experiment with prior approval from a hospital ethics committee.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a12",
+      "text": "Marshall conducted his self-experiment without prior approval from a hospital ethics committee.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "Eradicating H. pylori with antibiotics sharply lowers peptic ulcer recurrence rates.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "Peptic ulcers recur far less often after H. pylori is eliminated by antibiotic therapy.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    },
+    {
+      "id": "a15",
+      "text": "The Nobel Assembly at Karolinska Institutet determined that H. pylori infection plays a causal role in peptic ulcer disease.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a1",
+      "target_id": "a5",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 4,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a3",
+      "target_id": "a2",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a6",
+      "target_id": "a8",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a15",
+      "target_id": "a14",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a3",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a9",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a12",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a14",
+      "position_distance": 3
+    }
+  ],
+  "response": "J. Robin Warren was a pathologist at Royal Perth Hospital in Western Australia. His work involved the routine examination of tissue removed during endoscopy. In that setting, unusual material on the stomach lining was ordinarily dismissed as contamination or artefact, because the acidic gastric environment was thought to be effectively sterile. In 1979, Warren observed curved bacteria in gastric biopsy specimens. Across a growing series of samples, he noted that the curved bacteria were consistently associated with gastric inflammation, a pattern too regular to dismiss as incidental. Even though that association recurred specimen after specimen, in the early 1980s the prevailing medical view held that stress and excess acid caused peptic ulcers. By contrast with that combined account of stress and acid, psychological stress is the primary cause of most peptic ulcers.\n\nBarry Marshall began collaborating with Warren in 1981, two years after those first observations of curved organisms in the biopsy material. The partnership set out to move from histological correlation to microbiological proof. That required isolating the organism and growing it in pure culture, but the culture work failed repeatedly. At least one of two obstacles explains those failures, perhaps both: early attempts to culture the bacterium used incubation periods too short for colonies to appear, or H. pylori grows slowly on standard laboratory culture media. By contrast with that sluggish growth on ordinary media, the first successful culture came after plates were left incubating over the Easter long weekend, and it came then because the earlier incubation periods had been too short. The accidental extension gave the colonies the time they needed. From that point, the organism could be characterized, typed and supplied for further experiments.\n\nIsolation alone could not establish causation, since an organism found in diseased tissue may simply colonize damage that has already occurred. To satisfy the logic of Koch's postulates, the investigators needed to show that the bacterium could produce disease in a previously healthy stomach. Marshall drank the bacterial culture in 1990, and that act caused him to develop gastritis within days of ingesting it. Subsequent endoscopy and biopsy documented the inflammation and recovered the organism, closing the inferential gap between presence and pathogenesis. The procedural circumstances of the experiment are recorded inconsistently. Either Marshall conducted his self-experiment with prior approval from a hospital ethics committee, or he conducted it without prior approval from a hospital ethics committee. The two cannot both be true, and one of them must hold.\n\nThe decisive clinical evidence came from treatment trials, which tested whether removing the organism changed the course of the disease. Eradicating H. pylori with antibiotics sharply lowers peptic ulcer recurrence rates. In other words, peptic ulcers recur far less often after H. pylori is eliminated by antibiotic therapy. This therapeutic result carried particular weight because acid suppression alone had produced healing followed by frequent relapse. That pattern fits an untreated infectious cause better than a purely chemical one. Gastroenterologists who had been sceptical of a single pathologist's microscopy found it harder to resist outcome data from controlled trials. Patient populations, dosing regimens and follow-up periods varied across those trials, yet the difference in relapse persisted.\n\nThe Nobel Assembly at Karolinska Institutet determined that H. pylori infection plays a causal role in peptic ulcer disease. That verdict settled the long-standing tension between Warren's consistent histological association and the stress-and-acid orthodoxy, which had resisted it for years, and it led to the reduced recurrence that followed eradication. The path to the overturned view therefore ran through careful microscopy, a fortunate extension of culture time, deliberate self-infection and therapeutic trials. Each step supplied a different form of evidence, and together they amounted to a causal argument that clinical medicine could no longer set aside.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f020-r3",
+      "item_name": "Human Biology -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f020",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7898808125,
+        "consistency": 0.37021395412234037,
+        "reified": 0.203482,
+        "log_partition": 0.38961297948420737
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.907651,
+          "a11": 0.631579,
+          "a12": 0.631579,
+          "a13": 0.977959,
+          "a14": 0.976963,
+          "a15": 0.894541,
+          "a2": 0.929337,
+          "a3": 0.913974,
+          "a4": 0.104439,
+          "a5": 0.9,
+          "a6": 0.947002,
+          "a7": 0.93249,
+          "a8": 0.959976,
+          "a9": 0.130603
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.45490991361911803,
+        "log_z": -5.829153,
+        "log_z_max": -2.465326,
+        "log_z_min": -7.9763
+      },
+      "elapsed_s": 0.13,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f020-r3",
+      "item_name": "Human Biology -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f020",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.1,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.787205,
+        "consistency": 0.5076832042801556,
+        "reified": 0.321851,
+        "log_partition": 0.5091337895255831
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.9,
+          "a11": 0.631579,
+          "a12": 0.631579,
+          "a13": 0.979275,
+          "a14": 0.979275,
+          "a15": 0.9,
+          "a2": 0.929307,
+          "a3": 0.913025,
+          "a4": 0.1,
+          "a5": 0.9,
+          "a6": 0.946719,
+          "a7": 0.929062,
+          "a8": 0.955459,
+          "a9": 0.1
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4499987578768485,
+        "log_z": -3.09248,
+        "log_z_max": -1.060476,
+        "log_z_min": -5.200105
+      },
+      "elapsed_s": 0.135,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

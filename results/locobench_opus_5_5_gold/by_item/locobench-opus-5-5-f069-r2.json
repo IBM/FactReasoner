@@ -1,0 +1,847 @@
+{
+  "item_id": "locobench-opus-5-5-f069-r2",
+  "item_name": "Renewable Energy Technologies -- shuffle_adjacent",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f069",
+    "family": "ORDER",
+    "rung_index": 2,
+    "rung_name": "shuffle_adjacent",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "adjacent"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "adjacent",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Renewable Energy Technologies",
+    "domain": "Engineering & Technology",
+    "framing": "How do forensic engineers determine whether premature power loss at a utility-scale solar farm stems from a manufacturing defect in the photovoltaic modules or from faulty installation by the contractor when the module supplier disputes the owner's warranty claim?",
+    "split": "test",
+    "word_count": 643,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Lumora PV supplied the crystalline silicon modules for the SunHarbor solar farm.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Ridgeline Construction manufactured the racking system used at the farm.",
+      "label": "p2",
+      "factual": false,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The SunHarbor solar farm was commissioned in 2019.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The SunHarbor solar farm began commercial operation in 2019.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The farm's energy output fell about 12 percent below its modeled yield within three years of operation.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The power loss was confined to a single inverter block.",
+      "label": "p6",
+      "factual": false,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The owner filed a warranty claim with Lumora PV for the underperforming modules.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Lumora PV denied the warranty claim and attributed the power loss to installation damage by the contractor.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Electroluminescence imaging revealed microcracks in cells of the sampled modules.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "Laboratory testing detected potential-induced degradation in modules from two specific production lots.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The encapsulant used in the affected production lots had a substandard formulation.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The array's grounding configuration exposed the modules to a high negative voltage relative to earth.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "The degradation pattern correlated with module serial numbers and not with installation crew assignments.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "No modules were replaced during the forensic investigation.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "Lumora PV replaced some of the affected modules during the forensic investigation.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a15",
+      "text": "The arbitration tribunal held that the power loss stemmed from a manufacturing defect in the Lumora PV modules.",
+      "label": "p16",
+      "factual": true,
+      "role": "holding",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a12",
+      "target_id": "a15",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a0",
+      "target_id": "a2",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a2",
+      "target_id": "a5",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a10",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a14",
+      "position_distance": 2
+    }
+  ],
+  "response": "When a module supplier rejects a warranty claim and blames the installer, forensic engineers begin by fixing the chain of custody for every component, because responsibility can only be allocated once it is clear who made, supplied, and mounted each part of the array. At the SunHarbor project, Lumora PV supplied the crystalline silicon modules for the SunHarbor solar farm, whereas Ridgeline Construction manufactured the racking system used at the farm. That module supply predates the commissioning of the SunHarbor solar farm in 2019; in other words, the facility began commercial operation in 2019. The commissioning date is the reference point for the warranty clock and for every later degradation measurement, so it has to be documented before any performance data are interpreted.\n\nThe second step is to describe the shortfall precisely enough that competing explanations make different predictions about it. The farm's energy output fell about 12 percent below its modeled yield within three years of operation; by contrast, the power loss was confined to a single inverter block. On the basis of the measured deficit, the owner filed a warranty claim with Lumora PV for the underperforming modules. This spatial footprint matters because installation damage and manufacturing defects tend to leave distinct signatures across an array. Lumora PV denied the warranty claim and attributed the power loss to installation damage by the contractor, which moved the burden onto the investigators to test that attribution against physical evidence drawn from the field.\n\nField and laboratory diagnostics supply that evidence, and they do not always point in a single direction. Electroluminescence imaging revealed microcracks in cells of the sampled modules, a finding that on its face supports the supplier's position, since rough handling, overtightened clamps, or foot traffic during installation commonly produce such fractures. Although those microcracks were present, laboratory testing detected potential-induced degradation in modules from two specific production lots, a failure mode rooted in the electrochemistry of the module stack rather than in mechanical abuse. That degradation caused the encapsulant used in the affected production lots to have a substandard formulation. Investigators therefore trace the material bill for each lot, compare encapsulant samples against the qualification specimens, and record leakage-current behavior under controlled bias and humidity.\n\nSystem-level conditions must then be weighed alongside the material findings, because potential-induced degradation requires both a susceptible module and an electrical stress. At least one of two conditions drove the failure, perhaps both: the encapsulant flaw already identified, or the fact that the array's grounding configuration exposed the modules to a high negative voltage relative to earth. That grounding exposure indicates that the degradation pattern correlated with module serial numbers and not with installation crew assignments. Engineers establish such a correlation by mapping every tested module's serial number, production lot, string position, and installation date against the crew logs kept by the contractor, then testing statistically whether damage clusters by manufacturing origin or by the people who mounted the hardware.\n\nThe final evidentiary question concerns the integrity of the sample population, since any substitution of hardware mid-investigation alters what the remaining array can prove. The project records admit only one reading here: either no modules were replaced during the forensic investigation, or Lumora PV replaced some of the affected modules during the forensic investigation, and the two cannot both be true. Investigators resolve this point through delivery manifests, serial audits, and site access logs before presenting conclusions. As the serial-number correlation indicates, the arbitration tribunal held that the power loss stemmed from a manufacturing defect in the Lumora PV modules, a ruling that settles the apparent conflict between the mechanical microcracking and the electrochemical degradation by treating the latter as the controlling cause of the deficit. The general method, then, is to anchor the timeline, characterize the loss, gather mechanical and electrochemical diagnostics, and test whether the damage follows the factory or the field crew.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f069-r2",
+      "item_name": "Renewable Energy Technologies -- shuffle_adjacent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f069",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7911395625,
+        "consistency": 0.4878687992021277,
+        "reified": 0.2877,
+        "log_partition": 0.37342538783553053
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.895485,
+          "a1": 0.110159,
+          "a10": 0.969085,
+          "a11": 0.925237,
+          "a12": 0.915849,
+          "a13": 0.631579,
+          "a14": 0.631579,
+          "a15": 0.95365,
+          "a2": 0.979275,
+          "a3": 0.979275,
+          "a4": 0.895485,
+          "a5": 0.110159,
+          "a6": 0.9,
+          "a7": 0.9,
+          "a8": 0.913738,
+          "a9": 0.947678
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.44279670819061734,
+        "log_z": -5.708709,
+        "log_z_max": -2.210318,
+        "log_z_min": -7.793677
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f069-r2",
+      "item_name": "Renewable Energy Technologies -- shuffle_adjacent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f069",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.1,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7875505625,
+        "consistency": 0.5046404338521401,
+        "reified": 0.321856,
+        "log_partition": 0.5082073822512984
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.1,
+          "a10": 0.92929,
+          "a11": 0.92929,
+          "a12": 0.924058,
+          "a13": 0.631579,
+          "a14": 0.631579,
+          "a15": 0.954131,
+          "a2": 0.979275,
+          "a3": 0.979275,
+          "a4": 0.9,
+          "a5": 0.1,
+          "a6": 0.9,
+          "a7": 0.9,
+          "a8": 0.913025,
+          "a9": 0.929307
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4495057509181911,
+        "log_z": -3.100279,
+        "log_z_max": -1.068276,
+        "log_z_min": -5.200105
+      },
+      "elapsed_s": 0.13,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

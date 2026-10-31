@@ -1,0 +1,871 @@
+{
+  "item_id": "locobench-opus-5-5-f072-r4",
+  "item_name": "Zoology -- ordering_only",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f072",
+    "family": "ORDER",
+    "rung_index": 4,
+    "rung_name": "ordering_only",
+    "perturbation": {
+      "calls": [
+        "ordering_only"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "r007"
+      ],
+      "edge_effects": [
+        {
+          "call": "ordering_only",
+          "target": "r007",
+          "effect": "reordered",
+          "detail": "Precedence -> Succession"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Zoology",
+    "domain": "Natural Sciences",
+    "framing": "How did zoologists weigh the competing hypotheses for the function of zebra stripes, such as predator confusion, thermoregulation, social signaling, and biting-fly deterrence, to reach the current scientific consensus?",
+    "split": "test",
+    "word_count": 643,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Zebra stripes have been the subject of competing functional hypotheses since the nineteenth century.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The predator-confusion hypothesis proposes that stripes make it harder for lions and hyenas to single out an individual zebra.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Lions can resolve individual zebra stripes at distances of about 200 meters in daylight.",
+      "label": "p3",
+      "factual": false,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The 2016 Melin visual-acuity study determined that stripes are unlikely to function in confusing predators.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Larison and colleagues reported in 2015 that temperature was a strong predictor of stripe variation in plains zebras.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "An experiment with striped and plain water-filled barrels found no meaningful cooling advantage for the striped barrels.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Tim Caro and colleagues compared stripe patterns across equid species and subspecies against geographic environmental variables.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Caro's 2014 comparative study of zebra stripes was published in the journal Science.",
+      "label": "p8",
+      "factual": false,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Caro's comparative analysis concluded that biting-fly avoidance explained stripe distribution better than thermoregulation, predator confusion, or social signaling.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "A 2019 field experiment compared horsefly behavior around zebras and domestic horses on a British livery farm.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "Horseflies landed on zebras less often than on uniformly coated horses.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "Uniformly coated horses received more horsefly landings than zebras did.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Stripes disrupt the optic-flow cues horseflies use when approaching a landing surface.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "Stripes disrupt the polarized-light reflections horseflies use to locate hosts.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "Zebras are fundamentally white animals with black stripes.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a15",
+      "text": "Zebras are fundamentally black animals with white stripes.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a14",
+      "target_id": "a15",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a8",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a1",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a9",
+      "target_id": "a7",
+      "level2_sense": "Succession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5",
+        "perturbed_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a0",
+      "target_id": "a2",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a1",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a6",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a14",
+      "position_distance": 2
+    }
+  ],
+  "response": "Zebra stripes have been the subject of competing functional hypotheses since the nineteenth century, when Darwin and Wallace first disagreed over whether such conspicuous coloration could be explained by natural selection at all. For most of the following century the question remained open, because the candidate explanations were advanced largely on the basis of plausibility rather than measurement. Progress came only when zoologists began to treat each proposal as a testable claim about sensory systems, physiology, or geographic distribution, and to ask which one survived contact with data.\n\nThe predator-confusion hypothesis proposes that stripes make it harder for lions and hyenas to single out an individual zebra, particularly when a herd flees and the patterns of many bodies merge into a shifting visual field. The long life of the broader controversy is confirmed by the visual measurements eventually brought to bear on it: lions can resolve individual zebra stripes at distances of about 200 meters in daylight. By contrast with both the confusion proposal and that daylight resolving distance, the 2016 Melin visual-acuity study determined that stripes are unlikely to function in confusing predators. Its modelling of carnivore vision indicated that by the time a predator is close enough to see stripes clearly, it can already detect the zebra by outline, sound, and smell. That result largely removed confusion from serious contention.\n\nThermoregulation proved harder to dismiss. Although Larison and colleagues reported in 2015 that temperature was a strong predictor of stripe variation in plains zebras, an experiment with striped and plain water-filled barrels found no meaningful cooling advantage for the striped barrels. The correlation suggested a climatic link; the physical test suggested that stripes do not themselves cool the body. The two findings could coexist only if temperature tracked some other ecological factor that stripes actually address.\n\nA broader comparative framework was needed to identify that factor. Tim Caro and colleagues compared stripe patterns across equid species and subspecies against geographic environmental variables, mapping where stripes are bold, faint, or absent and asking which environmental conditions best predicted those patterns. Caro's 2014 comparative study of zebra stripes was published in the journal Science, and its analysis concluded that biting-fly avoidance explained stripe distribution better than thermoregulation, predator confusion, or social signaling. That conclusion settles the tension in the thermal evidence: warm regions are also regions of intense tabanid activity, so temperature predicts striping because it predicts flies, not because stripes cool the animal. Social signaling fared no better, since equids recognize one another readily by voice and scent and stripe variation did not track social structure. A 2019 field experiment that compared horsefly behavior around zebras and domestic horses on a British livery farm came five years after the Science publication.\n\nThat experiment indicates that horseflies landed on zebras less often than on uniformly coated horses. In other words, uniformly coated horses received more horsefly landings than zebras did, and that disparity in landings is what causes stripes to disrupt the optic-flow cues horseflies use when approaching a landing surface. Video tracking showed flies approaching zebras at normal speed but failing to decelerate, then overshooting or bumping off the coat. At least one of two mechanisms operates here, perhaps both: that optic-flow disruption, or a disruption of the polarized-light reflections horseflies use to locate hosts, since dark, uniform surfaces reflect horizontally polarized light that tabanids find attractive.\n\nThe current consensus therefore treats fly deterrence as the leading explanation, with predator confusion and thermoregulation relegated to secondary roles at most. Developmental questions remain, including the classic puzzle of coat ground color: either zebras are fundamentally white animals with black stripes, or they are fundamentally black animals with white stripes, and the two descriptions cannot both be correct. Embryological evidence on melanocyte distribution bears on that question, but it does not alter the functional verdict that comparative and experimental work has now converged upon.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f072-r4",
+      "item_name": "Zoology -- ordering_only",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f072",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a8",
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.78038825,
+        "consistency": 0.4270233385876419,
+        "reified": 0.1286,
+        "log_partition": 0.3735035302649187
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.90411,
+          "a1": 0.853464,
+          "a10": 0.997629,
+          "a11": 0.992337,
+          "a12": 0.970938,
+          "a13": 0.928746,
+          "a14": 0.631579,
+          "a15": 0.631579,
+          "a2": 0.093599,
+          "a3": 0.797431,
+          "a4": 0.913025,
+          "a5": 0.929307,
+          "a6": 0.9,
+          "a7": 0.1,
+          "a8": 0.9,
+          "a9": 0.942468
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.45623794715692984,
+        "log_z": -5.615934,
+        "log_z_max": -1.819881,
+        "log_z_min": -7.879058
+      },
+      "elapsed_s": 0.128,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f072-r4",
+      "item_name": "Zoology -- ordering_only",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f072",
+      "family": "ORDER",
+      "rung_index": 4,
+      "rung_name": "ordering_only",
+      "perturbation": {
+        "calls": [
+          "ordering_only"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "r007"
+        ],
+        "edge_effects": [
+          {
+            "call": "ordering_only",
+            "target": "r007",
+            "effect": "reordered",
+            "detail": "Precedence -> Succession"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.1,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.1,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a8",
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7776459375,
+        "consistency": 0.468239,
+        "reified": 0.204005,
+        "log_partition": 0.4278728083949569
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.85363,
+          "a10": 0.99719,
+          "a11": 0.989472,
+          "a12": 0.92929,
+          "a13": 0.92929,
+          "a14": 0.631579,
+          "a15": 0.631579,
+          "a2": 0.1,
+          "a3": 0.795667,
+          "a4": 0.913025,
+          "a5": 0.929307,
+          "a6": 0.9,
+          "a7": 0.1,
+          "a8": 0.9,
+          "a9": 0.942306
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.4710852097381526,
+        "log_z": -3.899577,
+        "log_z_max": -0.793459,
+        "log_z_min": -6.222528
+      },
+      "elapsed_s": 0.13,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

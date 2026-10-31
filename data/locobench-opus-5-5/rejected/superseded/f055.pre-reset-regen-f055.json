@@ -1,0 +1,375 @@
+{
+  "family_id": "f055",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.chain_links",
+      "passed": true,
+      "threshold": ">= 3 valid entailment relations",
+      "observed": 3,
+      "detail": ""
+    },
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Condition",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          5,
+          13,
+          8
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(5, 13, 8)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            4,
+            5
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            5,
+            13
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            14,
+            12
+          ],
+          [
+            13,
+            14
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            2,
+            3,
+            "Precedence"
+          ],
+          [
+            4,
+            5,
+            "Condition"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            8,
+            "Evidence"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            5,
+            13,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Contrast"
+          ],
+          [
+            14,
+            12,
+            "Cause-Effect"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            4,
+            5,
+            "Condition"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            6,
+            8,
+            "Evidence"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            15,
+            16,
+            "Restatement"
+          ],
+          [
+            5,
+            13,
+            "Concession"
+          ],
+          [
+            2,
+            3,
+            "Precedence"
+          ],
+          [
+            14,
+            12,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            14,
+            "Contrast"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 3,
+            "recovered_as_planned": 3
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 3, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gemini-3.1-pro",
+        "rates": {
+          "gpt-5.6-terra": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gemini-3.1-pro of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-5.6-terra": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-5.6-terra": 2,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 6
+        },
+        "spans": {
+          "gpt-5.6-terra": [
+            "Anastasia was the eldest daughter of Tsar Nicholas II years before Anna Anderson claimed to be Grand Duchess Anastasia, ",
+            "Either Anderson's mitochondrial DNA matched that of Prince Philip, or Anderson's mitochondrial DNA did not match that of"
+          ],
+          "gemini-3.1-pro": [
+            "Anastasia was the eldest daughter of Tsar Nicholas II years before Anna Anderson claimed to be Grand Duchess Anastasia",
+            "Either Anderson's mitochondrial DNA matched that of Prince Philip, or Anderson's mitochondrial DNA did not match that of",
+            "Anna Anderson's body was cremated after her death; that is, her remains were reduced to ashes following her death"
+          ],
+          "claude-sonnet-5-5": [
+            "Anastasia was the eldest daughter of Tsar Nicholas II years before Anna Anderson claimed to be Grand Duchess Anastasia",
+            "Karl Maucher was a grandnephew of Franziska Schanzkowska",
+            "Either Anderson's mitochondrial DNA matched that of Prince Philip, or Anderson's mitochondrial DNA did not match that of",
+            "Although Gill's leadership of the work is well documented, the 1994 DNA analysis of Anderson's tissue was conducted by t",
+            "That report settles the question of where the analysis was done, because its findings were issued under the Service's ow"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

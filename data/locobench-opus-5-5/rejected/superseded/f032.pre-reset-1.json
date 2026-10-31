@@ -1,0 +1,400 @@
+{
+  "family_id": "f032",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            8,
+            9
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            9,
+            7
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            3,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            3,
+            "Precedence"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Restatement"
+          ],
+          [
+            8,
+            9,
+            "Precedence"
+          ],
+          [
+            9,
+            7,
+            "Concession"
+          ],
+          [
+            10,
+            11,
+            "Alternative"
+          ],
+          [
+            11,
+            9,
+            "Evidence"
+          ],
+          [
+            12,
+            13,
+            "Disjunction"
+          ],
+          [
+            13,
+            14,
+            "Contrast"
+          ],
+          [
+            15,
+            7,
+            "Evidence"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            8,
+            9,
+            "Precedence"
+          ],
+          [
+            6,
+            7,
+            "Restatement"
+          ],
+          [
+            10,
+            11,
+            "Alternative"
+          ],
+          [
+            12,
+            13,
+            "Disjunction"
+          ],
+          [
+            5,
+            6,
+            "Evidence"
+          ],
+          [
+            9,
+            7,
+            "Concession"
+          ],
+          [
+            3,
+            4,
+            "Contrast"
+          ],
+          [
+            13,
+            14,
+            "Contrast"
+          ],
+          [
+            11,
+            9,
+            "Evidence"
+          ],
+          [
+            1,
+            3,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 1, 'spurious': 2, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            0.833,
+            0.833
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 2
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 2
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 2}, 'gemini-3.1-pro': {'fluency': 3, 'organization': 2}, 'claude-sonnet-5-5': {'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": false,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "leakage": 1
+          },
+          "gemini-3.1-pro": {
+            "leakage": 1
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 3,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 1,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 1,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 1,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "gpt-6-sol": {
+            "leakage": [
+              "two further claims"
+            ]
+          },
+          "gemini-3.1-pro": {
+            "leakage": [
+              "Even so, two further claims govern what the radiocarbon figure actually measured"
+            ]
+          },
+          "claude-sonnet-5-5": {
+            "leakage": [
+              "two further claims govern what the radiocarbon figure actually measured"
+            ]
+          }
+        }
+      },
+      "detail": "a majority flagged {'leakage': '3/3'}: {'gpt-6-sol': {'leakage': 1}, 'gemini-3.1-pro': {'leakage': 1}, 'claude-sonnet-5-5': {'leakage': 1}}"
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 4,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "That 1988 campaign is the reason three laboratories performed the radiocarbon tests on the shroud, each working independ",
+            "That unrepresentative character of the sample, if it is the case, is precisely what confirms the Rogers paper's repaired",
+            "Even so, two further claims govern what the radiocarbon figure actually measured, and at least one of them holds, perhap",
+            "Whereas that repaired corner is the focus of the reweaving debate, the 1988 tests dated the shroud to between AD 1000 an"
+          ],
+          "gemini-3.1-pro": [
+            "That 1988 campaign is the reason three laboratories performed the radiocarbon tests on the shroud, each working independ",
+            "That interval indicates that the 1988 radiocarbon results placed the origin of the shroud's linen in the Middle Ages; in",
+            "Either the sample used in the 1988 dating was representative of the main cloth of the shroud, or it was not representati",
+            "Even so, two further claims govern what the radiocarbon figure actually measured, and at least one of them holds, perhap"
+          ],
+          "claude-sonnet-5-5": [
+            "That 1988 campaign is the reason three laboratories performed the radiocarbon tests on the shroud, each working independ",
+            "By contrast, four laboratories performed the 1988 radiocarbon tests on the shroud, a larger consortium that spread the m",
+            "in other words, the 1988 tests dated the cloth of the shroud to the medieval period",
+            "That unrepresentative character of the sample, if it is the case, is precisely what confirms the Rogers paper's repaired",
+            "Whereas that repaired corner is the focus of the reweaving debate, the 1988 tests dated the shroud to between AD 1000 an"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 2}, 'gemini-3.1-pro': {'fluency': 3, 'organization': 2}, 'claude-sonnet-5-5': {'organization': 3}}; V3.spans: a majority flagged {'leakage': '3/3'}: {'gpt-6-sol': {'leakage': 1}, 'gemini-3.1-pro': {'leakage': 1}, 'claude-sonnet-5-5': {'leakage': 1}}"
+}

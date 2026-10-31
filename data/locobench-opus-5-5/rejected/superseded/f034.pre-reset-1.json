@@ -1,0 +1,388 @@
+{
+  "family_id": "f034",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [
+        [
+          13,
+          8,
+          5
+        ]
+      ],
+      "detail": "1 edge(s) beyond the window; recoverability is decided at build time by the real candidate selector, not here: [(13, 8, 5)]"
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            3,
+            4
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            13,
+            8
+          ],
+          [
+            14,
+            13
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            4,
+            2
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Precedence"
+          ],
+          [
+            2,
+            4,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            9,
+            "Precedence"
+          ],
+          [
+            3,
+            4,
+            "Alternative"
+          ],
+          [
+            4,
+            2,
+            "Cause-Effect"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            7,
+            8,
+            "Disjunction"
+          ],
+          [
+            9,
+            10,
+            "Contrast"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            11,
+            13,
+            "Cause-Effect"
+          ],
+          [
+            13,
+            8,
+            "Evidence"
+          ],
+          [
+            14,
+            2,
+            "Precedence"
+          ],
+          [
+            14,
+            13,
+            "Concession"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            3,
+            4,
+            "Alternative"
+          ],
+          [
+            7,
+            8,
+            "Disjunction"
+          ],
+          [
+            11,
+            12,
+            "Restatement"
+          ],
+          [
+            5,
+            6,
+            "Contrast"
+          ],
+          [
+            1,
+            2,
+            "Precedence"
+          ],
+          [
+            13,
+            8,
+            "Evidence"
+          ],
+          [
+            14,
+            13,
+            "Concession"
+          ],
+          [
+            9,
+            10,
+            "Contrast"
+          ],
+          [
+            11,
+            13,
+            "Cause-Effect"
+          ],
+          [
+            4,
+            2,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 2, 'spurious': 1, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            0.833,
+            0.833
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 4,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "In this case that fatal outcome is what brought about the strike inside the cell, and the inquiry was therefore conducte",
+            "Investigators downloaded the robot controller's event logs after the injury; by contrast, the controller event logs had ",
+            "The robot controller was running firmware version 4.2 at the time of the injury; that is, version 4.2 of the firmware wa",
+            "Because the controller was running that release, investigators found a jumper wire attached across the interlock switch "
+          ],
+          "gemini-3.1-pro": [
+            "Investigators downloaded the robot controller's event logs after the injury; by contrast, the controller event logs had ",
+            "The robot controller was running firmware version 4.2 at the time of the injury; that is, version 4.2 of the firmware wa",
+            "Because the controller was running that release, investigators found a jumper wire attached across the interlock switch "
+          ],
+          "claude-sonnet-5-5": [
+            "RoboDyne manufactured the industrial robot arm involved in the injury long before the shift on which the worker was stru",
+            "In this case that fatal outcome is what brought about the strike inside the cell, and the inquiry was therefore conducte",
+            "Investigators downloaded the robot controller's event logs after the injury; by contrast, the controller event logs had ",
+            "The robot controller was running firmware version 4.2 at the time of the injury; that is, version 4.2 of the firmware wa",
+            "Because the controller was running that release, investigators found a jumper wire attached across the interlock switch "
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+}

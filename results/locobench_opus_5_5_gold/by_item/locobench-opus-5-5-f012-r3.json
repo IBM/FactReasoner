@@ -1,0 +1,825 @@
+{
+  "item_id": "locobench-opus-5-5-f012-r3",
+  "item_name": "Cybersecurity -- base",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f012",
+    "family": "ORDER",
+    "rung_index": 3,
+    "rung_name": "base",
+    "perturbation": {
+      "calls": [],
+      "parent_rung": null,
+      "targets": [],
+      "edge_effects": []
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Cybersecurity",
+    "domain": "Engineering & Technology",
+    "framing": "How do forensic investigators decide whether a corporate data breach was carried out by a malicious insider or by an external intruder using stolen credentials, when the initial access logs appear consistent with either explanation?",
+    "split": "test",
+    "word_count": 664,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Meridian Logistics suffered a breach of its customer database.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Roughly 2.3 million customer records were exfiltrated in the breach.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "The attacker logged in with the database administrator's credentials.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "The database administrator's username and password were used to gain access to the system.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Multi-factor authentication was enforced on the compromised administrator account.",
+      "label": "p5",
+      "factual": false,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The administrator who owned the account had resigned two weeks before the breach.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The company initially suspected the departing administrator of the theft.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Badge records showed the administrator was not in the building at the time of the login.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Keystroke timing in the session differed from the administrator's historical typing patterns.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The administrator's password was harvested by malware on a compromised workstation.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The administrator's password was reused on an external website that suffered a breach.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The exfiltrated records were encrypted by the attacker before transfer.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a12",
+      "text": "The exfiltrated records were transferred in unencrypted form.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a13",
+      "text": "The exfiltration took place continuously over a period of eight months.",
+      "label": "p14",
+      "factual": false,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The incident review board concluded that the breach was carried out by an external intruder using stolen credentials.",
+      "label": "p15",
+      "factual": true,
+      "role": "holding",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Instantiation",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a8",
+      "target_id": "a10",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 2,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 1,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a14",
+      "target_id": "a10",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_direction",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "position_distance": 4,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a1",
+      "target_id": "a4",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a7",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a9",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a14",
+      "position_distance": 3
+    }
+  ],
+  "response": "When access logs fit both an insider and an outsider holding stolen credentials, investigators stop asking whose account was used and ask who was operating it. That shift moves the analysis from authentication records to physical, behavioural and procedural evidence that a credential cannot carry with it. A recent incident shows the method. Meridian Logistics suffered a breach of its customer database; specifically, roughly 2.3 million customer records were exfiltrated. The access trail pointed to a single privileged identity: the attacker logged in with the database administrator's credentials. In other words, the database administrator's username and password were used to gain access to the system. By contrast, multi-factor authentication was enforced on the compromised administrator account. That control shaped the initial reading of the logs, because a valid second factor seemed to point toward someone holding the administrator's physical token.\n\nPersonnel history then drew attention to one person. The administrator who owned the account had resigned two weeks before the breach, and because of that recent departure the company initially suspected the departing administrator of the theft. Departing staff with privileged access are a well-documented insider-risk category. Resentment, pending employment with a competitor, and knowledge of internal controls all make the window around a resignation a period of heightened exposure. Investigators therefore treated the suspicion as a hypothesis to be tested rather than a conclusion. Although the company held that suspicion, badge records showed the administrator was not in the building at the time of the login. Physical access data cannot by itself rule out remote activity. It does remove the simplest version of the insider scenario, in which a disgruntled employee works from a familiar terminal on the premises.\n\nBehavioural biometrics supplied the next layer of evidence. Keystroke timing in the session differed from the administrator's historical typing patterns. Dwell times, inter-key intervals and the rhythm of habitual command sequences form a profile that is hard to imitate and does not travel with a stolen password. With the operator's identity in doubt, the question became how the secret had left the administrator's control. Two leakage routes were identified, and at least one of them holds, perhaps both. The administrator's password was harvested by malware on a compromised workstation, or the administrator's password was reused on an external website that suffered a breach. Whereas the keystroke anomaly concerns who was typing during the session, that external reuse concerns how the credential entered circulation beyond Meridian's perimeter.\n\nAnalysis of the exfiltration path addressed a separate technical question: what the stolen data looked like in transit. Network captures and endpoint artefacts support two incompatible readings, and exactly one of them must be true. Either the exfiltrated records were encrypted by the attacker before transfer, or the exfiltrated records were transferred in unencrypted form. Resolving this matters for regulatory notification, since cleartext transfer exposes the records to any party positioned on the route. It also matters for attribution, because staging and encryption reflect an operator's tooling and habits. The forensic timeline places the unencrypted transfer first. It preceded the exfiltration, which took place continuously over a period of eight months. That sequence is recorded here purely as chronology, reconstructed from flow logs and storage timestamps.\n\nThe individual strands combined into a single finding. The incident review board concluded that the breach was carried out by an external intruder using stolen credentials. That determination settles the tension between the company's early suspicion of its former administrator and the badge evidence placing him elsewhere: the insider hypothesis is set aside, and the badge records are explained rather than overridden. The board's conclusion also confirms the password reuse on the breached external website as a route by which the credential reached the intruder. The general lesson for investigators is methodological. When authentication logs cannot tell an insider from an outsider, the decision rests on converging independent evidence: physical presence, behavioural signatures, credential provenance and exfiltration mechanics. Each of these is weighed on its own terms before any attribution is made.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f012-r3",
+      "item_name": "Cybersecurity -- base",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f012",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7931873333333334,
+        "consistency": 0.445680128113879,
+        "reified": 0.195875,
+        "log_partition": 0.3460645305026136
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.924058,
+          "a1": 0.954131,
+          "a10": 0.9713,
+          "a11": 0.631579,
+          "a12": 0.631579,
+          "a13": 0.1,
+          "a14": 0.925671,
+          "a2": 0.978693,
+          "a3": 0.978252,
+          "a4": 0.111098,
+          "a5": 0.938723,
+          "a6": 0.987476,
+          "a7": 0.931697,
+          "a8": 0.904812,
+          "a9": 0.928741
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4006861057368549,
+        "log_z": -5.089262,
+        "log_z_max": -1.684426,
+        "log_z_min": -6.891111
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f012-r3",
+      "item_name": "Cybersecurity -- base",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f012",
+      "family": "ORDER",
+      "rung_index": 3,
+      "rung_name": "base",
+      "perturbation": {
+        "calls": [],
+        "parent_rung": null,
+        "targets": [],
+        "edge_effects": []
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7877582000000001,
+        "consistency": 0.4793672324749642,
+        "reified": 0.310429,
+        "log_partition": 0.48062685293688806
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.924058,
+          "a1": 0.954131,
+          "a10": 0.92929,
+          "a11": 0.631579,
+          "a12": 0.631579,
+          "a13": 0.1,
+          "a14": 0.9,
+          "a2": 0.979275,
+          "a3": 0.979275,
+          "a4": 0.1,
+          "a5": 0.938723,
+          "a6": 0.987476,
+          "a7": 0.931697,
+          "a8": 0.9,
+          "a9": 0.92929
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.41656352716649775,
+        "log_z": -3.303664,
+        "log_z_max": -1.283947,
+        "log_z_min": -5.172706
+      },
+      "elapsed_s": 0.129,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    }
+  ]
+}

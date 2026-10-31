@@ -1,0 +1,390 @@
+{
+  "family_id": "f085",
+  "stage": "perturb",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            3,
+            4
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            7
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            10,
+            12
+          ],
+          [
+            9,
+            8
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            3,
+            4,
+            "Disjunction"
+          ],
+          [
+            5,
+            3,
+            "Evidence"
+          ],
+          [
+            4,
+            7,
+            "Concession"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            9,
+            4,
+            "Instantiation"
+          ],
+          [
+            9,
+            8,
+            "Cause-Effect"
+          ],
+          [
+            10,
+            12,
+            "Evidence"
+          ],
+          [
+            13,
+            14,
+            "Precedence"
+          ],
+          [
+            14,
+            15,
+            "Restatement"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            3,
+            4,
+            "Disjunction"
+          ],
+          [
+            7,
+            8,
+            "Alternative"
+          ],
+          [
+            14,
+            15,
+            "Restatement"
+          ],
+          [
+            5,
+            3,
+            "Evidence"
+          ],
+          [
+            4,
+            7,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Precedence"
+          ],
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            12,
+            13,
+            "Contrast"
+          ],
+          [
+            10,
+            12,
+            "Evidence"
+          ],
+          [
+            9,
+            8,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_sense': 1, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 5,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 1,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 2,
+          "gemini-3.1-pro": 4,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "By contrast, the Federal Reserve began raising the federal funds rate in March 2022, which came well before it raised th",
+            "In other words, in July 2023 the FOMC set its policy rate target at between 5\u00bc and 5\u00bd percent."
+          ],
+          "gemini-3.1-pro": [
+            "By contrast, a second figure places the peak higher, holding that US CPI inflation peaked at 11.2 percent year-over-year",
+            "At least one of two mechanisms was at work, perhaps both: pandemic-era supply disruptions raised US consumer prices duri",
+            "The alternative reading is that the decomposition attributed a share of mid-2022 PCE inflation to demand factors at leas",
+            "In other words, in July 2023 the FOMC set its policy rate target at between 5\u00bc and 5\u00bd percent."
+          ],
+          "claude-sonnet-5-5": [
+            "In other words, in July 2023 the FOMC set its policy rate target at between 5\u00bc and 5\u00bd percent.",
+            "Bernanke and Blanchard published their decomposition of the inflation surge in 2019.",
+            "By contrast, the Federal Reserve began raising the federal funds rate in March 2022, which came well before it raised th",
+            "The alternative reading is that the decomposition attributed a share of mid-2022 PCE inflation to demand factors at leas",
+            "pandemic-era supply disruptions raised US consumer prices during 2021\u20132022, and excess demand from fiscal and monetary s"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": true,
+      "threshold": "<= 15%",
+      "observed": "1.6%",
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": false,
+      "threshold": "response differs from parent",
+      "observed": "identical",
+      "detail": "add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text"
+    },
+    {
+      "gate": "P5.rung2",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+    }
+  ],
+  "reason": "P5.text_changed: add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text; P5.rung2: add_resolution(r001) returned the parent response unchanged, so the rung is not a distinct item; its labels would assert a coherence difference no reader or scorer could see in the text. A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+}

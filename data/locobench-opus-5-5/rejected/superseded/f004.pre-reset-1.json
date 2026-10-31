@@ -1,0 +1,370 @@
+{
+  "family_id": "f004",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            3
+          ],
+          [
+            5,
+            6
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            8,
+            7
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            13,
+            14
+          ],
+          [
+            13,
+            15
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            1,
+            3,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            6,
+            "Concession"
+          ],
+          [
+            8,
+            7,
+            "Instantiation"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            10,
+            11,
+            "Restatement"
+          ],
+          [
+            11,
+            12,
+            "Precedence"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            13,
+            15,
+            "Cause-Effect"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            3,
+            "Contrast"
+          ],
+          [
+            4,
+            5,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            2,
+            6,
+            "Concession"
+          ],
+          [
+            8,
+            7,
+            "Instantiation"
+          ],
+          [
+            8,
+            9,
+            "Disjunction"
+          ],
+          [
+            10,
+            11,
+            "Restatement"
+          ],
+          [
+            11,
+            12,
+            "Precedence"
+          ],
+          [
+            13,
+            14,
+            "Alternative"
+          ],
+          [
+            13,
+            15,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "false_endpoint": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'spurious': 1, 'wrong_sense': 1, 'wrong_direction': 1, 'false_endpoint': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gemini-3.1-pro",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gemini-3.1-pro of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {
+            "leakage": 1
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 1,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "claude-sonnet-5-5": {
+            "leakage": [
+              "stands in contrast to the paper's earlier history"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 5,
+          "gemini-3.1-pro": 2,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Scoring of this kind is one of two sources of distortion, and at least one of them, perhaps both, operated in the report",
+            "In the first,",
+            "In the second,",
+            "Because its authors worked at Google DeepMind, Schaeffer and colleagues argued that apparent emergence can result from a",
+            "On the first account, the award itself led the NeurIPS 2023 awards committee to determine that the paper merited an Outs"
+          ],
+          "gemini-3.1-pro": [
+            "Because its authors worked at Google DeepMind, Schaeffer and colleagues argued that apparent emergence can result from a",
+            "On the first account, the award itself led the NeurIPS 2023 awards committee to determine that the paper merited an Outs"
+          ],
+          "claude-sonnet-5-5": [
+            "The 2022 date, however, stands in contrast to the paper's earlier history: the Wei et al. emergent abilities paper was f",
+            "Its institutional origin runs the other way, since the Schaeffer et al. paper was written by researchers at Google DeepM",
+            "Because its authors worked at Google DeepMind, Schaeffer and colleagues argued that apparent emergence can result from a",
+            "In other words, arithmetic performance measured by token edit distance rose continuously and predictably with model size",
+            "On the first account, the award itself led the NeurIPS 2023 awards committee to determine that the paper merited an Outs"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'claude-sonnet-5-5': {'fluency': 3}}"
+}

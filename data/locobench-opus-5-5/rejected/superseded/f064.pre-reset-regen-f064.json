@@ -1,0 +1,376 @@
+{
+  "family_id": "f064",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.chain_links",
+      "passed": true,
+      "threshold": ">= 3 valid entailment relations",
+      "observed": 3,
+      "detail": ""
+    },
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Condition",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.833,
+        "sense": 0.833,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            2
+          ],
+          [
+            8,
+            5
+          ],
+          [
+            9,
+            12
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            2,
+            3,
+            "Concession"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Precedence"
+          ],
+          [
+            3,
+            2,
+            "Concession"
+          ],
+          [
+            4,
+            3,
+            "Evidence"
+          ],
+          [
+            6,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            8,
+            5,
+            "Condition"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            11,
+            9,
+            "Cause-Effect"
+          ],
+          [
+            9,
+            12,
+            "Evidence"
+          ],
+          [
+            12,
+            13,
+            "Restatement"
+          ],
+          [
+            14,
+            15,
+            "Alternative"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            2,
+            "Precedence"
+          ],
+          [
+            2,
+            3,
+            "Concession"
+          ],
+          [
+            8,
+            5,
+            "Condition"
+          ],
+          [
+            5,
+            9,
+            "Instantiation"
+          ],
+          [
+            9,
+            12,
+            "Evidence"
+          ],
+          [
+            12,
+            13,
+            "Restatement"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            14,
+            15,
+            "Alternative"
+          ],
+          [
+            6,
+            7,
+            "Cause-Effect"
+          ],
+          [
+            11,
+            9,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 1, 'spurious': 1, 'wrong_sense': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-5.6-terra",
+        "rates": {
+          "gpt-5.6-terra": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            0.667,
+            0.667
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-5.6-terra of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-5.6-terra": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-5.6-terra": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-5.6-terra": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 6
+        },
+        "spans": {
+          "gpt-5.6-terra": [
+            "Edmund Gettier published \"Is Justified True Belief Knowledge?\" in 1963, after which the paper was published in the journ",
+            "Gettier's 1963 paper presented two counterexamples to the justified true belief analysis, each constructed so that a sub",
+            "Gettier's 1963 paper presented five distinct counterexamples, and because it did so, Gettier assumed that a person can b"
+          ],
+          "gemini-3.1-pro": [
+            "Edmund Gettier published \"Is Justified True Belief Knowledge?\" in 1963, after which the paper was published in the journ",
+            "At least one of the following holds in the scenario, perhaps both: Jones owns a Ford in Gettier's second case, or Brown ",
+            "Either Plato's Theaetetus ends with Socrates accepting true belief with an account as the definition of knowledge, or Pl"
+          ],
+          "claude-sonnet-5-5": [
+            "after which the paper was published in the journal Mind, although it appeared in the journal Analysis",
+            "since it determined that Gettier's paper appeared in volume 23 of Analysis",
+            "Gettier's 1963 paper presented five distinct counterexamples, and because it did so, Gettier assumed that a person can b",
+            "Jones owns a Ford in Gettier's second case, or Brown is in Barcelona in Gettier's second case",
+            "Brown's being in Barcelona is what caused Smith's belief in the disjunction"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-5.6-terra': {'fluency': 3}, 'gemini-3.1-pro': {'fluency': 3}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}

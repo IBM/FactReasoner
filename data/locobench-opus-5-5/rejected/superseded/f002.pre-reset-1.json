@@ -1,0 +1,403 @@
+{
+  "family_id": "f002",
+  "stage": "perturb",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 1.0,
+        "sense": 1.0,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            5,
+            6
+          ],
+          [
+            9,
+            10
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            15,
+            16
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            7,
+            9
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            8,
+            12
+          ]
+        ],
+        "reversed_pairs": [],
+        "recovered_pairs": [
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            1,
+            5,
+            "Contrast"
+          ],
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            7,
+            9,
+            "Evidence"
+          ],
+          [
+            8,
+            9,
+            "Contrast"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            7,
+            11,
+            "Evidence"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            12,
+            8,
+            "Contrast"
+          ],
+          [
+            11,
+            13,
+            "Concession"
+          ],
+          [
+            13,
+            14,
+            "Contrast"
+          ],
+          [
+            15,
+            16,
+            "Disjunction"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            5,
+            6,
+            "Cause-Effect"
+          ],
+          [
+            9,
+            10,
+            "Restatement"
+          ],
+          [
+            11,
+            12,
+            "Alternative"
+          ],
+          [
+            15,
+            16,
+            "Disjunction"
+          ],
+          [
+            11,
+            13,
+            "Concession"
+          ],
+          [
+            7,
+            9,
+            "Evidence"
+          ],
+          [
+            3,
+            4,
+            "Precedence"
+          ],
+          [
+            1,
+            5,
+            "Contrast"
+          ],
+          [
+            8,
+            12,
+            "Contrast"
+          ],
+          [
+            14,
+            15,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 3,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "spurious": {
+            "n": 1,
+            "recovered_as_planned": 0
+          }
+        }
+      },
+      "detail": "3/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_sense': 1, 'spurious': 0}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            1.0,
+            1.0
+          ],
+          "gemini-3.1-pro": [
+            1.0,
+            1.0
+          ],
+          "claude-sonnet-5-5": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": true,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 4,
+            "formality": 4,
+            "organization": 4
+          }
+        },
+        "n_below_floor": 1,
+        "needed_to_reject": 2
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 1,
+          "gemini-3.1-pro": 2,
+          "claude-sonnet-5-5": 4
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "Systematic excavations at Monte Verde began in the late 1970s, a phase that predates 1995, the year in which Dillehay's "
+          ],
+          "gemini-3.1-pro": [
+            "Systematic excavations at Monte Verde began in the late 1970s, a phase that predates 1995, the year in which Dillehay's ",
+            "Some early people reached South America by a Pacific coastal route, moving along shorelines that offered marine and litt"
+          ],
+          "claude-sonnet-5-5": [
+            "a phase that predates 1995, the year in which Dillehay's team first excavated Monte Verde",
+            "In other words, the Clovis culture emerged over a millennium after people were already living at Monte Verde, near the s",
+            "That second possibility stands in contrast to the Clovis-first model and its placement of Clovis toolmakers at about 13,",
+            "Some early people reached South America by a Pacific coastal route, moving along shorelines that offered marine and litt"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": true,
+      "threshold": "<= 15%",
+      "observed": "1.1%",
+      "detail": ""
+    },
+    {
+      "gate": "P5.text_changed",
+      "passed": true,
+      "threshold": "response differs from parent",
+      "observed": "differs",
+      "detail": ""
+    },
+    {
+      "gate": "P5.length_drift",
+      "passed": false,
+      "threshold": "<= 15%",
+      "observed": "99.0%",
+      "detail": "length drifted 99.0% (limit 15%)"
+    },
+    {
+      "gate": "P5.rung2",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "length drifted 99.0% (limit 15%). A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+    }
+  ],
+  "reason": "P5.length_drift: length drifted 99.0% (limit 15%); P5.rung2: length drifted 99.0% (limit 15%). A ladder with a missing rung carries no ranking claim, so the family is rejected whole."
+}

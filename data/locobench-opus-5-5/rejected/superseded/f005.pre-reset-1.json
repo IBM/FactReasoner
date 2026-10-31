@@ -1,0 +1,387 @@
+{
+  "family_id": "f005",
+  "stage": "respond",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "plan.rare_facets",
+      "passed": true,
+      "threshold": ">= 1 each",
+      "observed": [
+        "Alternative",
+        "Cause-Effect",
+        "Concession",
+        "Contrast",
+        "Disjunction",
+        "Evidence",
+        "Instantiation",
+        "Precedence",
+        "Restatement"
+      ],
+      "detail": ""
+    },
+    {
+      "gate": "plan.window",
+      "passed": true,
+      "threshold": "<= 4 positions or a shared entity (recorded, not enforced)",
+      "observed": [],
+      "detail": ""
+    },
+    {
+      "gate": "plan.validity_split",
+      "passed": true,
+      "threshold": "0.55 +/- 0.15",
+      "observed": 0.6,
+      "detail": ""
+    },
+    {
+      "gate": "plan.factuality",
+      "passed": true,
+      "threshold": ">= 2 incorrect claim(s) selected",
+      "observed": {
+        "n_incorrect_selected": 2,
+        "n_incorrect_available": 4
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1",
+      "passed": true,
+      "threshold": {
+        "coupling": 0.8,
+        "sense": 0.7
+      },
+      "observed": {
+        "coupling": 0.833,
+        "sense": 0.833,
+        "n_graded": 6,
+        "n_planted": 4,
+        "matched_pairs": [
+          [
+            1,
+            2
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            10,
+            11
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            3,
+            7
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            4,
+            8
+          ],
+          [
+            12,
+            10
+          ],
+          [
+            13,
+            11
+          ],
+          [
+            6,
+            5
+          ]
+        ],
+        "reversed_pairs": [
+          [
+            6,
+            5,
+            "Instantiation"
+          ]
+        ],
+        "recovered_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            2,
+            3,
+            "Precedence"
+          ],
+          [
+            3,
+            7,
+            "Concession"
+          ],
+          [
+            4,
+            8,
+            "Evidence"
+          ],
+          [
+            5,
+            6,
+            "Instantiation"
+          ],
+          [
+            8,
+            9,
+            "Alternative"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            10,
+            12,
+            "Contrast"
+          ],
+          [
+            12,
+            13,
+            "Contrast"
+          ],
+          [
+            13,
+            11,
+            "Cause-Effect"
+          ],
+          [
+            14,
+            15,
+            "Restatement"
+          ]
+        ],
+        "planned_pairs": [
+          [
+            1,
+            2,
+            "Contrast"
+          ],
+          [
+            8,
+            9,
+            "Alternative"
+          ],
+          [
+            10,
+            11,
+            "Disjunction"
+          ],
+          [
+            14,
+            15,
+            "Restatement"
+          ],
+          [
+            3,
+            7,
+            "Concession"
+          ],
+          [
+            6,
+            5,
+            "Instantiation"
+          ],
+          [
+            2,
+            3,
+            "Precedence"
+          ],
+          [
+            4,
+            8,
+            "Evidence"
+          ],
+          [
+            12,
+            10,
+            "Contrast"
+          ],
+          [
+            13,
+            11,
+            "Cause-Effect"
+          ]
+        ]
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V1.planted",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "n_invalid": 4,
+        "recovered_as_planned": 4,
+        "by_error_kind": {
+          "false_endpoint": {
+            "n": 2,
+            "recovered_as_planned": 2
+          },
+          "wrong_sense": {
+            "n": 1,
+            "recovered_as_planned": 1
+          },
+          "wrong_direction": {
+            "n": 1,
+            "recovered_as_planned": 1
+          }
+        }
+      },
+      "detail": "4/4 planted error(s) realized as planned: {'false_endpoint': 2, 'wrong_sense': 1, 'wrong_direction': 1}"
+    },
+    {
+      "gate": "V1.raters",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "reported": "gpt-6-sol",
+        "rates": {
+          "gpt-6-sol": [
+            0.833,
+            0.833
+          ],
+          "gemini-3.1-pro": [
+            0.833,
+            0.833
+          ],
+          "claude-sonnet-5-5": [
+            0.667,
+            0.667
+          ]
+        }
+      },
+      "detail": "V1 reported from gpt-6-sol of 3 rater(s)"
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 2
+          },
+          "claude-sonnet-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 3,
+        "needed_to_reject": 2
+      },
+      "detail": "3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3, 'organization': 2}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-sonnet-5-5": {
+            "leakage": 2
+          }
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-sonnet-5-5": {
+            "leakage": 2,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "claude-sonnet-5-5": {
+            "leakage": [
+              "a specific instance of a general limitation",
+              "adjudicate this reading against its negation"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-6-sol": 3,
+          "gemini-3.1-pro": 3,
+          "claude-sonnet-5-5": 5
+        },
+        "spans": {
+          "gpt-6-sol": [
+            "By contrast, the BICEP2 announcement was made in March 2012, before the team reported a tensor-to-scalar ratio of r = 0.",
+            "It was also this conclusion that gave rise to the lensing contribution to the B-mode power in the field.",
+            "The BICEP2 telescope operated at the South Pole; that is, the instrument was located at the Amundsen-Scott South Pole St"
+          ],
+          "gemini-3.1-pro": [
+            "Either the signal contained such a component, or the B-mode signal measured by BICEP2 contained no detectable primordial",
+            "Two non-primordial sources bore on that choice, and at least one of them was at work in the field, perhaps both: polariz",
+            "The BICEP2 telescope operated at the South Pole; that is, the instrument was located at the Amundsen-Scott South Pole St"
+          ],
+          "claude-sonnet-5-5": [
+            "By contrast, the BICEP2 announcement was made in March 2012, before the team reported a tensor-to-scalar ratio of r = 0.",
+            "The inflationary prediction indicates that the B-mode signal measured by BICEP2 contained a detectable primordial gravit",
+            "Either the signal contained such a component, or the B-mode signal measured by BICEP2 contained no detectable primordial",
+            "In contrast with the dust contribution in the field, the joint analysis confirmed primordial gravitational waves at five",
+            "It was also this conclusion that gave rise to the lensing contribution to the B-mode power in the field."
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V4",
+      "passed": true,
+      "threshold": 1.0,
+      "observed": {
+        "coverage": 1.0,
+        "gating_statuses": [
+          "missing",
+          "merged"
+        ],
+        "needed_to_reject": 2,
+        "lost_votes": {},
+        "altered_votes": {},
+        "n_raters": 3
+      },
+      "detail": ""
+    }
+  ],
+  "reason": "V3.scores: 3/3 auditor(s) scored below the floor: {'gpt-6-sol': {'fluency': 3, 'organization': 3}, 'gemini-3.1-pro': {'fluency': 3, 'organization': 2}, 'claude-sonnet-5-5': {'fluency': 3, 'organization': 3}}"
+}
