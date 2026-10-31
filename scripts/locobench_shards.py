@@ -30,6 +30,7 @@ Subcommands::
     plan    assign topics to shards, balancing projected calls; write shards.json
     launch  start every shard detached (nohup + caffeinate), recording pids and logs
     reset   return every family to its stored base response (committee or P5 changed)
+    regen   regenerate one family from P1 in a scratch dir and splice it into its shard
     status  one table over all shards: admitted / rejected / in progress / running
     merge   consolidate the shards into one corpus directory, validating everything
 
@@ -322,6 +323,99 @@ def _drop_families(d: str, fids: set[str], n: int) -> None:
             shutil.move(rp, os.path.join(f"{rdir}.pre-reset-{n}", f"{fid}.json"))
 
 
+# -- regen --------------------------------------------------------------------
+
+
+def regen(root: str, family: str, *, reason: str, no_cache: bool = True) -> str:
+    """Regenerate one family from P1 in a scratch directory, then splice it into its shard.
+
+    For a family whose PLAN is the problem -- repeated, agreeing committee rejections on
+    fresh prose -- retrying from the stored plan cannot help. This discards every stored
+    artifact and reruns the family's own slot (same id, topic and ladder type) from P1.
+
+    ``no_cache`` sends LiteLLM's ``cache: {no-cache: true}`` on every generator call. The
+    gateway caches identical requests, and P1's request for a slot is identical every time,
+    so without it the first call replays the question that led to the bad plan. The bypass
+    lives in a scratch copy of the config, not in the shard's: shard configs must agree for
+    the merge, and the corpus config should not record a one-family transport setting.
+
+    The other families sharing the topic are seeded as admitted in the scratch state so the
+    CLI runs only this slot. Returns the scratch directory. The family is spliced into its
+    shard only if admitted; the shard's prior files are kept as ``*.pre-regen-<family>``.
+    """
+    manifest = _load_plan(root)
+    entry = next(e for e in manifest["shards"] if family in e["family_ids"])
+    if _alive(entry.get("pid")):
+        raise RuntimeError(f"{entry['shard']} is running; stop it first")
+    slot = next(sl for sl in _slots(manifest["n_families"]) if sl[0] == family)
+    topic = slot[1]
+    siblings = [sl[0] for sl in _slots(manifest["n_families"]) if sl[1] == topic]
+    d = entry["out_dir"]
+    shard_state = _read_json(os.path.join(d, STATE_FILE))["families"]
+
+    scratch = os.path.join(root, f"regen-{family}")
+    if os.path.exists(scratch):
+        shutil.rmtree(scratch)
+    os.makedirs(scratch)
+    seed = {f: shard_state[f] for f in siblings if f != family}
+    if any(v.get("stage") != "admitted" for v in seed.values()):
+        raise RuntimeError(f"siblings of {family} on {topic} are not all admitted: {list(seed)}")
+    with open(os.path.join(scratch, STATE_FILE), "w") as f:
+        json.dump({"families": seed}, f, indent=2)
+    cfg = _read_json(manifest["config"])
+    if no_cache:
+        for g in cfg["generators"]:
+            g.setdefault("model_options", {}).setdefault("extra_body", {})["cache"] = {
+                "no-cache": True
+            }
+    cfg_path = os.path.join(scratch, "regen_config.json")
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    cmd = list(entry["command"])
+    cmd[cmd.index("--config") + 1] = cfg_path
+    cmd[cmd.index("--out") + 1] = scratch
+    i = cmd.index("--only-topic")
+    cmd = cmd[:i] + ["--only-topic", topic]
+    env = {**os.environ, "PYTHONPATH": os.path.join(os.getcwd(), "src")}
+    with open(os.path.join(scratch, "run.log"), "w") as log:
+        subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, check=False)
+
+    new = _read_json(os.path.join(scratch, STATE_FILE))["families"].get(family, {})
+    if new.get("stage") != "admitted":
+        print(f"[shards] {family} not admitted in {scratch}: {new.get('rejected_reason', '')[:200]}")
+        return scratch
+    tag = f"pre-regen-{family}"
+    for name in (STATE_FILE, ITEMS_FILE, MANIFEST_FILE):
+        shutil.copy2(os.path.join(d, name), os.path.join(d, f"{name}.{tag}"))
+    new.setdefault("artifacts", {})["regenerated"] = {
+        "from": scratch, "reason": reason, "no_cache": no_cache, "config": cfg_path,
+        "previous_attempts": shard_state.get(family, {}).get("attempts"),
+    }
+    st = _read_json(os.path.join(d, STATE_FILE))
+    st["families"][family] = new
+    with open(os.path.join(d, STATE_FILE), "w") as f:
+        json.dump(st, f, indent=2)
+    _drop_families(d, {family}, f"regen-{family}")
+    with open(os.path.join(scratch, ITEMS_FILE)) as f:
+        fresh = [ln for ln in f if ln.strip()]
+    with open(os.path.join(d, ITEMS_FILE), "a") as f:
+        f.writelines(fresh)
+    m = _read_json(os.path.join(d, MANIFEST_FILE))
+    m["families"] = sorted(
+        m["families"] + [e for e in _read_json(os.path.join(scratch, MANIFEST_FILE))["families"]
+                         if e["family_id"] == family],
+        key=lambda e: e["family_id"],
+    )
+    with open(os.path.join(d, MANIFEST_FILE), "w") as f:
+        json.dump(m, f, indent=2)
+    manifest.setdefault("regens", []).append(
+        {"family": family, "shard": entry["shard"], "reason": reason, "scratch": scratch,
+         "git_commit": _git_commit(), "no_cache": no_cache}
+    )
+    _save_plan(root, manifest)
+    return scratch
+
+
 # -- status -------------------------------------------------------------------
 
 
@@ -549,6 +643,11 @@ def main() -> int:
     p.add_argument("--root", required=True)
     p.add_argument("--reason", required=True)
     p.add_argument("--family", action="append", help="family id, repeatable; default all")
+    p = sub.add_parser("regen")
+    p.add_argument("--root", required=True)
+    p.add_argument("--family", required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--keep-cache", action="store_true")
     p = sub.add_parser("status")
     p.add_argument("--root", required=True)
     p = sub.add_parser("merge")
@@ -569,6 +668,9 @@ def main() -> int:
         print(f"[shards] started: {launch(a.root, only=a.only, wait=a.wait)}")
     elif a.cmd == "reset":
         print(f"[shards] reset: {reset(a.root, reason=a.reason, families=a.family)}")
+    elif a.cmd == "regen":
+        print(f"[shards] regen scratch: "
+              f"{regen(a.root, a.family, reason=a.reason, no_cache=not a.keep_cache)}")
     elif a.cmd == "status":
         _print_status(status(a.root))
     elif a.cmd == "merge":

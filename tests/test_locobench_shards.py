@@ -204,3 +204,26 @@ class TestReset:
         after = str(tmp_path / "after")
         shards.merge(root, after)
         assert _items(after) == _items(before)
+
+
+
+class TestRegen:
+    def test_regen_replaces_one_family_and_the_corpus_still_merges(self, sharded, tmp_path):
+        root, manifest = sharded
+        before = str(tmp_path / "before")
+        shards.merge(root, before)
+        target = manifest["shards"][0]["family_ids"][0]
+        e = manifest["shards"][0]
+        e["command"] = [sys.executable, *e["command"][e["command"].index("-u"):]]
+        shards._save_plan(root, {**shards._load_plan(root), "shards": manifest["shards"]})
+        scratch = shards.regen(root, target, reason="test")
+        # The dry-run mock is deterministic, so a regenerated family is identical.
+        after = str(tmp_path / "after")
+        shards.merge(root, after)
+        assert _items(after) == _items(before)
+        with open(os.path.join(scratch, "regen_config.json")) as f:
+            cfg = json.load(f)
+        gens = cfg.get("generators") or []
+        assert all(g["model_options"]["extra_body"]["cache"] == {"no-cache": True}
+                   for g in gens)
+        assert shards._load_plan(root)["regens"][0]["family"] == target
