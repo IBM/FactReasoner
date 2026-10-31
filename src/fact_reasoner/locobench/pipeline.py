@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -1273,6 +1274,11 @@ def _temperature_for(model: ModelRef, cfg: GenConfig, attempt: int) -> float | N
     return max(lo, min(hi, t))
 
 
+#: Set to any non-empty value to send LiteLLM's ``cache: {"no-cache": true}`` on every
+#: call. See :func:`build_llm`.
+NO_CACHE_ENV = "LOCOBENCH_NO_CACHE"
+
+
 def build_llm(model: ModelRef, cfg: GenConfig) -> LLM:
     """Build a live LLM callable for one model.
 
@@ -1319,12 +1325,22 @@ def build_llm(model: ModelRef, cfg: GenConfig) -> LLM:
 
     from fact_reasoner.backends import build_backend
 
+    model_options = dict(model.model_options) if model.model_options else {}
+    if os.getenv(NO_CACHE_ENV):
+        # LiteLLM caches identical requests, so regenerating a slot re-sends P1's identical
+        # prompt and is served the question that produced the family being replaced. The
+        # bypass is a property of one RUN, not of the corpus, so it is read from the
+        # environment and never recorded in a config: a config field would land in the
+        # shard's config.json and differ from its siblings', which the merge refuses.
+        extra = dict(model_options.get("extra_body") or {})
+        extra["cache"] = {"no-cache": True}
+        model_options["extra_body"] = extra
     backend = build_backend(
         model.backend,
         model_id=model.model_id,
         base_url=model.base_url,
         api_key=model.api_key,
-        model_options=dict(model.model_options) if model.model_options else None,
+        model_options=model_options or None,
     )
 
     # One loop, created lazily so that merely building the callable touches nothing.

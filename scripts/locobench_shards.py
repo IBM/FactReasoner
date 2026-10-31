@@ -61,6 +61,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from fact_reasoner.locobench import cli, perturb  # noqa: E402
 from fact_reasoner.locobench.config import load_config  # noqa: E402
+from fact_reasoner.locobench.pipeline import NO_CACHE_ENV  # noqa: E402
 from fact_reasoner.locobench.schema import (  # noqa: E402
     validate_item,
     validate_manifest_entry,
@@ -192,7 +193,13 @@ def _alive(pid: int | None) -> bool:
     return True
 
 
-def launch(root: str, *, only: list[str] | None = None, wait: bool = False) -> list[str]:
+def launch(
+    root: str,
+    *,
+    only: list[str] | None = None,
+    wait: bool = False,
+    no_cache: bool = False,
+) -> list[str]:
     """Start each shard detached, appending to its log. Skips a shard already running.
 
     A shard is resumable, so re-launching one that crashed continues where it stopped.
@@ -216,6 +223,8 @@ def launch(root: str, *, only: list[str] | None = None, wait: bool = False) -> l
         cmd = ([caff, "-i"] if caff else []) + e["command"]
         log = open(e["log"], "a")
         env = {**os.environ, "PYTHONPATH": os.path.join(os.getcwd(), "src")}
+        if no_cache:
+            env[NO_CACHE_ENV] = "1"
         p = subprocess.Popen(
             cmd, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True, env=env,
@@ -339,11 +348,10 @@ def regen(root: str, family: str, *, reason: str, no_cache: bool = True) -> str:
     fresh prose -- retrying from the stored plan cannot help. This discards every stored
     artifact and reruns the family's own slot (same id, topic and ladder type) from P1.
 
-    ``no_cache`` sends LiteLLM's ``cache: {no-cache: true}`` on every generator call. The
-    gateway caches identical requests, and P1's request for a slot is identical every time,
-    so without it the first call replays the question that led to the bad plan. The bypass
-    lives in a scratch copy of the config, not in the shard's: shard configs must agree for
-    the merge, and the corpus config should not record a one-family transport setting.
+    ``no_cache`` sets ``LOCOBENCH_NO_CACHE`` for the run, which sends LiteLLM's
+    ``cache: {no-cache: true}`` on every call. The gateway caches identical requests, and
+    P1's request for a slot is identical every time, so without it the first call replays
+    the question that led to the bad plan.
 
     The other families sharing the topic are seeded as admitted in the scratch state so the
     CLI runs only this slot. Returns the scratch directory. The family is spliced into its
@@ -368,21 +376,13 @@ def regen(root: str, family: str, *, reason: str, no_cache: bool = True) -> str:
         raise RuntimeError(f"siblings of {family} on {topic} are not all admitted: {list(seed)}")
     with open(os.path.join(scratch, STATE_FILE), "w") as f:
         json.dump({"families": seed}, f, indent=2)
-    cfg = _read_json(manifest["config"])
-    if no_cache:
-        for g in cfg["generators"]:
-            g.setdefault("model_options", {}).setdefault("extra_body", {})["cache"] = {
-                "no-cache": True
-            }
-    cfg_path = os.path.join(scratch, "regen_config.json")
-    with open(cfg_path, "w") as f:
-        json.dump(cfg, f, indent=2)
     cmd = list(entry["command"])
-    cmd[cmd.index("--config") + 1] = cfg_path
     cmd[cmd.index("--out") + 1] = scratch
     i = cmd.index("--only-topic")
     cmd = cmd[:i] + ["--only-topic", topic]
     env = {**os.environ, "PYTHONPATH": os.path.join(os.getcwd(), "src")}
+    if no_cache:
+        env[NO_CACHE_ENV] = "1"
     with open(os.path.join(scratch, "run.log"), "w") as log:
         subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, check=False)
 
@@ -394,7 +394,7 @@ def regen(root: str, family: str, *, reason: str, no_cache: bool = True) -> str:
     for name in (STATE_FILE, ITEMS_FILE, MANIFEST_FILE):
         shutil.copy2(os.path.join(d, name), os.path.join(d, f"{name}.{tag}"))
     new.setdefault("artifacts", {})["regenerated"] = {
-        "from": scratch, "reason": reason, "no_cache": no_cache, "config": cfg_path,
+        "from": scratch, "reason": reason, "no_cache": no_cache,
         "previous_attempts": shard_state.get(family, {}).get("attempts"),
     }
     st = _read_json(os.path.join(d, STATE_FILE))
@@ -645,6 +645,8 @@ def main() -> int:
     p.add_argument("--root", required=True)
     p.add_argument("--only", action="append", help="shard id, repeatable")
     p.add_argument("--wait", action="store_true")
+    p.add_argument("--no-cache", action="store_true",
+                   help="bypass the gateway response cache for this launch")
     p = sub.add_parser("reset")
     p.add_argument("--root", required=True)
     p.add_argument("--reason", required=True)
@@ -673,7 +675,8 @@ def main() -> int:
         print(f"[shards] plan written to {os.path.join(a.root, PLAN_FILE)} "
               f"at {m['git_commit']}")
     elif a.cmd == "launch":
-        print(f"[shards] started: {launch(a.root, only=a.only, wait=a.wait)}")
+        started = launch(a.root, only=a.only, wait=a.wait, no_cache=a.no_cache)
+        print(f"[shards] started: {started}")
     elif a.cmd == "reset":
         keep = tuple(k for k in a.keep.split(",") if k)
         print(f"[shards] reset: "

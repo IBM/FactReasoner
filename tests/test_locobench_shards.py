@@ -221,11 +221,10 @@ class TestRegen:
         after = str(tmp_path / "after")
         shards.merge(root, after)
         assert _items(after) == _items(before)
-        with open(os.path.join(scratch, "regen_config.json")) as f:
-            cfg = json.load(f)
-        gens = cfg.get("generators") or []
-        assert all(g["model_options"]["extra_body"]["cache"] == {"no-cache": True}
-                   for g in gens)
+        # The bypass is runtime-only: no config anywhere records it.
+        assert not os.path.exists(os.path.join(scratch, "regen_config.json"))
+        with open(os.path.join(e["out_dir"], "config.json")) as f:
+            assert "model_options" not in json.dumps(json.load(f))
         assert shards._load_plan(root)["regens"][0]["family"] == target
 
 

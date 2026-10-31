@@ -4444,3 +4444,35 @@ class TestDefectTwoPerRungRelations:
         assert sigs[4] != sigs[parent], (
             "this is precisely why a parent-only comparison misses the collision"
         )
+
+
+class TestGatewayCacheBypass:
+    """LOCOBENCH_NO_CACHE reaches the backend as LiteLLM's no-cache flag, and only then."""
+
+    def _options(self, monkeypatch, value):
+        from fact_reasoner.locobench import pipeline
+        from fact_reasoner.locobench.config import ModelRef
+
+        seen = {}
+
+        def fake_build_backend(kind, **kw):
+            seen.update(kw)
+            return object()
+
+        monkeypatch.setattr("fact_reasoner.backends.build_backend", fake_build_backend)
+        if value is None:
+            monkeypatch.delenv(pipeline.NO_CACHE_ENV, raising=False)
+        else:
+            monkeypatch.setenv(pipeline.NO_CACHE_ENV, value)
+        model = ModelRef(name="m", model_id="m", backend="openai",
+                         model_options={"max_new_tokens": 100})
+        pipeline.build_llm(model, _dry_cfg())
+        return seen["model_options"]
+
+    def test_set(self, monkeypatch):
+        opts = self._options(monkeypatch, "1")
+        assert opts["extra_body"]["cache"] == {"no-cache": True}
+        assert opts["max_new_tokens"] == 100
+
+    def test_unset(self, monkeypatch):
+        assert "extra_body" not in (self._options(monkeypatch, None) or {})
