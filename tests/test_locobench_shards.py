@@ -240,3 +240,31 @@ class TestRegen:
             fs = json.load(f)["families"][target]
         assert fs["stage"] == "admitted"
         assert "P3" in fs["artifacts"]["calls"] and "P1" not in fs["artifacts"]["calls"]
+
+
+
+class TestRedeclare:
+    def test_redeclare_rewrites_constraints_and_directions_only(self, sharded, tmp_path):
+        root, manifest = sharded
+        before = str(tmp_path / "before")
+        shards.merge(root, before)
+        # Corrupt the stored declarations, as an old run would have left them.
+        for e in manifest["shards"]:
+            mp = os.path.join(e["out_dir"], "families.json")
+            with open(mp) as f:
+                m = json.load(f)
+            for fam in m["families"]:
+                fam["ordering_constraints"] = []
+            with open(mp, "w") as f:
+                json.dump(m, f)
+        types = {f["family"] for e in manifest["shards"]
+                 for f in json.load(open(os.path.join(e["out_dir"], "families.json")))["families"]}
+        for t in types:
+            shards.redeclare(root, family_type=t, reason="test")
+        after = str(tmp_path / "after")
+        shards.merge(root, after)
+        assert _items(after) == _items(before)
+        with open(os.path.join(after, "families.json")) as a, open(
+            os.path.join(before, "families.json")
+        ) as b:
+            assert json.load(a) == json.load(b)

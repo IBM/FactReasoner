@@ -31,6 +31,7 @@ Subcommands::
     launch  start every shard detached (nohup + caffeinate), recording pids and logs
     reset   return every family to its stored base response (committee or P5 changed)
     regen   regenerate one family from P1 in a scratch dir and splice it into its shard
+    redeclare  re-derive a ladder type's declared constraints in place (no regeneration)
     status  one table over all shards: admitted / rejected / in progress / running
     merge   consolidate the shards into one corpus directory, validating everything
 
@@ -422,6 +423,62 @@ def regen(root: str, family: str, *, reason: str, no_cache: bool = True) -> str:
     return scratch
 
 
+# -- redeclare ----------------------------------------------------------------
+
+
+def redeclare(root: str, *, family_type: str, reason: str) -> dict[str, int]:
+    """Re-derive a ladder type's declared expectations in place, without regenerating.
+
+    A family's ordering constraints (manifest) and each item's
+    ``expected.readout_directions`` are pure functions of the ladder type --
+    ``perturb.ordering_constraints`` and ``perturb.readout_directions`` -- written at
+    generation time. When the declaration changes, the on-disk copies are stale; this
+    rewrites them from the current code. Prose, plans and gold graphs are not touched.
+    Originals are kept as ``*.pre-redeclare-<n>``.
+    """
+    manifest = _load_plan(root)
+    n = len(manifest.get("redeclarations", [])) + 1
+    counts = collections.Counter()
+    constraints = perturb.ordering_constraints(family_type)
+    for e in manifest["shards"]:
+        d = e["out_dir"]
+        if _alive(e.get("pid")):
+            raise RuntimeError(f"{e['shard']} is running; stop it first")
+        mp, ip = os.path.join(d, MANIFEST_FILE), os.path.join(d, ITEMS_FILE)
+        m = _read_json(mp)
+        hit = [f for f in m["families"] if f["family"] == family_type]
+        if not hit:
+            continue
+        shutil.copy2(mp, f"{mp}.pre-redeclare-{n}")
+        shutil.copy2(ip, f"{ip}.pre-redeclare-{n}")
+        for f in hit:
+            f["ordering_constraints"] = constraints
+            counts["families"] += 1
+        with open(mp, "w") as fh:
+            json.dump(m, fh, indent=2)
+        out = []
+        with open(ip) as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                it = json.loads(line)
+                exp = it["expected"]
+                if exp["family"] == family_type:
+                    exp["readout_directions"] = perturb.readout_directions(
+                        family_type, exp["rung_index"]
+                    )
+                    counts["items"] += 1
+                out.append(json.dumps(it) + "\n")
+        with open(ip, "w") as fh:
+            fh.writelines(out)
+    manifest.setdefault("redeclarations", []).append(
+        {"n": n, "family_type": family_type, "reason": reason,
+         "git_commit": _git_commit(), "counts": dict(counts)}
+    )
+    _save_plan(root, manifest)
+    return dict(counts)
+
+
 # -- status -------------------------------------------------------------------
 
 
@@ -658,6 +715,10 @@ def main() -> int:
     p.add_argument("--family", required=True)
     p.add_argument("--reason", required=True)
     p.add_argument("--keep-cache", action="store_true")
+    p = sub.add_parser("redeclare")
+    p.add_argument("--root", required=True)
+    p.add_argument("--family-type", required=True, choices=perturb.FAMILY_TYPES)
+    p.add_argument("--reason", required=True)
     p = sub.add_parser("status")
     p.add_argument("--root", required=True)
     p = sub.add_parser("merge")
@@ -684,6 +745,9 @@ def main() -> int:
     elif a.cmd == "regen":
         print(f"[shards] regen scratch: "
               f"{regen(a.root, a.family, reason=a.reason, no_cache=not a.keep_cache)}")
+    elif a.cmd == "redeclare":
+        print(f"[shards] redeclared: "
+              f"{redeclare(a.root, family_type=a.family_type, reason=a.reason)}")
     elif a.cmd == "status":
         _print_status(status(a.root))
     elif a.cmd == "merge":

@@ -289,6 +289,16 @@ _SPECIAL: dict[tuple[str, int, int, str], str] = {
     # Defect 1: the same edit is weight-only, so the normalized log partition is
     # invariant -- Phase 1's reference ladder shows -9.64 at both rungs.
     ("CONFLICT", 1, 2, "log_partition"): INVARIANT,
+    # Finding 2: restoring an entailment link ADDS a factor that concentrates the joint's
+    # mass, which lowers the normalized log partition. So along CHAIN's breaking steps
+    # (break_3 -> break_2 -> break_1 -> base) log_partition falls while the belief readouts
+    # rise. Measured on the first 16 opus-5-5 CHAIN families with correctly-targeted breaks:
+    # strict decrease on 16/16, 0/48 of the previously declared increases held, while
+    # mean_marginal rose on 16/16. The base -> coherent step (drop an invalid conflict) and
+    # the C3 endpoint separation still increase, and stay declared that way (16/16 each).
+    ("CHAIN", 0, 1, "log_partition"): DECREASE,
+    ("CHAIN", 1, 2, "log_partition"): DECREASE,
+    ("CHAIN", 2, 3, "log_partition"): DECREASE,
 }
 
 
