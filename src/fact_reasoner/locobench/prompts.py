@@ -193,10 +193,7 @@ Instructions:
    fine. Order the positions so that related claims sit near each other.
 5. The plan must include AT LEAST ONE relation of each of these senses:
    Alternative, Disjunction, Restatement, Concession, and one of
-   Precedence/Succession. Separately, AT LEAST FOUR of your 10 relations must
-   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT MOST
-   ONE of those four may be a resolved Concession. Only three senses conflict, so
-   reaching four means using one of them TWICE, on a different claim pair.
+   Precedence/Succession. Separately, [LADDER_PLACEHOLDER]
 6. Every Concession must be marked resolved or unresolved. A resolved
    Concession must name a RESOLVER: a [holding] claim, also selected and
    positioned AFTER both endpoints.
@@ -588,13 +585,48 @@ VALIDATION_PROMPTS = ("V1", "V3", "V4")
 PROMPT_SPEC: dict[str, tuple[int, tuple[str, ...]]] = {
     "P1": (9, ("TOPIC_PLACEHOLDER",)),
     "P2": (7, ("QUESTION_PLACEHOLDER",)),
-    "P3": (10, ("CLAIMS_PLACEHOLDER", "QUESTION_PLACEHOLDER")),
+    "P3": (10, ("CLAIMS_PLACEHOLDER", "LADDER_PLACEHOLDER", "QUESTION_PLACEHOLDER")),
     "P4": (8, ("PLAN_PLACEHOLDER", "QUESTION_PLACEHOLDER")),
     "P5": (5, ("OPERATOR_PLACEHOLDER", "PLAN_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
     "V1": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
     "V3": (0, ("RESPONSE_PLACEHOLDER",)),
     "V4": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
 }
+
+#: P3's ladder-specific structural quota, substituted for ``[LADDER_PLACEHOLDER]``.
+#:
+#: The quota differs by ladder because the ladders' edits consume different edges. CONFLICT
+#: resolves one conflict and drops two more, so it needs >= 3 unresolved conflicts; CHAIN
+#: breaks up to three entailment links, so it needs >= 3 VALID entailments -- breaking a
+#: planted-invalid one removes an error and makes the text more coherent, inverting the
+#: ladder. Both cannot be asked of every plan: with 10 relations, 6 valid and five required
+#: senses, three valid entailments leave no room for the conflict quota. Before this, every
+#: plan got the conflict quota and CHAIN's `break_chain` fell through to the first edges in
+#: the plan, so no CHAIN family in either corpus broke only entailment links.
+#:
+#: ORDER and CONTROL carry the conflict quota, as before, so their prompt is unchanged.
+LADDER_REQUIREMENTS: dict[str, str] = {
+    "CONFLICT": (
+        "AT LEAST FOUR of your 10 relations must\n"
+        "   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT MOST\n"
+        "   ONE of those four may be a resolved Concession. Only three senses conflict, so\n"
+        "   reaching four means using one of them TWICE, on a different claim pair."
+    ),
+    "CHAIN": (
+        "AT LEAST THREE of your 6 VALID relations\n"
+        "   must be ENTAILMENTS - Cause-Effect, Effect-Cause, Evidence, Condition or\n"
+        "   Instantiation - forming a CHAIN of reasoning in which each link's target is the\n"
+        "   next link's source (for example 2 -> 5, 5 -> 7, 7 -> 9). These links must hold;\n"
+        "   do not spend this quota on invalid relations. Because three of the six valid\n"
+        "   slots go to this chain, the worked example below does NOT fit this plan as it\n"
+        "   stands: it has only two valid entailments. Keep its structure, but make at\n"
+        "   least three valid relations entailments, and you need not reach four\n"
+        "   conflicting relations."
+    ),
+}
+LADDER_REQUIREMENTS["ORDER"] = LADDER_REQUIREMENTS["CONFLICT"]
+LADDER_REQUIREMENTS["CONTROL"] = LADDER_REQUIREMENTS["CONFLICT"]
+
 
 _PLACEHOLDER_RE = re.compile(r"\[([A-Z_]+_PLACEHOLDER)\]")
 _INSTRUCTION_RE = re.compile(r"(?m)^\d+\. ")

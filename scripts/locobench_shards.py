@@ -240,7 +240,11 @@ KEEP_ON_RESET = ("question", "claims", "plan", "response")
 
 
 def reset(
-    root: str, *, reason: str, families: list[str] | None = None
+    root: str,
+    *,
+    reason: str,
+    families: list[str] | None = None,
+    keep: tuple[str, ...] = KEEP_ON_RESET,
 ) -> dict[str, int]:
     """Return families to "base response written, not yet validated" (all, by default).
 
@@ -248,7 +252,8 @@ def reset(
     verdict from the same panel and rungs from the same P5. Items and manifest entries of
     previously admitted families are removed (they will be regenerated); rejection records
     are cleared; attempts restart at zero. With ``families``, only those are reset and every
-    other family's items, manifest entry and rejection record are kept in place. Each shard's prior ``state.json`` is kept as
+    other family's items, manifest entry and rejection record are kept in place. ``keep``
+    names the artifacts to retain; dropping ``plan`` makes the family re-plan from P3. Each shard's prior ``state.json`` is kept as
     ``state.pre-reset-<n>.json`` and the reason is logged in ``shards.json``.
     """
     manifest = _load_plan(root)
@@ -269,7 +274,7 @@ def reset(
         for fid, fs in fams.items():
             if families is not None and fid not in families:
                 continue
-            kept = {k: fs["artifacts"][k] for k in KEEP_ON_RESET if k in fs.get("artifacts", {})}
+            kept = {k: fs["artifacts"][k] for k in keep if k in fs.get("artifacts", {})}
             counts["with_response" if "response" in kept else "replanned"] += 1
             counts[f"was_{'admitted' if fs.get('stage') == 'admitted' else 'other'}"] += 1
             fams[fid] = {**fs, "stage": "", "attempts": 0, "rejected_reason": "",
@@ -289,7 +294,8 @@ def reset(
             _drop_families(d, set(families), n)
     manifest.setdefault("resets", []).append(
         {"n": n, "reason": reason, "git_commit": _git_commit(), "counts": dict(counts),
-         "families": sorted(families) if families is not None else "all"}
+         "families": sorted(families) if families is not None else "all",
+         "kept": list(keep)}
     )
     _save_plan(root, manifest)
     return dict(counts)
@@ -643,6 +649,8 @@ def main() -> int:
     p.add_argument("--root", required=True)
     p.add_argument("--reason", required=True)
     p.add_argument("--family", action="append", help="family id, repeatable; default all")
+    p.add_argument("--keep", default=",".join(KEEP_ON_RESET),
+                   help="comma-separated artifacts to retain (default: through the response)")
     p = sub.add_parser("regen")
     p.add_argument("--root", required=True)
     p.add_argument("--family", required=True)
@@ -667,7 +675,9 @@ def main() -> int:
     elif a.cmd == "launch":
         print(f"[shards] started: {launch(a.root, only=a.only, wait=a.wait)}")
     elif a.cmd == "reset":
-        print(f"[shards] reset: {reset(a.root, reason=a.reason, families=a.family)}")
+        keep = tuple(k for k in a.keep.split(",") if k)
+        print(f"[shards] reset: "
+              f"{reset(a.root, reason=a.reason, families=a.family, keep=keep)}")
     elif a.cmd == "regen":
         print(f"[shards] regen scratch: "
               f"{regen(a.root, a.family, reason=a.reason, no_cache=not a.keep_cache)}")

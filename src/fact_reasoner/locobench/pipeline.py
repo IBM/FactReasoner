@@ -720,7 +720,7 @@ def generate_family(
 
         def _plan_ok(candidate: dict[str, Any]) -> str | None:
             """The plan gates, as a retryable check rather than a terminal verdict."""
-            verdict = validate.gate_plan(candidate, claims)
+            verdict = validate.gate_plan(candidate, claims, family=family)
             return None if verdict.passed else verdict.reason()
 
         plan, err = caller.ask(
@@ -729,6 +729,7 @@ def generate_family(
             check=_plan_ok,
             question=question,
             claims=claims_text,
+            ladder=prompts.LADDER_REQUIREMENTS[family],
         )
         if err is not None:
             res.verdict.add(validate.GateResult("P3", False, detail=err or "no plan"))
@@ -745,7 +746,7 @@ def generate_family(
 
     # Re-run the gates on the accepted plan so their results are recorded on the verdict
     # (the check above only decided whether to retry).
-    plan_verdict = validate.gate_plan(plan, claims)
+    plan_verdict = validate.gate_plan(plan, claims, family=family)
     res.verdict.results.extend(plan_verdict.results)
     if not plan_verdict.passed:
         res.stage = "plan"

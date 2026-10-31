@@ -227,3 +227,17 @@ class TestRegen:
         assert all(g["model_options"]["extra_body"]["cache"] == {"no-cache": True}
                    for g in gens)
         assert shards._load_plan(root)["regens"][0]["family"] == target
+
+
+    def test_reset_can_drop_the_plan_so_the_family_replans(self, sharded, tmp_path):
+        root, manifest = sharded
+        target = manifest["shards"][0]["family_ids"][0]
+        shards.reset(root, reason="replan", families=[target], keep=("question", "claims"))
+        with open(os.path.join(manifest["shards"][0]["out_dir"], "state.json")) as f:
+            fs = json.load(f)["families"][target]
+        assert set(fs["artifacts"]) == {"question", "claims"}
+        _run(manifest["shards"][0]["command"])
+        with open(os.path.join(manifest["shards"][0]["out_dir"], "state.json")) as f:
+            fs = json.load(f)["families"][target]
+        assert fs["stage"] == "admitted"
+        assert "P3" in fs["artifacts"]["calls"] and "P1" not in fs["artifacts"]["calls"]

@@ -46,6 +46,7 @@ from typing import Any
 from fact_reasoner.locobench.taxonomy_bridge import (
     REQUIRED_EITHER,
     REQUIRED_SENSES,
+    coupling_for_sense,
 )
 
 # ----------------------------------------------------------------------------
@@ -230,7 +231,10 @@ def unanimous(votes: list[Any]) -> bool:
 
 
 def gate_plan(
-    plan: dict[str, Any], claims: list[dict[str, str]] | None = None
+    plan: dict[str, Any],
+    claims: list[dict[str, str]] | None = None,
+    *,
+    family: str = "CONFLICT",
 ) -> Verdict:
     """Apply the P3 gates a parser cannot: rare facets, window, validity split, factuality.
 
@@ -242,6 +246,8 @@ def gate_plan(
         plan: A parsed P3 plan.
         claims: P2's parsed claims, enabling the factuality gate. When omitted that gate is
             skipped, so callers that only have a plan keep working.
+        family: The ladder the plan is for, which selects its structural quota (see
+            ``prompts.LADDER_REQUIREMENTS``).
 
     Returns:
         The verdict.
@@ -249,6 +255,63 @@ def gate_plan(
     v = Verdict()
     rels = plan.get("relations", [])
     senses = [r.get("sense") for r in rels]
+
+    # The ladder's own quota: what its edits will consume. A gate, not a parser check,
+    # because it depends on the ladder and the parser is dispatched by prompt id alone; it
+    # still reaches the planner as retry feedback through `_Caller.ask`'s `check=`.
+    if family == "CHAIN":
+        # `break_chain` removes up to three entailment links. Breaking a planted-INVALID
+        # one removes an error and makes the text more coherent, inverting the ladder, so
+        # the links must be valid.
+        links = [
+            r for r in rels
+            if coupling_for_sense(str(r.get("sense"))) == "entailment"
+            and r.get("validity") == "valid"
+        ]
+        v.add(
+            GateResult(
+                "plan.chain_links",
+                len(links) >= 3,
+                threshold=">= 3 valid entailment relations",
+                observed=len(links),
+                detail="" if len(links) >= 3 else (
+                    f"plan has {len(links)} VALID entailment relation(s); a CHAIN ladder "
+                    "breaks up to three, so it needs AT LEAST 3 valid relations with an "
+                    "entailment sense (Cause-Effect, Effect-Cause, Evidence, Condition or "
+                    "Instantiation), linked so each one's target is the next one's source"
+                ),
+            )
+        )
+    else:
+        # A CONFLICT ladder's deepest rung applies `add_resolution` plus TWO DISTINCT
+        # `drop_relation` calls on conflict-coupled edges, so the plan needs >= 3
+        # unresolved conflicts, i.e. >= 4 conflict edges with at most one pre-resolved.
+        # (Moved here from `parse.parse_plan`, where it applied to every ladder; ORDER and
+        # CONTROL keep it so their plans are generated exactly as before.) A prose-only
+        # request was ignored by a live model on six consecutive families, which is why it
+        # is enforced rather than merely asked for.
+        conflicts = [
+            r for r in rels
+            if coupling_for_sense(str(r.get("sense"))) in ("contradiction", "exclusive")
+        ]
+        unresolved = [r for r in conflicts if not r.get("resolved")]
+        v.add(
+            GateResult(
+                "plan.conflict_edges",
+                len(unresolved) >= 3,
+                threshold=">= 3 unresolved conflict relations",
+                observed=len(unresolved),
+                detail="" if len(unresolved) >= 3 else (
+                    f"plan has {len(conflicts)} conflicting relation(s) "
+                    f"({sorted(r['sense'] for r in conflicts)}) of which only "
+                    f"{len(unresolved)} are unresolved; a CONFLICT ladder needs AT LEAST 4 "
+                    "relations with a conflicting sense (Alternative, Concession or "
+                    "Contrast) and AT MOST 1 of them marked resolved, because its deepest "
+                    "rung resolves one and then drops two others. Only three senses "
+                    "conflict, so use one of them TWICE on a different pair of claims"
+                ),
+            )
+        )
 
     # Rare-facet floor: the categories with no prior gold data must be present, or the
     # corpus will not grade the couplings the benchmark exists for.

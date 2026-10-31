@@ -677,6 +677,8 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
         is ``shuffle_order(level)``. ``apply_calls`` ignores the target for that call, so
         the level is inert on the label side and only varies the prompt.
     """
+    from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
     lad = ladder_for(family)
     drop_order = [str(e["id"]) for e in _conflict_edges(relations)]
     resolvable = [str(e["id"]) for e in _resolvable_edges(relations)]
@@ -718,6 +720,19 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
                         "",
                     )
                     if target:
+                        break
+            elif call == "break_chain":
+                # Only VALID entailment links. This call fell through to the generic
+                # first-unused-edge branch, so its targets were Precedence, Restatement,
+                # Alternative, Contrast... -- 10 of 69 in the opus-5-5 corpus were
+                # entailments, and no CHAIN family in either corpus broke only chain
+                # links. Breaking a planted-invalid entailment removes an error, which
+                # would make the "broken" rung MORE coherent than the base.
+                for eid, edge in by_id.items():
+                    if (eid not in used and edge.get("validity") == "valid"
+                            and coupling_for_sense(str(edge.get("level2_sense")))
+                            == "entailment"):
+                        target = eid
                         break
             elif call == "spurious_relation":
                 # Adds a NEW edge between two unrelated atoms; no existing edge target.

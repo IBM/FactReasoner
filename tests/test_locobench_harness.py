@@ -2339,6 +2339,7 @@ class TestP3PromptTeachesAConformingAnswer:
         assert prompts.instruction_count("P3") == 10
         assert prompts.placeholders("P3") == (
             "CLAIMS_PLACEHOLDER",
+            "LADDER_PLACEHOLDER",
             "QUESTION_PLACEHOLDER",
         )
         _check_probes()
@@ -2364,6 +2365,7 @@ class TestGateFailuresAreRepairable:
             check=lambda _p: "always unhappy",
             question="q",
             claims="- a [correct]",
+            ladder=prompts.LADDER_REQUIREMENTS["CONFLICT"],
         )
         assert calls == [0, 1, 2], "the check must be retried, not evaluated once"
         assert err == "always unhappy"
@@ -2382,6 +2384,7 @@ class TestGateFailuresAreRepairable:
             check=lambda _p: "only 4 of 10 relations are valid",
             question="q",
             claims="- a [correct]",
+            ladder=prompts.LADDER_REQUIREMENTS["CONFLICT"],
         )
         assert "only 4 of 10 relations are valid" in seen[1]
         # A gate complaint must NOT be framed as an unreadable output. The output parsed
@@ -2402,7 +2405,8 @@ class TestGateFailuresAreRepairable:
             return "not a plan at all"
 
         _Caller(llm, attempts=2).ask(
-            "P3", parse.parse_plan, question="q", claims="- a [correct]"
+            "P3", parse.parse_plan, question="q", claims="- a [correct]",
+            ladder=prompts.LADDER_REQUIREMENTS["CONFLICT"],
         )
         assert "could not be read" in seen[1]
         assert "did not meet a quality requirement" not in seen[1]
@@ -2420,6 +2424,7 @@ class TestGateFailuresAreRepairable:
             check=lambda _p: None,
             question="q",
             claims="- a [correct]",
+            ladder=prompts.LADDER_REQUIREMENTS["CONFLICT"],
         )
         assert err is None and value is not None
         assert calls == [0]
@@ -3773,6 +3778,60 @@ class TestPromptTexParity:
         )
 
 
+class TestChainLadderBreaksEntailments:
+    """CHAIN plans carry valid entailment links, and break_chain breaks only those.
+
+    break_chain fell through to the first edges in the plan: 10 of its 69 opus-5-5 targets
+    were entailments, and no CHAIN family in either corpus broke only chain links.
+    """
+
+    def _plan(self, n_valid_entailment):
+        senses = (["Cause-Effect"] * n_valid_entailment
+                  + ["Restatement", "Alternative", "Disjunction", "Concession", "Precedence",
+                     "Contrast", "Contrast"])[:10]
+        while len(senses) < 10:
+            senses.append("Contrast")
+        rels = []
+        for i, s in enumerate(senses):
+            rels.append({"source_pos": i + 1, "target_pos": i + 2, "sense": s,
+                         "validity": "valid" if i < 6 else "invalid",
+                         "resolved": False if s == "Concession" else None})
+        return {"relations": rels, "atoms": [], "non_relations": []}
+
+    def test_chain_quota_requires_three_valid_entailments(self):
+        def chain_gate(plan):
+            return next(g for g in validate.gate_plan(plan, family="CHAIN").results
+                        if g.gate == "plan.chain_links")
+
+        assert chain_gate(self._plan(3)).passed
+        assert not chain_gate(self._plan(2)).passed
+
+    def test_chain_does_not_carry_the_conflict_quota(self):
+        v = validate.gate_plan(self._plan(3), family="CHAIN")
+        assert not any(g.gate == "plan.conflict_edges" for g in v.results)
+
+    def test_break_chain_targets_only_valid_entailments(self):
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        rels = [
+            {"id": f"r{i:03d}", "level2_sense": s, "validity": v}
+            for i, (s, v) in enumerate([
+                ("Precedence", "valid"), ("Contrast", "valid"), ("Evidence", "invalid"),
+                ("Cause-Effect", "valid"), ("Restatement", "valid"), ("Evidence", "valid"),
+                ("Condition", "valid"),
+            ])
+        ]
+        targets = perturb.plan_targets("CHAIN", rels)
+        by_id = {r["id"]: r for r in rels}
+        hit = {t for k, ts in targets.items() for c, t in
+               zip(next(r for r in perturb.ladder_for("CHAIN").rungs if r.index == k).calls, ts)
+               if c == "break_chain"}
+        assert hit == {"r003", "r005", "r006"}
+        for t in hit:
+            assert by_id[t]["validity"] == "valid"
+            assert coupling_for_sense(by_id[t]["level2_sense"]) == "entailment"
+
+
 class TestIdenticalTextNeedsIdenticalLabels:
     """Two rungs with the same prose must carry the same gold edge set (opus-5-5 f029)."""
 
@@ -4031,12 +4090,17 @@ class TestDefectTwoPerRungRelations:
         and rung 4 collapses onto rung 3. Measured live: droppable==3 admitted 4/4 and
         droppable==2 was rejected 4/4 across 8 distinct topics.
         """
-        head = prompts.PROMPTS["P3"].split("```json")[0]
-        assert "AT LEAST FOUR" in head
-        assert "AT MOST" in head and "resolved Concession" in head
+        req = prompts.LADDER_REQUIREMENTS["CONFLICT"]
+        assert "AT LEAST FOUR" in req
+        assert "AT MOST" in req and "resolved Concession" in req
+        for fam in ("ORDER", "CONTROL"):
+            assert prompts.LADDER_REQUIREMENTS[fam] == req
 
-    def test_parse_plan_rejects_too_few_droppable_conflicts(self):
-        """The prompt alone did not work, so the PARSER enforces the pool.
+    def test_gate_plan_rejects_too_few_droppable_conflicts(self):
+        """The prompt alone did not work, so the PLAN GATE enforces the pool.
+
+        It was a parser check, which applied the conflict quota to every ladder; it is a
+        gate now so CHAIN can carry its own quota instead.
 
         Instruction 5 was extended to demand >= 4 conflict edges with <= 1 resolved, and a
         live model ignored it on six consecutive families across five topics -- each time
@@ -4061,8 +4125,10 @@ class TestDefectTwoPerRungRelations:
             if r["sense"] == "Contrast" and r["source_pos"] == 4:
                 r["sense"] = "Instantiation"
         parsed, err = parse.parse_plan("```json" + _json.dumps(bad) + "```")
-        assert parsed is None
-        assert "conflicting relation" in err and "unresolved" in err
+        assert parsed is not None, err  # structurally fine
+        verdict = validate.gate_plan(parsed, family="CONFLICT")
+        assert not verdict.passed
+        assert "conflicting relation" in verdict.reason() and "unresolved" in verdict.reason()
 
     def test_p3_worked_example_is_itself_admissible(self):
         """The example in instruction 10 must satisfy the rule instruction 5 states.
