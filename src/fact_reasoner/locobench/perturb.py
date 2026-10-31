@@ -552,20 +552,24 @@ def _reversal_invariant_senses() -> tuple[str, ...]:
     from fact_reasoner.lcs.taxonomy import Level2Sense
     from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense, is_ordering_only
 
-    out = []
+    coupled, uncoupled = [], []
     for s in Level2Sense:
         if s.value == "None":
             continue
         if is_ordering_only(s.value):
-            out.append(s.value)
+            uncoupled.append(s.value)
             continue
         edge = SimpleNamespace(
             type=coupling_for_sense(s.value), link="atom_atom", probability=0.7
         )
         t = edge_factor_values(edge, use_priors=True)
         if t[1] == t[2]:  # row-major [(0,0),(0,1),(1,0),(1,1)]: symmetric iff (0,1)==(1,0)
-            out.append(s.value)
-    return tuple(out)
+            coupled.append(s.value)
+    # Coupled first: reversing an edge that builds a factor tests that a measure respects
+    # the factor's symmetry, which ordering_only (CONTROL's other edit) cannot. Falling back
+    # to the Precedence edge made both edits hit the same edge on opus-5-5 f031, so its four
+    # edited rungs shared one text while carrying two different gold graphs.
+    return tuple(coupled + uncoupled)
 
 
 # Which senses each call can legally target. A call whose ladder finds no eligible edge is
@@ -706,11 +710,14 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
                         target = eid
                         break
             elif call in _ELIGIBLE_SENSES:
-                for eid, edge in by_id.items():
-                    if eid in used:
-                        continue
-                    if edge.get("level2_sense") in _ELIGIBLE_SENSES[call]:
-                        target = eid
+                # Senses are tried in the tuple's order of preference, then plan order.
+                for sense in _ELIGIBLE_SENSES[call]:
+                    target = next(
+                        (eid for eid, edge in by_id.items()
+                         if eid not in used and edge.get("level2_sense") == sense),
+                        "",
+                    )
+                    if target:
                         break
             elif call == "spurious_relation":
                 # Adds a NEW edge between two unrelated atoms; no existing edge target.

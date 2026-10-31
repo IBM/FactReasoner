@@ -1005,6 +1005,40 @@ def generate_family(
         }
         res.calls = caller.counts
         return res
+    # The converse, over ALL rung pairs: identical TEXT must carry identical LABELS. The
+    # adjacency gate compares edge sets, not prose, and only between neighbours, so it
+    # passed opus-5-5 f029, whose `break_1` and `coherent` rungs came back byte-identical
+    # while their labels declared different edits -- a gold graph describing an edit the
+    # text does not contain. Rungs that share both (CONTROL's symmetric 0/4 and 1/3) pass.
+    for i, a in enumerate(lad.rungs):
+        for b in lad.rungs[i + 1 :]:
+            if texts[a.index] != texts[b.index]:
+                continue
+            if _edge_set_signature(rung_relations[a.index]) == _edge_set_signature(
+                rung_relations[b.index]
+            ):
+                continue
+            res.verdict.add(
+                validate.GateResult(
+                    f"P5.rung{b.index}.text_label",
+                    False,
+                    detail=(
+                        f"rungs {a.index} ({a.name}) and {b.index} ({b.name}) have "
+                        "identical text but different gold edge sets, so at least one "
+                        "rung's labels describe an edit its prose does not contain. The "
+                        "family is rejected."
+                    ),
+                )
+            )
+            res.stage = "perturb"
+            res.artifacts = {
+                "question": question,
+                "claims": claims,
+                "plan": plan,
+                "response": base,
+            }
+            res.calls = caller.counts
+            return res
     res.timing["perturb"] = round(time.perf_counter() - t2, 3)
 
     # ---- stage: admit -------------------------------------------------------

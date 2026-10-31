@@ -3773,6 +3773,36 @@ class TestPromptTexParity:
         )
 
 
+class TestIdenticalTextNeedsIdenticalLabels:
+    """Two rungs with the same prose must carry the same gold edge set (opus-5-5 f029)."""
+
+    def test_a_rung_repeating_another_rungs_text_is_rejected(self):
+        # CHAIN dispatches P5 base-first then by rung index: rung 0 (3 calls), 1 (2), 2 (1),
+        # then rung 4 (1). Return rung 2's prose for rung 4's single call -- a real edit
+        # (text_changed passes, rung 3 is the base) whose result duplicates a non-adjacent
+        # rung with different labels, which is what f029 shipped.
+        assert [len(r.calls) for r in perturb.ladder_for("CHAIN").rungs] == [3, 2, 1, 0, 1]
+        cfg = _dry_cfg()
+        mock = make_mock_llm(cfg, plan_holder={})
+        p5_outputs: list[str] = []
+
+        def llm(rendered):
+            out = mock(rendered)
+            if "one PERTURBATION to apply" in rendered:
+                p5_outputs.append(out)
+                if len(p5_outputs) == 7:  # rung 4's call
+                    return p5_outputs[5]  # rung 2's call
+            return out
+
+        res = generate_family("f001", "Law", "CHAIN", cfg, llm=llm)
+        assert not res.admitted
+        assert "identical text but different gold edge sets" in res.verdict.reason()
+
+    def test_control_symmetric_rungs_still_pass(self):
+        res = generate_family("f001", "Art", "CONTROL", _dry_cfg())
+        assert res.admitted
+
+
 class TestControlReversalTargets:
     """CONTROL's direction_reversal rungs must target reversal-invariant edges.
 
@@ -3808,6 +3838,18 @@ class TestControlReversalTargets:
         rev = [targets[r.index][0] for r in perturb.ladder_for("CONTROL").rungs
                if r.calls == ("direction_reversal",)]
         assert all(rev)
+
+    def test_the_two_control_edits_target_different_edges(self):
+        # opus-5-5 f031: both edits hit the lone Precedence edge, so the four edited rungs
+        # shared one text under two different gold graphs.
+        rels = self._relations(["Precedence", "Concession", "Restatement", "Alternative"])
+        targets = perturb.plan_targets("CONTROL", rels)
+        by_call = {}
+        for r in perturb.ladder_for("CONTROL").rungs:
+            for call, t in zip(r.calls, targets.get(r.index, [])):
+                by_call.setdefault(call, set()).add(t)
+        assert by_call["ordering_only"] == {"r000"}
+        assert not by_call["direction_reversal"] & by_call["ordering_only"]
 
     def test_contrast_is_not_eligible(self):
         # Symmetric as a SENSE, asymmetric as a with-priors factor table.
