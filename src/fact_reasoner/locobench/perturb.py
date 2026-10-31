@@ -527,11 +527,53 @@ _ORDERING_FLIP: dict[str, str] = {
     "Succession": "Precedence",
 }
 
+def _reversal_invariant_senses() -> tuple[str, ...]:
+    """Senses whose edge can be reversed without changing any factor the scorer builds.
+
+    `direction_reversal` is the CONTROL ladder's meaning-preserving edit, so its target must
+    leave the Markov network unchanged. That is a property of the factor TABLE, not of the
+    sense's `directed` flag: `contradiction` penalizes only the symmetric (1,1) world but its
+    with-priors table carries the source's prior on one row, so reversing even a symmetric
+    `Contrast` moves every readout, and `entailment` is asymmetric for the same reason. The
+    set is therefore derived from :func:`factors.edge_factor_values` -- a table equal to its
+    transpose -- plus the
+    ordering-only senses, which build no factor at all. At present that is Restatement
+    (`equivalence`), Alternative (`exclusive`), Disjunction (`co_necessity`, whose prior sits
+    on both off-diagonal cells), Precedence and Succession; every P3 plan carries all three
+    coupled kinds, so a CONTROL ladder always finds two distinct targets.
+
+    Until this existed the call targeted the first edge in the plan whatever its sense: 7 of
+    the opus-5-5 corpus's 12 CONTROL families reversed a Concession, Contrast, Condition or
+    Cause-Effect edge and scored 0/12 on the ladder they exist to test.
+    """
+    from types import SimpleNamespace
+
+    from fact_reasoner.factors import edge_factor_values
+    from fact_reasoner.lcs.taxonomy import Level2Sense
+    from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense, is_ordering_only
+
+    out = []
+    for s in Level2Sense:
+        if s.value == "None":
+            continue
+        if is_ordering_only(s.value):
+            out.append(s.value)
+            continue
+        edge = SimpleNamespace(
+            type=coupling_for_sense(s.value), link="atom_atom", probability=0.7
+        )
+        t = edge_factor_values(edge, use_priors=True)
+        if t[1] == t[2]:  # row-major [(0,0),(0,1),(1,0),(1,1)]: symmetric iff (0,1)==(1,0)
+            out.append(s.value)
+    return tuple(out)
+
+
 # Which senses each call can legally target. A call whose ladder finds no eligible edge is
 # a no-op on the edge set, recorded rather than silently skipped.
 _ELIGIBLE_SENSES: dict[str, tuple[str, ...]] = {
     "exhaustiveness_flip": tuple(_EXHAUSTIVENESS_FLIP),
     "ordering_only": tuple(_ORDERING_FLIP),
+    "direction_reversal": _reversal_invariant_senses(),
 }
 
 # Calls that leave the MRF's factor set unchanged BY DESIGN, so a rung built only from them

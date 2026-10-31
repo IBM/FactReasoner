@@ -187,3 +187,20 @@ class TestReset:
         shards.merge(root, after)
         assert _items(after) == _items(before)
         assert shards._load_plan(root)["resets"][0]["reason"] == "test"
+
+
+    def test_a_family_reset_touches_only_that_family(self, sharded, tmp_path):
+        root, manifest = sharded
+        before = str(tmp_path / "before")
+        shards.merge(root, before)
+        target = manifest["shards"][0]["family_ids"][0]
+        counts = shards.reset(root, reason="one", families=[target])
+        assert counts["was_admitted"] == 1
+        for e in manifest["shards"]:
+            ids = {it["expected"]["family_id"] for it in _items(e["out_dir"])}
+            assert target not in ids
+            assert ids == set(e["family_ids"]) - {target}
+        _run(manifest["shards"][0]["command"])
+        after = str(tmp_path / "after")
+        shards.merge(root, after)
+        assert _items(after) == _items(before)

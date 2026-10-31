@@ -1925,3 +1925,71 @@ def test_short_arm_keeps_the_variant_visible():
     )
     assert rp._short_arm("mined:m:windowed") == "windowed"
     assert rp._short_arm("gold") == "gold"
+
+
+# ---------------------------------------------------------------------------
+# direction_reversal is meaning-preserving only on reversal-invariant couplings.
+# ---------------------------------------------------------------------------
+
+
+def _reversal_item(sense):
+    """Four atoms with distinct priors, one edge of `sense` between a0 and a2."""
+    from fact_reasoner.locobench.taxonomy_bridge import (
+        coupling_for_sense,
+        is_directed,
+        is_ordering_only,
+    )
+
+    rng = (0.6, 0.84)
+    rel = _relation("r0", "a0", "a2", sense, coupling_for_sense(sense), "moderate", rng,
+                    directed=is_directed(sense), ordering_only=is_ordering_only(sense))
+    # A second, fixed edge so the network is not just the edge under test.
+    anchor = _relation("r1", "a1", "a3", "Evidence", "entailment", "strong", (0.85, 1.0))
+    return {
+        "id": f"rev-{sense}",
+        "response": "x",
+        "num_atoms": 4,
+        "atoms": [
+            {"id": "a0", "text": "Atom zero.", "factual": True, "pos": 1},
+            {"id": "a1", "text": "Atom one.", "factual": True, "pos": 2},
+            {"id": "a2", "text": "Atom two.", "factual": False, "pos": 3},
+            {"id": "a3", "text": "Atom three.", "factual": True, "pos": 4},
+        ],
+        "relations": [rel, anchor],
+    }
+
+
+def _gold_scores(item):
+    res = gg.build_gold_result(item)
+    return LCSScorer("unused-merlin-path").score_all(
+        res, methods=("mean_marginal", "consistency", "log_partition")
+    )
+
+
+@pytest.mark.parametrize(
+    "sense",
+    ["Cause-Effect", "Effect-Cause", "Evidence", "Condition", "Instantiation",
+     "Restatement", "Contrast", "Concession", "Alternative", "Disjunction",
+     "Precedence", "Succession"],
+)
+def test_reversal_changes_the_score_exactly_when_the_sense_is_not_eligible(sense):
+    # The CONTROL ladder's invariance rests on this partition: the senses
+    # `direction_reversal` may target are precisely those whose reversal leaves every
+    # graded readout unchanged. Measured, not asserted from the factor tables.
+    from fact_reasoner.locobench import perturb
+
+    item = _reversal_item(sense)
+    before = _gold_scores(item)
+    rev = copy.deepcopy(item)
+    r = rev["relations"][0]
+    r["source_id"], r["target_id"] = r["target_id"], r["source_id"]
+    after = _gold_scores(rev)
+    moved = any(
+        abs(before[m] - after[m]) > 1e-9
+        for m in ("mean_marginal", "consistency", "log_partition")
+    )
+    eligible = sense in perturb._ELIGIBLE_SENSES["direction_reversal"]
+    assert moved != eligible, (
+        f"{sense}: reversal {'moved' if moved else 'did not move'} the score but the "
+        f"sense is {'' if eligible else 'not '}eligible for direction_reversal"
+    )

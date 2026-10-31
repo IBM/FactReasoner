@@ -3773,6 +3773,47 @@ class TestPromptTexParity:
         )
 
 
+class TestControlReversalTargets:
+    """CONTROL's direction_reversal rungs must target reversal-invariant edges.
+
+    The call used to fall through to "first edge in the plan", which on 7 of 12 opus-5-5
+    CONTROL families was a directed coupling -- so the ladder's declared invariance was false
+    by construction. Measured invariance per sense is tested in test_locoeval.
+    """
+
+    def _relations(self, senses):
+        from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+        return [
+            {"id": f"r{i:03d}", "level2_sense": s, "level1_coupling": coupling_for_sense(s),
+             "source_id": f"a{i}", "target_id": f"a{i + 1}"}
+            for i, s in enumerate(senses)
+        ]
+
+    def test_first_edge_directed_is_skipped(self):
+        rels = self._relations(["Concession", "Cause-Effect", "Restatement", "Alternative",
+                                "Precedence"])
+        targets = perturb.plan_targets("CONTROL", rels)
+        lad = perturb.ladder_for("CONTROL")
+        by_id = {r["id"]: r for r in rels}
+        eligible = perturb._ELIGIBLE_SENSES["direction_reversal"]
+        for rung in lad.rungs:
+            for call, t in zip(rung.calls, targets.get(rung.index, [])):
+                if call == "direction_reversal":
+                    assert t and by_id[t]["level2_sense"] in eligible
+
+    def test_the_two_reversal_rungs_need_not_share_a_target(self):
+        rels = self._relations(["Contrast", "Restatement", "Alternative", "Precedence"])
+        targets = perturb.plan_targets("CONTROL", rels)
+        rev = [targets[r.index][0] for r in perturb.ladder_for("CONTROL").rungs
+               if r.calls == ("direction_reversal",)]
+        assert all(rev)
+
+    def test_contrast_is_not_eligible(self):
+        # Symmetric as a SENSE, asymmetric as a with-priors factor table.
+        assert "Contrast" not in perturb._ELIGIBLE_SENSES["direction_reversal"]
+
+
 class TestP5DefinesEveryCall:
     """Every operator call a ladder dispatches must be defined in P5.
 

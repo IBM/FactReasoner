@@ -238,13 +238,16 @@ def launch(root: str, *, only: list[str] | None = None, wait: bool = False) -> l
 KEEP_ON_RESET = ("question", "claims", "plan", "response")
 
 
-def reset(root: str, *, reason: str) -> dict[str, int]:
-    """Return every family in every shard to "base response written, not yet validated".
+def reset(
+    root: str, *, reason: str, families: list[str] | None = None
+) -> dict[str, int]:
+    """Return families to "base response written, not yet validated" (all, by default).
 
     Used when the committee or P5 changes mid-run, so that every admitted family carries a
     verdict from the same panel and rungs from the same P5. Items and manifest entries of
     previously admitted families are removed (they will be regenerated); rejection records
-    are cleared; attempts restart at zero. Each shard's prior ``state.json`` is kept as
+    are cleared; attempts restart at zero. With ``families``, only those are reset and every
+    other family's items, manifest entry and rejection record are kept in place. Each shard's prior ``state.json`` is kept as
     ``state.pre-reset-<n>.json`` and the reason is logged in ``shards.json``.
     """
     manifest = _load_plan(root)
@@ -255,12 +258,16 @@ def reset(root: str, *, reason: str) -> dict[str, int]:
         sp = os.path.join(d, STATE_FILE)
         if not os.path.exists(sp):
             continue
+        if families is not None and not set(families) & set(e["family_ids"]):
+            continue
         if _alive(e.get("pid")):
             raise RuntimeError(f"{e['shard']} is running; stop it before resetting")
         raw = _read_json(sp)
         shutil.copy2(sp, os.path.join(d, f"state.pre-reset-{n}.json"))
         fams = raw.get("families", {})
         for fid, fs in fams.items():
+            if families is not None and fid not in families:
+                continue
             kept = {k: fs["artifacts"][k] for k in KEEP_ON_RESET if k in fs.get("artifacts", {})}
             counts["with_response" if "response" in kept else "replanned"] += 1
             counts[f"was_{'admitted' if fs.get('stage') == 'admitted' else 'other'}"] += 1
@@ -268,19 +275,51 @@ def reset(root: str, *, reason: str) -> dict[str, int]:
                          "item_ids": [], "artifacts": kept}
         with open(sp, "w") as f:
             json.dump(raw, f, indent=2)
-        for name in (ITEMS_FILE, MANIFEST_FILE):
-            path = os.path.join(d, name)
-            if os.path.exists(path):
-                os.replace(path, os.path.join(d, f"{name}.pre-reset-{n}"))
-        rdir = os.path.join(d, REJECTED_DIR)
-        if os.path.isdir(rdir):
-            shutil.move(rdir, os.path.join(d, f"{REJECTED_DIR}.pre-reset-{n}"))
-            os.makedirs(rdir)
+        if families is None:
+            for name in (ITEMS_FILE, MANIFEST_FILE):
+                path = os.path.join(d, name)
+                if os.path.exists(path):
+                    os.replace(path, os.path.join(d, f"{name}.pre-reset-{n}"))
+            rdir = os.path.join(d, REJECTED_DIR)
+            if os.path.isdir(rdir):
+                shutil.move(rdir, os.path.join(d, f"{REJECTED_DIR}.pre-reset-{n}"))
+                os.makedirs(rdir)
+        else:
+            _drop_families(d, set(families), n)
     manifest.setdefault("resets", []).append(
-        {"n": n, "reason": reason, "git_commit": _git_commit(), "counts": dict(counts)}
+        {"n": n, "reason": reason, "git_commit": _git_commit(), "counts": dict(counts),
+         "families": sorted(families) if families is not None else "all"}
     )
     _save_plan(root, manifest)
     return dict(counts)
+
+
+def _drop_families(d: str, fids: set[str], n: int) -> None:
+    """Remove ``fids``' items, manifest entries and rejection records from shard ``d``.
+
+    The originals are kept beside the live files with a ``.pre-reset-<n>`` suffix.
+    """
+    ip = os.path.join(d, ITEMS_FILE)
+    if os.path.exists(ip):
+        shutil.copy2(ip, f"{ip}.pre-reset-{n}")
+        with open(ip) as f:
+            keep = [ln for ln in f if ln.strip()
+                    and json.loads(ln)["expected"]["family_id"] not in fids]
+        with open(ip, "w") as f:
+            f.writelines(keep)
+    mp = os.path.join(d, MANIFEST_FILE)
+    if os.path.exists(mp):
+        shutil.copy2(mp, f"{mp}.pre-reset-{n}")
+        m = _read_json(mp)
+        m["families"] = [e for e in m["families"] if e["family_id"] not in fids]
+        with open(mp, "w") as f:
+            json.dump(m, f, indent=2)
+    rdir = os.path.join(d, REJECTED_DIR)
+    for fid in fids:
+        rp = os.path.join(rdir, f"{fid}.json")
+        if os.path.exists(rp):
+            os.makedirs(f"{rdir}.pre-reset-{n}", exist_ok=True)
+            shutil.move(rp, os.path.join(f"{rdir}.pre-reset-{n}", f"{fid}.json"))
 
 
 # -- status -------------------------------------------------------------------
@@ -509,6 +548,7 @@ def main() -> int:
     p = sub.add_parser("reset")
     p.add_argument("--root", required=True)
     p.add_argument("--reason", required=True)
+    p.add_argument("--family", action="append", help="family id, repeatable; default all")
     p = sub.add_parser("status")
     p.add_argument("--root", required=True)
     p = sub.add_parser("merge")
@@ -528,7 +568,7 @@ def main() -> int:
     elif a.cmd == "launch":
         print(f"[shards] started: {launch(a.root, only=a.only, wait=a.wait)}")
     elif a.cmd == "reset":
-        print(f"[shards] reset: {reset(a.root, reason=a.reason)}")
+        print(f"[shards] reset: {reset(a.root, reason=a.reason, families=a.family)}")
     elif a.cmd == "status":
         _print_status(status(a.root))
     elif a.cmd == "merge":
