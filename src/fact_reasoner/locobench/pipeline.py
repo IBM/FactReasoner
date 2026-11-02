@@ -774,7 +774,8 @@ def generate_family(
         def _response_ok(candidate: str) -> str | None:
             """The response gates, as a retryable check rather than a terminal verdict."""
             verdict = _validate_response(
-                caller, candidate, plan, atom_texts, auditors=audit_callers
+                caller, candidate, plan, atom_texts, auditors=audit_callers,
+                claims=claims,
             )
             # Kept so the accepted (or last rejected) verdict is REUSED below rather than
             # recomputed. Re-running it would silently double the validator calls -- 1 V1 +
@@ -820,7 +821,7 @@ def generate_family(
     if resp_verdict is None:
         # Resumed from a stored response, so the gates have not run against it.
         resp_verdict = _validate_response(
-            caller, base, plan, atom_texts, auditors=audit_callers
+            caller, base, plan, atom_texts, auditors=audit_callers, claims=claims
         )
         if not resp_verdict.passed:
             res.verdict.results.extend(resp_verdict.results)
@@ -1140,6 +1141,7 @@ def _validate_response(
     atom_texts: list[str],
     *,
     auditors: list[tuple[str, _Caller]] | None = None,
+    claims: list[dict[str, Any]] | None = None,
 ) -> Verdict:
     """Run V1, V3 and V4 on a base response, on the committee rather than the author.
 
@@ -1170,6 +1172,9 @@ def _validate_response(
         auditors: ``(name, caller)`` pairs, per R3 generator exclusion. Defaults to
             ``[("self", caller)]`` -- the model validates its own prose, a weaker result, so
             the CLI warns when it cannot supply separate ones.
+        claims: P2's tagged claims, from which the planted-false atoms are derived the
+            same way the shipped labels are (:func:`_atoms_from_plan`), for V4's
+            false-atom check. Omitted, the plan's own ``factual`` fields are used.
 
     Returns:
         The combined verdict.
@@ -1243,8 +1248,15 @@ def _validate_response(
             coverages.append((name, cov))
     if not coverages:
         return v.add(validate.GateResult("V4", False, detail="no coverage output"))
+    # V4's index i is atom_texts[i-1], the i-th plan atom in position order -- the same
+    # order `_atoms_from_plan` emits a0..aN in, and from the same labels that ship.
+    false_indices = {
+        i + 1 for i, a in enumerate(_atoms_from_plan(plan, claims)) if not a["factual"]
+    }
     v.results.extend(
-        validate.gate_coverage_panel(coverages, len(atom_texts)).results
+        validate.gate_coverage_panel(
+            coverages, len(atom_texts), false_indices=false_indices
+        ).results
     )
     return v
 

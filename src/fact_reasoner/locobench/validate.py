@@ -79,6 +79,13 @@ THRESHOLDS: dict[str, Any] = {
     # rejections were one `altered` atom. `missing` and `merged` are structural losses.
     "v4_gating_statuses": ("missing", "merged"),
     "v4_rule": "majority",  # of the panel must call an atom lost for it to count
+    # ...except on a planted-FALSE atom, where `altered` gates too (`V4.false_atoms`). The
+    # leniency above exists for surface rewording of true content; on a false atom the
+    # characteristic `altered` is the generator correcting it to the truth, which leaves a
+    # `factual: false` label on prose asserting the opposite. Measured on opus-5-5: 9 of
+    # 204 false atoms were corrected this way, in f033, f035, f055 and f058 -- every false
+    # atom in each, so those four responses carried no false content at all.
+    "v4_false_gating_statuses": ("missing", "merged", "altered"),
     # -- plan structure (P3) --
     "n_claims": (14, 16),  # a dead copy of parse.N_CLAIMS_RANGE; keep them in step
     "n_relations": (8, 12),
@@ -1200,7 +1207,10 @@ def gate_coverage(entries: list[dict[str, Any]], n_atoms: int) -> Verdict:
 
 
 def gate_coverage_panel(
-    coverages: list[tuple[str, list[dict[str, Any]]]], n_atoms: int
+    coverages: list[tuple[str, list[dict[str, Any]]]],
+    n_atoms: int,
+    *,
+    false_indices: "set[int] | None" = None,
 ) -> Verdict:
     """Apply the V4 gate over several raters, counting an atom lost only on a majority.
 
@@ -1219,6 +1229,11 @@ def gate_coverage_panel(
         coverages: ``(rater name, parsed V4 output)`` pairs. A single entry reduces to
             :func:`gate_coverage`'s behaviour.
         n_atoms: How many atoms the plan selected.
+        false_indices: The 1-based V4 indices of the plan's planted-FALSE atoms. When
+            given, a second result ``V4.false_atoms`` rejects if a majority calls any of
+            them altered, missing or merged: a false atom the prose no longer asserts
+            leaves its ``factual: false`` label describing content that is not there.
+            ``None`` (the default) skips the check, preserving the old behaviour.
 
     Returns:
         The verdict, with every rater's per-atom dissent recorded.
@@ -1303,6 +1318,43 @@ def gate_coverage_panel(
             f"{[(i, lost_by[i]) for i in lost[:6]]}",
         )
     )
+
+    if false_indices is not None:
+        false_set = {_idx(i) for i in false_indices}
+        false_gating = THRESHOLDS["v4_false_gating_statuses"]
+        not_asserted: dict[Any, set[str]] = {}
+        for name, entries in coverages:
+            for e in entries:
+                idx = _idx(e.get("index"))
+                if idx in false_set and e.get("status") in false_gating:
+                    not_asserted.setdefault(idx, set()).add(name)
+        bad_false = sorted(
+            (i for i, voters in not_asserted.items() if len(voters) >= needed), key=_order
+        )
+        v.add(
+            GateResult(
+                "V4.false_atoms",
+                not bad_false,
+                threshold=f"majority of {n} must not call a planted-false atom "
+                f"{'/'.join(false_gating)}",
+                observed={
+                    "false_indices": sorted(false_set, key=_order),
+                    "not_asserted": [str(i) for i in bad_false],
+                    "votes": {
+                        str(k): sorted(vs)
+                        for k, vs in sorted(not_asserted.items(), key=lambda kv: _order(kv[0]))
+                    },
+                },
+                # Worded for the P4 retry, which receives this text: it must say what to do.
+                detail=""
+                if not bad_false
+                else f"planted-FALSE atom(s) {[int(i) if isinstance(i, int) else i for i in bad_false]} "
+                "are not asserted as written: the response corrected, contradicted or "
+                "omitted them. Each false atom must be asserted exactly as given, "
+                "including its wrong figure, date, entity or polarity -- do not fix it "
+                "to the true fact, and do not add text that refutes it.",
+            )
+        )
     return v
 
 

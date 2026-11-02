@@ -3181,6 +3181,108 @@ class TestV4PanelVote:
         assert v.passed, "one rater listing an atom twice must not constitute a majority"
 
 
+class TestV4FalseAtomsMustStayFalse:
+    """A planted-false atom the prose corrects is a label/text contradiction, so it gates.
+
+    `altered` is non-gating for true atoms (surface rewording), but on a false atom the
+    characteristic alteration is the generator fixing it to the truth. opus-5-5 admitted
+    four families this way (f033, f035, f055, f058) with EVERY false atom corrected, so
+    the shipped `factual: false` labels described content the responses did not contain.
+    """
+
+    def _cov(self, statuses):
+        return [{"index": i + 1, "status": s} for i, s in enumerate(statuses)]
+
+    def _gate(self, v):
+        return next(g for g in v.results if g.gate == "V4.false_atoms")
+
+    def test_a_majority_altered_false_atom_rejects(self):
+        alt = self._cov(["asserted", "altered", "asserted"])
+        ok = self._cov(["asserted"] * 3)
+        v = validate.gate_coverage_panel(
+            [("a", alt), ("b", alt), ("c", ok)], 3, false_indices={2}
+        )
+        assert not v.passed
+        g = self._gate(v)
+        assert g.observed["not_asserted"] == ["2"]
+        # The detail is fed back to P4 on retry, so it must say what to do.
+        assert "do not fix it" in g.detail
+
+    def test_altered_true_atoms_still_never_gate(self):
+        alt = self._cov(["asserted", "altered", "asserted"])
+        v = validate.gate_coverage_panel(
+            [("a", alt), ("b", alt), ("c", alt)], 3, false_indices={3}
+        )
+        assert v.passed
+
+    def test_a_lone_altered_vote_on_a_false_atom_does_not_reject(self):
+        alt = self._cov(["altered", "asserted"])
+        ok = self._cov(["asserted", "asserted"])
+        v = validate.gate_coverage_panel(
+            [("a", alt), ("b", ok), ("c", ok)], 2, false_indices={1}
+        )
+        assert v.passed
+        assert self._gate(v).observed["votes"] == {"1": ["a"]}
+
+    def test_altered_and_missing_votes_combine_into_a_majority(self):
+        # opus-5-5 f055 a7 and f058 a1 were each voted altered x2 + missing x1. Mixed votes
+        # must pool: altered x1 + missing x1 is a majority against a false atom, even
+        # though V4 proper sees only one lost vote and passes.
+        v = validate.gate_coverage_panel(
+            [("a", self._cov(["altered"])), ("b", self._cov(["missing"])),
+             ("c", self._cov(["asserted"]))],
+            1,
+            false_indices={1},
+        )
+        assert next(g for g in v.results if g.gate == "V4").passed
+        assert not self._gate(v).passed
+
+    def test_string_indices_match(self):
+        v = validate.gate_coverage_panel(
+            [("a", [{"index": "2", "status": "altered"}]),
+             ("b", [{"index": 2, "status": "altered"}])],
+            2,
+            false_indices={2},
+        )
+        assert not self._gate(v).passed
+
+    def test_omitting_false_indices_preserves_the_old_verdict(self):
+        alt = self._cov(["altered"])
+        v = validate.gate_coverage_panel([("a", alt), ("b", alt)], 1)
+        assert v.passed
+        assert not any(g.gate == "V4.false_atoms" for g in v.results)
+
+    def test_the_pipeline_derives_false_atoms_from_p2_tags_not_the_plan(self):
+        # P3's own `factual` field is authoritative nowhere; the shipped label comes from
+        # P2's tag by text match. The gate must use the same source, or it would check a
+        # different set of atoms than the one the item labels false.
+        plan = {
+            "atoms": [
+                {"pos": 1, "text": "True claim.", "factual": False},
+                {"pos": 2, "text": "False claim.", "factual": True},
+            ],
+            "relations": [],
+        }
+        claims = [
+            {"text": "True claim.", "tag": "correct"},
+            {"text": "False claim.", "tag": "incorrect"},
+        ]
+        cov = '[{"index": 1, "status": "asserted"}, {"index": 2, "status": "altered"}]'
+
+        def _llm(rendered, *, attempt=0):
+            pid = which_prompt(rendered)
+            return cov if pid == "V4" else _CANNED[pid]
+
+        auds = [(n, _Caller(_llm, attempts=1)) for n in ("a", "b", "c")]
+        v = pipeline._validate_response(
+            _Caller(_llm, attempts=1), "prose", plan,
+            ["True claim.", "False claim."], auditors=auds, claims=claims,
+        )
+        g = self._gate(v)
+        assert g.observed["false_indices"] == [2]
+        assert not g.passed
+
+
 class TestV3LeakageSemantics:
     """Leakage means naming the apparatus, not using the connectives it requires.
 
