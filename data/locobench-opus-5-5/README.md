@@ -11,9 +11,9 @@
 | ORDER | 21 |
 | CONTROL | 12 |
 
-All **36** canonical topics across all four domains: 28 topics have 3 families, 8 have 2. Responses run 551–731 words.
+All **36** canonical topics across all four domains: 28 topics have 3 families, 8 have 2. Responses run 567–731 words.
 
-**4761 gold edges** across all rungs: 2833 valid, 1928 planted-invalid (false_endpoint 768, spurious 470, wrong_sense 360, wrong_direction 330). Every sense with no prior gold data is represented: `Instantiation` 77, `Restatement` 550, `Contrast` 716, `Concession` 500, `Alternative` 491, `Disjunction` 500.
+**4761 gold edges** across all rungs: 2833 valid, 1928 planted-invalid (false_endpoint 768, spurious 460, wrong_sense 365, wrong_direction 335). Every sense with no prior gold data is represented: `Instantiation` 70, `Restatement` 560, `Contrast` 716, `Concession` 500, `Alternative` 491, `Disjunction` 500.
 
 ## Gold-arm ordering constraints
 
@@ -28,18 +28,22 @@ The invariance ladders (ORDER, CONTROL) are exactly flat on the gold arm, as des
 
 ## Construction checks (all pass)
 
-- Every family has five rungs with the expected number of distinct texts (5; CONTROL 3 by design).
+- Every family has five rungs. Every non-CONTROL family has five distinct texts; CONTROL's twin rungs (`_a`/`_b`) repeat one edit on one edge, so they carry identical labels and may share text (11 of 12 families have 3 distinct texts; f035 has 5).
 - No two rungs share text while carrying different gold edge sets.
 - Every `direction_reversal` targets a reversal-invariant sense; every `break_chain` targets a valid entailment edge.
 - Every manifest's declared constraints and every item's `readout_directions` match the current code.
+- Every rung's gold edges, non-relations, targets and edge effects are reproduced exactly by replaying its calls on the base rung with the current `perturb.apply_calls`.
+- Every planted-false atom is asserted as written: no family has a false atom a majority of the committee judged altered, missing or merged (`V4.false_atoms`).
 
 ## Generation record
 
-- `attempts.jsonl`: every family attempt (245: 180 admitted, 65 rejected), with the rejecting gate. Rejections by gate: V3.scores 41, P5.text_changed 17, P5.length_drift 3, V1 3, V3.spans 1.
-- `rejected/superseded/`: the rejection record of every attempt later superseded by a reset or regeneration.
+- `attempts.jsonl`: every family attempt (251: 184 admitted, 67 rejected), with the rejecting gate. Rejections by gate: V3.scores 43, P5.text_changed 17, P5.length_drift 3, V1 3, V3.spans 1.
+- `rejected/superseded/`: the rejection record of every attempt later superseded by a reset or regeneration, and (`*.withdrawn-false-atoms.json`) the full manifest entry, items and state of the four families withdrawn on 2026-11-02.
 - `state.json`: each admitted family's committee verdict (with V1 per-rater rates) and call counts.
 - `config.json`: the resolved generation config plus `merged_from` (shard → topics).
 
-Generated in 8 topic-disjoint shards (`scripts/locobench_shards.py`) and merged; the merge is byte-identical to an unsharded run. Several construction bugs found during generation were fixed and the affected families regenerated before release: an undefined `add_resolution` operator in P5; `direction_reversal` targeting directed edges on CONTROL; `break_chain` targeting non-entailment edges on CHAIN, with P3 now requiring a valid entailment chain for CHAIN plans; and identical rung text under different labels. CHAIN declares `log_partition` a predicted decrease on its three breaking steps. A handful of families were regenerated from P1 with the gateway's response cache bypassed (`LOCOBENCH_NO_CACHE`) after repeated agreeing committee rejections. The full history is in `data/locobench-opus-5-5-shards/shards.json` and the git log.
+Generated in 8 topic-disjoint shards (`scripts/locobench_shards.py`) and merged; the merge is byte-identical to an unsharded run. Several construction bugs found during generation were fixed and the affected families regenerated before release: an undefined `add_resolution` operator in P5; `direction_reversal` targeting directed edges on CONTROL; `break_chain` targeting non-entailment edges on CHAIN, with P3 now requiring a valid entailment chain for CHAIN plans; and identical rung text under different labels. CHAIN declares `log_partition` a predicted decrease on its three breaking steps.
 
-Gateway spend for the whole generation, including failed runs and regenerations: **$236.73**.
+**Post-release correction (2026-11-02).** An audit found four admitted families (f033, f035, f055, f058) in which the generator had corrected every planted-false atom to the truth: 9 of 204 false atoms, so those responses carried no false content while their labels said otherwise. V4 had flagged each atom `altered` by a majority, but `altered` did not gate. V4 now rejects a planted-false atom a majority calls altered, missing or merged (`V4.false_atoms`, commit 8545193), and the four families were regenerated from P1 with the cache bypassed (f035 and f055 on a second attempt, after a V3 fluency rejection). Family ids, topics and ladder types are unchanged; the gold-arm numbers are unchanged, since all four scored 15/15 before and after. A handful of families were regenerated from P1 with the gateway's response cache bypassed (`LOCOBENCH_NO_CACHE`) after repeated agreeing committee rejections. The full history is in `data/locobench-opus-5-5-shards/shards.json` and the git log.
+
+Gateway spend for the whole generation, including failed runs and regenerations: **$248.47** ($236.73 at release, plus $11.74 for the 2026-11-02 correction).
