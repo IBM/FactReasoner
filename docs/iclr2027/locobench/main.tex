@@ -224,12 +224,12 @@ is total and deterministic, and is given in Table~\ref{tab:compile}.
 \toprule
 Level-2 sense & $\mathcal{C}$ coupling & prior & dir. & flag & rev. & gloss & edges \\
 \midrule
-\sense{Cause-Effect}   & \ent & $\bot$ & yes & & & source brings target about & 666 \\
+\sense{Cause-Effect}   & \ent & $\bot$ & yes & & & source brings target about & 667 \\
 \sense{Effect-Cause}   & \ent & $\bot$ & yes & & & source is effect, target cause & 51 \\
-\sense{Evidence}       & \ent & $\bot$ & yes & & & source is evidence for target & 666 \\
-\sense{Condition}      & \ent & $\bot$ & yes & & & source conditions target & 34 \\
-\textbf{\sense{Instantiation}} & \ent & $\bot$ & yes & & & target instantiates source & 77 \\
-\textbf{\sense{Restatement}} & \eqv & $0.90$ & no & & \checkmark & definitional identity & 550 \\
+\sense{Evidence}       & \ent & $\bot$ & yes & & & source is evidence for target & 660 \\
+\sense{Condition}      & \ent & $\bot$ & yes & & & source conditions target & 36 \\
+\textbf{\sense{Instantiation}} & \ent & $\bot$ & yes & & & target instantiates source & 70 \\
+\textbf{\sense{Restatement}} & \eqv & $0.90$ & no & & \checkmark & definitional identity & 560 \\
 \textbf{\sense{Contrast}}    & \con & $\bot$ & no & & & opposed, \emph{not} exhaustive & 716 \\
 \textbf{\sense{Concession}}  & \con & $\bot$ & yes & conc. & & a tension the text resolves & 500 \\
 \textbf{\sense{Alternative}} & \exc & $\bot$ & no & & \checkmark & exhaustive: exactly one holds & 491 \\
@@ -607,7 +607,7 @@ claim that a careful reader \emph{can} recover the plan, so one rater clearing b
 evidence; every rater's rates are recorded alongside the reported one. \textbf{V3} is \emph{majority per
 facet}: a prose defect counts only if a majority of raters report it, so a single unusually strict auditor
 cannot reject a sound response. \textbf{V4} is \emph{majority per claim}: a claim counts as lost only if a
-majority calls it lost.
+majority calls it lost, and a planted-false claim counts as lost if a majority calls it altered.
 
 \paragraph{The committee validates the base response; rungs are validated by construction.} The committee
 runs on the base response of each family. The four perturbed rungs are checked by deterministic gates ---
@@ -631,7 +631,7 @@ V1 & \dots\ and with correct sense & $\ge 0.70$ & any-of \\
 V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority/facet \\
 V3 & leakage and hedging span lists & empty & majority/facet \\
 V4 & claim coverage over gating statuses & $=1.00$ & majority/claim \\
-V4 & gating statuses & \gate{missing}, \gate{merged} & --- \\
+V4 & gating statuses & \gate{missing}, \gate{merged}; on a planted-false claim also \gate{altered} & --- \\
 \midrule
 P3 & claims selected & $14$--$16$ & --- \\
 P3 & relations planned (prompt asks for $10$) & $8$--$12$ & --- \\
@@ -689,7 +689,10 @@ For each claim, a committee model decides whether the response asserts it, retur
 \gate{altered}, \gate{missing} or \gate{merged} with a quoted span. Coverage must be perfect over the
 \emph{gating} statuses, \gate{missing} and \gate{merged}. \gate{altered} is deliberately non-gating: it is the
 judgement most sensitive to the rewording P4 licenses, and three of five early V4 rejections were a single
-claim called \gate{altered} where the rewording was permitted. The prompt states that two claims joined by a
+claim called \gate{altered} where the rewording was permitted. The exception is a planted-\emph{false}
+claim, on which \gate{altered} also gates (by majority): there the characteristic alteration is the generator
+correcting the claim to the truth, which leaves a \texttt{factual: false} label on prose asserting the
+opposite (\S\ref{sec-pitfalls}). The prompt states that two claims joined by a
 connective are \emph{not} merged, since ``either X or Y'' asserts both; without that clarification every
 realized \sense{Alternative} counted as a merge.
 
@@ -698,16 +701,16 @@ realized \sense{Alternative} counted as a merge.
 
 \paragraph{Admission.} On the clean generation pass --- after the fixes of \S\ref{sec-pitfalls} that bear on
 P5 and the committee --- $88$ of $100$ families were admitted on their first attempt, and every remaining
-family within its three-attempt budget or on a fresh regeneration from P1. Over all $245$ logged family
-attempts, including those superseded by a fix, the rejecting gate was the prose audit in $42$ cases
-($41$ on scores, $1$ on a leakage span all three raters quoted), an unchanged or over-long P5 rung in $20$,
+family within its three-attempt budget or on a fresh regeneration from P1. Over all $251$ logged family
+attempts, including those superseded by a fix, the rejecting gate was the prose audit in $44$ cases
+($43$ on scores, $1$ on a leakage span all three raters quoted), an unchanged or over-long P5 rung in $20$,
 and relation recovery in $3$. The release includes every attempt and its outcome.
 
 \paragraph{How decisive the decision rules are.} Each admitted family records every rater's verdict. On
-relation recovery, each rater alone would have admitted $88$--$92$ of the $100$ families, and all three
+relation recovery, each rater alone would have admitted $89$--$91$ of the $100$ families, and all three
 independently clear both thresholds on $77$. So the any-of rule is decisive on $23$ families and redundant on
 the rest. On the prose audit the raters are not interchangeable: \texttt{claude-sonnet-5-5} scored some facet
-below the floor on $35$ admitted families, the other two raters on $3$ each, so the majority rule is what
+below the floor on $36$ admitted families, the other two raters on $3$ each, so the majority rule is what
 keeps one strict rater from deciding admission. An earlier committee that included \texttt{gpt-6-sol} as its
 OpenAI member, which scored below the floor on $11$ of its first $45$ votes, combined with the same strict
 rater into rejecting majorities on $23$ families. We replaced it, rather than lowering the floor, so that
@@ -758,13 +761,14 @@ adjudicated topics) that applies from $108$ families upward.
 \famtype{control}, over all $36$ topics in all four domains ($31$ natural sciences, $29$ humanities, $22$
 engineering and technology, $18$ social sciences). Each base plan selects $15$--$16$ claims, $2$--$3$ of them
 false, and plans $10$ relations ($6$ valid, $4$ invalid) and $5$ declared non-relations; responses run
-$551$--$731$ words, mean $640$. Across all rungs there are $4{,}761$ gold edges, $4{,}251$ of them
-edge-producing; $2{,}833$ are valid and $1{,}928$ planted-invalid ($768$ \gate{false\_endpoint}, $470$
-\gate{spurious}, $360$ \gate{wrong\_sense}, $330$ \gate{wrong\_direction}). Every one of the six senses with
-no prior gold data is represented by at least $77$ edges (Table~\ref{tab:compile}). Every family carries
+$567$--$731$ words, mean $643$. Across all rungs there are $4{,}761$ gold edges, $4{,}251$ of them
+edge-producing; $2{,}833$ are valid and $1{,}928$ planted-invalid ($768$ \gate{false\_endpoint}, $460$
+\gate{spurious}, $365$ \gate{wrong\_sense}, $335$ \gate{wrong\_direction}). Every one of the six senses with
+no prior gold data is represented by at least $70$ edges (Table~\ref{tab:compile}). Every family carries
 five distinct response texts except the \famtype{control} families, whose ladder is symmetric by design ---
-rungs $0$ and $4$ apply the same edit, as do rungs $1$ and $3$ --- so three distinct texts is their correct
-signature.
+rungs $0$ and $4$ apply the same edit, as do rungs $1$ and $3$ --- so each pair carries identical labels and
+usually identical text: $11$ of the $12$ have three distinct texts, and one has five, its paired rungs
+differing only in wording.
 
 \paragraph{A development set.} An earlier $14$-family corpus generated by \texttt{claude-opus-5}, with a
 committee of \texttt{gpt-5.6}, \texttt{gemini-3.1-pro} and \texttt{claude-sonnet-5}, is released separately
@@ -1054,11 +1058,12 @@ satisfies $21$ increase assertions with one backend and none with the other. The
 essential: the claim-count control and the entity-grid metric score perfectly on invariance by never moving,
 and would top an invariance-only leaderboard.
 
-\subsection{Construction defects the gold arm caught}
+\subsection{Construction defects}
 \label{sec-pitfalls}
 
-Seven generator defects passed every content gate, and were caught only because the gold arm makes a ladder's
-\emph{internal} consistency measurable. We report them because any benchmark that grades comparisons rather
+Eight generator defects passed every content gate. Seven were caught only because the gold arm makes a ladder's
+\emph{internal} consistency measurable; the eighth, which the gold arm cannot see, was caught by auditing the
+released text against its labels. We report them because any benchmark that grades comparisons rather
 than absolute values is exposed to the same class of defect, and because four of them were present while
 earlier numbers in this line of work were reported.
 
@@ -1097,6 +1102,18 @@ families were re-planned from P3, and the ladder's gold arm went from $44.8\%$ t
 edge sets between neighbours only, so it could not see this. The text--label gate of \S\ref{sec-goldedges}
 now does, and on its first run over the corpus it also flagged a \famtype{control} family whose two edits had
 landed on the same edge.
+
+\paragraph{Found auditing the release.} \emph{False claims corrected to the truth.} P4 must assert every planned
+claim, including the planted-false ones, but in $4$ admitted families (one \famtype{control}, three
+\famtype{chain}) the generator had replaced \emph{every} false claim with its true counterpart --- $9$ of the
+$204$ false claims in the release, e.g.\ a court of inquiry said to have blamed a bunker fire, in prose stating
+it ``did not adopt the coal-fire explanation''. Those responses carried no false content while their labels
+said otherwise. V4 had flagged each such claim \gate{altered} by a majority, but \gate{altered} did not gate. It
+now does on a planted-false claim; replayed on the stored votes the rule rejects exactly these $4$ families and
+no other. They were regenerated from P1 (two needed a second attempt, after a prose-audit rejection), and
+their new false claims are each asserted as written. This defect is invisible to the gold arm, which reads only
+the labels: all four families scored $15/15$ before and after, so the gold-arm totals are unchanged. It is
+the one defect here that would have corrupted extraction-arm results rather than the ladder.
 
 \paragraph{A declaration revised on measurement.} With \gate{break\_chain} fixed, the log-partition readout
 fell strictly across \famtype{chain}'s three breaking steps on all $16$ families first regenerated: $0$ of
@@ -1342,7 +1359,7 @@ development set, which predates the \famtype{chain} fix, and have not been rerun
 \famtype{control} is the smallest ladder type by design ($12$ families), and the type a reader should most
 want enlarged.
 
-\paragraph{Genre, length, and provenance.} Every item is $550$--$731$ words of formal expository prose with
+\paragraph{Genre, length, and provenance.} Every item is $567$--$731$ words of formal expository prose with
 $15$--$16$ claims, and the locality bias of P3 under-represents long-range dependencies; conclusions do not
 transfer automatically to dialogue, summarization, much longer arguments, or informal registers. The release
 comes from a single generator and the mined arms from two extraction models, so generator-specific artifacts
@@ -1365,7 +1382,7 @@ the development set, the same scorer satisfies $82.7\%$ from gold graphs and at 
 graphs are unstable under meaning-preserving edits: the bottleneck is extraction. Evidence-free baselines and LLM judges
 fall between the response-length control and chance.
 
-The gold arm is also how the benchmark audits itself. Seven construction defects passed every content gate, including
+The gold arm is also how the benchmark audits itself. Seven of the eight construction defects that passed every content gate were found this way, including
 a \famtype{chain} ladder that had never broken a chain and a \famtype{control} ladder that was not meaning-preserving;
 each was visible only as a gold-arm result the construction should not have produced. A pilot study finds that readers
 confirm the declared orderings and the meaning-preserving control, and reject the invariance of sentence shuffling; the
