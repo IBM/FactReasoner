@@ -141,6 +141,18 @@ def _build_baselines(args, backend):
     throttle = {}
     if args.rate_per_minute is not None:
         throttle["rate_per_minute"] = args.rate_per_minute
+    if args.nli_cache_dir:
+        # Every rung of a family carries the SAME claim list (only the prose changes), and
+        # the pairwise NLI and ROSCOE baselines read only the claims. Without a cache each
+        # rung re-samples identical inputs, so their rung-to-rung movement is pure sampling
+        # noise -- on the development set one family's contradiction count went
+        # 14/12/14/14/14 over five identical inputs -- and a strict-increase constraint
+        # credits that noise. Keyed on (prompt version, model, method, premise,
+        # hypothesis), one verdict per pair serves every rung and all three measures, so
+        # each reports what it actually computes on a fixed claim set: one value per family.
+        from fact_reasoner.core.nli_cache import NLIVerdictCache
+
+        throttle["verdict_cache"] = NLIVerdictCache(args.nli_cache_dir)
 
     baselines += [
         PairwiseNLIContradiction(nli, show_progress=True, throttle=throttle),
@@ -172,6 +184,13 @@ def main() -> int:
         "--nli-method", default="logprobs", choices=("logprobs", "direct", "simbauq")
     )
     parser.add_argument("--rate-per-minute", type=int, default=None)
+    parser.add_argument(
+        "--nli-cache-dir",
+        default=None,
+        help="Cache NLI verdicts here, so a claim pair is scored once per family rather "
+        "than once per rung (see _build_baselines). Off by default: the development-set "
+        "results were produced without it.",
+    )
     parser.add_argument("--rits-model", default=None)
     from fact_reasoner.cli import _add_backend_args
 
@@ -236,7 +255,10 @@ def main() -> int:
     else:
         from fact_reasoner.cli import _backend_context
 
-        with _backend_context(args) as backend:
+        # `_backend_context` yields `(backend, adapter_backends)` since 0af4033. Binding the
+        # tuple as the backend made every NLI call raise inside the extractor, which the
+        # baselines record as an unparseable verdict: all-None scores, no exception.
+        with _backend_context(args) as (backend, _adapters):
             run(backend)
 
     print(f"\nWrote {out_path}")
