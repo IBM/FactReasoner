@@ -846,7 +846,16 @@ class TestRetrieveContextsFlag:
 
 
 class TestReasoningFlag:
-    _ARGV = ["--pipeline", "factscore", "--backend", "ollama", "--query", "q", "--response", "r"]
+    _ARGV = [
+        "--pipeline",
+        "factscore",
+        "--backend",
+        "ollama",
+        "--query",
+        "q",
+        "--response",
+        "r",
+    ]
 
     def _runner_kwargs(self, *flags):
         fake_runner = MagicMock()
