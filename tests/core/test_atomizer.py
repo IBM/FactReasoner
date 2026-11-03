@@ -17,7 +17,8 @@
 
 import asyncio
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from mellea.backends import ModelOption
 from fact_reasoner.core.atomizer import Atomizer, INSTRUCTION_ATOMIZER
 
 
@@ -239,3 +240,47 @@ class TestAtomizerRunBatch:
             results = asyncio.run(atm.run_batch(["a", "b", "c"]))
 
         assert results == [{}, {}, {"id1": "C"}]
+
+
+class TestAtomizerReasoning:
+    """Tests for the Atomizer reasoning ("thinking") setting."""
+
+    @staticmethod
+    def _model_options(**atomizer_kwargs):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: '```json\n{"id1": "A"}\n```'
+        with patch(
+            "src.fact_reasoner.core.atomizer.mfuncs.instruct", return_value=out
+        ) as instruct:
+            Atomizer(backend=mock_backend, **atomizer_kwargs).run("resp")
+        return instruct.call_args.kwargs["model_options"]
+
+    def test_reasoning_off_by_default(self):
+        assert self._model_options() == {ModelOption.THINKING: False}
+
+    def test_reasoning_can_be_enabled(self):
+        assert self._model_options(reasoning=True) == {ModelOption.THINKING: True}
+
+    def test_reasoning_none_leaves_backend_default(self):
+        assert self._model_options(reasoning=None) is None
+
+    def test_run_batch_sends_the_setting(self):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: '```json\n{"id1": "A"}\n```'
+        ainstruct = AsyncMock(return_value=out)
+        with patch("src.fact_reasoner.core.atomizer.mfuncs.ainstruct", new=ainstruct):
+            asyncio.run(Atomizer(backend=mock_backend).run_batch(["resp"]))
+        assert ainstruct.call_args.kwargs["model_options"] == {
+            ModelOption.THINKING: False
+        }
+
+    @pytest.mark.parametrize("value", ["false", "low", 0, 1])
+    def test_reasoning_rejects_non_bool_values(self, value):
+        with pytest.raises(TypeError, match="reasoning must be True, False or None"):
+            Atomizer(backend=MagicMock(), reasoning=value)
