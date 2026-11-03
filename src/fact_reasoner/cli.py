@@ -31,6 +31,10 @@ from fact_reasoner.runner import _FR_VERSIONS, PIPELINES, FactualityRunner
 from fact_reasoner.utils import MAX_REQUESTS_PER_MINUTE, set_throttle
 
 
+# --reasoning choice -> the runner's ``reasoning`` value.
+REASONING_CHOICES = {"off": False, "on": True, "server": None}
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fact-reasoner",
@@ -199,6 +203,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Stop with the backend's exception when an LLM call fails in atom "
         "extraction, revision, NLI or summarization, instead of printing it and "
         "using a fallback result.",
+    )
+    p.add_argument(
+        "--reasoning",
+        default="off",
+        choices=list(REASONING_CHOICES),
+        help="Whether the model may reason ('think') during atom extraction and "
+        "revision. 'off' (default) suits granite-4.2, which thinks by default; "
+        "use 'server' (send no setting) for gpt-oss, which rejects 'off'.",
     )
 
     # --- NLI relation-extraction cost ---
@@ -815,6 +827,7 @@ def main() -> None:
             show_progress=args.progress_bar,
             atomizer_backend=adapters.get("atomizer"),
             nli_backend=adapters.get("nli"),
+            reasoning=REASONING_CHOICES[args.reasoning],
             raise_errors=args.raise_errors,
             item_concurrency=args.item_concurrency,
         )

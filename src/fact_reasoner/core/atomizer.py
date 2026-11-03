@@ -18,7 +18,7 @@
 import json
 
 import mellea.stdlib.functional as mfuncs
-from mellea.backends import Backend
+from mellea.backends import Backend, ModelOption
 from mellea.core import MelleaLogger
 from mellea.stdlib.context import SimpleContext
 from mellea.stdlib.requirements import check, simple_validate
@@ -179,6 +179,7 @@ class Atomizer:
     def __init__(
         self,
         backend: Backend,
+        reasoning: bool | None = False,
         *,
         raise_errors: bool = False,
     ):
@@ -188,6 +189,12 @@ class Atomizer:
         Args:
             backend: Backend
                 The Mellea backend to use for LLM interactions.
+            reasoning: Optional[bool]
+                Whether the model may reason ("think") before answering.
+                Defaults to False: granite-4.2 thinks by default otherwise, and
+                its reasoning fills the output before the JSON is written. None
+                sends no setting and keeps the backend's default; use it for
+                models that reject a reasoning parameter (e.g. gpt-oss).
             raise_errors: bool
                 If True, an exception raised by the backend (e.g. a connection
                 error) propagates to the caller unchanged. Default False: the
@@ -199,9 +206,16 @@ class Atomizer:
             raise ValueError(
                 "Mellea backend is None. Please provide a valid Mellea backend."
             )
+        # Any other value would be forwarded as a reasoning effort level (e.g.
+        # reasoning="false" -> reasoning_effort="false"), which backends reject.
+        if reasoning is not None and not isinstance(reasoning, bool):
+            raise TypeError(
+                f"reasoning must be True, False or None, not {reasoning!r}."
+            )
 
         # Initialize the extractor
         self.backend = backend
+        self.reasoning = reasoning
         self.raise_errors = raise_errors
 
         # Print info
@@ -240,6 +254,11 @@ class Atomizer:
                 user_variables={"response": response},
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
+                model_options=(
+                    None
+                    if self.reasoning is None
+                    else {ModelOption.THINKING: self.reasoning}
+                ),
             )
         except Exception as e:  # noqa: BLE001
             handle_generation_error(
@@ -291,6 +310,11 @@ class Atomizer:
                 user_variables={"response": response},
                 strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
                 return_sampling_results=True,
+                model_options=(
+                    None
+                    if self.reasoning is None
+                    else {ModelOption.THINKING: self.reasoning}
+                ),
             )
 
         print(f"[Atomizer] Running throttled batch of {len(responses)} requests ...")
