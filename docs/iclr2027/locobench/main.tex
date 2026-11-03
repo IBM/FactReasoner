@@ -631,7 +631,8 @@ V1 & \dots\ and with correct sense & $\ge 0.70$ & any-of \\
 V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority/facet \\
 V3 & leakage and hedging span lists & empty & majority/facet \\
 V4 & claim coverage over gating statuses & $=1.00$ & majority/claim \\
-V4 & gating statuses & \gate{missing}, \gate{merged}; on a planted-false claim also \gate{altered} & --- \\
+V4 & gating statuses & \gate{missing}, \gate{merged} & --- \\
+V4 & \dots\ and on a planted-false claim & $+$\gate{altered} & majority/claim \\
 \midrule
 P3 & claims selected & $14$--$16$ & --- \\
 P3 & relations planned (prompt asks for $10$) & $8$--$12$ & --- \\
@@ -892,9 +893,9 @@ inversion.
 
 \paragraph{Setup, stated first.} Two corpora are measured here, and every table states which.
 \S\ref{sec-gold-release} reports the gold arm on the released $100$-family corpus ($500$ responses, $1{,}454$
-declared constraints); it needs no LLM and is deterministic. The extraction and baseline results of
-\S\ref{sec-extract}--\S\ref{sec-measures} are on the $14$-family development set ($70$ responses, $202$
-constraints), on which they were run; \tbd{rerun the mined arms and baselines on the release}. Relations are
+declared constraints); it needs no LLM and is deterministic. The single-score baselines of \S\ref{sec-measures} are on the release as well. The relation-extraction
+results of \S\ref{sec-extract} are on the $14$-family development set ($70$ responses, $202$ constraints), on
+which they were run; \tbd{rerun the mined arms on the release}. Relations are
 mined by
 \texttt{llama-3.3-70b-instruct} and \texttt{gpt-oss-120b} under two candidate-pair policies: \emph{windowed}
 (forward pairs within four positions, refined by what the response links) and \emph{bidirectional} (both
@@ -1026,11 +1027,15 @@ informative.
 
 \begin{table}[t]
 \centering\small
-\caption{Single-score measures on the readout-independent constraints of the \textbf{development set}:
-  \textbf{Increase} over the \famtype{conflict} and \famtype{chain} families ($50$ assertions),
-  \textbf{Invariance} over the \famtype{order} and \famtype{control} families ($20$). A measure must do well on \emph{both} columns: the
-  claim-count control and the entity-grid metric score perfectly on invariance by never moving at all. Judge
-  baselines are shown for both backends.}
+\caption{Single-score measures on the readout-independent constraints of the \textbf{released corpus}:
+  \textbf{Increase} over the $67$ \famtype{conflict} and \famtype{chain} families ($335$ assertions: C1 adjacent
+  pairs and the C3 endpoint pair, deduplicated across readouts), \textbf{Invariance} over the $33$
+  \famtype{order} and \famtype{control} families ($165$ rung pairs, satisfied when the score does not move).
+  A measure must do well on \emph{both} columns: the claim-count control and the claim-only measures score
+  perfectly on invariance by never moving at all. Only the two judges call the backend model, so every other
+  row is the same under both. The MRF rows use gold graphs and no LLM. On the log-partition readout the
+  Increase axis holds \famtype{chain}'s three breaking steps to an increase where C2 predicts a decrease
+  (\S\ref{sec-constraints}), which is most of that row's shortfall.}
 \label{tab:baselines}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
@@ -1038,30 +1043,44 @@ informative.
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Measure & Increase & Invariance & Increase & Invariance \\
 \midrule
-MRF, \textsc{gold}, mean marginal          & \multicolumn{2}{c}{37/50 \quad 20/20} & \multicolumn{2}{c}{(no LLM)} \\
-MRF, \textsc{gold}, log partition          & \multicolumn{2}{c}{36/50 \quad 20/20} & \multicolumn{2}{c}{(no LLM)} \\
-MRF, mined (best arm)                      & 29/50 & 0/20 & 35/50 & 0/20 \\
+MRF, \textsc{gold}, mean marginal          & \multicolumn{4}{c}{273/335 (81.5) \quad 165/165 (100) \quad (no LLM)} \\
+MRF, \textsc{gold}, consistency            & \multicolumn{4}{c}{242/335 (72.2) \quad 165/165 (100) \quad (no LLM)} \\
+MRF, \textsc{gold}, log partition          & \multicolumn{4}{c}{233/335 (69.6) \quad 165/165 (100) \quad (no LLM)} \\
 \midrule
-DiscoScore RC                              & 30/50 & 16/20 & 30/50 & 16/20 \\
-DiscoScore LC                              & 28/50 & 16/20 & 28/50 & 16/20 \\
-G-Eval judge                               & 21/50 & 5/20  &  0/50 & 13/20 \\
-Direct judge                               & 18/50 & 5/20  &  4/50 & 14/20 \\
-ROSCOE self-consistency (mean)             & 17/50 & 5/20  & 16/50 & 9/20 \\
-NLI contradiction                          & 12/50 & 8/20  & 12/50 & 9/20 \\
+DiscoScore RC                              & 199 (59.4) & 110 (66.7) & 199 (59.4) & 110 (66.7) \\
+DiscoScore LC                              & 186 (55.5) & 112 (67.9) & 186 (55.5) & 112 (67.9) \\
+G-Eval judge                               & 123 (36.7) &  62 (37.6) &  11 (3.3)  & 133 (80.6) \\
+Direct judge                               & 115 (34.3) &  48 (29.1) &  32 (9.6)  & 113 (68.5) \\
+Entity grid                                &   3 (0.9)  & 153 (92.7) &   3 (0.9)  & 153 (92.7) \\
+NLI contradiction                          &   0        & 165 (100)  &   0        & 165 (100)  \\
+ROSCOE self-consistency (max, mean)        &   0        & 165 (100)  &   0        & 165 (100)  \\
 \midrule
-Response length (control)                  & 20/50 & 12/20 & 20/50 & 12/20 \\
-Claim count (control)                      &  0/50 & 20/20 &  0/50 & 20/20 \\
+Response length (control)                  & 140 (41.8) & 110 (66.7) & 140 (41.8) & 110 (66.7) \\
+Claim count (control)                      &   0        & 165 (100)  &   0        & 165 (100)  \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:baselines} scores single-score measures on the same ladders. No evidence-free baseline
-approaches the gold-graph measure on increase, and the two that do best --- noun-repetition cohesion metrics at
-$56$--$60\%$ --- are measuring lexical overlap, which the \famtype{conflict} edits happen to change. LLM coherence
-judges are near or below the response-length control on increase, and unstable across backends: the G-Eval judge
-satisfies $21$ increase assertions with one backend and none with the other. The two-column design is
-essential: the claim-count control and the entity-grid metric score perfectly on invariance by never moving,
-and would top an invariance-only leaderboard.
+Table~\ref{tab:baselines} scores single-score measures on the same ladders. No evidence-free measure
+approaches the gold-graph measure on increase. The two that do best, the DiscoScore cohesion metrics at
+$55$--$59\%$, are the only ones above the response-length control ($41.8\%$), and they measure noun repetition,
+which the \famtype{conflict} and \famtype{chain} edits happen to change; on invariance they are no better than
+length. The LLM coherence judges fall below the length control on increase with both backends, and fail in
+opposite directions: with \texttt{gpt-oss-120b} they move on most edits, meaning-preserving or not ($34$--$37\%$
+increase, $29$--$38\%$ invariance), and with \texttt{llama-3.3-70b} they barely move ($3$--$10\%$ increase,
+$69$--$81\%$ invariance). The two-column design is what separates these: on either column alone a degenerate
+measure wins --- the claim-count control on invariance, an over-sensitive judge on increase.
+
+\paragraph{Claim-only measures cannot see a ladder.} Every rung of a family carries the same claims; only the
+prose and the relations it draws differ. The NLI contradiction score and ROSCOE self-consistency read only the
+claims, so on a ladder they receive the same input at every rung, and the right result is the claim-count
+control's: one value per family. Scoring each distinct claim pair once per family gives exactly that. On the
+development set they were scored once per rung, and their rung-to-rung differences --- e.g.\ a family's
+contradiction count of $14, 12, 14, 14, 14$ over five identical inputs --- were sampling noise that the increase
+axis credited ($12$--$17$ of $50$). Those development-set rows were therefore not measurements of coherence, and
+we do not report them. The development-set results for the mined MRF arms (\S\ref{sec-extract}) are unaffected:
+they read the prose, and every rung's mined graph is its own. Scoring these measures with the response as NLI
+context would let them see the ladder, but that is a different measure from the one the literature reports.
 
 \subsection{Construction defects}
 \label{sec-pitfalls}
@@ -1359,8 +1378,8 @@ outcomes change them.
 
 \paragraph{Scale, and where the extraction results come from.} One hundred families is enough to establish that
 the instrument discriminates, and not enough to rank closely matched measures. Mining is single-sample, with
-measured run-to-run variation of $0.06$ F1. The extraction and baseline comparisons are on the $14$-family
-development set, which predates the \famtype{chain} fix, and have not been rerun on the release.
+measured run-to-run variation of $0.06$ F1. The extraction comparisons are on the $14$-family development set, which predates the \famtype{chain}
+fix, and have not been rerun on the release; the baseline comparisons are on the release.
 \famtype{control} is the smallest ladder type by design ($12$ families), and the type a reader should most
 want enlarged.
 
@@ -1384,8 +1403,9 @@ score difference to coherence rather than to content, and --- by scoring a measu
 mined ones --- isolates extraction error from scoring error by construction. On the released $100$-family corpus the
 gold-graph measure satisfies $89.1\%$ of $1{,}454$ declared constraints, with both invariance ladders exactly flat. On
 the development set, the same scorer satisfies $82.7\%$ from gold graphs and at most $37.1\%$ from mined ones, and mined
-graphs are unstable under meaning-preserving edits: the bottleneck is extraction. Evidence-free baselines and LLM judges
-fall between the response-length control and chance.
+graphs are unstable under meaning-preserving edits: the bottleneck is extraction. On the release, only two
+cohesion metrics beat the response-length control on increase, LLM judges fall below it with both backends, and
+measures that read only the claims cannot see a ladder at all.
 
 The gold arm is also how the benchmark audits itself. Seven of the eight construction defects that passed every content gate were found this way, including
 a \famtype{chain} ladder that had never broken a chain and a \famtype{control} ladder that was not meaning-preserving;
