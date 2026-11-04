@@ -254,11 +254,16 @@ class TestBuilderAssertion:
 
 
 class TestDefectOneEncoded:
-    """``log_partition`` is invariant at rung 1->2, not increasing."""
+    """``log_partition`` at CONFLICT rung 1->2: first declared invariant, now unconstrained.
 
-    def test_conflict_rung_two_expects_invariance(self):
+    Defect 1 replaced a declared increase with invariance. Measured on the opus-5-5
+    release the invariance failed on all 46 families (40 decreases, 6 increases), so the
+    pair is now declared nothing at all -- neither an increase nor an invariance.
+    """
+
+    def test_conflict_rung_two_leaves_log_partition_unconstrained(self):
         dirs = perturb.readout_directions("CONFLICT", 2)
-        assert dirs["log_partition"] == "invariant"
+        assert dirs["log_partition"] == "unconstrained"
 
     def test_conflict_rung_two_expects_the_consistency_inversion(self):
         # Phase 1's Finding 1, asserted as a positive prediction rather than exempted.
@@ -276,16 +281,17 @@ class TestDefectOneEncoded:
         exp = perturb.expectations_for("CONTROL")
         assert all(d == "invariant" for pair in exp.values() for d in pair.values())
 
-    def test_the_invariance_reaches_the_generated_item(self):
+    def test_the_declaration_reaches_the_generated_item(self):
         res = generate_family("f001", "Civil Engineering", "CONFLICT", _dry_cfg())
         assert res.admitted
         rung2 = next(i for i in res.items if i["expected"]["rung_index"] == 2)
-        assert rung2["expected"]["readout_directions"]["log_partition"] == "invariant"
+        assert rung2["expected"]["readout_directions"]["log_partition"] == "unconstrained"
 
     def test_constraints_split_c1_from_c2(self):
         cons = {c["id"]: c for c in perturb.ordering_constraints("CONFLICT")}
         c2_pairs = {(p["readout"], tuple(p["pair"])) for p in cons["c2"]["pairs"]}
-        assert ("log_partition", (1, 2)) in c2_pairs
+        # Unconstrained pairs sit in NEITHER list: no prediction is made about them.
+        assert ("log_partition", (1, 2)) not in c2_pairs
         assert ("consistency", (1, 2)) in c2_pairs
         c1_pairs = {(p["readout"], tuple(p["pair"])) for p in cons["c1"]["pairs"]}
         assert ("log_partition", (1, 2)) not in c1_pairs

@@ -286,9 +286,14 @@ _SPECIAL: dict[tuple[str, int, int, str], str] = {
     # the direction is unchanged, the headroom is not.
     ("CONFLICT", 1, 2, "consistency"): DECREASE,
     ("CONFLICT", 2, 3, "consistency"): UNCONSTRAINED,
-    # Defect 1: the same edit is weight-only, so the normalized log partition is
-    # invariant -- Phase 1's reference ladder shows -9.64 at both rungs.
-    ("CONFLICT", 1, 2, "log_partition"): INVARIANT,
+    # Defect 1 declared this pair INVARIANT: the edit is weight-only, and Phase 1's
+    # reference ladder shows -9.64 at both rungs. On the opus-5-5 release it failed on all
+    # 46 CONFLICT families -- 40 decreases, 6 increases, median delta -0.041 -- because the
+    # weight change is not exactly zero once the readout is normalized over a real graph.
+    # Not a uniform reversal, as CHAIN's was, so it is not re-declared as DECREASE: the
+    # readout is simply not predicted to hold still here, and the pair is left out of
+    # both C1 and C2. Revised after measuring, on the families it governs.
+    ("CONFLICT", 1, 2, "log_partition"): UNCONSTRAINED,
     # Finding 2: restoring an entailment link ADDS a factor that concentrates the joint's
     # mass, which lowers the normalized log partition. So along CHAIN's breaking steps
     # (break_3 -> break_2 -> break_1 -> base) log_partition falls while the belief readouts
