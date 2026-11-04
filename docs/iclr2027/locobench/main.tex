@@ -1236,21 +1236,22 @@ sentence permutations of their base, which a script certifies without a reader; 
 f063, rewrites two sentences and is judged by hand. The study therefore reads each base response once and asks
 every question about its family while the text is fresh. Reading the same responses separately for labels, for
 edits and for pairwise comparison --- as a design with one study per claim does --- costs about $550$
-annotator-hours at the release's scale; this design costs about $30$.
+annotator-hours at the release's scale; this design costs about $31$.
 
-\paragraph{Sample.} $27$ families, drawn per ladder type with a fixed seed: $11$ \famtype{conflict} and $6$
+\paragraph{Sample.} $29$ families, drawn per ladder type with a fixed seed: $11$ \famtype{conflict} and $6$
 \famtype{chain}, in proportion to the release; $5$ \famtype{control}, oversampled because the ladder is small
-and Hypothesis~H3 depends on it; and $5$ \famtype{order}, used only in the instruction test below. The $22$
-non-\famtype{order} base responses carry $162$ valid and $108$ planted-invalid gold relations, $135$ declared
-non-relations and $55$ planted-false claims. Every sense the scheme exists to separate is represented ---
-\sense{Contrast} $43$, \sense{Alternative} $28$, \sense{Disjunction} $27$, \sense{Concession} $28$ --- but
-\sense{Instantiation} ($6$) and \sense{Condition} ($3$) are too rare to estimate alone, and are reported pooled
+and Hypothesis~H3 depends on it; and $7$ \famtype{order}, used only in the instruction test below. The $22$
+non-\famtype{order} base responses carry $132$ valid and $88$ planted-invalid gold relations, $110$ declared
+non-relations and $45$ planted-false claims. Every sense the scheme exists to separate is represented ---
+\sense{Contrast} $33$, \sense{Alternative} $23$, \sense{Disjunction} $22$, \sense{Concession} $23$ --- but
+\sense{Instantiation} ($5$) and \sense{Condition} ($3$) are too rare to estimate alone, and are reported pooled
 with the other senses of their coupling.
 
 \paragraph{Core sessions.} Seven annotators with a linguistics or NLP background each judge $7$ or $8$
-\famtype{conflict} or \famtype{chain} families and $2$ or $3$ \famtype{control} families, so that each of the
-$22$ families is judged by exactly three annotators, and no annotator sees two rungs of one family in different
-sessions. For each family the annotator works through four steps, never seeing validity labels, rung names, or
+\famtype{conflict} or \famtype{chain} families and $1$ to $3$ \famtype{control} families, so that each of the
+$22$ families is judged by exactly three annotators and no annotator judges a family twice. Families on one topic
+are spread across annotators; the three Botany families force two annotators to hold two of them, which leaks
+nothing, since different families pose different questions over different claims. For each family the annotator works through four steps, never seeing validity labels, rung names, or
 which version is the base:
 \begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
 \item \emph{Read} the base response, with its claims numbered in the margin.
@@ -1272,18 +1273,24 @@ a brief and one practice family, excluded from analysis, whose gold answers are 
 
 \paragraph{Instruction test.} The pilot's \famtype{order} result has two readings (\S\ref{sec-pilot}), and
 choosing between them needs whole texts but no label work, so it runs as a separate block. Three further
-annotators --- educated readers, screened for reading comprehension --- each judge $20$ whole-text pairs: the
-$5$ \famtype{order} families' four shuffled rungs, each against its base. The instruction varies by screen,
+annotators --- educated readers, screened for reading comprehension --- each judge $21$ whole-text pairs: the
+$7$ \famtype{order} families' three shuffled rungs (full, block and adjacent), each against its base. The
+fourth non-base \famtype{order} rung relabels a temporal relation without moving any sentence, so it is not a
+shuffle and is left out. The instruction varies by screen,
 randomized and balanced within each annotator: half the screens ask which response is more \emph{logically
 consistent} (``if you believed everything each response says, which would leave you believing something
 consistent?''), and half which \emph{hangs together better as an argument}. Varying the instruction within
-rather than between annotators makes each annotator their own control, so differences in strictness cancel,
-and three annotators yield $30$ judgements per instruction.
+rather than between annotators makes each annotator their own control, so differences in strictness cancel.
+The instructions are assigned by a cyclic Latin plan across the three annotators, so every pair is judged under
+both instructions and pair difficulty cannot masquerade as an instruction effect; drawing them independently
+per annotator left $9$ of the $21$ pairs under one instruction only. That yields $31$ and $32$ judgements per
+instruction. Which side holds the original is balanced exactly within each annotator, and no two consecutive
+screens come from one family.
 
 \paragraph{Time.} At $200$ words per minute, $27$ seconds per claim pair and $45$ seconds per edited version, a
 \famtype{conflict} or \famtype{chain} family takes about $15$ minutes and a \famtype{control} family about
 $13$. The longest core session is modelled at $169$ minutes including a ten-minute break, and the others at
-$154$--$167$; an instruction-test session at $164$ minutes, at about seven minutes per pair of full readings.
+$156$--$169$; an instruction-test session at $171$ minutes, at about seven minutes per pair of full readings.
 These are model estimates, not measurements. The pilot's recorded times cannot calibrate them: the annotation
 tool logged the time a task was open rather than the time spent on it, and one screen recorded $42$ hours. Two
 annotators are therefore timed on the practice family before the study runs; if it takes more than
@@ -1303,26 +1310,27 @@ fail either are excluded before analysis.
 \toprule
 Hypothesis & Judged & Units & Precision & Pass criterion \\
 \midrule
-A1. Valid gold relations are confirmed & $486$ & $162$ & $\pm4.7$ & $\ge 90\%$ at the coupling level \\
-A2. Declared non-relations are confirmed & $405$ & $135$ & $\pm6.7$ & $\ge 80\%$ \\
-A3. Planted-invalid relations are rejected & $324$ & $108$ & $\pm7.5$ & by error kind; an accepted planted error is a label to repair \\
-A4. Planted-false claims are asserted & $165$ & $55$ & $\pm6.3$ & $\ge 95\%$, every exception listed \\
+A1. Valid gold relations are confirmed & $396$ & $132$ & $\pm5.2$ & $\ge 90\%$ at the coupling level \\
+A2. Declared non-relations are confirmed & $330$ & $110$ & $\pm7.4$ & $\ge 80\%$ \\
+A3. Planted-invalid relations are rejected & $264$ & $88$ & $\pm8.3$ & by error kind; an accepted planted error is a label to repair \\
+A4. Planted-false claims are asserted & $135$ & $45$ & $\pm7.1$ & $\ge 95\%$, every exception listed \\
 B. Edits realize their declared effect only & $234$ & $78$ & $\pm6.8$ & $\ge 90\%$, no material collateral change \\
 H1. Readers agree with the declared increase & $204$ & $68$ & needs $23$ & majority above chance, one-sided binomial \\
 H2. Agreement is lowest at \famtype{conflict}'s first step & $33$ & $11$ & --- & descriptive, with its interval \\
 H3. \famtype{control} versions read as equal & $30$ & $10$ & --- & descriptive \\
-H4. The instruction moves \famtype{order} toward equal & $60$ & $30$/arm & needs $21$/arm & higher ``equal'' rate under logical consistency \\
+H4. The instruction moves \famtype{order} toward equal & $63$ & ${\sim}32$/arm & needs $32$/arm & higher ``equal'' rate under logical consistency \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Hypotheses and analysis, pre-registered.} Table~\ref{tab:study} lists the hypotheses. Each test
 runs on majorities, one per item, so its sample is a third of the judgements. The rate estimates A1--A4 and B
-are reported with $95\%$ Wilson intervals, of half-width $4.7$ to $7.5$ points at the expected rates; that
-resolves a $90\%$ pass threshold from a rate of $80\%$, but not from $85\%$, and the criteria are set
-accordingly. H1 needs $23$ items for power $0.8$ at $\alpha=0.05$ at the pilot's measured agreement of
-$0.75$, and has $68$. H4 needs $21$ per instruction to detect a rate of ``about equal'' of $0.10$ against
-$0.40$, and has $30$. H2 and H3 are too small to test, and are reported descriptively. Agreement is Krippendorff's $\alpha$ per question
+are reported with $95\%$ Wilson intervals, of half-width $5.2$ to $8.3$ points at the expected rates; that
+resolves a $90\%$ pass threshold from a rate of $80\%$, but not from $85\%$, and A3, the widest, is reported
+by error kind without a threshold. H1 needs $23$ items for power $0.8$ at $\alpha=0.05$ at the pilot's measured agreement of
+$0.75$, and has $68$. H4 needs $32$ per instruction for power $0.8$ to detect a rate of ``about equal'' of $0.10$ against
+$0.40$, and has $31$ to $32$; that requirement is why the test draws $7$ \famtype{order} families rather than
+$5$, which would give power $0.65$. H2 and H3 are too small to test, and are reported descriptively. Agreement is Krippendorff's $\alpha$ per question
 \citep{krippendorff}, with $\alpha \ge 0.67$ on coupling as the reliability target. Rung strengths per family
 are fitted with a Bradley--Terry model with ties \citep{bradleyterry} and compared with the declared order by
 Kendall's $\tau$, and every measure of \S\ref{sec-experiments} is rescored against the human majority as well as
@@ -1345,7 +1353,7 @@ generator rather than the released labels, so we leave it to future work. Until 
 are evidence that the prose realizes its plan, not a substitute for the human checks above.
 
 \paragraph{Cost and procedure.} The core sessions total about $19$ annotator-hours, the instruction test about
-$8$, and adjudicating the practice family about $3$: about $30$ hours in all, paid at or above the local minimum
+$9$, and adjudicating the practice families about $3$: about $31$ hours in all, paid at or above the local minimum
 wage for the time worked. Screens are exported from the redacted release by the script of
 \S\ref{sec-schema}, which adds a highlighted-change view to the existing pairwise screen; its leak checks
 apply unchanged. The analysis plan --- hypotheses, models, exclusion rules and pass criteria --- is registered

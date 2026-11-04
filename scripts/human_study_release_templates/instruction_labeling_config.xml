@@ -1,0 +1,50 @@
+<!-- LoCoBench validation study, INSTRUCTION test (paper, section "Validation study", H4).
+
+     One task is one pair of whole responses over the same claims. The question asked
+     varies by task: the task carries it in $instruction, so the annotator sees one of the
+     two instructions per screen, balanced within each annotator. Neither the instruction's
+     name nor which side is the original reaches the task data; both live in the answer key.
+
+     (An XML comment may not contain a double hyphen, so this block avoids them.)
+-->
+<View>
+  <Style>
+    .lsf-richtext { line-height: 1.65; }
+    .col { flex: 1; min-width: 0; background: #fafbfa; border: 1px solid #d9dfdb; padding: 12px 14px; border-radius: 4px; }
+    .col p { margin: 0 0 0.8em 0; }
+    .ask { background: #e3eef6; border-left: 4px solid #1f5f8b; padding: 10px 14px; margin: 10px 0 14px 0; font-size: 1.05em; }
+  </Style>
+
+  <Text name="framing" value="$framing"/>
+  <View className="ask">
+    <Text name="instruction" value="$instruction"/>
+  </View>
+
+  <View style="display:flex; gap:1.2em">
+    <View className="col">
+      <Header value="Response A" size="4"/>
+      <HyperText name="response_a" value="$response_a" inline="true"/>
+    </View>
+    <View className="col">
+      <Header value="Response B" size="4"/>
+      <HyperText name="response_b" value="$response_b" inline="true"/>
+    </View>
+  </View>
+
+  <Header value="Your answer to the question above" size="4"/>
+  <Choices name="choice" toName="response_a" choice="single-radio" required="true" requiredMessage="Pick A, B, or about equal before submitting.">
+    <Choice value="Response A" alias="A"/>
+    <Choice value="Response B" alias="B"/>
+    <Choice value="About equal" alias="equal"/>
+  </Choices>
+
+  <Header value="How confident are you?" size="5"/>
+  <Choices name="confidence" toName="response_a" choice="single-radio" showInline="true" required="true" requiredMessage="Record your confidence; low is a valid answer.">
+    <Choice value="low"/>
+    <Choice value="medium"/>
+    <Choice value="high"/>
+  </Choices>
+
+  <Header value="Why? One sentence." size="5"/>
+  <TextArea name="why" toName="response_a" rows="2" maxSubmissions="1" placeholder="e.g. B refers to 'that deficit' before any deficit has been mentioned."/>
+</View>

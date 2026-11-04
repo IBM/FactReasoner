@@ -1,0 +1,88 @@
+<!-- LoCoBench validation study, CORE session (paper, section "Validation study").
+
+     One task is one family. The annotator reads the base response once, then answers
+     three blocks from that reading: 15 claim pairs, each claim as stated, and each edited
+     version shown as a highlighted change. Repeater renders one block per element of the
+     task's pairs / claims / versions arrays, so one config serves every family.
+
+     Every choice is required. The two truth questions are required even when the answer
+     to "linked?" is no: a required-when rule cannot be expressed per repeated block, and
+     the answers are simply ignored at analysis for unlinked pairs. The brief says so.
+
+     (An XML comment may not contain a double hyphen, so this block avoids them.)
+-->
+<View>
+  <Style>
+    .lsf-richtext { line-height: 1.65; }
+    .resp { background: #fafbfa; border: 1px solid #d9dfdb; padding: 14px 16px; border-radius: 4px; }
+    .resp p { margin: 0 0 0.8em 0; }
+    .claims { columns: 2; column-gap: 2em; padding-left: 1.6em; font-size: 0.95em; }
+    .claims li { break-inside: avoid; margin-bottom: 0.35em; }
+    .block { border-top: 2px solid #1f5f8b; margin-top: 1.4em; padding-top: 0.6em; }
+    .item { border: 1px solid #e2e6e3; padding: 10px 12px; margin: 8px 0; border-radius: 4px; }
+    del { background: #f6dcd7; color: #7a2a1e; text-decoration: line-through; }
+    ins { background: #d9ebf6; color: #12466b; text-decoration: none; }
+  </Style>
+
+  <Header value="Read this response carefully, once. Every question below is about it."/>
+  <Text name="framing" value="$framing"/>
+  <HyperText name="base" value="$base_html" inline="true"/>
+
+  <View className="block">
+    <Header value="Part 1. Claim pairs" size="4"/>
+    <Text name="pairs_help" value="For each pair of numbered claims: does the response draw a logical link between them? Then, whatever the answer: could both claims be true at the same time, and could both be false at the same time? Answer the last two from the claims' meaning, not from the response."/>
+    <Repeater on="$pairs" indexFlag="{{idx}}">
+      <View className="item">
+        <Text name="pair_{{idx}}" value="$pairs[{{idx}}].label"/>
+        <Choices name="linked_{{idx}}" toName="pair_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Answer whether the response links these two claims.">
+          <Choice value="Linked"/>
+          <Choice value="Not linked"/>
+        </Choices>
+        <Choices name="both_true_{{idx}}" toName="pair_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Answer whether both claims could be true together.">
+          <Choice value="Both could be true"/>
+          <Choice value="Not both true"/>
+        </Choices>
+        <Choices name="both_false_{{idx}}" toName="pair_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Answer whether both claims could be false together.">
+          <Choice value="Both could be false"/>
+          <Choice value="Not both false"/>
+        </Choices>
+      </View>
+    </Repeater>
+  </View>
+
+  <View className="block">
+    <Header value="Part 2. Claims as stated" size="4"/>
+    <Text name="claims_help" value="For each numbered claim: does the response assert it as written? Judge what the text says, not whether the claim is true in the real world. If the response states a different number, date, name or the opposite, choose 'Changed or contradicted'."/>
+    <Repeater on="$claims" indexFlag="{{idx}}">
+      <View className="item">
+        <Text name="claim_{{idx}}" value="$claims[{{idx}}].label"/>
+        <Choices name="asserted_{{idx}}" toName="claim_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Answer whether the response asserts this claim as written.">
+          <Choice value="Asserted as written"/>
+          <Choice value="Changed or contradicted"/>
+          <Choice value="Not stated"/>
+        </Choices>
+      </View>
+    </Repeater>
+  </View>
+
+  <View className="block">
+    <Header value="Part 3. Edited versions" size="4"/>
+    <Text name="versions_help" value="Each version is the response above with a change. Removed text is struck through in red; added text is marked in blue. Compare each version with the response you read."/>
+    <Repeater on="$versions" indexFlag="{{idx}}">
+      <View className="item">
+        <HyperText name="version_{{idx}}" value="$versions[{{idx}}].html" inline="true"/>
+        <Choices name="coherence_{{idx}}" toName="version_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Compare this version's coherence with the response you read.">
+          <Choice value="More coherent"/>
+          <Choice value="About as coherent"/>
+          <Choice value="Less coherent"/>
+        </Choices>
+        <Choices name="collateral_{{idx}}" toName="version_{{idx}}" choice="single-radio" showInline="true" required="true" requiredMessage="Say whether the change altered anything besides a link between claims.">
+          <Choice value="Nothing else changed"/>
+          <Choice value="Minor other change"/>
+          <Choice value="Material other change"/>
+        </Choices>
+        <TextArea name="collateral_span_{{idx}}" toName="version_{{idx}}" rows="1" maxSubmissions="1" placeholder="If something else changed, quote it here."/>
+      </View>
+    </Repeater>
+  </View>
+</View>
