@@ -30,8 +30,8 @@ that the prose realizes its planned relations, reads as expert prose, and assert
 The released corpus comprises $100$ families and $500$ responses over $36$ topics, with $4{,}761$ gold edges
 and gold data for six discourse senses --- including exhaustive alternatives and resolved concessions ---
 that no existing dataset labels. Scored from its gold graphs, a probabilistic coherence measure satisfies
-$89.1\%$ of $1{,}454$ declared constraints, and both invariance ladders are exactly flat. Scored from graphs
-mined by two open models, the same measure satisfies $31.4$--$34.0\%$ and fails almost every invariance check,
+$92.0\%$ of $1{,}408$ declared constraints, and both invariance ladders are exactly flat. Scored from graphs
+mined by two open models, the same measure satisfies $32.4$--$34.9\%$ and fails almost every invariance check,
 and the best relation extractor reaches $54.6\%$ coupling-level F1: the bottleneck is relation extraction, not
 scoring. We also report four construction defects that passed every content gate
 and were found only by scoring the gold graphs. A pilot human study finds that readers agree with the
@@ -350,10 +350,10 @@ then asserts an equality, and a measure that moves at all has been caught readin
 for all readouts. This is the robust headline claim, insensitive to the fine structure of intermediate
 rungs.
 
-For the three-readout measure of \S\ref{sec-harness}, a \famtype{conflict} family declares $14$
-constraints ($9$ C1, $2$ C2, $3$ C3) and every other family $15$: \famtype{chain} has $9$ C1, $3$ C2 and
+For the three-readout measure of \S\ref{sec-harness}, a \famtype{conflict} family declares $13$
+constraints ($9$ C1, $1$ C2, $3$ C3) and every other family $15$: \famtype{chain} has $9$ C1, $3$ C2 and
 $3$ C3, and \famtype{order} and \famtype{control} have $12$ C2 invariances and $3$ C3. The released corpus
-declares $1{,}454$, and a manifest's constraints are re-derived from the code and checked against it on
+declares $1{,}408$, and a manifest's constraints are re-derived from the code and checked against it on
 release. A single-score measure inherits only the
 readout-independent content: five increase assertions per \famtype{conflict} or \famtype{chain} family (four
 C1 pairs and the C3 endpoints) and five invariance assertions per \famtype{order} or \famtype{control} family.
@@ -894,7 +894,7 @@ inversion.
 %% ================================================================
 
 \paragraph{Setup, stated first.} Two corpora are measured here, and every table states which.
-\S\ref{sec-gold-release} reports the gold arm on the released $100$-family corpus ($500$ responses, $1{,}454$
+\S\ref{sec-gold-release} reports the gold arm on the released $100$-family corpus ($500$ responses, $1{,}408$
 declared constraints); it needs no LLM and is deterministic. The relation-extraction results of
 \S\ref{sec-extract} and the single-score baselines of \S\ref{sec-measures} are on the release as well; the
 same measurements on the $14$-family development set are in Appendix~\ref{app-dev}. Relations are mined by
@@ -920,13 +920,13 @@ response length and claim count.
 \toprule
 Arm & Ladder & C1 & C2 & C3 & total (\%) \\
 \midrule
-\textsc{gold} & \famtype{conflict} & 339/414 & 45/92 & 119/138 & 503/644 (78.1) \\
+\textsc{gold} & \famtype{conflict} & 339/414 & 45/46 & 119/138 & 503/598 (84.1) \\
               & \famtype{chain}    & 174/189 & 62/63 & 62/63 & 298/315 (94.6) \\
               & \famtype{order}    & --- & 252/252 & 63/63 & 315/315 (100) \\
               & \famtype{control}  & --- & 144/144 & 36/36 & 180/180 (100) \\
-              & all                & 513/603 & 503/551 & 280/300 & \textbf{1296/1454 (89.1)} \\
+              & all                & 513/603 & 503/505 & 280/300 & \textbf{1296/1408 (92.0)} \\
 \midrule
-\textsc{gold\_valid} & all         & 277/603 & 503/551 & 238/300 & 1018/1454 (70.0) \\
+\textsc{gold\_valid} & all         & 277/603 & 503/505 & 238/300 & 1018/1408 (72.3) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -936,14 +936,18 @@ ladders are \emph{exactly} flat: all $495$ invariance and endpoint assertions on
 \famtype{control} hold, which is what certifies that their edits change no factor. On the first assembled
 version of the corpus \famtype{control} held $96$ of $180$, the defect of \S\ref{sec-pitfalls}. Second,
 \famtype{chain} holds $94.6\%$, against $44.8\%$ before its targeting was fixed. Third, \famtype{conflict} holds
-$78.1\%$, and its failures are concentrated rather than diffuse. The largest block, $46$ of the $47$ failing
-C2 assertions, is the declared \emph{invariance} of the log-partition readout at the
-\rung{concession\_resolved} step, which failed on every one of the $46$ families, as a small decrease on
-$40$ and a small increase on $6$. That declaration was made on the pilot. Unlike the \famtype{chain} case it
-is not a uniform reversal: the readout is simply not exactly invariant at this step. The natural revision is
-therefore to leave the pair unconstrained, not to predict a direction; \tbd{decide whether to revise it}. The next largest are C1 increases on the mean-marginal
-readout at the two upper steps ($53$), $60$ of the $141$ \famtype{conflict} failures overall being changes
-below $10^{-3}$. \textsc{gold\_valid} falls to $70.0\%$ because the conflict-fixing rungs remove
+$84.1\%$, and its failures are concentrated rather than diffuse. The largest block is C1 increases on the
+mean-marginal readout at the two upper steps ($53$ of $95$), and $60$ of the $95$ \famtype{conflict} failures
+are changes below $10^{-3}$. One declaration was revised on this corpus. Defect~1 had declared the
+log-partition readout \emph{invariant} at the \rung{concession\_resolved} step, because that edit only
+reweights a factor; the declaration was made on the pilot. On the release it failed on every one of the
+$46$ families, as a small decrease on $40$ and a small increase on $6$. Unlike the \famtype{chain} case this
+is not a uniform reversal --- the readout is simply not exactly invariant at this step --- so we did not
+predict a direction instead, but left the pair unconstrained: it is in neither C1 nor C2, and the corpus
+declares $1{,}408$ assertions rather than $1{,}454$. Every number in this paper is on the revised
+declaration. Since the dropped pair failed on every family, the revision raises the gold arm from $89.1\%$
+to $92.0\%$ without changing a single passing assertion. \textsc{gold\_valid} falls to $72.3\%$ because the
+conflict-fixing rungs remove
 planted-invalid conflicts that this arm has already discarded, which confirms that the planted errors carry
 the \famtype{conflict} signal.
 
@@ -985,24 +989,24 @@ points, at the cost of more than tripling the edge count and multiplying non-rel
 \begin{table}[t]
 \centering\small
 \caption{Declared ordering constraints satisfied on the \textbf{released corpus}, by ladder type, for the MRF
-  measure under each arm ($1{,}454$ assertions). The arms differ only in the relation graph.}
+  measure under each arm ($1{,}408$ assertions). The arms differ only in the relation graph.}
 \label{tab:ladder}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 Arm & \famtype{conflict} & \famtype{chain} & \famtype{order} & \famtype{control} & total (\%) \\
 \midrule
-\textsc{gold}                                   & 503/644 & 298/315 & 315/315 & 180/180 & 1296/1454 (\textbf{89.1}) \\
-\textsc{gold\_valid}                            & 253/644 & 270/315 & 315/315 & 180/180 & 1018/1454 (70.0) \\
-\textsc{mined}, \texttt{llama}, windowed        & 303/644 & 174/315 &   2/315 &   1/180 & 480/1454 (33.0) \\
-\textsc{mined}, \texttt{llama}, bidirectional   & 303/644 & 154/315 &   0/315 &   0/180 & 457/1454 (31.4) \\
-\textsc{mined}, \texttt{gpt-oss}, windowed      & 311/644 & 169/315 &  13/315 &   2/180 & 495/1454 (34.0) \\
-\textsc{mined}, \texttt{gpt-oss}, bidirectional & 290/644 & 158/315 &   5/315 &   3/180 & 456/1454 (31.4) \\
+\textsc{gold}                                   & 503/598 & 298/315 & 315/315 & 180/180 & 1296/1408 (\textbf{92.0}) \\
+\textsc{gold\_valid}                            & 253/598 & 270/315 & 315/315 & 180/180 & 1018/1408 (72.3) \\
+\textsc{mined}, \texttt{llama}, windowed        & 303/598 & 174/315 &   2/315 &   1/180 & 480/1408 (34.1) \\
+\textsc{mined}, \texttt{llama}, bidirectional   & 303/598 & 154/315 &   0/315 &   0/180 & 457/1408 (32.5) \\
+\textsc{mined}, \texttt{gpt-oss}, windowed      & 308/598 & 169/315 &  13/315 &   2/180 & 492/1408 (34.9) \\
+\textsc{mined}, \texttt{gpt-oss}, bidirectional & 290/598 & 158/315 &   5/315 &   3/180 & 456/1408 (32.4) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:ladder} gives the ordering results. The same scorer satisfies $89.1\%$ of constraints from gold
-graphs and $31.4$--$34.0\%$ from mined graphs; since the arms differ only in the relation graph, the gap is the
+Table~\ref{tab:ladder} gives the ordering results. The same scorer satisfies $92.0\%$ of constraints from gold
+graphs and $32.4$--$34.9\%$ from mined graphs; since the arms differ only in the relation graph, the gap is the
 extraction contribution, isolated by construction. The best extractor by coupling F1 is also the best mined arm
 here, but by under three points over the worst, within what a single mining sample can resolve
 (\S\ref{sec-limitations}). Two features of the breakdown are informative. First, the mined arms fail nearly every invariance
@@ -1010,7 +1014,7 @@ constraint: at most $15$ of the $495$ \famtype{order} and \famtype{control} asse
 from gold graphs, and every one that passes does so because two re-mined graphs happened to score identically.
 Re-mining a reordered or re-directed response returns a slightly different graph, so the score moves; the
 invariance ladders therefore expose extractor \emph{instability under meaning-preserving edits}, which no
-increase-only benchmark could detect. Second, \textsc{gold\_valid} falls to $70.0\%$ because the
+increase-only benchmark could detect. Second, \textsc{gold\_valid} falls to $72.3\%$ because the
 conflict-fixing rungs remove planted-invalid conflicts that this arm has already discarded, which confirms that
 the planted errors carry the \famtype{conflict} signal.
 
@@ -1384,19 +1388,23 @@ deterministic gates until the validation study's edit check (\S\ref{sec-study}) 
 
 \paragraph{Declared orderings are premises, and two were revised.} A ladder's constraints encode our judgement
 that, for example, resolving a conceded tension increases coherence. The pilot shows that at least one
-declared pattern --- \famtype{order} invariance --- is not what readers perceive. The \famtype{chain}
-log-partition declaration was revised after measuring the families it governs (\S\ref{sec-pitfalls}), and
-the \famtype{conflict} log-partition invariance at \rung{concession\_resolved} fails on all $46$
-families ($40$ as decreases), so it is a candidate for the same treatment. A declaration revised on the data it scores is weaker
-evidence than one made in advance. The validation study tests the premises (Hypotheses H1--H4 of
+declared pattern --- \famtype{order} invariance --- is not what readers perceive. Two log-partition
+declarations were revised after measuring the families they govern: \famtype{chain}'s breaking steps, from an
+increase to a predicted decrease (\S\ref{sec-pitfalls}), and \famtype{conflict}'s \rung{concession\_resolved}
+step, from invariance to unconstrained (\S\ref{sec-gold-release}), after it failed on all $46$ families. The
+second revision only removes a prediction, so a measure's score rises if it failed that pair more often than it
+passed it. Every arm in this paper did: the gold arm loses $46$ failures and no passes, and the mined arms lose
+at most $3$ passes each. A declaration revised on the data it scores is weaker evidence
+than one made in advance, and we report the unrevised figure ($89.1\%$ of $1{,}454$) alongside the revised
+one. The validation study tests the premises (Hypotheses H1--H4 of
 \S\ref{sec-study}), and we fix in advance how its outcomes change them.
 
 \paragraph{Scale.} One hundred families is enough to establish that
 the instrument discriminates, and not enough to rank closely matched measures. Mining is single-sample, with
 measured run-to-run variation of up to $0.06$ coupling F1. The four mined arms' ordering satisfaction spans
-only $2.6$ points ($31.4$--$34.0\%$, Table~\ref{tab:ladder}), and a single sample per arm cannot rank arms that
-close, so we do not rank them on it; the gap that matters, $89.1\%$ from gold graphs against at most $34.0\%$
-mined, is twenty times that spread. Every comparison in \S\ref{sec-experiments} is on the release.
+only $2.5$ points ($32.4$--$34.9\%$, Table~\ref{tab:ladder}), and a single sample per arm cannot rank arms that
+close, so we do not rank them on it; the gap that matters, $92.0\%$ from gold graphs against at most $34.9\%$
+mined, is more than twenty times that spread. Every comparison in \S\ref{sec-experiments} is on the release.
 \famtype{control} is the smallest ladder type by design ($12$ families), and the type a reader should most
 want enlarged.
 
@@ -1418,8 +1426,8 @@ them as ladders: families of responses over one claim set, with declared orderin
 labelled negative set, and invariance ladders on which a sound measure must not move. The construction attributes a
 score difference to coherence rather than to content, and --- by scoring a measure once on gold graphs and once on
 mined ones --- isolates extraction error from scoring error by construction. On the released $100$-family corpus the
-gold-graph measure satisfies $89.1\%$ of $1{,}454$ declared constraints, with both invariance ladders exactly flat,
-and at most $34.0\%$ from mined graphs, which are unstable under meaning-preserving edits: the bottleneck is
+gold-graph measure satisfies $92.0\%$ of $1{,}408$ declared constraints, with both invariance ladders exactly flat,
+and at most $34.9\%$ from mined graphs, which are unstable under meaning-preserving edits: the bottleneck is
 extraction. Only two
 cohesion metrics beat the response-length control on increase, LLM judges fall below it with both backends, and
 measures that read only the claims cannot see a ladder at all.
@@ -1695,9 +1703,7 @@ informative.
 %% ================================================================
 
 \subsection{Pilot annotator brief}
-The pilot's full written brief, given to every annotator before the first screen. \tbd{Validation study: add the
-core-session and instruction-test briefs, and a screenshot of the claim-pair and highlighted-change screens, once
-finalized.}
+The pilot's full written brief, given to every annotator before the first screen.
 
 \begin{quote}\small
 \textbf{The task.} Each screen shows two responses, A and B, answering the same question. You decide which one is
@@ -1721,6 +1727,65 @@ however small, pick a side and mark low confidence.
 \textbf{Confidence and reason.} Rate confidence low, medium or high, and give one sentence saying what drove the choice,
 ideally naming the specific claims or connection.
 \end{quote}
+
+\subsection{Validation-study briefs}
+The two briefs of the validation study (\S\ref{sec-study}), condensed. The full text, the Label Studio
+configurations and every task file are in the release's \texttt{docs/human\_study\_release}.
+
+\paragraph{Core session} (annotators C1--C7, about $2$ hours $45$ minutes).
+\begin{quote}\small
+\textbf{The task.} Each task is one response, with its claims numbered underneath. Read it once, carefully; every
+question is about it, and needs no outside knowledge.
+
+\textbf{Part 1: claim pairs.} For each pair of numbered claims: does the response draw a logical link between them?
+A link means the text connects them --- one causes, supports, explains, restates, contrasts with or rules out the
+other; mentioning the same topic is not a link. Then, \emph{whatever the answer}: could both claims be true at the
+same time, and could both be false at the same time? Answer these two from the claims' meaning alone. A worked table
+covers the four cases: two different dates for one event (not both true; both could be false); a claim and its
+negation (neither); two possible causes (both); ``at least one inverter failed'' and ``not every inverter failed''
+(both could be true; not both false).
+
+\textbf{Part 2: claims as stated.} For each numbered claim: does the response assert it as written, change or
+contradict it, or not state it? Judge only what the text says. Some claims are false in the real world on purpose;
+a false claim the response states is ``asserted as written''.
+
+\textbf{Part 3: edited versions.} Each version is the response with a change: removed text struck through in red,
+added text marked in blue. Is the version more coherent, about as coherent, or less coherent than the response you
+read? A response is coherent when what it says can all be true together and the connections it draws hold up. Did the
+change alter anything besides a link between claims --- a fact, a number, what a claim means, or another connection?
+If so, choose minor or material and quote it. Some versions may change nothing.
+
+\textbf{Not the target.} Length, fluency, style, vocabulary, and real-world truth.
+\end{quote}
+
+\paragraph{Instruction test} (annotators I1--I3, about $2$ hours $50$ minutes).
+\begin{quote}\small
+\textbf{The task.} Each screen shows two responses with much the same content, and a question above them, highlighted.
+\emph{The question is not the same on every screen}: read it each time and answer exactly what it asks. One asks
+which response would leave you believing something consistent, if you believed everything it says --- whether the
+claims fit together, not how the response reads. The other asks which hangs together better as an argument --- the
+response as a piece of writing. The two can have different answers for the same pair; that is what is being measured,
+so do not give the same answer to both on principle.
+
+\textbf{Your answer.} Response A, Response B, or about equal, which is a real answer; then confidence (low, medium or
+high) and one sentence saying why.
+\end{quote}
+
+\begin{figure}[p]
+\centering
+\includegraphics[height=0.24\textheight]{figures/study_claim_pairs.png}\\[1pt]{\small (a)}\\[4pt]
+\includegraphics[height=0.24\textheight]{figures/study_edited_version.png}\\[1pt]{\small (b)}\\[4pt]
+\includegraphics[height=0.28\textheight]{figures/study_instruction.png}\\[1pt]{\small (c)}
+\caption{The validation study's interfaces in Label Studio, on the practice families, which are outside the study
+  sample. (a) Two claim pairs from a core task, each with its link question and the two truth questions
+  that recover its coupling. (b) An edited version, shown as the base response with removed text
+  struck through and added text highlighted; only the paragraphs carrying a change are shown here. The highlight
+  marks every textual change, including rewording that alters no relation --- here the date clause is restructured
+  as well as a resolving sentence added --- which is why each version also asks whether anything besides a link
+  between claims changed. (c) An instruction-test screen, with the screen's instruction in the band above
+  the two responses; the responses are cut at the dashed line.}
+\label{fig:study-ui}
+\end{figure}
 
 \subsection{Pilot screen selection}
 \begin{center}\small
