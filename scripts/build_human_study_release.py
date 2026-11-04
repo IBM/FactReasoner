@@ -235,8 +235,12 @@ def core_task(fid, fams, by_rung, rng, annotator, task_id):
         # {{idx}} in a value, so a value naming two fields renders the second as "undefined".
         pair_rows.append({"pair_id": f"p{k + 1:02d}", "claim_x": num[s], "claim_y": num[t],
                           "label": f"Claim {num[s]} and claim {num[t]}"})
+        # `pair_id` is only an index into THIS task: each annotator gets the pairs in their
+        # own shuffled order, so p01 is a different pair for each of them. `atoms` is the
+        # pair's identity, stable across annotators, and is what the analysis groups on.
         pair_key.append({
             "pair_id": f"p{k + 1:02d}", "kind": kind, "shown_as": [num[s], num[t]],
+            "atoms": sorted([s, t]),
             **({k2: e.get(k2) for k2 in ("id", "source_id", "target_id", "level2_sense",
                                            "level1_coupling", "validity", "error_kind")}
                if kind == "rel" else {}),
@@ -288,7 +292,8 @@ def add_attention_checks(task, key, base_item, rng):
     pid = f"p{len(task['pairs']) + 1:02d}"
     task["pairs"].insert(rng.randrange(len(task["pairs"]) + 1),
                          {"pair_id": pid, "claim_x": c, "claim_y": c, "label": f"Claim {c} and claim {c}"})
-    key["pairs"].append({"pair_id": pid, "kind": "attention_check", "shown_as": [c, c]})
+    key["pairs"].append({"pair_id": pid, "kind": "attention_check", "shown_as": [c, c],
+                         "atoms": [base_item["atoms"][c - 1]["id"]] * 2})
 
 
 def order_jobs(order_fams, fams):

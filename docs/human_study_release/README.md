@@ -145,8 +145,48 @@ an answer-revealing field or string.
 
 ## Analysis
 
-The study's answers do not fit the pilot's importer (`scripts/import_label_studio.py`),
-which expects one choice per screen. That importer, and an analysis script for the
-hypotheses in the paper's Table 12, still need to be written. Every task carries its
-`task_id` and `annotator`, so exports from separate projects can be joined to the answer
-key without relying on Label Studio's user ids, which restart at 1 in every project.
+Export each annotator's project from Label Studio as **JSON** (Export → JSON; not
+JSON-MIN, which drops the field that tells the questions in a task apart). Then:
+
+```sh
+python scripts/import_human_study_release.py \
+    --export exports/core_C1.json ... --export exports/instr_I3.json \
+    --out artifacts/human_study_release/judgements.jsonl
+
+python scripts/analyze_human_study_release.py \
+    --judgements artifacts/human_study_release/judgements.jsonl \
+    --json artifacts/human_study_release/results.json
+```
+
+**The importer** turns every export into one record per judgement, joined to the answer
+key. It stops, rather than guesses, on: an export with no annotations, a task not in the
+key (an export from a different build), an answer the interface never offered, one export
+holding two annotators' tasks, a task annotated twice, or a required question left blank.
+Annotator identity comes from each task's own `annotator` field, not Label Studio's user
+ids, which restart at 1 in every project. Practice tasks are dropped unless you pass
+`--keep-practice`.
+
+**The analysis** reports every hypothesis in the paper's Table 12 with its units, its
+95% Wilson interval or test, and its pass criterion; Krippendorff's alpha per question;
+and the attention checks. An annotator who fails either check is excluded, and the
+report then lists every family left with fewer than three annotators. **Re-annotate
+those families** before reporting: with two raters a split has no majority.
+
+Everything is computed on majorities, one per unit, and a unit is the thing judged: a
+claim pair by its two claims, a claim by itself, an edited version by its rungs. Never
+by a task's own ids (`p01`, `v1`): each annotator's copy of a family is shuffled
+independently, so `p01` is a different pair for each of them.
+
+Two results are descriptive, not tests:
+
+- **A3** reports how often readers accept a planted-invalid relation at its labelled
+  coupling. Planted relations are written into the prose like valid ones, so careful
+  readers link them; the truth questions can catch a wrong coupling but not a wrong
+  direction or a link with no basis. A high rate means the planted errors read as real,
+  not that the labels failed.
+- **H2** and **H3** are too small to test (11 and 10 units) and are reported with their
+  intervals.
+
+`tests/test_human_study_release.py` simulates a whole study from these task files, with
+annotators whose answers are fixed in advance, and checks that the importer and the
+analysis recover what was planted.
