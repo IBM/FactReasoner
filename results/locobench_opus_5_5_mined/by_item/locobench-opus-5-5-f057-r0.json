@@ -1,0 +1,3522 @@
+{
+  "item_id": "locobench-opus-5-5-f057-r0",
+  "item_name": "Law -- shuffle_full",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f057",
+    "family": "ORDER",
+    "rung_index": 0,
+    "rung_name": "shuffle_full",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "full"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "full",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": null
+  },
+  "meta": {
+    "canonical_topic": "Law",
+    "domain": "Social Sciences",
+    "framing": "How do courts determine whether a defendant's negligence or an unforeseeable intervening event is legally responsible for a plaintiff's injury when opposing experts offer conflicting accounts of what happened?",
+    "split": "test",
+    "word_count": 659,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Proximate cause is an element a plaintiff must prove in a negligence claim.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "An unforeseeable intervening event can qualify as a superseding cause that breaks the chain of legal causation.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "A plaintiff in a civil negligence case bears the burden of proving causation by a preponderance of the evidence.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "A plaintiff in a civil negligence case must prove causation beyond a reasonable doubt.",
+      "label": "p4",
+      "factual": false,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Under Daubert v. Merrell Dow Pharmaceuticals, trial judges act as gatekeepers for the admissibility of expert testimony.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Daubert v. Merrell Dow Pharmaceuticals was decided in 2005.",
+      "label": "p6",
+      "factual": false,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Harlow Construction's expert testified that a sudden microburst caused the scaffolding collapse.",
+      "label": "p7",
+      "factual": true,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Lopez's expert testified that missing tie-in anchors caused the scaffolding collapse.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Site inspection records showed that several tie-in anchors on the scaffolding had not been installed.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The Pine Street scaffolding was structurally deficient.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "The wind load at the Pine Street site exceeded the scaffolding's design limits.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The microburst was a reasonably foreseeable weather event at the Pine Street site.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "A microburst at the Pine Street site fell within the range of risks a reasonable contractor would anticipate.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "Harlow Construction's negligence was a contributing cause of Lopez's injuries.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "Harlow Construction's negligence played no causal role in Lopez's injuries.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a15",
+      "text": "The appellate court ruled that the microburst was not a superseding cause of the scaffolding collapse.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a3",
+      "target_id": "a2",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a8",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a8",
+      "target_id": "a10",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a6",
+      "target_id": "a13",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "out_of_window",
+      "in_candidate_window": false
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a1",
+      "target_id": "a3",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a11",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a15",
+      "position_distance": 3
+    }
+  ],
+  "response": "In other words, a microburst there fell within the range of risks a reasonable contractor would anticipate. A plaintiff in a civil negligence case bears the burden of proving causation by a preponderance of the evidence, so the factfinder must find it more likely than not that the defendant's conduct produced the injury. Finally, the court asks whether any intervening event was so far outside the foreseeable risk that it relieves the defendant of liability. Harlow Construction's expert testified that a sudden microburst caused the scaffolding collapse, whereas Lopez's expert testified that missing tie-in anchors caused it. Because the element is framed in those terms, an unforeseeable intervening event can qualify as a superseding cause that breaks the chain of legal causation.\n\nThe appellate court resolved that tension by ruling that the microburst was not a superseding cause of the scaffolding collapse, so the first of those outcomes controls. Under Daubert v. Merrell Dow Pharmaceuticals, trial judges act as gatekeepers for the admissibility of expert testimony, and the reliability inquiry that role entails was developing in the lower courts before Daubert v. Merrell Dow Pharmaceuticals was decided in 2005. A structural defect and an excessive wind load can coexist, and the law must still decide whether the weather displaces the contractor's responsibility. When a scaffold collapses and the parties dispute whether carelessness or nature brought it down, the question before the court concerns legal causation rather than the bare physical sequence of events. The judge first screens each account for methodological reliability. On the decisive point, the case offered no middle ground, and the two possible outcomes cannot both be true. These burdens matter most when the record supports two technically plausible explanations, because they decide which party loses if the factfinder remains uncertain. Read alongside the meteorological data, those records establish that at least one of two conditions held, perhaps both: the Pine Street scaffolding was structurally deficient, or, as the inspection records also indicate, the wind load at the Pine Street site exceeded the scaffolding's design limits.\n\nIt argues instead that something extraordinary, rather than its own lapse, is the occurrence to which the law should attach responsibility. Two experts who reach opposite results may therefore both be admitted, and their disagreement then passes to the jury. The microburst was a reasonably foreseeable weather event at the Pine Street site. Proximate cause is an element a plaintiff must prove in a negligence claim, and it asks whether the harm falls within the scope of the risk created by the defendant's conduct. A dramatic natural event does not displace an established breach merely because an expert names it as the immediate trigger. Site inspection records showed that several tie-in anchors on the scaffolding had not been installed, which confirms the account given by Lopez's expert.\n\nBefore any weighing occurs, however, the court must decide which expert accounts the jury may hear at all. Either Harlow Construction's negligence was a contributing cause of Lopez's injuries, even though Harlow's expert attributed the collapse to the microburst, or Harlow Construction's negligence played no causal role in Lopez's injuries. The allocation of proof determines how that argument is tested. The jury then weighs the admitted testimony under the governing burden of proof. A dispute over a collapsed scaffold on Pine Street shows how this process unfolds. Neither possibility, standing alone, resolves the legal question.\n\nBy contrast, a plaintiff in a civil negligence case must prove causation beyond a reasonable doubt. Anchoring requirements exist to guard against sudden lateral forces of exactly this kind, so a contractor who omits anchors cannot treat such forces as a surprise. That inquiry examines methodology, including testing, peer review, error rates and general acceptance, rather than conclusions. The ruling reflects the general method courts apply when opposing experts conflict. A defendant who invokes such an event does not deny that it acted carelessly. Harlow's defense depended on showing that the weather was extraordinary, and that showing failed.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7759666875,
+        "consistency": 0.49787421509971513,
+        "reified": 0.175293,
+        "log_partition": 0.34831358191764433
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.895485,
+          "a1": 0.889841,
+          "a10": 0.921684,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.709657,
+          "a14": 0.587137,
+          "a15": 0.9,
+          "a2": 0.891791,
+          "a3": 0.067164,
+          "a4": 0.9,
+          "a5": 0.1,
+          "a6": 0.850766,
+          "a7": 0.899099,
+          "a8": 0.914904,
+          "a9": 0.929389
+        },
+        "num_below_prior": 8,
+        "avg_norm_entropy": 0.4776540102554079,
+        "log_z": -6.541533,
+        "log_z_max": -2.547504,
+        "log_z_min": -8.676263
+      },
+      "elapsed_s": 0.152,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.780196125,
+        "consistency": 0.5048402655642023,
+        "reified": 0.192983,
+        "log_partition": 0.3958466509830623
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.92929,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.709654,
+          "a14": 0.587139,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.9,
+          "a5": 0.1,
+          "a6": 0.850725,
+          "a7": 0.899558,
+          "a8": 0.918932,
+          "a9": 0.92929
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.47766151051998834,
+        "log_z": -4.333601,
+        "log_z_max": -1.068276,
+        "log_z_min": -6.473071
+      },
+      "elapsed_s": 0.145,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "mined:llama-3.3-70b-instruct:windowed",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 17,
+      "num_dropped_none": 2,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 32,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 15,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 17,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 103,
+        "discourse_anchored": true,
+        "num_sentences": 33,
+        "num_atoms_aligned": 16,
+        "num_promoted": 7,
+        "num_demoted": 44,
+        "pairs_scored": 17,
+        "dropped_none": 2,
+        "relations_kept": 15,
+        "llm_calls": 32,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.00015843621027845703,
+          "strength": 0.00015843623546121045,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.037326883221056546,
+          "strength": 0.03732688915400391,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9959297039754521,
+          "strength": 0.9959298622741902,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.017986211850767708,
+          "strength": 0.017986211850767708,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999785550419277,
+          "strength": 0.9999785550419277,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999963774085127,
+          "strength": 0.999999,
+          "type_confidence": 0.9999973774058901,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.3208213105346002,
+          "strength": 0.3208213105346002,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 7.48462480827337e-05,
+          "strength": 7.484626295334436e-05,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999546021485856,
+          "strength": 0.9999546021485856,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9995693237547264,
+          "strength": 0.9995694429126635,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.22270013458735485,
+          "strength": 0.22270014343666278,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999411524515509,
+          "strength": 0.9999417087285314,
+          "type_confidence": 0.9999994436905916,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7744878125,
+        "consistency": 0.6411698013721288,
+        "reified": 0.487482,
+        "log_partition": 0.11315754210985696
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.004846,
+          "a1": 0.928488,
+          "a10": 0.974512,
+          "a11": 0.994021,
+          "a12": 0.994021,
+          "a13": 0.999775,
+          "a14": 0.004757,
+          "a15": 0.980056,
+          "a2": 0.898002,
+          "a3": 0.679092,
+          "a4": 0.9,
+          "a5": 0.1,
+          "a6": 0.994656,
+          "a7": 0.994735,
+          "a8": 0.996134,
+          "a9": 0.94871
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.22642307615021373,
+        "log_z": -11.582234,
+        "log_z_max": -5.460294,
+        "log_z_min": -12.363369
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 15,
+        "pair": {
+          "tp": 6,
+          "fp": 9,
+          "fn": 3,
+          "precision": 0.4,
+          "recall": 0.6666666666666666,
+          "f1": 0.5
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 11,
+          "fn": 5,
+          "precision": 0.26666666666666666,
+          "recall": 0.4444444444444444,
+          "f1": 0.33333333333333337
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 11,
+          "fn": 5,
+          "precision": 0.26666666666666666,
+          "recall": 0.4444444444444444,
+          "f1": 0.33333333333333337
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 7,
+            "found": 3,
+            "recall": 0.42857142857142855
+          },
+          "backward": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "True": {
+            "total": 4,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "out_of_window": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "entailment": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "valid": {
+            "total": 6,
+            "found": 3,
+            "recall": 0.5
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 156.957,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "mined:llama-3.3-70b-instruct:bidirectional",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "bidirectional",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 108,
+      "num_dropped_none": 39,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 177,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 69,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "pairs_selected": 108,
+        "pairs_pruned": 132,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 108,
+        "dropped_none": 39,
+        "relations_kept": 69,
+        "llm_calls": 177,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.0011695102980051148,
+          "strength": 0.0011695102980051148,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.00012339459913881975,
+          "strength": 0.00012339461875185997,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "None",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999987615817635,
+          "strength": 0.999999,
+          "type_confidence": 0.9999997615815251,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.029312227848531033,
+          "strength": 0.029312232507583434,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "None",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9968271585292952,
+          "strength": 0.9968273169706797,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 2.143756622996883e-05,
+          "strength": 2.1444958611112947e-05,
+          "type_confidence": 0.9996552858283304,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 4.5397733240603996e-05,
+          "strength": 4.539785230058577e-05,
+          "type_confidence": 0.9999973774093764,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.00070967019044671,
+          "strength": 0.000709670303245731,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.3775406710197615,
+          "strength": 0.3775406710197615,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.00043055698906485033,
+          "strength": 0.00043055709171761547,
+          "type_confidence": 0.9999997615815251,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.017986209704049832,
+          "strength": 0.017986211848173114,
+          "type_confidence": 0.9999998807907247,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 3.5356236605868976e-05,
+          "strength": 3.535625486995696e-05,
+          "type_confidence": 0.9999994834269622,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.010986941560674085,
+          "strength": 0.010986941560674085,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.04742587390486657,
+          "strength": 0.04742587390486657,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999998902494731,
+          "strength": 0.9999989322970193,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.014063622976530646,
+          "strength": 0.014063626888396767,
+          "type_confidence": 0.9999997218451434,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9241412035616341,
+          "strength": 0.9241418278365082,
+          "type_confidence": 0.9999993244815294,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0005527782439232698,
+          "strength": 0.0005527785514391787,
+          "type_confidence": 0.9999994436905916,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999974217844146,
+          "strength": 0.9999977396749328,
+          "type_confidence": 0.9999996821087633,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a6",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 9.610234998516491e-05,
+          "strength": 9.610239199155213e-05,
+          "type_confidence": 0.9999995628996703,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999646040106587,
+          "strength": 0.9999646437456805,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999977396749491,
+          "strength": 0.9999977396749491,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a12",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0024726215609318157,
+          "strength": 0.002472622936475219,
+          "type_confidence": 0.9999994436905916,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a7",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989105931404,
+          "strength": 0.999999,
+          "type_confidence": 0.999999910593051,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a8",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a12",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.029284759158912477,
+          "strength": 0.029312233267479438,
+          "type_confidence": 0.9990627084495318,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9994029116529668,
+          "strength": 0.9999724643128796,
+          "type_confidence": 0.9994304316566316,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 3.535625491800636e-05,
+          "strength": 3.535625491800636e-05,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 3.5356238018353486e-05,
+          "strength": 3.535625487751351e-05,
+          "type_confidence": 0.9999995231632965,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.622459336419471,
+          "strength": 0.622459336419471,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999964966169227,
+          "strength": 0.999999,
+          "type_confidence": 0.9999974966144194,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999867544611113,
+          "strength": 0.999986992876485,
+          "type_confidence": 0.9999997615815251,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 4.5397852402304475e-05,
+          "strength": 4.5397852402304475e-05,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999968542417834,
+          "strength": 0.999999,
+          "type_confidence": 0.9999978542396377,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998801318126,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999866749894031,
+          "strength": 0.9999869928765049,
+          "type_confidence": 0.9999996821087633,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999976602022503,
+          "strength": 0.9999977396749178,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999645245407767,
+          "strength": 0.9999646437458325,
+          "type_confidence": 0.9999998807907294,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9933071490631437,
+          "strength": 0.9933071490631437,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.3208213105346002,
+          "strength": 0.3208213105346002,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a10",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.09534942980809635,
+          "strength": 0.09534946390769775,
+          "type_confidence": 0.9999996423723848,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.5621763037427296,
+          "strength": 0.5621765047925724,
+          "type_confidence": 0.9999996423723848,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 6.14417728407486e-06,
+          "strength": 6.14417752822252e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.00015843623586342447,
+          "strength": 0.00015843623586342447,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a15",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9997963345902384,
+          "strength": 0.9997965729602125,
+          "type_confidence": 0.9999997615815251,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999542445372417,
+          "strength": 0.9999546021486213,
+          "type_confidence": 0.9999996423723848,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.84055475,
+        "consistency": 0.4591169360490895,
+        "reified": 0.060974,
+        "log_partition": 0.02704442033280589
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.144037,
+          "a1": 0.999921,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 1.0,
+          "a13": 1.0,
+          "a14": 0.0,
+          "a15": 1.0,
+          "a2": 0.99917,
+          "a3": 0.999181,
+          "a4": 0.999218,
+          "a5": 0.307349,
+          "a6": 1.0,
+          "a7": 1.0,
+          "a8": 1.0,
+          "a9": 1.0
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.09465398120442131,
+        "log_z": -49.01505,
+        "log_z_max": -30.160749,
+        "log_z_min": -49.539127
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 69,
+        "pair": {
+          "tp": 8,
+          "fp": 35,
+          "fn": 1,
+          "precision": 0.18604651162790697,
+          "recall": 0.8888888888888888,
+          "f1": 0.3076923076923077
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 52,
+          "fn": 3,
+          "precision": 0.10344827586206896,
+          "recall": 0.6666666666666666,
+          "f1": 0.17910447761194032
+        },
+        "sense": {
+          "tp": 5,
+          "fp": 53,
+          "fn": 4,
+          "precision": 0.08620689655172414,
+          "recall": 0.5555555555555556,
+          "f1": 0.1492537313432836
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 7,
+            "found": 4,
+            "recall": 0.5714285714285714
+          },
+          "backward": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "True": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "out_of_window": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 5,
+            "recall": 0.8333333333333334
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "entailment": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "valid": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 4,
+        "non_relation_violation_rate": 0.8
+      },
+      "duplicate_unordered_pairs": 26,
+      "elapsed_s": 56.697,
+      "run_config_fingerprint": "860248201fa2"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "mined:gpt-oss-120b:windowed",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "windowed",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 17,
+      "num_dropped_none": 8,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 26,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 9,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 54,
+        "num_callback_pairs": 0,
+        "pairs_selected": 17,
+        "forward_pairs_possible": 120,
+        "pairs_pruned": 103,
+        "discourse_anchored": true,
+        "num_sentences": 33,
+        "num_atoms_aligned": 16,
+        "num_promoted": 7,
+        "num_demoted": 44,
+        "pairs_scored": 17,
+        "dropped_none": 8,
+        "relations_kept": 9,
+        "llm_calls": 26,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999984635592895,
+          "strength": 0.999999,
+          "type_confidence": 0.999999463558753,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988013181095,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998013179108,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.814822125,
+        "consistency": 0.6725670845006266,
+        "reified": 0.499997,
+        "log_partition": 0.17571980710354188
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.947349,
+          "a10": 0.95,
+          "a11": 0.987805,
+          "a12": 0.987805,
+          "a13": 0.999827,
+          "a14": 0.000182,
+          "a15": 0.99998,
+          "a2": 0.642859,
+          "a3": 0.678567,
+          "a4": 0.9,
+          "a5": 0.1,
+          "a6": 0.996562,
+          "a7": 0.996562,
+          "a8": 0.999656,
+          "a9": 0.95
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.2743432551700115,
+        "log_z": -5.147155,
+        "log_z_max": -0.770228,
+        "log_z_min": -6.080227
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 9,
+        "pair": {
+          "tp": 6,
+          "fp": 3,
+          "fn": 3,
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 5,
+          "fn": 5,
+          "precision": 0.4444444444444444,
+          "recall": 0.4444444444444444,
+          "f1": 0.4444444444444444
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 5,
+          "fn": 5,
+          "precision": 0.4444444444444444,
+          "recall": 0.4444444444444444,
+          "f1": 0.4444444444444444
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 7,
+            "found": 3,
+            "recall": 0.42857142857142855
+          },
+          "backward": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "True": {
+            "total": 4,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "out_of_window": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "entailment": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "valid": {
+            "total": 6,
+            "found": 3,
+            "recall": 0.5
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 94.419,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f057-r0",
+      "item_name": "Law -- shuffle_full",
+      "arm": "mined:gpt-oss-120b:bidirectional",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "bidirectional",
+      "family_id": "f057",
+      "family": "ORDER",
+      "rung_index": 0,
+      "rung_name": "shuffle_full",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "full"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "full",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 108,
+      "num_dropped_none": 79,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 137,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 29,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 16,
+        "total_ordered_pairs": 240,
+        "pairs_selected": 108,
+        "pairs_pruned": 132,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 108,
+        "dropped_none": 79,
+        "relations_kept": 29,
+        "llm_calls": 137,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.1,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999980463284562,
+          "strength": 0.999999,
+          "type_confidence": 0.9999990463275026,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a8",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988410544735,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543145,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a6",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.99999631781004,
+          "strength": 0.999999,
+          "type_confidence": 0.9999973178073578,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a6",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999944700824781,
+          "strength": 0.999999,
+          "type_confidence": 0.9999954700779482,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999998612570529,
+          "strength": 0.999999,
+          "type_confidence": 0.9999996125701416,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999965860230122,
+          "strength": 0.999999,
+          "type_confidence": 0.9999975860205983,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 2.260324926215265e-06,
+          "strength": 2.2603251058497368e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999998880790851,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907318,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a15",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.4835521875,
+        "consistency": 0.2154420433144551,
+        "reified": 0.430021,
+        "log_partition": 0.027298144654048496
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.997977,
+          "a1": 0.999797,
+          "a10": 0.998321,
+          "a11": 0.245374,
+          "a12": 0.245374,
+          "a13": 1e-06,
+          "a14": 0.999999,
+          "a15": 0.960283,
+          "a2": 0.965208,
+          "a3": 0.006326,
+          "a4": 0.243636,
+          "a5": 0.1,
+          "a6": 0.243621,
+          "a7": 0.243621,
+          "a8": 0.24362,
+          "a9": 0.243677
+        },
+        "num_below_prior": 9,
+        "avg_norm_entropy": 0.4148632165228325,
+        "log_z": -31.263626,
+        "log_z_max": -14.281164,
+        "log_z_min": -31.740226
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 29,
+        "pair": {
+          "tp": 7,
+          "fp": 14,
+          "fn": 2,
+          "precision": 0.3333333333333333,
+          "recall": 0.7777777777777778,
+          "f1": 0.4666666666666666
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 18,
+          "fn": 3,
+          "precision": 0.25,
+          "recall": 0.6666666666666666,
+          "f1": 0.36363636363636365
+        },
+        "sense": {
+          "tp": 5,
+          "fp": 19,
+          "fn": 4,
+          "precision": 0.20833333333333334,
+          "recall": 0.5555555555555556,
+          "f1": 0.30303030303030304
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 7,
+            "found": 4,
+            "recall": 0.5714285714285714
+          },
+          "backward": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "True": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "out_of_window": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 6,
+            "found": 5,
+            "recall": 0.8333333333333334
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "entailment": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "valid": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 1,
+        "non_relation_violation_rate": 0.2
+      },
+      "duplicate_unordered_pairs": 8,
+      "elapsed_s": 208.833,
+      "run_config_fingerprint": "860248201fa2"
+    }
+  ]
+}

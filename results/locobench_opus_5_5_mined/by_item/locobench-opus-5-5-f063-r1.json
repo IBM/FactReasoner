@@ -1,0 +1,3227 @@
+{
+  "item_id": "locobench-opus-5-5-f063-r1",
+  "item_name": "Oceanography -- shuffle_block",
+  "source": "generated:P4/claude-opus-5-5",
+  "expected": {
+    "family_id": "f063",
+    "family": "ORDER",
+    "rung_index": 1,
+    "rung_name": "shuffle_block",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "block"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "block",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Oceanography",
+    "domain": "Natural Sciences",
+    "framing": "How did oceanographers determine whether the apparent slowdown in global surface warming during the early 2000s reflected a genuine halt in the planet's heat accumulation or a redistribution of that heat into the deeper ocean?",
+    "split": "test",
+    "word_count": 638,
+    "generator": "claude-opus-5-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 15,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "The rate of global mean surface warming between roughly 1998 and 2012 was smaller than the rate over the preceding decades.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "The apparent slowdown in surface warming became widely known as the \"global warming hiatus.\"",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Kevin Trenberth and colleagues highlighted an apparent \"missing heat\" problem in Earth's energy budget during the late 2000s.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Earth's energy imbalance remained positive throughout the early 2000s.",
+      "label": "p4",
+      "factual": true,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "The planet continued to absorb more energy than it emitted to space throughout the early 2000s.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "The Argo program deploys autonomous profiling floats that measure ocean temperature and salinity.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "The first Argo floats were deployed in the early 1980s.",
+      "label": "p7",
+      "factual": false,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "The Argo array reached near-global coverage in the mid-2000s.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Standard Argo floats routinely profile the full ocean depth down to 6,000 meters.",
+      "label": "p9",
+      "factual": false,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The heat content of the upper 2,000 meters of the global ocean increased between 2005 and 2013.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a10",
+      "text": "The heat content of the upper 2,000 meters of the global ocean did not increase between 2005 and 2013.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a11",
+      "text": "Excess heat accumulated in the subsurface Pacific Ocean during the slowdown.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Excess heat accumulated in the subsurface Atlantic and Southern Oceans during the slowdown.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "England and colleagues attributed the slowdown to a weakening of the Pacific trade winds.",
+      "label": "p14",
+      "factual": false,
+      "role": "claim",
+      "pos": 14
+    },
+    {
+      "id": "a14",
+      "text": "The IPCC Fifth Assessment Report determined that internal climate variability, including possible redistribution of heat within the ocean, contributed substantially to the reduced surface warming trend.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a0",
+      "target_id": "a4",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a14",
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a7",
+      "target_id": "a9",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5-5"
+      },
+      "window_admission": "gate",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a1",
+      "target_id": "a3",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a6",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a7",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a13",
+      "position_distance": 3
+    }
+  ],
+  "response": "Between roughly 1998 and 2012, the rate of global mean surface warming was smaller than the rate over the preceding decades. That deceleration was large enough to attract sustained scientific and public attention, and the apparent slowdown in surface warming became widely known as the \"global warming hiatus.\" For oceanographers, the central question was physical rather than rhetorical. A reduced surface trend could mean that the climate system had stopped gaining energy. It could also mean that energy was still entering the system but was being stored where surface thermometers could not register it. Distinguishing between these possibilities required an accounting of the planet's total heat budget, most of which resides in the ocean.\n\nThose observations came largely from a single observing system. The Argo program deploys autonomous profiling floats that measure ocean temperature and salinity, drifting at depth and surfacing periodically to transmit their profiles by satellite. The first Argo floats were deployed in the early 1980s, long before the Argo array reached near-global coverage in the mid-2000s. Standard Argo floats routinely profile the full ocean depth down to 6,000 meters, giving the array its value for heat-budget work. With broad spatial sampling in place, the measurements could settle a sharply posed question. Either the heat content of the upper 2,000 meters of the global ocean increased between 2005 and 2013, an increase that resulted from the array's reaching near-global coverage, or the heat content of the upper 2,000 meters of the global ocean did not increase between 2005 and 2013. These two outcomes cannot both be true, and one of them must hold. The first would locate the missing energy in the interior ocean. The second would leave the surplus implied by the radiative imbalance unaccounted for.\n\nThe problem was sharpened during the late 2000s, when Kevin Trenberth and colleagues highlighted an apparent \"missing heat\" problem in Earth's energy budget. By contrast, satellite and radiative measurements showed that Earth's energy imbalance remained positive throughout the early 2000s. In other words, the planet continued to absorb more energy than it emitted to space throughout the early 2000s, despite the diminished rate of surface warming. The difficulty, then, was not whether energy was arriving but where it was going. Because the atmosphere and land surface have little heat capacity, the only plausible reservoir for a persistent surplus was the ocean. Testing that inference required observations capable of resolving subsurface temperature on a global scale.\n\nThese regional findings were ultimately drawn together at the level of formal assessment. As England's trade-wind attribution indicates, the IPCC Fifth Assessment Report determined that internal climate variability, including possible redistribution of heat within the ocean, contributed substantially to the reduced surface warming trend. That determination settles the apparent tension between a slower surface trend and a planet that kept absorbing energy. Surface temperature alone had misrepresented the state of the climate system, because the energy surplus never vanished. It was redistributed vertically and geographically within the ocean, where profiling instruments could detect what thermometers at the surface could not.\n\nBy contrast with a stagnant upper ocean, regional analyses pointed to active storage below the surface. At least one of two accounts holds, perhaps both: excess heat accumulated in the subsurface Pacific Ocean during the slowdown, or excess heat accumulated in the subsurface Atlantic and Southern Oceans during the slowdown. The Pacific interpretation emphasized the role of wind-driven circulation in pumping warm water downward in the western tropical basin. The Atlantic and Southern Ocean interpretation stressed deep overturning and the formation of intermediate waters at high latitudes. Whereas that high-latitude account placed the storage far from the tropics, England and colleagues attributed the slowdown to a weakening of the Pacific trade winds, which they linked to altered subduction in the subtropical gyres and a corresponding change in the uptake of heat beneath the surface.",
+  "runs": [
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7191353333333333,
+        "consistency": 0.365333390625,
+        "reified": 0.175036,
+        "log_partition": 0.2655032035940797
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.915246,
+          "a1": 0.9,
+          "a10": 0.418746,
+          "a11": 0.890438,
+          "a12": 0.926481,
+          "a13": 0.105767,
+          "a14": 0.8988,
+          "a2": 0.904957,
+          "a3": 0.984663,
+          "a4": 0.98654,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.913514,
+          "a8": 0.1,
+          "a9": 0.841878
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.4558480560079769,
+        "log_z": -6.250121,
+        "log_z_max": -1.766234,
+        "log_z_min": -7.87094
+      },
+      "elapsed_s": 0.138,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "num_relations": 6,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 3,
+        "relations_kept": 6,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7144046,
+        "consistency": 0.443825,
+        "reified": 0.180605,
+        "log_partition": 0.336039220174091
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.915246,
+          "a1": 0.9,
+          "a10": 0.51613,
+          "a11": 0.881325,
+          "a12": 0.929916,
+          "a13": 0.1,
+          "a14": 0.9,
+          "a2": 0.904957,
+          "a3": 0.984663,
+          "a4": 0.98654,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.9,
+          "a8": 0.1,
+          "a9": 0.697292
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.47651332398715335,
+        "log_z": -4.264891,
+        "log_z_max": -0.650333,
+        "log_z_min": -6.094266
+      },
+      "elapsed_s": 0.155,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "mined:llama-3.3-70b-instruct:windowed",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 14,
+      "num_dropped_none": 5,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 23,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 9,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 50,
+        "num_callback_pairs": 0,
+        "pairs_selected": 14,
+        "forward_pairs_possible": 105,
+        "pairs_pruned": 91,
+        "discourse_anchored": true,
+        "num_sentences": 30,
+        "num_atoms_aligned": 15,
+        "num_promoted": 0,
+        "num_demoted": 36,
+        "pairs_scored": 14,
+        "dropped_none": 5,
+        "relations_kept": 9,
+        "llm_calls": 23,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999986821090812,
+          "strength": 0.999999,
+          "type_confidence": 0.9999996821087633,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999954237440175,
+          "strength": 0.999999,
+          "type_confidence": 0.9999964237404413,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9820108203968942,
+          "strength": 0.999999,
+          "type_confidence": 0.9820118024086967,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.22270014120849405,
+          "strength": 0.22270014120849405,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.04742587406487396,
+          "strength": 0.04742587406487396,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7509002,
+        "consistency": 0.83918829082213,
+        "reified": 0.481482,
+        "log_partition": 0.7592598074210789
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.94186,
+          "a1": 0.994186,
+          "a10": 0.976665,
+          "a11": 0.95,
+          "a12": 0.95,
+          "a13": 0.1,
+          "a14": 0.9,
+          "a2": 0.972648,
+          "a3": 0.999666,
+          "a4": 0.999666,
+          "a5": 0.16821,
+          "a6": 0.227582,
+          "a7": 0.9,
+          "a8": 0.209052,
+          "a9": 0.973968
+        },
+        "num_below_prior": 1,
+        "avg_norm_entropy": 0.3361227831761653,
+        "log_z": -5.033569,
+        "log_z_max": -4.75705,
+        "log_z_min": -5.90567
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 9,
+        "pair": {
+          "tp": 4,
+          "fp": 5,
+          "fn": 5,
+          "precision": 0.4444444444444444,
+          "recall": 0.4444444444444444,
+          "f1": 0.4444444444444444
+        },
+        "coupling": {
+          "tp": 3,
+          "fp": 6,
+          "fn": 6,
+          "precision": 0.3333333333333333,
+          "recall": 0.3333333333333333,
+          "f1": 0.3333333333333333
+        },
+        "sense": {
+          "tp": 3,
+          "fp": 6,
+          "fn": 6,
+          "precision": 0.3333333333333333,
+          "recall": 0.3333333333333333,
+          "f1": 0.3333333333333333
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 3,
+            "recall": 0.3333333333333333
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 3,
+            "recall": 0.5
+          },
+          "True": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 5,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 4,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "valid": {
+            "total": 6,
+            "found": 3,
+            "recall": 0.5
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 15.533,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "mined:llama-3.3-70b-instruct:bidirectional",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "bidirectional",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 100,
+      "num_dropped_none": 58,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 142,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 42,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "pairs_selected": 100,
+        "pairs_pruned": 110,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 100,
+        "dropped_none": 58,
+        "relations_kept": 42,
+        "llm_calls": 142,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 2.7534734826577205e-05,
+          "strength": 2.7535687782739785e-05,
+          "type_confidence": 0.9999653919607857,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 7.484620933348457e-05,
+          "strength": 7.484626286762763e-05,
+          "type_confidence": 0.9999992847452764,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 5.2856286190888015e-05,
+          "strength": 9.610239199155213e-05,
+          "type_confidence": 0.9999994436905916,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999986821090812,
+          "strength": 0.999999,
+          "type_confidence": 0.9999996821087633,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 5.8291077887000534e-05,
+          "strength": 5.82912724538168e-05,
+          "type_confidence": 0.9999966621621372,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9914223574828905,
+          "strength": 0.9914225150652053,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.9999954833479365,
+          "strength": 0.999999,
+          "type_confidence": 0.9999964833444199,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.0005527782437894654,
+          "strength": 0.0005527785513053743,
+          "type_confidence": 0.9999994436905916,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999952149055338,
+          "strength": 0.9999952149055338,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999998403954667,
+          "strength": 0.999999,
+          "type_confidence": 0.9999994039540709,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.017986212411379942,
+          "strength": 0.017986212411379942,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9859334248511515,
+          "strength": 0.999999,
+          "type_confidence": 0.9859344107855623,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999986821090053,
+          "strength": 0.999999,
+          "type_confidence": 0.9999996821086875,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999290329702064,
+          "strength": 0.999290329702064,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9994451035180095,
+          "strength": 0.999999,
+          "type_confidence": 0.9994461029641125,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.9999898700127318,
+          "strength": 0.9999898700127318,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.182425517279397,
+          "strength": 0.182425517279397,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.22270014249062525,
+          "strength": 0.22270014249062525,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.0600866510528045,
+          "strength": 0.0600866510528045,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999251537374064,
+          "strength": 0.9999251537374064,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 2.753568453325485e-05,
+          "strength": 2.753568781576424e-05,
+          "type_confidence": 0.9999998807907247,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.008577481827068805,
+          "strength": 0.008577485235452582,
+          "type_confidence": 0.9999996026360078,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a12",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1.0129984937172532e-05,
+          "strength": 1.0129987352349147e-05,
+          "type_confidence": 0.9999997615814777,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.14804712071128465,
+          "strength": 0.14804720307133662,
+          "type_confidence": 0.9999994436905916,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 2.9023119846427968e-06,
+          "strength": 2.9023119846427968e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989701977096,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999701976798,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9390348712255451,
+          "strength": 0.9399133510364579,
+          "type_confidence": 0.999065360854866,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 3.535625491338812e-05,
+          "strength": 3.535625491338812e-05,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999989403954237,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999403953641,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.037326889911218734,
+          "strength": 0.037326889911218734,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9871412727340836,
+          "strength": 0.9997388096952928,
+          "type_confidence": 0.9873991718246401,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.014063626398172654,
+          "strength": 0.014063626398172654,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9975271788783856,
+          "strength": 0.9975273770691925,
+          "type_confidence": 0.9999998013179273,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9045631941669153,
+          "strength": 0.90465053835676,
+          "type_confidence": 0.9999034498006232,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.00669285125414491,
+          "strength": 0.00669285125414491,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7662822666666667,
+        "consistency": 0.3227656142546357,
+        "reified": 0.430115,
+        "log_partition": 0.07570333051399669
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 1.0,
+          "a1": 1.0,
+          "a10": 1.0,
+          "a11": 1.0,
+          "a12": 1.0,
+          "a13": 0.124057,
+          "a14": 0.999699,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 0.354902,
+          "a6": 0.333491,
+          "a7": 0.327189,
+          "a8": 0.354896,
+          "a9": 1.0
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.28347221142142937,
+        "log_z": -25.10916,
+        "log_z_max": -18.066024,
+        "log_z_min": -25.686019
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 42,
+        "pair": {
+          "tp": 9,
+          "fp": 20,
+          "fn": 0,
+          "precision": 0.3103448275862069,
+          "recall": 1.0,
+          "f1": 0.4736842105263158
+        },
+        "coupling": {
+          "tp": 7,
+          "fp": 30,
+          "fn": 2,
+          "precision": 0.1891891891891892,
+          "recall": 0.7777777777777778,
+          "f1": 0.30434782608695654
+        },
+        "sense": {
+          "tp": 5,
+          "fp": 32,
+          "fn": 4,
+          "precision": 0.13513513513513514,
+          "recall": 0.5555555555555556,
+          "f1": 0.2173913043478261
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 7,
+            "recall": 0.7777777777777778
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          },
+          "True": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "window": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "entailment": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "valid": {
+            "total": 6,
+            "found": 5,
+            "recall": 0.8333333333333334
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 2,
+        "non_relation_violation_rate": 0.4
+      },
+      "duplicate_unordered_pairs": 13,
+      "elapsed_s": 87.53,
+      "run_config_fingerprint": "860248201fa2"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "mined:gpt-oss-120b:windowed",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "windowed",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 14,
+      "num_dropped_none": 6,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 22,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 8,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 50,
+        "num_callback_pairs": 0,
+        "pairs_selected": 14,
+        "forward_pairs_possible": 105,
+        "pairs_pruned": 91,
+        "discourse_anchored": true,
+        "num_sentences": 30,
+        "num_atoms_aligned": 15,
+        "num_promoted": 0,
+        "num_demoted": 36,
+        "pairs_scored": 14,
+        "dropped_none": 6,
+        "relations_kept": 8,
+        "llm_calls": 22,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999792717809743,
+          "strength": 0.999999,
+          "type_confidence": 0.9999802717612462,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7099472666666667,
+        "consistency": 0.36076950072243613,
+        "reified": 0.499997,
+        "log_partition": 0.4880489581666728
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.94186,
+          "a1": 0.994186,
+          "a10": 0.500002,
+          "a11": 0.949999,
+          "a12": 0.949999,
+          "a13": 0.1,
+          "a14": 0.9,
+          "a2": 0.972648,
+          "a3": 0.999666,
+          "a4": 0.999666,
+          "a5": 0.264709,
+          "a6": 0.338236,
+          "a7": 0.9,
+          "a8": 0.338236,
+          "a9": 0.500002
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.48139781286038946,
+        "log_z": -5.64074,
+        "log_z_max": -3.836045,
+        "log_z_min": -7.361177
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 8,
+        "pair": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 5,
+          "precision": 0.5,
+          "recall": 0.4444444444444444,
+          "f1": 0.47058823529411764
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 5,
+          "precision": 0.5,
+          "recall": 0.4444444444444444,
+          "f1": 0.47058823529411764
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 5,
+          "precision": 0.5,
+          "recall": 0.4444444444444444,
+          "f1": 0.47058823529411764
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 4,
+            "recall": 0.4444444444444444
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          },
+          "True": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 5,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 4,
+            "found": 1,
+            "recall": 0.25
+          },
+          "entailment": {
+            "total": 2,
+            "found": 0,
+            "recall": 0.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 0,
+            "recall": 0.0
+          },
+          "valid": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 50.539,
+      "run_config_fingerprint": "bf40f01ad8ed"
+    },
+    {
+      "item_id": "locobench-opus-5-5-f063-r1",
+      "item_name": "Oceanography -- shuffle_block",
+      "arm": "mined:gpt-oss-120b:bidirectional",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "bidirectional",
+      "family_id": "f063",
+      "family": "ORDER",
+      "rung_index": 1,
+      "rung_name": "shuffle_block",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "block"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "block",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 15,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": false,
+      "strategy": null,
+      "sense_menu": "full",
+      "reconcile": "ratchet",
+      "prompt_variant": "v1",
+      "require_evidence": false,
+      "num_pairs_scored": 100,
+      "num_dropped_none": 57,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 143,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 43,
+      "coverage": {
+        "policy": "bidirectional",
+        "num_atoms": 15,
+        "total_ordered_pairs": 210,
+        "pairs_selected": 100,
+        "pairs_pruned": 110,
+        "window": null,
+        "max_distance": 4,
+        "gate": null,
+        "discourse_anchored": false,
+        "pairs_scored": 100,
+        "dropped_none": 57,
+        "relations_kept": 43,
+        "llm_calls": 143,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "bidirectional",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": false,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "full",
+        "reconcile": "ratchet",
+        "prompt_variant": "v1",
+        "require_evidence": false,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1,
+        "a14": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999988410544901,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998410543312,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a14",
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998807907294,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998410543312,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a0",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999998013179273,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a2",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a0",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999989205272276,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271481,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a6",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Condition",
+          "probability": 2.2603250135417553e-06,
+          "strength": 2.260325103358998e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a12",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Effect-Cause",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a9",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999986026363696,
+          "strength": 0.999999,
+          "type_confidence": 0.9999996026359723,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999973906822772,
+          "strength": 0.999999,
+          "type_confidence": 0.999998390680668,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 0.9999988807908557,
+          "strength": 0.999999,
+          "type_confidence": 0.9999998807907365,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a11",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999963476122389,
+          "strength": 0.999999,
+          "type_confidence": 0.9999973476095865,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999989205272324,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a12",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.9999987218454215,
+          "strength": 0.999999,
+          "type_confidence": 0.9999997218451434,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a14",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Instantiation",
+          "probability": 1e-06,
+          "strength": 1e-06,
+          "type_confidence": 0.9999999205271529,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.6004531333333334,
+        "consistency": 0.20005949325490993,
+        "reified": 0.011099,
+        "log_partition": 0.02331755828502473
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 1.0,
+          "a1": 1.0,
+          "a10": 0.999504,
+          "a11": 0.568688,
+          "a12": 0.435419,
+          "a13": 0.002871,
+          "a14": 1.0,
+          "a2": 1.0,
+          "a3": 1.0,
+          "a4": 1.0,
+          "a5": 0.003882,
+          "a6": 0.003882,
+          "a7": 0.988281,
+          "a8": 0.003774,
+          "a9": 0.000496
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.14774236160523205,
+        "log_z": -47.373492,
+        "log_z_max": -23.427355,
+        "log_z_min": -47.945188
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 43,
+        "pair": {
+          "tp": 8,
+          "fp": 21,
+          "fn": 1,
+          "precision": 0.27586206896551724,
+          "recall": 0.8888888888888888,
+          "f1": 0.42105263157894735
+        },
+        "coupling": {
+          "tp": 8,
+          "fp": 27,
+          "fn": 1,
+          "precision": 0.22857142857142856,
+          "recall": 0.8888888888888888,
+          "f1": 0.3636363636363636
+        },
+        "sense": {
+          "tp": 8,
+          "fp": 28,
+          "fn": 1,
+          "precision": 0.2222222222222222,
+          "recall": 0.8888888888888888,
+          "f1": 0.3555555555555555
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 8,
+            "recall": 0.8888888888888888
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 5,
+            "recall": 0.8333333333333334
+          },
+          "True": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "window": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "entailment": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          },
+          "valid": {
+            "total": 6,
+            "found": 5,
+            "recall": 0.8333333333333334
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 2,
+        "non_relation_violation_rate": 0.4
+      },
+      "duplicate_unordered_pairs": 14,
+      "elapsed_s": 205.498,
+      "run_config_fingerprint": "860248201fa2"
+    }
+  ]
+}

@@ -21,8 +21,8 @@ Deterministic, no LLM (`python -m fact_reasoner.locoeval.cli --arms gold,gold_va
 
 | Arm | CONFLICT | CHAIN | ORDER | CONTROL | Total |
 |---|---|---|---|---|---|
-| `gold` | 503/644 | 298/315 | 315/315 | 180/180 | **1296/1454 (89.1%)** |
-| `gold_valid` | 253/644 | 270/315 | 315/315 | 180/180 | **1018/1454 (70.0%)** |
+| `gold` | 503/598 | 298/315 | 315/315 | 180/180 | **1296/1408 (92.0%)** |
+| `gold_valid` | 253/598 | 270/315 | 315/315 | 180/180 | **1018/1408 (72.3%)** |
 
 The invariance ladders (ORDER, CONTROL) are exactly flat on the gold arm, as designed.
 
@@ -42,7 +42,7 @@ The invariance ladders (ORDER, CONTROL) are exactly flat on the gold arm, as des
 - `state.json`: each admitted family's committee verdict (with V1 per-rater rates) and call counts.
 - `config.json`: the resolved generation config plus `merged_from` (shard → topics).
 
-Generated in 8 topic-disjoint shards (`scripts/locobench_shards.py`) and merged; the merge is byte-identical to an unsharded run. Several construction bugs found during generation were fixed and the affected families regenerated before release: an undefined `add_resolution` operator in P5; `direction_reversal` targeting directed edges on CONTROL; `break_chain` targeting non-entailment edges on CHAIN, with P3 now requiring a valid entailment chain for CHAIN plans; and identical rung text under different labels. CHAIN declares `log_partition` a predicted decrease on its three breaking steps.
+Generated in 8 topic-disjoint shards (`scripts/locobench_shards.py`) and merged; the merge is byte-identical to an unsharded run. Several construction bugs found during generation were fixed and the affected families regenerated before release: an undefined `add_resolution` operator in P5; `direction_reversal` targeting directed edges on CONTROL; `break_chain` targeting non-entailment edges on CHAIN, with P3 now requiring a valid entailment chain for CHAIN plans; and identical rung text under different labels. CHAIN declares `log_partition` a predicted decrease on its three breaking steps. CONFLICT leaves `log_partition` unconstrained at `concession_resolved` (rung 1→2): it was declared invariant, and failed on all 46 families (40 decreases, 6 increases), so the corpus declares 1,408 assertions rather than 1,454. Under the original declaration the gold arm was 1296/1454 (89.1%).
 
 **Post-release correction (2026-11-02).** An audit found four admitted families (f033, f035, f055, f058) in which the generator had corrected every planted-false atom to the truth: 9 of 204 false atoms, so those responses carried no false content while their labels said otherwise. V4 had flagged each atom `altered` by a majority, but `altered` did not gate. V4 now rejects a planted-false atom a majority calls altered, missing or merged (`V4.false_atoms`, commit 8545193), and the four families were regenerated from P1 with the cache bypassed (f035 and f055 on a second attempt, after a V3 fluency rejection). Family ids, topics and ladder types are unchanged; the gold-arm numbers are unchanged, since all four scored 15/15 before and after. A handful of families were regenerated from P1 with the gateway's response cache bypassed (`LOCOBENCH_NO_CACHE`) after repeated agreeing committee rejections. The full history is in `data/locobench-opus-5-5-shards/shards.json` and the git log.
 
