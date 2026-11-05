@@ -391,7 +391,7 @@ must return, and why its instructions are as they are.
   \node[fin,right=of p5] (adm) {admit\\family};
   \foreach \a/\b in {t/p1,p1/p2,p2/p3,p3/p4,p4/p5,p5/adm} \draw[ar] (\a) -- (\b);
   \node[dt,below=8mm of p3] (g3) {plan gate\\(deterministic)};
-  \node[vd,below=8mm of p4] (cv) {\textbf{V1 V3 V4}\\committee};
+  \node[vd,below=8mm of p4] (cv) {\textbf{V1 V2 V3}\\committee};
   \node[dt,below=8mm of p5] (g5) {rung gates\\(deterministic)};
   \draw[ar,dashed] (g3) -- node[left,font=\scriptsize]{retry} (p3);
   \draw[ar,dashed] (cv) -- node[left,font=\scriptsize]{retry} (p4);
@@ -415,7 +415,7 @@ must return, and why its instructions are as they are.
 \State $q \gets \textsc{Ask}(\text{P1}, t)$ \Comment{open question}
 \State $C \gets \textsc{Ask}(\text{P2}, q)$ \Comment{26 tagged claims}
 \State $\mathcal{P} \gets \textsc{Ask}(\text{P3}, q, C, T,\ g{=}\textsc{PlanGate}_T)$ \Comment{claims, 10 relations, non-relations}
-\State $x_{\text{base}} \gets \textsc{Ask}(\text{P4}, q, \mathcal{P},\ g{=}\textsc{Committee})$ \Comment{V1, V3, V4}
+\State $x_{\text{base}} \gets \textsc{Ask}(\text{P4}, q, \mathcal{P},\ g{=}\textsc{Committee})$ \Comment{V1, V2, V3}
 \State $E_{\text{base}} \gets$ gold graph of $\mathcal{P}$, fields re-derived through $\mathcal{C}$
 \State assign each operator call of each rung of $T$ a distinct eligible target edge; \textbf{reject} if too few
 \For{each non-base rung $\rho_k$ of $T$, in ladder order}
@@ -614,15 +614,13 @@ and a truncated response fails every parser for the wrong stated reason, so the 
 %% ================================================================
 
 The base response of every family is checked by a committee of three models before the family is admitted. Each
-committee member runs three validators, each a fixed prompt reproduced in Appendix~\ref{app-prompts}:\footnote{The
-numbering has a gap because a fourth validator, V2, was specified to adjudicate exhaustiveness and then removed;
-Appendix~\ref{app-v2} explains why.}
+committee member runs three validators, each a fixed prompt reproduced in Appendix~\ref{app-prompts}:
 \begin{itemize}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
 \item \textbf{V1, relation recovery} (\S\ref{sec-v1}, Appendix~\ref{app-v1}): can a reader who has not seen the
   plan recover the planned relations from the prose?
-\item \textbf{V3, prose audit} (\S\ref{sec-v3}, Appendix~\ref{app-v3}): does the response read as expert prose,
+\item \textbf{V2, prose audit} (\S\ref{sec-v2}, Appendix~\ref{app-v2}): does the response read as expert prose,
   without leaking the plan or hedging its claims?
-\item \textbf{V4, claim coverage} (\S\ref{sec-v4}, Appendix~\ref{app-v4}): does the response assert every
+\item \textbf{V3, claim coverage} (\S\ref{sec-v3}, Appendix~\ref{app-v3}): does the response assert every
   planned claim?
 \end{itemize}
 A family is admitted only if its base response passes all three, its plan passed the plan gate, and every rung
@@ -640,8 +638,8 @@ dependence in \S\ref{sec-limitations}.
 \paragraph{How votes are combined.} The three validators measure different things, so each has its own decision
 rule (rightmost column of Table~\ref{tab:thresholds}). \textbf{V1 is any-of}: it certifies that a careful reader
 \emph{can} recover the plan, so one rater who clears both thresholds is sufficient evidence; every rater's rates are
-recorded alongside the decisive one. \textbf{V3 is a majority per facet}: a prose defect counts only if a majority
-of raters report it, so a single unusually strict auditor cannot reject a sound response. \textbf{V4 is a majority
+recorded alongside the decisive one. \textbf{V2 is a majority per facet}: a prose defect counts only if a majority
+of raters report it, so a single unusually strict auditor cannot reject a sound response. \textbf{V3 is a majority
 per claim}: a claim counts as lost only if a majority of raters call it lost.
 
 \paragraph{What the committee sees.} The committee runs on the base response only. The four perturbed rungs are
@@ -662,11 +660,11 @@ Gate & Quantity & Threshold & Rule \\
 \midrule
 V1 & valid planned relations recovered, correct coupling & $\ge 0.80$ & any-of \\
 V1 & \dots\ and with correct sense & $\ge 0.70$ & any-of \\
-V3 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority/facet \\
-V3 & leakage and hedging span lists & empty & majority/facet \\
-V4 & claim coverage over gating statuses & $=1.00$ & majority/claim \\
-V4 & gating statuses & \gate{missing}, \gate{merged} & --- \\
-V4 & \dots\ and on a planted-false claim & $+$\gate{altered} & majority/claim \\
+V2 & fluency, formality, organization (each, of $5$) & $\ge 4$ & majority/facet \\
+V2 & leakage and hedging span lists & empty & majority/facet \\
+V3 & claim coverage over gating statuses & $=1.00$ & majority/claim \\
+V3 & gating statuses & \gate{missing}, \gate{merged} & --- \\
+V3 & \dots\ and on a planted-false claim & $+$\gate{altered} & majority/claim \\
 \midrule
 P3 & claims selected & $14$--$16$ & --- \\
 P3 & relations planned (prompt asks for $10$) & $8$--$12$ & --- \\
@@ -707,10 +705,10 @@ sense instead would place a planned \sense{Concession}$(7,12)$ and a recovered \
 endpoints, both \con{} --- in different key spaces, and would score ``recovered with the wrong sense'' as ``not
 recovered'', which is precisely the distinction V1 exists to measure.
 
-\subsection{V3: prose audit}
-\label{sec-v3}
+\subsection{V2: prose audit}
+\label{sec-v2}
 
-V3 (Appendix~\ref{app-v3}) scores the response for fluency, formality and organization, each from $1$ to $5$
+V2 (Appendix~\ref{app-v2}) scores the response for fluency, formality and organization, each from $1$ to $5$
 with a floor of $4$, and collects three lists of spans: \emph{leakage}, \emph{hedging} and \emph{artifacts}. The
 leakage and hedging lists must be empty; artifacts are recorded but do not gate. Leakage is defined narrowly: naming
 a relation type or sense, naming the plan or its labels, referring to ``claims'' or ``atoms'' as the material the
@@ -720,10 +718,10 @@ them, and flagging them would reject correctly written responses. Hedging is a c
 reported span must be quoted verbatim from the response, so that a hallucinated objection can be detected and
 discarded.
 
-\subsection{V4: claim coverage}
-\label{sec-v4}
+\subsection{V3: claim coverage}
+\label{sec-v3}
 
-V4 (Appendix~\ref{app-v4}) asks, for each planned claim, whether the response asserts it, and returns
+V3 (Appendix~\ref{app-v3}) asks, for each planned claim, whether the response asserts it, and returns
 \gate{asserted}, \gate{altered}, \gate{missing} or \gate{merged} with a quoted span. Coverage must be perfect over
 the \emph{gating} statuses, \gate{missing} and \gate{merged}. \gate{altered} does not gate in general: it is the
 judgement most sensitive to the rewording P4 licenses, and a permitted rewording is easily read as an alteration.
@@ -1413,7 +1411,7 @@ want enlarged.
 $15$--$16$ claims, and the locality bias of P3 under-represents long-range dependencies; conclusions do not
 transfer automatically to dialogue, summarization, much longer arguments, or informal registers. The release
 comes from a single generator and the mined arms from two extraction models, so generator-specific artifacts
-are controlled only by the V3 leakage gate. The model gateway caches identical requests, so a repeated
+are controlled only by the V2 leakage gate. The model gateway caches identical requests, so a repeated
 temperature-zero run through it can return a cached response rather than a new sample; one release family takes
 its question and claims from such a cached response (its plan and prose were generated afresh).
 
@@ -1496,7 +1494,9 @@ families with their reasons. The gold-arm evaluation requires no LLM access and 
 Every prompt follows, exactly as issued, written to the files included here by
 \texttt{scripts/export\_locobench\_prompts.py} and checked against the code by a test. Placeholders have the form
 \verb|[NAME_PLACEHOLDER]| and are substituted by the contract of Appendix~\ref{app-spec}. Line numbers are added for
-reference. Each prompt is preceded by a short card: its inputs, what it must emit, and what checks its output.
+reference. Each prompt is preceded by a short card: its inputs, what it must emit, and what checks its output. The source code and the released generation log keep the
+validators' original identifiers, under which the prose audit is \texttt{V3} and claim coverage \texttt{V4}; this paper
+numbers them V2 and V3.
 
 \subsection{P1 --- topic to question}
 \label{app-p1}
@@ -1523,7 +1523,7 @@ instructions. Placeholders: \verb|[QUESTION_PLACEHOLDER]|, \verb|[CLAIMS_PLACEHO
 \subsection{P4 --- plan to response}
 \label{app-p4}
 \textbf{Input:} the question and the plan. \textbf{Output:} $550$--$650$ words of prose. \textbf{Checked by:} the parser
-(word floor), then V1, V3 and V4 on the committee, whose combined complaint is fed back as a content retry. $5{,}571$
+(word floor), then V1, V2 and V3 on the committee, whose combined complaint is fed back as a content retry. $5{,}571$
 characters, $8$ numbered instructions. Placeholders: \verb|[QUESTION_PLACEHOLDER]|, \verb|[PLAN_PLACEHOLDER]|.
 \promptfile{prompts/PROMPT_P4.txt}
 
@@ -1545,15 +1545,15 @@ thresholds of Table~\ref{tab:thresholds}. $4{,}086$ characters. Placeholders: \v
 rule states the compile map, so a validator's coupling must be the one its sense compiles to.
 \promptfile{prompts/PROMPT_V1.txt}
 
-\subsection{V3 --- prose audit}
-\label{app-v3}
+\subsection{V2 --- prose audit}
+\label{app-v2}
 \textbf{Input:} the response. \textbf{Output:} three $1$--$5$ scores and three span lists, every span quoted verbatim.
 \textbf{Decision:} majority per facet. $2{,}455$ characters. Placeholder: \verb|[RESPONSE_PLACEHOLDER]|. The list of spans
-that must \emph{not} be flagged as leakage is the narrow definition described in \S\ref{sec-v3}.
+that must \emph{not} be flagged as leakage is the narrow definition described in \S\ref{sec-v2}.
 \promptfile{prompts/PROMPT_V3.txt}
 
-\subsection{V4 --- claim coverage}
-\label{app-v4}
+\subsection{V3 --- claim coverage}
+\label{app-v3}
 \textbf{Input:} the response and its claims. \textbf{Output:} a status and quoted span per claim. \textbf{Decision:}
 majority per claim over the gating statuses, with \gate{altered} also gating on a planted-false claim. $1{,}403$ characters. Placeholders: \verb|[RESPONSE_PLACEHOLDER]|,
 \verb|[ATOMS_PLACEHOLDER]|.
@@ -1620,8 +1620,8 @@ P3 & 7,778 & 10 & \texttt{CLAIMS}, \texttt{QUESTION} \\
 P4 & 5,571 & 8  & \texttt{PLAN}, \texttt{QUESTION} \\
 P5 & 2,592 & 5  & \texttt{OPERATOR}, \texttt{PLAN}, \texttt{RESPONSE} \\
 V1 & 4,086 & 0  & \texttt{ATOMS}, \texttt{RESPONSE} \\
-V3 & 2,455 & 0  & \texttt{RESPONSE} \\
-V4 & 1,403 & 0  & \texttt{ATOMS}, \texttt{RESPONSE} \\
+V2 & 2,455 & 0  & \texttt{RESPONSE} \\
+V3 & 1,403 & 0  & \texttt{ATOMS}, \texttt{RESPONSE} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1632,7 +1632,7 @@ Substitution enforces a \emph{bidirectional} exact match between declared placeh
 name and an extra name are both errors, since a typo in either direction would otherwise ship a prompt containing a
 literal \verb|[FOO_PLACEHOLDER]|, which a model will treat as content.
 
-\paragraph{A validator that was specified and removed.}\label{app-v2} The original design included a fourth validator to adjudicate
+\paragraph{A validator that was specified and removed.}\label{app-removed-validator} The original design included a further validator to adjudicate
 exhaustiveness. It is deliberately absent: exhaustiveness is derived from the sense by the compile map, so the validator
 would have re-derived from prose what the scheme fixes by construction, and could have contradicted it. Exhaustiveness is
 instead checked by V1's sense-recovery rate, and by the validation study's both-false and both-true questions
