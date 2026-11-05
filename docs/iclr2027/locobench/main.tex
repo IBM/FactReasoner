@@ -462,38 +462,86 @@ P3 (Appendix~\ref{app-p3}) is the most constrained stage. It receives the questi
 ladder type, and returns a \emph{relation plan}: $14$--$16$ claims selected from the pool and renumbered to
 consecutive assertion positions; exactly ten relations over distinct claim pairs, each with a sense from
 Table~\ref{tab:compile}, an intended strength band and a \emph{validity} label; and a short list of declared
-non-relations. A deterministic \emph{plan gate} checks every requirement below and feeds a violation back to P3 as
-a retry (\S\ref{sec-failure}); its thresholds are the P3 rows of Table~\ref{tab:thresholds}.
+non-relations. The prompt states the requirements below as exact targets. Two deterministic checks enforce them,
+in most cases with some tolerance. The \emph{parser} checks the plan's structure: the claim, relation and
+non-relation counts; legal senses, with each coupling equal to $\mathcal{C}$ of its sense; an error kind on every
+invalid relation; at most one relation per claim pair; and no pair that is both a relation and a non-relation.
+The \emph{plan gate} then checks the quotas. A failure of either is fed back to P3 as a retry
+(\S\ref{sec-failure}), and the thresholds are the P3 rows of Table~\ref{tab:thresholds}.
+Algorithm~\ref{alg:plangate} gives the plan gate in full. It evaluates every check rather than stopping at the
+first failure, so the retry note lists every violated quota at once. Each item below says what the prompt asks
+for and what is checked.
+
+\begin{algorithm}[t]
+\caption{The plan gate \textsc{PlanGate}$_T$ of Algorithm~\ref{alg:pipeline}, applied to a plan $\mathcal{P}$
+  that has already passed the parser, for ladder type $T$. $R$ is the plan's relation list, $\mathcal{C}$ the
+  compile map, and $F$ the set of claims P2 tagged as false; $r.\text{src}$ and $r.\text{tgt}$ are a relation's
+  endpoint positions, and \textsc{norm} normalizes whitespace, case and a final period. A non-empty list of failures is joined into the
+  retry note sent back to P3.}
+\label{alg:plangate}
+\begin{algorithmic}[1]
+\State $\textit{fail} \gets [\,]$
+\If{$T = \famtype{chain}$} \Comment{ladder-specific quota}
+  \State $L \gets \{r \in R : \mathcal{C}(r.\text{sense}) = \ent \wedge r.\text{validity} = \gate{valid}\}$
+  \If{$|L| < 3$} append \gate{chain\_links} to \textit{fail} \EndIf
+\Else \Comment{\famtype{conflict}, \famtype{order}, \famtype{control}}
+  \State $K \gets \{r \in R : \mathcal{C}(r.\text{sense}) \in \{\con,\exc\} \wedge \neg r.\text{resolved}\}$
+  \If{$|K| < 3$} append \gate{conflict\_edges} to \textit{fail} \EndIf
+\EndIf
+\State $S \gets \{r.\text{sense} : r \in R\}$ \Comment{required senses}
+\State $Q \gets \{\sense{Alternative},\sense{Disjunction},\sense{Restatement},\sense{Concession}\}$
+\If{$Q \not\subseteq S$ \textbf{or} $\{\sense{Precedence},\sense{Succession}\} \cap S = \varnothing$}
+  \State append \gate{rare\_facets} to \textit{fail}
+\EndIf
+\If{$\bigl|\,|\{r \in R : r.\text{validity} = \gate{valid}\}| / |R| - 0.55\,\bigr| > 0.15$} \Comment{validity split}
+  \State append \gate{validity\_split} to \textit{fail}
+\EndIf
+\If{$|\{a \in \mathcal{P}.\text{claims} : \textsc{norm}(a.\text{text}) \in \textsc{norm}(F)\}| < 2$} \Comment{false claims}
+  \State append \gate{factuality} to \textit{fail}
+\EndIf
+\State record $\{r \in R : |r.\text{src} - r.\text{tgt}| > 4 \wedge \neg\textsc{SharesEntity}(r)\}$
+  \Comment{locality: logged only}
+\State \Return \textbf{pass} if \textit{fail} is empty, else \textbf{retry} with the reasons in \textit{fail}
+\end{algorithmic}
+\end{algorithm}
 
 \begin{description}[leftmargin=1.2em,itemsep=2pt,topsep=3pt,font=\normalfont\itshape]
 \item[At least two false claims are selected,] so the response asserts false content alongside true. Without
   this quota a planner can select none, and coherence and factuality would be perfectly correlated in the data.
   Two sits just below the $\approx 2.3$ expected when $15$ of $26$ claims, $4$ of them false, are selected
-  indifferently.
+  indifferently. The plan gate checks this quota as stated.
 \item[Five senses are required:] at least one \sense{Alternative}, \sense{Disjunction}, \sense{Restatement},
-  \sense{Concession} and temporal ordering. This is what supplies the scarce senses.
+  \sense{Concession} and temporal ordering (\sense{Precedence} or \sense{Succession}). This is what supplies the
+  scarce senses, and the plan gate checks it as stated.
 \item[A ladder-specific quota] reserves the edges that the ladder's own edits will consume. It is the only part
   of P3 that differs between ladders, and is substituted through a placeholder. For \famtype{conflict},
-  \famtype{order} and \famtype{control}, at least four of the ten relations must carry a conflicting sense
+  \famtype{order} and \famtype{control}, the prompt asks for at least four relations with a conflicting sense
   (\sense{Alternative}, \sense{Concession} or \sense{Contrast}), at most one of them a resolved
-  \sense{Concession}, so that the \famtype{conflict} ladder has enough unresolved conflict edges to drop two and
-  resolve a third. For \famtype{chain}, at least three of the six valid relations must be entailments forming a
-  chain --- each link's target is the next link's source --- and these are the links the ladder breaks. The two
-  quotas cannot be imposed on one plan: with ten relations, six of them valid, and five required senses, three
-  valid entailments leave no room for four conflicts.
+  \sense{Concession}. What the \famtype{conflict} ladder actually needs is three \emph{unresolved} conflict edges,
+  enough to resolve one and drop two others, and that is what the gate checks. For \famtype{chain}, the prompt
+  asks for at least three valid entailment relations forming a chain, each link's target the next link's source;
+  these are the links the ladder breaks. The gate checks that at least three valid relations have a sense that
+  compiles to \ent{}, but not that they are linked end to end. The two quotas cannot be imposed on one plan: with
+  ten relations, six of them valid, and five required senses, three valid entailments leave no room for four
+  conflicts.
 \item[Exactly six relations are valid and four invalid.] Each invalid relation carries an error kind ---
   \gate{wrong\_sense}, \gate{wrong\_direction}, \gate{false\_endpoint} or \gate{spurious} --- and is asserted in
   the prose in the same register as the valid ones. The planted errors make the corpus a test of
   \emph{precision}: an extractor that recovers every gold edge, planted ones included, has not exercised
-  judgement. The quota is stated as a count, because a planner asked for ``about $60\%$'' rounds unpredictably.
+  judgement. The prompt states the quota as a count, because a planner asked for ``about $60\%$'' rounds
+  unpredictably. The plan gate is more tolerant: it accepts $8$--$12$ relations with a valid fraction of
+  $0.55\pm0.15$. Every released base plan has exactly ten relations, six of them valid
+  (\S\ref{sec-corpus}).
 \item[Four to six non-relations are declared:] pairs of selected claims, within four positions of each other,
   between which the response must draw no dependence. Precision against all unlabelled pairs is close to
   meaningless, since most such pairs are simply unannotated; a violated \emph{declared} non-relation is a genuine
-  false positive against a real negative set.
+  false positive against a real negative set. The parser checks the count and that no non-relation is also a
+  planned relation; the distance of at most four positions is asked for but not checked.
 \item[Relations are local by default.] Pairs within four positions are preferred, and long-range pairs are
   permitted when the two claims share a named entity. This biases the graphs toward ones a reader can recover, so
   that a failure of the relation-recovery gate (\S\ref{sec-v1}) indicates a defective realization rather than an
-  unreasonable demand. Locality is recorded but not enforced.
+  unreasonable demand. The plan gate records the relations that fall outside this window but does not reject a
+  plan for them.
 \end{description}
 
 \subsection{P4: plan to response}
@@ -666,11 +714,14 @@ V3 & claim coverage over gating statuses & $=1.00$ & majority/claim \\
 V3 & gating statuses & \gate{missing}, \gate{merged} & --- \\
 V3 & \dots\ and on a planted-false claim & $+$\gate{altered} & majority/claim \\
 \midrule
-P3 & claims selected & $14$--$16$ & --- \\
-P3 & relations planned (prompt asks for $10$) & $8$--$12$ & --- \\
-P3 & declared non-relations & $4$--$6$ & --- \\
+P3 & claims selected (parser) & $14$--$16$ & --- \\
+P3 & relations planned (parser; prompt asks for $10$) & $8$--$12$ & --- \\
+P3 & declared non-relations (parser) & $4$--$6$ & --- \\
 P3 & fraction valid (prompt asks for $6/10$) & $0.55 \pm 0.15$ & --- \\
 P3 & false claims selected & $\ge 2$ & --- \\
+P3 & each required sense, temporal ordering by either sense & $\ge 1$ & --- \\
+P3 & unresolved conflict relations (\famtype{conflict}, \famtype{order}, \famtype{control}) & $\ge 3$ & --- \\
+P3 & valid relations compiling to \ent{} (\famtype{chain}) & $\ge 3$ & --- \\
 P3 & relation locality (recorded, not enforced) & $\le 4$ positions & --- \\
 P5 & length drift & $\le 15\%$ & --- \\
 \midrule
@@ -1514,9 +1565,11 @@ numbered instructions. Placeholder: \verb|[QUESTION_PLACEHOLDER]|.
 \subsection{P3 --- claims to relation plan}
 \label{app-p3}
 \textbf{Input:} the question and the tagged claims. \textbf{Output:} a JSON plan of $14$--$16$ positioned claims, ten
-relations with sense, strength band, validity and error kind, and $4$--$6$ non-relations. \textbf{Checked by:} the plan
-gate (every P3 row of Table~\ref{tab:thresholds}, the required senses, the ladder-specific quota, disjointness of the
-relation and non-relation lists), whose complaint is fed back as a content retry. $7{,}778$ characters, $10$ numbered
+relations with sense, strength band, validity and error kind, and $4$--$6$ non-relations. \textbf{Checked by:} the parser
+(counts, legal senses and couplings, error kinds, one relation per pair, disjointness of the relation and
+non-relation lists), whose complaint is fed back as a format retry, then the plan gate (the remaining P3 rows of
+Table~\ref{tab:thresholds}), whose complaint is fed back as a content retry. Section~\ref{sec-p3} lists which of the
+prompt's requirements are checked, and with what tolerance. $7{,}778$ characters, $10$ numbered
 instructions. Placeholders: \verb|[QUESTION_PLACEHOLDER]|, \verb|[CLAIMS_PLACEHOLDER]|.
 \promptfile{prompts/PROMPT_P3.txt}
 
