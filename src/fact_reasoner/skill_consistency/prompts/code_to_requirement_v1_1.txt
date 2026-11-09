@@ -1,0 +1,49 @@
+You are evaluating whether grounded implementation evidence realizes a complete
+documentation requirement.
+
+The PREMISE is one normalized grounded code atom or one normalized structural
+bundle. The HYPOTHESIS is one normalized documentation requirement. Each input
+is a JSON object containing only a statement, a statement type, and typed
+entities. Treat exact entity values, actions, conditions, conjunctions, and
+negation as semantically important.
+
+Decide the directional natural-language-inference relation from the PREMISE to
+the HYPOTHESIS:
+
+1. Entailment
+   - Choose entailment only when the grounded code atom or bundle realizes the
+     complete requirement, including every required action, entity, constraint,
+     output field, and condition expressed by that requirement.
+   - A premise whose statement type is structural_bundle is the conjunction of
+     exactly its listed grounded members. It may satisfy a compound requirement
+     only when those members jointly establish every required part.
+   - Implementing one stage, one field, one checklist item, or one example of a
+     compound requirement is not complete implementation.
+   - A low-level read, search, parse, classifier, or command establishes only
+     that operation; do not promote it to a broader workflow unless the premise
+     explicitly contains the other required stages.
+   - Use only the supplied normalized statements and typed entities. Do not use
+     compiler mappings, expected labels, scores, source excerpts, or assumptions
+     about what the code probably does.
+
+2. Contradiction
+   - Choose contradiction only when the grounded implementation evidence is
+     explicitly incompatible with the requirement, so both cannot hold under
+     the same condition and interpretation.
+   - Reading, parsing, searching, checking, reviewing, or reporting code does
+     not contradict a requirement not to modify code.
+   - Absence or incomplete implementation evidence is neutral, not contradiction.
+
+3. Neutral
+   - Choose neutral when the premise implements only part of a compound
+     requirement, is at a different level of detail, concerns a different
+     action, entity, or condition, or otherwise does not establish the entire
+     requirement.
+   - Choose neutral when no implementation evidence is present for the required
+     behavior; do not infer that the opposite behavior occurs.
+
+Explain the decisive evidence briefly. End with exactly one label in square
+brackets: [entailment], [contradiction], or [neutral].
+
+PREMISE: {{premise_text}}
+HYPOTHESIS: {{hypothesis_text}}

@@ -1,0 +1,104 @@
+You are evaluating whether grounded implementation evidence realizes a complete
+documentation requirement.
+
+The PREMISE is one normalized grounded code atom or one normalized structural
+bundle. The HYPOTHESIS is one normalized documentation requirement. Each input
+is a JSON object containing only a statement, a statement type, and typed
+entities. Treat exact entity values, actions, conditions, conjunctions, and
+negation as semantically important.
+
+Decide the directional natural-language-inference relation from the PREMISE to
+the HYPOTHESIS:
+
+1. Entailment
+   - Choose entailment only when the grounded code atom or bundle realizes the
+     complete requirement, including every required action, entity, constraint,
+     output field, and condition expressed by that requirement.
+   - A premise whose statement type is structural_bundle is the conjunction of
+     exactly its listed grounded members. It may satisfy a compound requirement
+     only when those members jointly establish every required part.
+   - Implementing one stage, one field, one checklist item, or one example of a
+     compound requirement is not complete implementation.
+   - A low-level read, search, parse, classifier, or command establishes only
+     that operation; do not promote it to a broader workflow unless the premise
+     explicitly contains the other required stages.
+   - Use only the supplied normalized statements and typed entities. Do not use
+     compiler mappings, expected labels, scores, source excerpts, or assumptions
+     about what the code probably does.
+
+2. Contradiction
+   - Choose contradiction only when the grounded implementation evidence is
+     explicitly incompatible with the requirement, so both cannot hold under
+     the same condition and interpretation.
+   - Reading, parsing, searching, checking, reviewing, or reporting code does
+     not contradict a requirement not to modify code.
+   - Absence or incomplete implementation evidence is neutral, not contradiction.
+
+3. Neutral
+   - Choose neutral when the premise implements only part of a compound
+     requirement, is at a different level of detail, concerns a different
+     action, entity, or condition, or otherwise does not establish the entire
+     requirement.
+   - Choose neutral when no implementation evidence is present for the required
+     behavior; do not infer that the opposite behavior occurs.
+
+DECLARATIONS AND BOUND CHECKS
+- A code_declaration is a statement of intent. Requirement descriptions, prompt
+  instructions and field descriptions do not prove that a validator checks them.
+  They can establish a requirement to declare or request something, but cannot
+  by themselves entail a requirement to validate, enforce, guarantee or execute it.
+- A bound_call_bundle contains explicitly connected static facts about one call:
+  its instruction, supplied output format and attached checker. Evaluate those
+  facts together. The schema specifies output shape; it does not prove semantic
+  correctness or successful execution. A request does not prove its completion.
+- For actual validation, use the attached checker's extracted acceptance
+  predicate. Its requirement description cannot add missing checks. A subset of
+  required checks gives neutral for the whole requirement. An explicitly inverted
+  acceptance rule can contradict a requirement under the same conditions.
+- Unresolved bindings or unsupported checker bodies provide no missing behavior.
+  A checker defined elsewhere but not bound to this call supplies no enforcement
+  evidence for this call. Do not combine distinct call bundles in a single pair.
+- The evidence describes code statically: it can establish how a call is
+  configured, but cannot establish that the program ran or that its output passed.
+
+Return only a JSON object with relation, relation_ambiguity, and basis, in that order. Select the relation first under the directional rules. Then classify ambiguity in assigning that relation. Do not give a numeric probability.
+unambiguous: The relation assignment is clear under the supplied rules. The premise may clearly establish entailment, contradiction, or a neutral coverage gap.
+minor_ambiguity: A small wording ambiguity exists, but resolving it in reasonable ways is unlikely to change the selected relation.
+moderate_ambiguity: A specific reasonable alternative reading could change the relation, although the selected relation is favored under the supplied rules.
+substantial_ambiguity: A material reference, scope, or condition is ambiguous, and the relation assignment depends strongly on its interpretation.
+closely_competing_relations: At least two relation assignments remain comparably defensible because of identified interpretive ambiguity, even after applying the rules.
+Missing coverage can clearly establish neutral: do not confuse neutral with evaluator ambiguity. An unambiguous relation can be entailment, contradiction, or neutral. Identify a concrete competing interpretation when ambiguity is present. Do not infer ambiguity merely from absence of evidence. The examples illustrate generic NLI; apply the directional rules to the actual pair.
+
+IN-CONTEXT EXAMPLES
+
+PREMISE: Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. Smith was knighted in 1999, appointed to the House of Lords as an independent crossbench peer in 2008, and appointed Knight of the Thistle in the 2014 New Year Honours.
+HYPOTHESIS: Robert Smith holds the title of Baron Smith of Kelvin.
+OUTPUT: {"relation": "entailment", "relation_ambiguity": "unambiguous", "basis": "The title is explicitly stated; the additional biography is unnecessary to the relation."}
+
+PREMISE: In 2022, Passover begins in Israel at sunset on Friday, 15 April, and ends at sunset on Friday, 22 April 2022.
+HYPOTHESIS: Passover in 2022 begins at sundown on March 27.
+OUTPUT: {"relation": "contradiction", "relation_ambiguity": "unambiguous", "basis": "The stated start dates are explicitly incompatible for the same event."}
+
+PREMISE: Little India in the East Village: Two restaurants ablaze with tiny colored lights stand at the top of a steep staircase.
+HYPOTHESIS: The village had colorful decorations on every street corner.
+OUTPUT: {"relation": "neutral", "relation_ambiguity": "unambiguous", "basis": "The premise describes two restaurants, not every street corner. That scope gap clearly establishes neutral; missing coverage does not make the relation assignment ambiguous."}
+
+PREMISE: The validator notified the exporter after it wrote the report.
+HYPOTHESIS: The validator wrote the report.
+OUTPUT: {"relation": "neutral", "relation_ambiguity": "moderate_ambiguity", "basis": "The pronoun could refer to the validator or exporter. Without resolving it, the premise does not establish that the validator wrote the report; entailment remains a competing reading."}
+
+PREMISE: Lena placed the invoice in the archive.
+HYPOTHESIS: Lena stored the invoice.
+OUTPUT: {"relation": "entailment", "relation_ambiguity": "minor_ambiguity", "basis": "Archive normally denotes storage here. Its precise physical or digital form is unspecified, but that small ambiguity is unlikely to change the relation."}
+
+PREMISE: The gateway can reject a request.
+HYPOTHESIS: The gateway is permitted to reject a request.
+OUTPUT: {"relation": "neutral", "relation_ambiguity": "substantial_ambiguity", "basis": "Can may express ability or permission. The permission claim depends on which interpretation is intended; it is not established under the ability reading."}
+
+PREMISE: The chamber is light.
+HYPOTHESIS: The chamber is brightly illuminated.
+OUTPUT: {"relation": "neutral", "relation_ambiguity": "closely_competing_relations", "basis": "Light may describe illumination or low weight. Without context neither reading is preferred; the illumination reading supports the hypothesis and the weight reading leaves it neutral."}
+
+ACTUAL PAIR
+PREMISE: {{premise_text}}
+HYPOTHESIS: {{hypothesis_text}}

@@ -1438,6 +1438,7 @@ See the `docs/` directory for complete examples:
 |---------|-------------|
 | `docs/examples/assessors/ex_factreasoner_all_pairs.py` | Full FactReasoner pipeline, `all_pairs` NLI mode (highest fidelity) |
 | `docs/examples/assessors/ex_factreasoner_fast.py` | Full FactReasoner pipeline, `fast` NLI mode (fewer LLM calls) |
+| [Skill–code consistency](docs/examples/skill_consistency/README.md) | Compare skill instructions and Python behavior in both directions |
 | `docs/examples/assessors/ex_factscore.py` | FactScore baseline |
 | `docs/examples/assessors/ex_veriscore.py` | VeriScore baseline |
 | `docs/examples/core/ex_atomizer.py` | Standalone atomization |

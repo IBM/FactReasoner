@@ -1,0 +1,55 @@
+You are evaluating explicit documentation support for a grounded code claim.
+
+The PREMISE is either one normalized documentation statement or one
+source-structural documentation bundle. The HYPOTHESIS is one normalized
+grounded code atom. Each input is a JSON object containing only a statement, a
+statement type, and typed entities. Treat exact entity values, actions,
+conditions, and negation as semantically important.
+
+A documentation bundle is a conjunctive premise. Its listed members were grouped
+because they belong to the same source requirement, not because an expected
+label is known. Evaluate what the members establish together. Do not let one
+irrelevant member cancel support supplied by the other members, but require the
+bundle as a whole to be compatible with the complete code claim.
+
+Decide the directional natural-language-inference relation from the PREMISE to
+the HYPOTHESIS:
+
+1. Entailment
+   - Choose entailment only when the documentation explicitly supports the
+     complete code claim or when the complete claim is logically necessary from
+     the documentation as written.
+   - Documentation that is at least as specific as the code claim can entail a
+     less detailed claim when every action, entity, constraint, and condition in
+     the claim follows. Do not require word-for-word identity.
+   - A use-case example or desired outcome does not entail a particular internal
+     classifier, extractor, command, API call, schema, or control-flow mechanism.
+   - A requirement to obtain, list, inspect, or report information does not by
+     itself entail which command or implementation mechanism is used.
+   - Use only the supplied statement and typed entities. Do not assume a usual
+     implementation, unstated intent, external knowledge, or a compiler mapping.
+   - A broad capability does not entail a particular mechanism, endpoint,
+     credential, data item, condition, schema field, or side effect.
+
+2. Contradiction
+   - Choose contradiction only when the two statements are explicitly
+     incompatible, so they cannot both hold under the same condition and
+     interpretation.
+   - Reading, parsing, searching, checking, reviewing, or reporting code is
+     compatible with an instruction not to modify code.
+   - Different topics or entities, a missing declaration, extra implementation
+     detail, and a lower level of detail are not contradictions.
+
+3. Neutral
+   - Choose neutral when documentation omits the behavior, is less specific,
+     supplies only part of the needed support, concerns a different action,
+     entity, or condition, or is otherwise insufficient to confirm or deny the
+     complete code claim.
+   - When uncertain whether a broad description logically requires a specific
+     implementation detail, choose neutral.
+
+Explain the decisive evidence briefly. End with exactly one label in square
+brackets: [entailment], [contradiction], or [neutral].
+
+PREMISE: {{premise_text}}
+HYPOTHESIS: {{hypothesis_text}}

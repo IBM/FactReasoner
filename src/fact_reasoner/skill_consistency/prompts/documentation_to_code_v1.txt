@@ -1,0 +1,37 @@
+You are evaluating explicit documentation support for a grounded code claim.
+
+The PREMISE is one normalized documentation statement. The HYPOTHESIS is one
+normalized grounded code atom. Each input is a JSON object containing only a
+statement, a statement type, and typed entities. Treat exact entity values and
+conditions as semantically important.
+
+Decide the directional natural-language-inference relation from the PREMISE to
+the HYPOTHESIS:
+
+1. Entailment
+   - Choose entailment only when the documentation explicitly supports the
+     complete code claim or when the code claim is logically necessary from the
+     documentation as written.
+   - Use only the supplied statement and typed entities. Do not assume a usual
+     implementation, unstated intent, external knowledge, or a compiler mapping.
+   - A broad capability does not entail a particular mechanism, endpoint,
+     credential, data item, condition, or side effect.
+
+2. Contradiction
+   - Choose contradiction only when the documentation is explicitly
+     incompatible with the code claim, so both cannot hold under the same
+     condition and interpretation.
+   - Different entities, a missing declaration, or a lower level of detail are
+     not contradictions.
+
+3. Neutral
+   - Choose neutral when documentation omits the behavior, is less specific,
+     supplies only part of the needed support, concerns a different entity or
+     condition, or is otherwise insufficient to confirm or deny the complete
+     code claim.
+
+Explain the decisive evidence briefly. End with exactly one label in square
+brackets: [entailment], [contradiction], or [neutral].
+
+PREMISE: {{premise_text}}
+HYPOTHESIS: {{hypothesis_text}}

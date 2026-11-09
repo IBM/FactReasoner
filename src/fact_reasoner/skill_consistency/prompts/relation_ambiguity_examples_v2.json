@@ -1,0 +1,131 @@
+{
+  "version": "0.2.0-pilot",
+  "status": "prompt_demonstrations_only",
+  "labels": {
+    "unambiguous": "The relation assignment is clear under the supplied rules. The premise may clearly establish entailment, contradiction, or a neutral coverage gap.",
+    "minor_ambiguity": "A small wording ambiguity exists, but resolving it in reasonable ways is unlikely to change the selected relation.",
+    "moderate_ambiguity": "A specific reasonable alternative reading could change the relation, although the selected relation is favored under the supplied rules.",
+    "substantial_ambiguity": "A material reference, scope, or condition is ambiguous, and the relation assignment depends strongly on its interpretation.",
+    "closely_competing_relations": "At least two relation assignments remain comparably defensible because of identified interpretive ambiguity, even after applying the rules."
+  },
+  "examples": [
+    {
+      "id": "default-1",
+      "scope": "generic",
+      "premise": "Robert Haldane Smith, Baron Smith of Kelvin, KT, CH, FRSGS is a British businessman and former Governor of the British Broadcasting Corporation. Smith was knighted in 1999, appointed to the House of Lords as an independent crossbench peer in 2008, and appointed Knight of the Thistle in the 2014 New Year Honours.",
+      "hypothesis": "Robert Smith holds the title of Baron Smith of Kelvin.",
+      "output": {
+        "relation": "entailment",
+        "relation_ambiguity": "unambiguous",
+        "basis": "The title is explicitly stated; the additional biography is unnecessary to the relation."
+      },
+      "provenance": {
+        "source": "fact_reasoner/core/nli.py:INSTRUCTION_NLI",
+        "source_sha256": "282f6473095b7123c34dbe7aac3b2f8b91ee40a1731590064f1788d394b54423",
+        "relation": "Preserved from installed default prompt",
+        "relation_ambiguity": "Authored illustration, not a validated reference"
+      }
+    },
+    {
+      "id": "default-2",
+      "scope": "generic",
+      "premise": "In 2022, Passover begins in Israel at sunset on Friday, 15 April, and ends at sunset on Friday, 22 April 2022.",
+      "hypothesis": "Passover in 2022 begins at sundown on March 27.",
+      "output": {
+        "relation": "contradiction",
+        "relation_ambiguity": "unambiguous",
+        "basis": "The stated start dates are explicitly incompatible for the same event."
+      },
+      "provenance": {
+        "source": "fact_reasoner/core/nli.py:INSTRUCTION_NLI",
+        "source_sha256": "282f6473095b7123c34dbe7aac3b2f8b91ee40a1731590064f1788d394b54423",
+        "relation": "Preserved from installed default prompt",
+        "relation_ambiguity": "Authored illustration, not a validated reference"
+      }
+    },
+    {
+      "id": "default-3",
+      "scope": "generic",
+      "premise": "Little India in the East Village: Two restaurants ablaze with tiny colored lights stand at the top of a steep staircase.",
+      "hypothesis": "The village had colorful decorations on every street corner.",
+      "output": {
+        "relation": "neutral",
+        "relation_ambiguity": "unambiguous",
+        "basis": "The premise describes two restaurants, not every street corner. That scope gap clearly establishes neutral; missing coverage does not make the relation assignment ambiguous."
+      },
+      "provenance": {
+        "source": "fact_reasoner/core/nli.py:INSTRUCTION_NLI",
+        "source_sha256": "282f6473095b7123c34dbe7aac3b2f8b91ee40a1731590064f1788d394b54423",
+        "relation": "Preserved from installed default prompt",
+        "relation_ambiguity": "Authored illustration, not a validated reference"
+      }
+    },
+    {
+      "id": "generic-ambiguous-reference",
+      "scope": "generic",
+      "premise": "The validator notified the exporter after it wrote the report.",
+      "hypothesis": "The validator wrote the report.",
+      "output": {
+        "relation": "neutral",
+        "relation_ambiguity": "moderate_ambiguity",
+        "basis": "The pronoun could refer to the validator or exporter. Without resolving it, the premise does not establish that the validator wrote the report; entailment remains a competing reading."
+      },
+      "provenance": {
+        "source": "Authored prompt illustration",
+        "relation": "Illustrative, not evaluation gold",
+        "relation_ambiguity": "Illustrative, not calibrated"
+      }
+    },
+    {
+      "id": "generic-minor-wording",
+      "scope": "generic",
+      "premise": "Lena placed the invoice in the archive.",
+      "hypothesis": "Lena stored the invoice.",
+      "output": {
+        "relation": "entailment",
+        "relation_ambiguity": "minor_ambiguity",
+        "basis": "Archive normally denotes storage here. Its precise physical or digital form is unspecified, but that small ambiguity is unlikely to change the relation."
+      },
+      "provenance": {
+        "source": "Authored pilot illustration",
+        "relation": "Illustrative, not evaluation gold",
+        "relation_ambiguity": "Subjective rubric illustration, not a validated reference"
+      }
+    },
+    {
+      "id": "generic-modal-ambiguity",
+      "scope": "generic",
+      "premise": "The gateway can reject a request.",
+      "hypothesis": "The gateway is permitted to reject a request.",
+      "output": {
+        "relation": "neutral",
+        "relation_ambiguity": "substantial_ambiguity",
+        "basis": "Can may express ability or permission. The permission claim depends on which interpretation is intended; it is not established under the ability reading."
+      },
+      "provenance": {
+        "source": "Authored pilot illustration",
+        "relation": "Illustrative, not evaluation gold",
+        "relation_ambiguity": "Subjective rubric illustration, not a validated reference"
+      }
+    },
+    {
+      "id": "generic-balanced-lexical-readings",
+      "scope": "generic",
+      "premise": "The chamber is light.",
+      "hypothesis": "The chamber is brightly illuminated.",
+      "output": {
+        "relation": "neutral",
+        "relation_ambiguity": "closely_competing_relations",
+        "basis": "Light may describe illumination or low weight. Without context neither reading is preferred; the illumination reading supports the hypothesis and the weight reading leaves it neutral."
+      },
+      "provenance": {
+        "source": "Authored pilot illustration",
+        "relation": "Illustrative, not evaluation gold",
+        "relation_ambiguity": "Subjective rubric illustration, not a validated reference"
+      }
+    }
+  ],
+  "probability_mapping": null,
+  "evaluation_policy": "Exclude every demonstration and its close variants from evaluation. Authored ambiguity labels are not reference probabilities or human gold.",
+  "coverage_note": "All five categories have an illustration. Ordinal boundaries remain subjective and unvalidated. Generic ambiguity examples emphasize neutral, so measure category use conditional on relation to detect confounding. Domain examples from v1 excluded to avoid evaluation overlap."
+}
