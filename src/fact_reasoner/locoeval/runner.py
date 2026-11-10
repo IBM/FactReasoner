@@ -58,6 +58,22 @@ from fact_reasoner.locoeval.gold_graph import (
     atom_priors,
     build_gold_result,
 )
+from fact_reasoner.locoeval.graph_miner import (
+    DEFAULT_CANDIDATE_ARM,
+    DEFAULT_CANDIDATES_DIR,
+    MAX_TOKENS as GRAPH_MAX_TOKENS,
+    ChatClient,
+    SampleCache,
+    build_graph_result,
+    build_prompt,
+    collect_samples,
+    is_graph_policy,
+    load_candidates,
+    parse_recipe,
+    rits_strengths,
+    vote,
+    _atoms_arg,
+)
 from fact_reasoner.locoeval.mined_graph import (
     DEFAULT_MAX_CALL_ERROR_RATE,
     MinedArm,
@@ -224,6 +240,9 @@ def evaluate_constraints(
         for pair in constraint.get("required", []):
             for readout in readouts:
                 record(cid, cclass, strict, readout, pair, "increase")
+            # Endpoint readouts the family declares to FALL (resolution-only CONFLICT).
+            for readout in constraint.get("decrease_readouts", []) or []:
+                record(cid, cclass, strict, readout, pair, "decrease")
         for pair in constraint.get("invariant", []):
             for readout in readouts:
                 record(cid, cclass, strict, readout, pair, "invariant")
@@ -288,6 +307,9 @@ class GoldEvalRunner:
         require_evidence: bool = False,
         resume: bool = False,
         show_progress: bool = False,
+        sample_cache_dir: str | None = None,
+        candidates_dir: str = DEFAULT_CANDIDATES_DIR,
+        candidate_arm: str = DEFAULT_CANDIDATE_ARM,
     ):
         """Initialize the runner.
 
@@ -344,6 +366,13 @@ class GoldEvalRunner:
                     f"model inventory ({sorted(model_specs or {})}). Pass "
                     "model_specs=... (see locoeval.models.load_model_specs)."
                 )
+            if is_graph_policy(spec.pair_policy):
+                sm = parse_recipe(spec.variant).strength_model
+                if sm is not None and sm not in model_specs:
+                    raise ValueError(
+                        f"Arm {arm!r} takes strengths from {sm!r}, which is not in "
+                        "the model inventory."
+                    )
             self.mined_arms[arm] = spec
 
         self.data_dir = data_dir
@@ -373,6 +402,14 @@ class GoldEvalRunner:
         self.require_evidence = require_evidence
         self.resume = resume
         self.show_progress = show_progress
+        # Graph-level arms (see `graph_miner`): raw samples are cached here, shared
+        # by every weighting variant of one model, so variants cost nothing extra.
+        self.sample_cache = SampleCache(
+            sample_cache_dir or os.path.join(output_dir, "samples")
+        )
+        self.candidates_dir = candidates_dir
+        self.candidate_arm = candidate_arm
+        self._chat_clients: dict[str, ChatClient] = {}
         # Backends are built once per model and shared across that model's arms and
         # items: constructing one per cell would re-open a client 20 times.
         self._backends: dict[str, Any] = {}
@@ -477,7 +514,10 @@ class GoldEvalRunner:
         }
         start = time.perf_counter()
         try:
-            if mined_spec is not None:
+            if mined_spec is not None and is_graph_policy(mined_spec.pair_policy):
+                result = self._graph_cell(item, mined_spec, record)
+                node_priors = atom_priors(item)
+            elif mined_spec is not None:
                 result = self._mine_cell(item, mined_spec, record)
                 node_priors = atom_priors(item)
             else:
@@ -595,6 +635,12 @@ class GoldEvalRunner:
         if loop is None:
             return
         try:
+            for chat in self._chat_clients.values():
+                try:
+                    loop.run_until_complete(chat.aclose())
+                except Exception:  # noqa: BLE001, S110
+                    pass
+            self._chat_clients.clear()
             for backend in self._backends.values():
                 cache = getattr(backend, "_client_cache", None)
                 clients = (
@@ -716,6 +762,128 @@ class GoldEvalRunner:
                 f"{cov.get('llm_call_errors_by_type')}. A failed call is parsed as "
                 "'no relation', so these scores would understate the graph. Lower "
                 "--max-concurrency or retry."
+            )
+        return result
+
+    def _chat_client(self, model: str) -> ChatClient:
+        if model not in self._chat_clients:
+            self._chat_clients[model] = ChatClient(self.model_specs[model])
+        return self._chat_clients[model]
+
+    def _graph_cell(
+        self, item: Mapping[str, Any], spec: MinedArm, record: dict[str, Any]
+    ) -> Any:
+        """Mine one item at the GRAPH level (V1 recovery, K samples, majority vote).
+
+        Raises:
+            MinedArmError: If fewer than a majority of the K samples could be drawn.
+                A short vote is not a smaller vote -- with 2 of 5 samples a single
+                model output decides every edge -- so the cell fails instead.
+        """
+        recipe = parse_recipe(spec.variant)
+        mode = spec.pair_policy
+        model_spec = self.model_specs[spec.model]
+        candidates = (
+            load_candidates(item, self.candidates_dir, self.candidate_arm)
+            if mode == "verify"
+            else None
+        )
+        prompt = build_prompt(item, mode, candidates)
+        client = self._chat_client(spec.model)
+
+        async def go():
+            return await collect_samples(
+                client,
+                self.sample_cache,
+                model=spec.model,
+                mode=mode,
+                item=item,
+                prompt=prompt,
+                k=recipe.k,
+            )
+
+        samples, stats = self._run_async(go())
+        if len(samples) * 2 <= recipe.k:
+            raise MinedArmError(
+                f"{item.get('id')}: only {len(samples)} of {recipe.k} graph samples "
+                f"succeeded ({stats.get('last_error')})."
+            )
+        _, pos_to_id = _atoms_arg(item)
+        edges = vote(samples, pos_to_id)
+
+        strengths = None
+        strength_stats: dict[str, Any] = {}
+        if recipe.weighting == "rits_strength":
+            sm = self.model_specs[recipe.strength_model]
+            strengths, strength_stats = self._run_async(
+                rits_strengths(
+                    self._backend_for(sm),
+                    item,
+                    edges,
+                    max_concurrency=self.max_concurrency or 16,
+                )
+            )
+
+        calls = int(stats["calls"]) + int(strength_stats.get("calls") or 0)
+        errors = int(stats["errors"]) + int(strength_stats.get("errors") or 0)
+        coverage = {
+            "policy": mode,
+            "pairs_scored": None,
+            "llm_calls": calls,
+            "llm_call_errors": errors,
+            "graph_samples": len(samples),
+            "graph_samples_cached": stats["cached"],
+            "graph_samples_fresh": stats["fresh"],
+            "graph_parse_failures": stats["parse_failures"],
+            "graph_failed_samples": stats["failed_samples"],
+            "graph_fresh_usage": stats["fresh_usage"],
+            "graph_used_usage": stats["used_usage"],
+            "graph_edges_voted": len(edges),
+            "graph_raw_edges_per_sample": [len(s["relations"]) for s in samples],
+            "num_candidates": len(candidates) if candidates is not None else None,
+        }
+        result = build_graph_result(
+            item,
+            edges,
+            recipe,
+            concession_discount=self.concession_discount,
+            strengths=strengths,
+            coverage=coverage,
+            extra_config={"graph_mode": mode, "pair_policy": mode},
+        )
+        record.update(
+            {
+                "model_id": model_spec.model_id,
+                "backend": model_spec.backend,
+                "base_url": model_spec.base_url,
+                "nli_method": "vote_share",
+                "strength_method": recipe.weighting,
+                "strength_model": recipe.strength_model,
+                "strategy": spec.variant,
+                "graph_mode": mode,
+                "graph_k": recipe.k,
+                "candidate_arm": self.candidate_arm if mode == "verify" else None,
+                "num_pairs_scored": None,
+                "num_llm_calls": calls,
+                "num_call_exceptions": errors,
+                "graph_samples": len(samples),
+                "graph_fresh_usage": stats["fresh_usage"],
+                "graph_used_usage": stats["used_usage"],
+                "graph_vote": [
+                    {k: e[k] for k in ("source_id", "target_id", "sense", "vote_share", "label_share", "band", "resolved")}
+                    for e in edges
+                ],
+            }
+        )
+        record["call_error_rate"] = (errors / calls) if calls else 0.0
+        # Graph samples retry their own transport errors, so `errors` counts
+        # retried attempts; only the RITS strength stage maps an error to a
+        # silent 0.5, and that is what the ceiling must guard.
+        s_calls = int(strength_stats.get("calls") or 0)
+        s_err = int(strength_stats.get("errors") or 0)
+        if s_err and s_calls and s_err / s_calls > self.max_call_error_rate:
+            raise MinedArmError(
+                f"{item.get('id')}: {s_err} of {s_calls} strength calls failed."
             )
         return result
 
@@ -846,7 +1014,19 @@ class GoldEvalRunner:
             "ibound": self.ibound,
         }
         spec = self.mined_arms.get(arm) if arm is not None else None
-        if arm is None or spec is not None:
+        if spec is not None and is_graph_policy(spec.pair_policy):
+            payload.update(
+                {
+                    "graph_mode": spec.pair_policy,
+                    "resolved_rule": "conflict_coupling",
+                    "recipe": parse_recipe(spec.variant).to_dict(),
+                    "prompt": "V1",
+                    "max_tokens": GRAPH_MAX_TOKENS,
+                }
+            )
+            if spec.pair_policy == "verify":
+                payload["candidates"] = [self.candidates_dir, self.candidate_arm]
+        elif arm is None or spec is not None:
             # Mining knobs: only a mined arm (or the run-level hash) depends on them.
             payload.update(
                 {

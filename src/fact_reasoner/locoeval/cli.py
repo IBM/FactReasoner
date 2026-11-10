@@ -258,6 +258,24 @@ def build_parser() -> argparse.ArgumentParser:
         "response. Needs --prompt-variant v2, which has the evidence slot.",
     )
     mined.add_argument(
+        "--sample-cache-dir",
+        default=None,
+        help="Graph arms (mined:<m>:graph|verify:k<N>...): where raw V1 samples are "
+        "cached, shared by every weighting variant of a model (default: "
+        "<out-dir>/samples).",
+    )
+    mined.add_argument(
+        "--candidates-dir",
+        default=None,
+        help="verify arms: records/ directory holding the pairwise candidate arm's "
+        "cells.",
+    )
+    mined.add_argument(
+        "--candidate-arm",
+        default=None,
+        help="verify arms: the pairwise arm whose edges are offered as candidates.",
+    )
+    mined.add_argument(
         "--resume",
         action="store_true",
         help="Reuse existing successful per-cell records whose run configuration "
@@ -375,6 +393,18 @@ def _estimate(args, arms: list[str], parser) -> None:
 
     mined = [(a, parse_arm(a)) for a in arms]
     mined = [(a, s) for a, s in mined if s is not None]
+    from fact_reasoner.locoeval.graph_miner import is_graph_policy, parse_recipe
+
+    graph = [(a, s) for a, s in mined if is_graph_policy(s.pair_policy)]
+    mined = [(a, s) for a, s in mined if not is_graph_policy(s.pair_policy)]
+    if graph:
+        n_items = len(load_items(args.data_dir, args.items))
+        for arm, spec in graph:
+            k = parse_recipe(spec.variant).k
+            print(
+                f"  {arm:<48s} {n_items} items x k={k} -> {n_items * k} graph calls "
+                "(upper bound; cached samples are reused across variants)"
+            )
     if not mined:
         print("[locoeval] no mined arms: gold arms make no LLM calls.")
         return
@@ -496,6 +526,13 @@ def main(argv: list[str] | None = None) -> int:
                 require_evidence=args.require_evidence,
                 resume=args.resume,
                 show_progress=args.show_progress,
+                sample_cache_dir=args.sample_cache_dir,
+                **(
+                    {"candidates_dir": args.candidates_dir}
+                    if args.candidates_dir
+                    else {}
+                ),
+                **({"candidate_arm": args.candidate_arm} if args.candidate_arm else {}),
             )
         except ValueError as e:  # unknown arm / policy / model
             parser.error(str(e))

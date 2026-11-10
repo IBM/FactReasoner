@@ -63,6 +63,11 @@ from fact_reasoner.lcs.relation_miner import (
     _atom_sort_key,
 )
 from fact_reasoner.lcs.taxonomy import LEVEL1_NONE
+from fact_reasoner.locoeval.graph_miner import (
+    GRAPH_POLICIES,
+    GraphMinerError,
+    parse_recipe,
+)
 from fact_reasoner.locoeval.gold_graph import (
     DEFAULT_CONCESSION_DISCOUNT,
     atom_priors,
@@ -194,7 +199,14 @@ def parse_arm(arm: str) -> MinedArm | None:
     variant = parts[3] if len(parts) == 4 else None
     if not model:
         raise MinedArmError(f"Mined arm {arm!r} names no model.")
-    if policy not in PAIR_POLICIES:
+    if policy in GRAPH_POLICIES:
+        # Graph-level mining: the variant is a sampling/weighting recipe, not a
+        # MINING_STRATEGIES key. Validate it now, before any backend is built.
+        try:
+            parse_recipe(variant)
+        except GraphMinerError as e:
+            raise MinedArmError(f"Arm {arm!r}: {e}") from e
+    elif policy not in PAIR_POLICIES:
         raise MinedArmError(
             f"Unknown pair policy {policy!r} in arm {arm!r} (expected one of "
             f"{list(PAIR_POLICIES)})."
