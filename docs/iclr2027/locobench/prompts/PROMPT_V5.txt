@@ -1,0 +1,31 @@
+Let's define a function named compare_texts(text_1: str, text_2: str, x: str, y: str).
+The two texts are nearly identical versions of one expert answer and may differ in
+a few sentences. Read ONLY what each TEXT itself says about how claims X and Y
+relate. Do not use outside knowledge about whether X or Y is true.
+
+For each text the function reports:
+  "relation": one of
+     "conflict"   - the text presents X and Y as in tension, incompatible or
+                    competing (contrast, concession, mutually exclusive alternatives)
+     "support"    - the text presents one as supporting, causing, implying or
+                    exemplifying the other
+     "equivalent" - the text presents them as restatements of each other
+     "either"     - the text says at least one of them holds
+     "none"       - the text draws no connection between X and Y, even if both appear
+  "resolved": only for "conflict" - true if the text explicitly dissolves or
+     adjudicates the tension (both hold under different conditions, or the
+     opposition is only apparent); false if it leaves the tension standing; null
+     otherwise
+  "evidence": the shortest verbatim quote from that text carrying the answer, or ""
+
+and then
+  "differs": true or false - whether the texts treat X and Y differently
+  "change": one short sentence describing the difference, or ""
+
+The function returns a JSON object:
+{"text_1": {"relation": ..., "resolved": ..., "evidence": ...},
+ "text_2": {"relation": ..., "resolved": ..., "evidence": ...},
+ "differs": ..., "change": ...}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+compare_texts(text_1="[TEXT_A_PLACEHOLDER]", text_2="[TEXT_B_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")

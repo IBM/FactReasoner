@@ -94,7 +94,7 @@ FAMILY_TYPES = ("CONFLICT", "CHAIN", "ORDER", "CONTROL")
 # Families per type at the Phase-2 target of 120 (Phase 1 tab:families).
 FAMILY_COUNTS = {"CONFLICT": 55, "CHAIN": 25, "ORDER": 25, "CONTROL": 15}
 
-RUNG_NAMES = ("worse", "base", "concession_resolved", "fix_one_conflict", "coherent")
+RUNG_NAMES = ("worse_two", "worse_one", "base", "resolve_one", "resolve_two")
 
 # Expectation vocabulary for `expected.readout_directions`.
 INCREASE, DECREASE, INVARIANT, UNCONSTRAINED = (
@@ -144,6 +144,14 @@ class Ladder:
     rungs: tuple[Rung, ...]
     flat: tuple[str, ...] = ()
     notes: str = ""
+    # Build each rung from its PARENT rung's text and labels, applying only the calls the
+    # parent lacks, instead of re-applying every call to the base. Adjacent rungs then
+    # differ by exactly one edit, and a deep rung never redoes (and re-risks) the edits
+    # below it -- the third resolution of the three-resolution CONFLICT ladder failed in
+    # 4 of 4 families that reached it. `calls` stays the FULL list from the base, which
+    # is what `apply_calls`, the budget and the manifest read; the parent's calls must be
+    # a prefix of the child's, so the increment is well defined (checked below).
+    incremental: bool = False
 
     def __post_init__(self) -> None:
         if len(self.rungs) != 5:
@@ -152,6 +160,24 @@ class Ladder:
             )
         if [r.index for r in self.rungs] != [0, 1, 2, 3, 4]:
             raise ValueError(f"{self.family}: rung indices must be 0..4 in order.")
+        if self.incremental:
+            by = {r.index: r for r in self.rungs}
+            for r in self.rungs:
+                if r.parent is None:
+                    continue
+                pc = by[r.parent].calls
+                if r.calls[: len(pc)] != pc or len(r.calls) != len(pc) + 1:
+                    raise ValueError(
+                        f"{self.family}: incremental rung {r.index} must extend its parent "
+                        f"{r.parent}'s calls {pc} by exactly one call, got {r.calls}."
+                    )
+
+    def increment(self, rung: "Rung") -> tuple[str, ...]:
+        """The calls a rung adds on top of its parent (all of them if not incremental)."""
+        if not self.incremental or rung.parent is None:
+            return rung.calls
+        parent = next(r for r in self.rungs if r.index == rung.parent)
+        return rung.calls[len(parent.calls):]
 
     def base_index(self) -> int:
         """The index of the unperturbed rung."""
@@ -168,24 +194,31 @@ class Ladder:
 LADDERS: dict[str, Ladder] = {
     # The reference ladder, whose exact values Phase 1 publishes:
     # 0.586 < 0.607 < 0.612 < 0.613 < 0.620 on mean_marginal.
+    # Two spurious links down, two resolutions up (2026-11-09, "variant B"). History:
+    # the original deep rungs DROPPED conflicts (realized 0/18 dev, 31/113 release, and
+    # mean_marginal predictions failing on gold at 2->3 16/54, 3->4 29/54); a three-
+    # resolution ladder then failed at its third resolution in every family that reached
+    # it (4/4) and asked P4 to leave three expert-adjudicable tensions open (it settled
+    # one in 3 of 8). This ladder never needs a third resolution, asks P4 to keep two open,
+    # and builds incrementally so each rung adds ONE edit to its parent. Declared
+    # directions hold on gold over all 54 CONFLICT families in 689/756 = 0.911.
     "CONFLICT": Ladder(
         family="CONFLICT",
         rungs=(
-            Rung(0, "worse", ("spurious_relation",), parent=1),
-            Rung(1, "base"),
-            Rung(2, "concession_resolved", ("add_resolution",), parent=1),
-            Rung(3, "fix_one_conflict", ("add_resolution", "drop_relation"), parent=1),
-            Rung(
-                4,
-                "coherent",
-                ("add_resolution", "drop_relation", "drop_relation"),
-                parent=1,
-            ),
+            Rung(0, "worse_two", ("spurious_relation", "spurious_relation"), parent=1),
+            Rung(1, "worse_one", ("spurious_relation",), parent=2),
+            Rung(2, "base"),
+            Rung(3, "resolve_one", ("add_resolution",), parent=2),
+            Rung(4, "resolve_two", ("add_resolution", "add_resolution"), parent=3),
         ),
+        incremental=True,
         notes=(
-            "The reference ladder. Only the conflict structure varies; atoms, topic and "
-            "every other relation are held fixed, which is what makes the ordering "
-            "attributable to coherence."
+            "The reference ladder. Only the conflict structure varies: rungs 0-1 add two "
+            "and one spurious conflicts, rungs 3-4 settle one and two of the base's open "
+            "conflicts; each rung adds one edit to its neighbour. Belief readouts rise up "
+            "the ladder; the conflict-activity readout (consistency) falls at each "
+            "resolution because the concession discount raises the both-true mass "
+            "(Finding 1) -- both declared from measurements on gold."
         ),
     ),
     # Chain integrity: break N links, then repair.
@@ -284,16 +317,20 @@ _SPECIAL: dict[tuple[str, int, int, str], str] = {
     # single-term readout's was (0.072 vs 0.152), so an item whose effect size sits
     # near the noise floor may now land `indeterminate` rather than `decrease` --
     # the direction is unchanged, the headroom is not.
-    ("CONFLICT", 1, 2, "consistency"): DECREASE,
-    ("CONFLICT", 2, 3, "consistency"): UNCONSTRAINED,
-    # Defect 1 declared this pair INVARIANT: the edit is weight-only, and Phase 1's
-    # reference ladder shows -9.64 at both rungs. On the opus-5-5 release it failed on all
-    # 46 CONFLICT families -- 40 decreases, 6 increases, median delta -0.041 -- because the
-    # weight change is not exactly zero once the readout is normalized over a real graph.
-    # Not a uniform reversal, as CHAIN's was, so it is not re-declared as DECREASE: the
-    # readout is simply not predicted to hold still here, and the pair is left out of
-    # both C1 and C2. Revised after measuring, on the families it governs.
-    ("CONFLICT", 1, 2, "log_partition"): UNCONSTRAINED,
+    # Measured on GOLD over all 54 CONFLICT families (46 release + 8 dev), variant B
+    # simulated on their labels with Merlin (2026-11-09). Counts are families in which the
+    # declared direction held. Unlisted pairs are strict increases: mean_marginal at every
+    # step (52-54/54), and log_partition/consistency on the two spurious steps (54/54,
+    # 37-38/54).
+    #
+    # Finding 1 at each resolution: the discount raises the both-true cell mass, so the
+    # conflict-activity readout falls while belief readers rise.
+    ("CONFLICT", 2, 3, "consistency"): DECREASE,  # 53/54
+    ("CONFLICT", 3, 4, "consistency"): DECREASE,  # 48/54
+    # The first resolution lowers the normalized log partition (48/54); the second splits
+    # (32 rise / 22 fall) and is not predicted.
+    ("CONFLICT", 2, 3, "log_partition"): DECREASE,  # 48/54
+    ("CONFLICT", 3, 4, "log_partition"): UNCONSTRAINED,
     # Finding 2: restoring an entailment link ADDS a factor that concentrates the joint's
     # mass, which lowers the normalized log partition. So along CHAIN's breaking steps
     # (break_3 -> break_2 -> break_1 -> base) log_partition falls while the belief readouts
@@ -305,6 +342,12 @@ _SPECIAL: dict[tuple[str, int, int, str], str] = {
     ("CHAIN", 1, 2, "log_partition"): DECREASE,
     ("CHAIN", 2, 3, "log_partition"): DECREASE,
 }
+
+
+# C3 endpoint readouts predicted to FALL from rung 0 to rung 4. Every other C3 readout
+# is a strict increase. CONFLICT's consistency falls 44/54 on gold under the
+# resolution ladder: each discount raises the both-true mass (variant B: 38/54).
+_C3_DECREASE: dict[str, tuple[str, ...]] = {"CONFLICT": ("consistency",)}
 
 
 def expectations_for(family: str) -> dict[str, dict[str, str]]:
@@ -387,15 +430,19 @@ def ordering_constraints(family: str) -> list[dict[str, Any]]:
         constraints.append({"id": "c2", "class": "C2", "strict": False, "pairs": c2})
     if not lad.flat:
         # A control family makes no endpoint claim -- its endpoints must be equal.
-        constraints.append(
-            {
-                "id": "c3",
-                "class": "C3",
-                "strict": True,
-                "readouts": list(READOUTS),
-                "required": [[0, 4]],
-            }
-        )
+        falls = _C3_DECREASE.get(family, ())
+        c3: dict[str, Any] = {
+            "id": "c3",
+            "class": "C3",
+            "strict": True,
+            "readouts": [r for r in READOUTS if r not in falls],
+            "required": [[0, 4]],
+        }
+        if falls:
+            # Endpoint readouts measured to FALL; the evaluator reads `decrease_readouts`
+            # over the same pairs. Older manifests lack the key and evaluate unchanged.
+            c3["decrease_readouts"] = list(falls)
+        constraints.append(c3)
     else:
         constraints.append(
             {
@@ -445,7 +492,9 @@ def p5_calls_for(family: str) -> int:
     Returns:
         The number of P5 calls.
     """
-    return sum(len(r.calls) for r in ladder_for(family).rungs)
+    lad = ladder_for(family)
+    # An incremental ladder issues only each rung's increment over its parent.
+    return sum(len(lad.increment(r)) for r in lad.rungs)
 
 
 def call_budget(
@@ -646,7 +695,9 @@ def _conflict_edges(relations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def _resolvable_edges(relations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _resolvable_edges(
+    relations: list[dict[str, Any]], prefer: "set[str] | None" = None
+) -> list[dict[str, Any]]:
     """Conflict edges an `add_resolution` may resolve, most-damaging first.
 
     A resolution attaches an adjudicating holding to a conflict the text already draws, so
@@ -662,9 +713,13 @@ def _resolvable_edges(relations: list[dict[str, Any]]) -> list[dict[str, Any]]:
         and e.get("validity") == "valid"
         and not e.get("is_resolved_concession")
     ]
+    prefer = prefer or set()
     return sorted(
         eligible,
         key=lambda e: (
+            # Head-on conflicts first when known: resolving needs no compatible claims,
+            # while a drop does, so resolving a head-on pair spares a droppable one.
+            0 if str(e.get("id")) in prefer else 1,
             0 if e.get("is_concession") else 1,
             band_rank.get(str(e.get("intended_strength_band")), 3),
             str(e.get("id")),
@@ -672,7 +727,95 @@ def _resolvable_edges(relations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list[str]]:
+def eligible_targets(
+    relations: list[dict[str, Any]],
+    *,
+    exclude: "dict[str, set[str]] | None" = None,
+    prefer_resolve: "set[str] | None" = None,
+) -> dict[str, list[str]]:
+    """Every edge each edge-targeting call may take, in `plan_targets` preference order.
+
+    The primary target per call is the first entry; the rest are what a gated rung falls
+    back to when the primary cannot be realized in the text.
+    """
+    from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+
+    excl = {k: set(v) for k, v in (exclude or {}).items()}
+    chain = [
+        str(e["id"])
+        for e in relations
+        if e.get("validity") == "valid"
+        and coupling_for_sense(str(e.get("level2_sense"))) == "entailment"
+    ]
+    return {
+        "drop_relation": [
+            str(e["id"]) for e in _conflict_edges(relations)
+            if str(e["id"]) not in excl.get("drop_relation", set())
+        ],
+        "add_resolution": [
+            str(e["id"]) for e in _resolvable_edges(relations, prefer_resolve)
+            if str(e["id"]) not in excl.get("add_resolution", set())
+        ],
+        "break_chain": [t for t in chain if t not in excl.get("break_chain", set())],
+    }
+
+
+def spurious_pairs(
+    relations: list[dict[str, Any]],
+    non_relations: list[dict[str, Any]],
+    atom_text: "dict[str, str] | None" = None,
+) -> list[str]:
+    """Every declared non-relation a `spurious_relation` may link, as ``"src|tgt"``.
+
+    The first is the pair `_spurious_pair` picks by default; the rest are what a gated
+    rung falls back to. Phase 2 lost 4 CONFLICT families to a single hard pair ("Griffith
+    used E. coli" vs "the activity survived protease") that no one connective could set
+    against each other, with no other pair ever tried.
+    """
+    existing = {_edge_key(e) for e in relations}
+    out = []
+    for nr in non_relations or []:
+        pair = (str(nr.get("source_id")), str(nr.get("target_id")))
+        if pair not in existing and pair[::-1] not in existing:
+            out.append(f"{pair[0]}|{pair[1]}")
+    if atom_text:
+        # Most-related pair first: a conflict can only be SAID between claims about the
+        # same thing. Variant B needs two links, and its spurious rungs failed in 3 of 5
+        # families on pairs a reader could not see as competing ("the original paper's
+        # benchmark" vs an unrelated deployment claim). Stable, so ties keep plan order.
+        out.sort(key=lambda t: -_topic_overlap(*(atom_text.get(x, "") for x in t.split("|"))))
+    return out
+
+
+_STOP = frozenset(
+    "the a an of in on at to for and or but with by from as that this these those was "
+    "were is are be been has have had its their it which who whom than then into onto "
+    "over under after before during between about any each all some no not only more "
+    "most less such same other".split()
+)
+
+
+def _topic_overlap(a: str, b: str) -> float:
+    """How much two claims are about the same thing: shared content words, entities x2."""
+
+    def words(s: str) -> tuple[set[str], set[str]]:
+        toks = [w.strip(".,;:!?\"'()") for w in s.split()]
+        content = {w.lower() for w in toks if len(w) > 3 and w.lower() not in _STOP}
+        ents = {w for w in toks if len(w) > 2 and w[:1].isupper() and not w.isupper()}
+        return content, ents
+
+    ca, ea = words(a)
+    cb, eb = words(b)
+    return len(ca & cb) + 2 * len(ea & eb)
+
+
+def plan_targets(
+    family: str,
+    relations: list[dict[str, Any]],
+    *,
+    exclude: "dict[str, set[str]] | None" = None,
+    prefer_resolve: "set[str] | None" = None,
+) -> dict[int, list[str]]:
     """Choose which edge each rung's each call targets.
 
     The harness previously passed the literal edge ``r000`` to every P5 call, so a rung
@@ -683,6 +826,14 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
     Args:
         family: One of :data:`FAMILY_TYPES`.
         relations: The base plan's gold edges (schema shape).
+        exclude: Optional ``{call: {edge_id, ...}}`` of edges a call may NOT target.
+            Filled by callers from checks this module cannot run itself because they
+            need a model: a conflict pair whose two claims are incompatible ON CONTENT
+            cannot be dropped by any edit that keeps both atoms (measured: 1/18 dev,
+            13/82 unrealized release drops), and a conflict the base text already
+            resolves cannot be resolved again. An excluded edge is skipped exactly as
+            a used one is, so a call with no eligible edge left gets ``""`` and the
+            harness rejects the family rather than shipping a no-op rung.
 
     Returns:
         ``{rung_index: [edge_id per call]}`` for the non-base rungs. An entry is the empty
@@ -695,8 +846,17 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
     from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
 
     lad = ladder_for(family)
-    drop_order = [str(e["id"]) for e in _conflict_edges(relations)]
-    resolvable = [str(e["id"]) for e in _resolvable_edges(relations)]
+    excl = {k: set(v) for k, v in (exclude or {}).items()}
+    drop_order = [
+        str(e["id"])
+        for e in _conflict_edges(relations)
+        if str(e["id"]) not in excl.get("drop_relation", set())
+    ]
+    resolvable = [
+        str(e["id"])
+        for e in _resolvable_edges(relations, prefer_resolve)
+        if str(e["id"]) not in excl.get("add_resolution", set())
+    ]
     by_id = {str(e["id"]): e for e in relations}
 
     out: dict[int, list[str]] = {}
@@ -745,6 +905,7 @@ def plan_targets(family: str, relations: list[dict[str, Any]]) -> dict[int, list
                 # would make the "broken" rung MORE coherent than the base.
                 for eid, edge in by_id.items():
                     if (eid not in used and edge.get("validity") == "valid"
+                            and eid not in excl.get("break_chain", set())
                             and coupling_for_sense(str(edge.get("level2_sense")))
                             == "entailment"):
                         target = eid
@@ -925,7 +1086,16 @@ def apply_calls(
                 entry.update(effect="unresolved", detail=str(edge.get("id")))
 
         elif call == "spurious_relation":
-            pair = _spurious_pair(out, nons)
+            # An explicit "src|tgt" target names the pair (a gated rung retargeting after
+            # a pair proved unrealizable); otherwise the first eligible non-relation.
+            pair = None
+            if target and "|" in target:
+                cand = tuple(target.split("|", 1))
+                existing = {_edge_key(e) for e in out}
+                if cand not in existing and cand[::-1] not in existing:
+                    pair = cand
+            if pair is None:
+                pair = _spurious_pair(out, nons)
             if pair is None:
                 entry.update(effect="noop", detail="no unrelated atom pair available")
             else:

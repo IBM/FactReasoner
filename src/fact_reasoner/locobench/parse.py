@@ -538,6 +538,70 @@ def parse_coverage(text: str) -> tuple[list[dict[str, Any]] | None, str | None]:
     return parsed, None
 
 
+_V5_RELATIONS = ("conflict", "support", "equivalent", "either", "none")
+
+
+def parse_realization(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Extract V5's side-by-side reading.
+
+    Returns:
+        ``({"text_1": {...}, "text_2": {...}, "differs": bool, "change": str}, None)``,
+        each text block normalized to ``relation`` in :data:`_V5_RELATIONS` and
+        ``resolved`` a bool only for a conflict, else None; or ``(None, reason)``.
+    """
+    obj, err = _json_block(text or "")
+    if err:
+        return None, err
+    if not isinstance(obj, dict):
+        return None, f"V5 must return an object, got {type(obj).__name__}"
+    out: dict[str, Any] = {}
+    for side in ("text_1", "text_2"):
+        blk = obj.get(side)
+        if not isinstance(blk, dict):
+            return None, f"V5 output is missing the {side!r} object"
+        rel = str(blk.get("relation") or "").strip().lower()
+        if rel not in _V5_RELATIONS:
+            return None, f"V5 {side}.relation must be one of {_V5_RELATIONS}, got {rel!r}"
+        res = blk.get("resolved")
+        out[side] = {
+            "relation": rel,
+            "resolved": bool(res) if rel == "conflict" and res is not None else None,
+            "evidence": str(blk.get("evidence") or ""),
+        }
+    out["differs"] = bool(obj.get("differs"))
+    out["change"] = str(obj.get("change") or "")
+    return out, None
+
+
+def parse_compatibility(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Extract V5c's content-only compatibility verdict."""
+    obj, err = _json_block(text or "")
+    if err:
+        return None, err
+    if not isinstance(obj, dict) or not isinstance(obj.get("compatible"), bool):
+        return None, "V5c must return {\"compatible\": true|false, \"why\": ...}"
+    return {"compatible": obj["compatible"], "why": str(obj.get("why") or "")}, None
+
+
+
+def parse_resolution(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Extract V5r's verdict, enforcing its contract in code.
+
+    ``resolved`` is recomputed rather than trusted: true only when a resolving sentence
+    is quoted and differs from the tension sentence. The pilot's false "resolved" verdicts
+    all quoted the opposition itself.
+    """
+    obj, err = _json_block(text or "")
+    if err:
+        return None, err
+    if not isinstance(obj, dict):
+        return None, f"V5r must return an object, got {type(obj).__name__}"
+    norm = lambda v: " ".join(str(v or "").split()).strip()  # noqa: E731
+    tension, resolving = norm(obj.get("tension_sentence")), norm(obj.get("resolving_sentence"))
+    resolved = bool(resolving) and resolving.lower() != tension.lower()
+    return {"tension_sentence": tension, "resolving_sentence": resolving,
+            "resolved": resolved, "model_said": bool(obj.get("resolved"))}, None
+
 PARSERS = {
     "P1": parse_question,
     "P2": parse_claims,
@@ -547,6 +611,9 @@ PARSERS = {
     "V1": parse_recovery,
     "V3": parse_audit,
     "V4": parse_coverage,
+    "V5": parse_realization,
+    "V5c": parse_compatibility,
+    "V5r": parse_resolution,
 }
 
 __all__ = [

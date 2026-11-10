@@ -1,7 +1,10 @@
 Instructions:
 1. You are given a RESPONSE, its RELATION PLAN, and one PERTURBATION to apply.
 2. Apply ONLY the named perturbation. Change the minimum number of words
-   needed. Every other relation, atom, and sentence must be preserved verbatim.
+   needed. Every other relation, atom, and sentence must be preserved verbatim:
+   a sentence containing none of the spans you list in spans_removed or
+   spans_added must come back word for word, and an automated check rejects any
+   other change. Never rewrite a sentence that realizes a different relation.
 3. The perturbations are defined as follows.
    - wrong_sense(edge, new_sense): rewrite the connective realizing that edge so
      the text draws new_sense instead. Keep both atoms' content unchanged.
@@ -14,20 +17,31 @@ Instructions:
      it, leaving the conceded tension unresolved. Change nothing else.
    - add_resolution(edge): the edge is a conflict the response leaves open. Add
      ONE sentence, after both of its atoms, in which an authority reaches a
-     determination that settles the tension. Do not delete either atom or change
-     the connective realizing the edge. Change nothing else.
+     determination that names BOTH claims and states how the tension between them
+     is settled. Do not delete either atom or change the connective realizing the
+     edge. Change nothing else.
    - inject_contradiction(atom): add ONE new sentence asserting a claim that
      directly contradicts the named atom. Place it at least two sentences later.
-   - break_chain(edge): remove or negate the link realizing that edge so the
-     causal chain no longer connects, keeping both endpoint atoms present.
+   - break_chain(edge): remove or negate EVERY span that presents one atom as
+     supporting, causing or leading to the other, so the chain no longer connects
+     at that link. Keep both endpoint atoms present, verbatim.
    - shuffle_order(level): reorder the response's sentences without changing any
      wording. level=full permutes all sentences; level=block permutes paragraph
      blocks; level=adjacent swaps one adjacent pair.
-   - spurious_relation(atom_a, atom_b): add a connective asserting a causal or
-     contradictory link between two atoms the original response kept separate.
-     Add no new factual content.
-   - drop_relation(edge): remove the connective realizing that edge so the two
-     atoms are merely adjacent assertions. Keep both atoms.
+   - spurious_relation(atom_a, atom_b): make the response set the two atoms
+     AGAINST each other, so it asserts they cannot both hold. The original response
+     kept them separate. Either add ONE connective that joins them as competing
+     claims ("by contrast", "which cannot be squared with"), or, when they sit far
+     apart, add ONE short sentence that names the subject both atoms bear on and
+     states that they cannot both be right. Do NOT assert a causal, evidential or
+     supporting link, and add no new factual claim: the added words may only
+     relate the two atoms already present.
+   - drop_relation(edge): find EVERY span that presents the two atoms as related -
+     a connective, a framing sentence that sets them against each other or calls
+     them alternatives, and any later sentence referring back to their opposition -
+     and delete or rewrite each one so the response still asserts both atoms
+     verbatim but no longer relates them. Deleting a connective alone is not
+     enough when a framing sentence still sets the atoms against each other.
    - ordering_only(edge): rewrite a Precedence edge as Succession, or the
      reverse, preserving the actual chronology and adding NO causal or
      inferential language. The truth of neither atom may become dependent on
@@ -39,7 +53,12 @@ Instructions:
    containing a JSON diff:
    {"operator": "...", "target": ..., "sentences_changed": [...],
     "relations_added": [...], "relations_removed": [...],
-    "relations_relabeled": [...]}
+    "relations_relabeled": [...],
+    "spans_removed": [...], "spans_added": [...]}
+   spans_removed lists, VERBATIM from the input RESPONSE, every span you deleted or
+   rewrote; spans_added lists, verbatim from your output, every span you wrote. For
+   drop_relation and break_chain, no span in spans_removed may survive in your
+   output.
 
 Your Task:
 RESPONSE: [RESPONSE_PLACEHOLDER]

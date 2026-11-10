@@ -35,10 +35,13 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from fact_reasoner.locobench import config as config_mod
+from fact_reasoner.locobench import realize
 from fact_reasoner.locobench import mock as _mock
 from fact_reasoner.locobench import parse, prompts, validate
 from fact_reasoner.locobench.config import GenConfig, ModelRef
 from fact_reasoner.locobench.perturb import (
+    eligible_targets,
+    spurious_pairs,
     EDGE_INVARIANT_CALLS,
     apply_calls,
     ladder_for,
@@ -81,6 +84,11 @@ LLM = Callable[..., str]
 # stopped mid-sentence, which every parser here rejects for the wrong stated reason.
 # Override per model with `model_options: {"max_new_tokens": N}`.
 _MAX_OUTPUT_TOKENS = 16000
+
+
+# Extra P4 attempts spent only on keep-open failures (see the P4 call).
+P4_KEEP_OPEN_EXTRA = 2
+
 
 
 class SamplingFailed(RuntimeError):
@@ -186,6 +194,8 @@ class _Caller:
         parser: Callable[[str], tuple[Any, str | None]],
         *,
         check: Callable[[Any], str | None] | None = None,
+        free_retries: int = 0,
+        is_free: Callable[[], bool] | None = None,
         **values: str,
     ) -> tuple[Any, str | None]:
         """Render, call, parse, retrying on a parse *or* semantic failure.
@@ -211,11 +221,17 @@ class _Caller:
             offline analysis instead of throwing it away.
         """
         rendered = prompts.fill(prompt_id, **values)
+        # `free_retries`: extra attempts granted only for semantic failures `is_free()`
+        # vouches for (P4's keep-open), so the base budget still bounds every other gate.
+        budget = self.attempts + max(0, free_retries)
+        spent_paid = 0
         last = "no attempt made"
         last_value: Any = None
         prev_err: str | None = None
         prev_semantic = False
-        for i in range(self.attempts):
+        for i in range(budget):
+            if spent_paid >= self.attempts:
+                break
             self.counts[prompt_id] = self.counts.get(prompt_id, 0) + 1
             # Tell the model what was wrong with the last attempt. Appended after
             # rendering because `prompts.fill` admits only declared placeholders.
@@ -227,6 +243,7 @@ class _Caller:
             try:
                 raw = self._call(prompt, i)
             except Exception as e:  # a backend failure is a retryable condition
+                spent_paid += 1
                 last = f"{type(e).__name__}: {e}"
                 prev_err = last
                 # A backend/sampling error is not a content complaint.
@@ -240,6 +257,7 @@ class _Caller:
             self.last_raw[prompt_id] = raw
             value, err = parser(raw)
             if err is not None:
+                spent_paid += 1
                 last, prev_err = err, err
                 prev_semantic = False
                 continue
@@ -254,6 +272,9 @@ class _Caller:
             # The output WAS readable, so the next attempt must be told to change the
             # content and keep the format -- the opposite of the parse-failure advice.
             prev_semantic = True
+            if not (is_free is not None and is_free() and i < budget - 1
+                    and (i + 1 - spent_paid) <= free_retries):
+                spent_paid += 1
         return last_value, last
 
 
@@ -270,6 +291,9 @@ _PROBES: dict[str, str] = {
     "V1": "recover_relations(",
     "V3": "check_response(",
     "V4": "check_atom_coverage(",
+    "V5": "compare_texts(",
+    "V5c": "jointly_assertable(",
+    "V5r": "find_resolution(",
 }
 
 
@@ -657,6 +681,8 @@ def generate_family(
     generator: str | None = None,
     resume_from: dict[str, Any] | None = None,
     auditor_llms: list[tuple[str, LLM]] | None = None,
+    trust_base: bool = False,
+    plan_holder: dict[str, Any] | None = None,
 ) -> FamilyResult:
     """Run one family through the stage machine.
 
@@ -672,11 +698,21 @@ def generate_family(
             ``plan``, ``response``), so a family with a validated plan does not re-plan.
         auditor_llms: ``(name, callable)`` pairs for V3, per R3 generator exclusion. V3
             rejects only on a majority. When None, V3 runs on ``llm`` and self-audits.
+        trust_base: Skip V1/V3/V4 on a resumed ``response`` that an earlier run already
+            ADMITTED. For rung repair only (`locobench.rung_repair`): re-auditing an
+            admitted base spends calls and can reject it on V3's run-to-run noise
+            (repeat audits of one family returned leakage [0, 3, 0]), losing a family
+            whose base was never in question. Recorded on the verdict as
+            ``respond.trusted``. Never set for fresh generation.
+        plan_holder: Dry-run seam. The dict the mock generator writes each plan into;
+            pass the SAME dict to mock auditors (``make_mock_llm(cfg, plan_holder=...)``)
+            so their V1/V4 see the plan. Separately built mocks each hold an empty plan,
+            so mock V1 recovers nothing and every family dies at ``respond``.
 
     Returns:
         The result. ``admitted`` is True only when all five items passed every gate.
     """
-    holder: dict[str, Any] = {}
+    holder: dict[str, Any] = plan_holder if plan_holder is not None else {}
     if llm is None:
         llm = make_mock_llm(cfg, plan_holder=holder)
     generator = generator or (cfg.generators[0].name if cfg.generators else "mock")
@@ -716,13 +752,31 @@ def generate_family(
             return res
 
     plan = prior.get("plan")
+    plan_screen: dict[str, Any] = {}
     if not plan:
         claims_text = "\n".join(f"- {c['text']} [{c['tag']}]" for c in claims)
+
+        plan_panel = realize.RaterPanel(audit_callers) if audit_callers else None
+        if plan_panel is not None and cfg.dry_run:
+            plan_panel.oracle = lambda lo, hi: json.loads(_mock.mock_realization(lo, hi))
 
         def _plan_ok(candidate: dict[str, Any]) -> str | None:
             """The plan gates, as a retryable check rather than a terminal verdict."""
             verdict = validate.gate_plan(candidate, claims, family=family)
-            return None if verdict.passed else verdict.reason()
+            if not verdict.passed:
+                return verdict.reason()
+            if plan_panel is None:
+                return None
+            # Content screen of the plan's conflict pairs: a ladder that drops conflicts
+            # needs TEXT-drawn ones, and a head-on pair is visible from the plan alone.
+            c_atoms = _atoms_from_plan(candidate, claims)
+            c_rels = _relations_from_plan(candidate, c_atoms, generator)
+            reason, plan_log = realize.plan_droppability(
+                family, c_rels, {a["id"]: a["text"] for a in c_atoms}, plan_panel
+            )
+            if reason is None:
+                plan_screen["log"] = plan_log
+            return reason
 
         plan, err = caller.ask(
             "P3",
@@ -748,6 +802,21 @@ def generate_family(
     # Re-run the gates on the accepted plan so their results are recorded on the verdict
     # (the check above only decided whether to retry).
     plan_verdict = validate.gate_plan(plan, claims, family=family)
+    if trust_base and prior.get("plan") and not plan_verdict.passed:
+        # An ADMITTED family's plan, re-checked against gates tightened since it was
+        # admitted (measured on the dev set: f004/f011 ORDER fail a conflict quota their
+        # ladder never consumes). Rung repair keeps the plan by design, so record the
+        # drift as a non-blocking note rather than rejecting a family whose ladder the
+        # repair can still realize; the ladder's own targeting decides that below.
+        res.verdict.add(
+            validate.GateResult(
+                "plan.trusted",
+                True,
+                observed=[g.gate for g in plan_verdict.results if not g.passed],
+                detail="admitted plan reused; it fails gates tightened since admission",
+            )
+        )
+        plan_verdict = Verdict()
     res.verdict.results.extend(plan_verdict.results)
     if not plan_verdict.passed:
         res.stage = "plan"
@@ -755,6 +824,27 @@ def generate_family(
         res.calls = caller.counts
         return res
     res.timing["plan"] = round(time.perf_counter() - t0, 3)
+
+    # The conflict(s) the ladder will resolve later, which the base response must leave
+    # OPEN: pilot 3's base text adjudicated its only valid open conflict, leaving nothing
+    # to resolve. Derived from the plan gate's simulated targets when it ran, else from
+    # the unscreened targeting rule. Sent to P4 as a `keep_open` mark on a COPY of the
+    # plan; the stored plan, which the labels are built from, is not touched.
+    _p_atoms = _atoms_from_plan(plan, claims)
+    _p_rels = _relations_from_plan(plan, _p_atoms, generator)
+    _sim = plan_screen.get("log", {}).get("targets")
+    if not _sim:
+        _sim = {str(k): v for k, v in plan_targets(family, _p_rels).items()}
+    keep_open = realize.keep_open_targets(family, _sim)
+    p4_plan = json.loads(json.dumps(plan))
+    for i, rel in enumerate(p4_plan.get("relations", [])):
+        if f"r{i:03d}" in keep_open:
+            rel["keep_open"] = True
+    _atom_text = {a["id"]: a["text"] for a in _p_atoms}
+    _keep_pairs = [
+        (_atom_text[str(e["source_id"])], _atom_text[str(e["target_id"])])
+        for e in _p_rels if str(e["id"]) in keep_open
+    ]
 
     # ---- stage: respond (P4, then V1/V3/V4) ---------------------------------
     t1 = time.perf_counter()
@@ -781,14 +871,45 @@ def generate_family(
             # recomputed. Re-running it would silently double the validator calls -- 1 V1 +
             # N V3 + 1 V4 per evaluation, with N the panel size.
             held["verdict"] = verdict
-            return None if verdict.passed else verdict.reason()
+            if not verdict.passed:
+                return verdict.reason()
+            # The reserved conflict(s) must still be open in this text (V5r majority).
+            if keep_panel is not None:
+                for x, y in _keep_pairs:
+                    votes = keep_panel.resolution(candidate, x, y)
+                    if votes and sum(v["resolved"] for v in votes) * 2 > len(votes):
+                        quote = next((v["resolving_sentence"] for v in votes if v["resolved"]), "")
+                        held["verdict"] = Verdict().add(validate.GateResult(
+                            "P4.keep_open", False,
+                            detail=f"the response settles a tension it must leave open: "
+                                   f'"{x}" vs "{y}" is resolved by "{quote[:240]}"',
+                        ))
+                        return (
+                            f'The relation marked keep_open ("{x}" vs "{y}") must stay an '
+                            f'unsettled tension, but this sentence settles it: "{quote[:240]}". '
+                            "Remove that adjudication; state the opposition and leave it standing."
+                        )
+            return None
 
+        keep_panel = (
+            realize.RaterPanel(audit_callers) if (audit_callers and not cfg.dry_run) else None
+        )
+        # More attempts when the plan reserves conflicts to keep open: the resolution-only
+        # CONFLICT ladder needs P4 to state three tensions and settle none, and in the
+        # 2026-11-08 run it adjudicated one on all three attempts in 2 of 8 families. The
+        # retry quotes the offending sentence, so extra attempts are informed, not blind.
+        # The EXTRA attempts are spent only on keep-open failures: every other P4 gate
+        # (parse, V1, V3, V4) keeps `max_attempts`, which the response-retry tests pin.
         base, err = caller.ask(
             "P4",
             parse.parse_response,
             check=_response_ok,
             question=question,
-            plan=json.dumps(plan),
+            plan=json.dumps(p4_plan),
+            free_retries=P4_KEEP_OPEN_EXTRA if keep_open else 0,
+            is_free=lambda: held.get("verdict") is not None and any(
+                r.gate == "P4.keep_open" for r in held["verdict"].results
+            ),
         )
         resp_verdict = held.get("verdict")
         if err is not None or not base:
@@ -818,6 +939,16 @@ def generate_family(
             res.calls = caller.counts
             return res
 
+    if resp_verdict is None and trust_base:
+        if not base:
+            raise ValueError("trust_base needs a resumed `response` to trust.")
+        resp_verdict = Verdict().add(
+            validate.GateResult(
+                "respond.trusted",
+                True,
+                detail="base response reused from an admitted family; V1/V3/V4 not re-run",
+            )
+        )
     if resp_verdict is None:
         # Resumed from a stored response, so the gates have not run against it.
         resp_verdict = _validate_response(
@@ -850,7 +981,60 @@ def generate_family(
     # factuality exists -- P3's atom schema does not preserve it.
     atoms = _atoms_from_plan(plan, claims)
     base_relations = _relations_from_plan(plan, atoms, generator)
-    rung_targets = plan_targets(family, base_relations)
+    atom_text = {a["id"]: a["text"] for a in atoms}
+    # V5 raters: the committee that audited the base rung (generator excluded, R3). With
+    # no committee (a bare dry run) the deterministic span check still runs.
+    v5_panel = realize.RaterPanel(audit_callers) if audit_callers else None
+    if v5_panel is not None and cfg.dry_run:
+        v5_panel.oracle = lambda lo, hi: json.loads(_mock.mock_realization(lo, hi))
+    exclude: dict[str, set[str]] = {}
+    if v5_panel is not None:
+        exclude, screen_log = realize.screen_targets(
+            base, base_relations, atom_text, v5_panel
+        )
+        res.verdict.add(
+            validate.GateResult(
+                "V5.screen",
+                True,
+                observed=json.dumps(screen_log),
+                detail="",
+            )
+        )
+    head_on = set(screen_log.get("drop_incompatible", [])) if v5_panel is not None else set()
+    rung_targets = plan_targets(
+        family, base_relations, exclude=exclude, prefer_resolve=head_on
+    )
+    alternates = eligible_targets(base_relations, exclude=exclude, prefer_resolve=head_on)
+    missing = realize.unfillable_calls(
+        {r.index: r.calls for r in lad.rungs if not r.is_base}, rung_targets
+    )
+    if missing:
+        res.verdict.add(
+            validate.GateResult(
+                "screen.no_target",
+                False,
+                observed=missing,
+                detail=(
+                    f"no eligible edge left for {missing} after screening "
+                    f"(excluded: {json.dumps({k: sorted(v) for k, v in exclude.items()})}). "
+                    "The plan cannot support this ladder; regenerate the family."
+                ),
+            )
+        )
+        res.stage = "perturb"
+        res.artifacts = {"question": question, "claims": claims, "plan": plan, "response": base}
+        res.calls = caller.counts
+        return res
+    _spurious = _spurious_pair_ids(plan, atoms)
+
+    def _operator_for(call: str, target: str) -> str:
+        if call == "spurious_relation":
+            # The "src|tgt" target carries the pair, so a retarget renders the new one;
+            # the prompt and `apply_calls` therefore always name the same two atoms.
+            pair = tuple(target.split("|", 1)) if target and "|" in target else _spurious
+            return f"{call}({pair[0]}, {pair[1]})" if pair else f"{call}()"
+        return f"{call}({target})" if target else f"{call}()"
+
     _by_pos = {a["pos"]: a["id"] for a in atoms}
     base_non_relations = [
         {
@@ -861,6 +1045,17 @@ def generate_family(
         for nr in plan.get("non_relations", [])
         if nr["source_pos"] in _by_pos and nr["target_pos"] in _by_pos
     ]
+    _sp = spurious_pairs(base_relations, base_non_relations, atom_text)
+    alternates["spurious_relation"] = _sp
+    # Successive spurious calls in one rung link SUCCESSIVE pairs (CONFLICT's `worse_two`
+    # adds a second link on top of `worse_one`'s). Handing every call `_sp[0]` made the
+    # second call re-name a pair already linked, so the prompt and the labels disagreed.
+    for idx, calls in ((r.index, r.calls) for r in lad.rungs if not r.is_base):
+        k = 0
+        for i, c in enumerate(calls):
+            if c == "spurious_relation" and k < len(_sp):
+                rung_targets[idx][i] = _sp[k]
+                k += 1
 
     texts: dict[int, str] = {}
     rung_relations: dict[int, list[dict[str, Any]]] = {}
@@ -870,54 +1065,71 @@ def generate_family(
     # edge set. A ladder's base is not always index 0 (CHAIN and ORDER derive downward from
     # rung 3, CONTROL from rung 2), so iterating in index order would leave the early rungs
     # with no parent to check against.
-    for rung in sorted(lad.rungs, key=lambda r: (not r.is_base, r.index)):
+    def _parent_order(rungs):
+        """Base first, then each rung once its parent is built (incremental ladders)."""
+        done, out, pending = set(), [], list(rungs)
+        while pending:
+            for r in list(pending):
+                if r.is_base or not lad.incremental or r.parent in done:
+                    out.append(r)
+                    done.add(r.index)
+                    pending.remove(r)
+                    break
+            else:  # pragma: no cover -- Ladder.__post_init__ rejects such a chain
+                raise ValueError(f"{family}: rung parents do not form a chain from the base")
+        return out
+
+    ordered = (
+        _parent_order(lad.rungs)
+        if lad.incremental
+        else sorted(lad.rungs, key=lambda r: (not r.is_base, r.index))
+    )
+    for rung in ordered:
         if rung.is_base:
             texts[rung.index] = base
             rung_relations[rung.index] = [dict(r) for r in base_relations]
             rung_non_relations[rung.index] = [dict(n) for n in base_non_relations]
             rung_edit_logs[rung.index] = []
             continue
-        current = base
-        failed = None
         targets = rung_targets.get(rung.index, [])
-        for i, call in enumerate(rung.calls):
-            target = targets[i] if i < len(targets) else ""
-            # `spurious_relation` adds an edge between two atoms, so it is parameterized
-            # by an atom pair rather than an existing edge id.
-            if call == "spurious_relation":
-                pair = _spurious_pair_ids(plan, atoms)
-                operator = (
-                    f"{call}({pair[0]}, {pair[1]})" if pair else f"{call}()"
-                )
-            else:
-                operator = f"{call}({target})" if target else f"{call}()"
-            previous = current
-            out, err = caller.ask(
-                "P5",
-                parse.parse_perturbation,
-                response=current,
-                plan=json.dumps(plan),
-                operator=operator,
-            )
-            if not out:
-                failed = err or f"{call} produced nothing"
-                break
-            current, _diff = out
-            # A perturbation that returns the prose unchanged did not happen. Checked
-            # against the text this call was handed (`previous`), not against the base, so
-            # a composed rung whose SECOND call is a no-op is caught even though its first
-            # call already moved the text away from the base.
-            changed = validate.gate_text_changed(previous, current, operator=operator)
-            res.verdict.add(changed)
-            if not changed.passed:
-                failed = changed.detail
-                break
-            drift = validate.gate_length_drift(base, current, operator=call)
-            res.verdict.add(drift)
-            if not drift.passed:
-                failed = drift.detail
-                break
-        if failed:
+        # An incremental rung starts from its PARENT's text and labels and issues only the
+        # calls the parent lacks; otherwise every call is applied to the base.
+        inc = lad.increment(rung)
+        if lad.incremental and rung.parent is not None:
+            p_idx = rung.parent
+            start_text = texts[p_idx]
+            start_rels = [dict(r) for r in rung_relations[p_idx]]
+            start_nons = [dict(n) for n in rung_non_relations[p_idx]]
+            inc_targets = list(targets[len(rung.calls) - len(inc):])
+            prefix_targets = list(rung_targets.get(p_idx, []))
+            prefix_log = list(rung_edit_logs[p_idx])
+        else:
+            start_text, start_rels, start_nons = base, [dict(r) for r in base_relations], [
+                dict(n) for n in base_non_relations]
+            inc_targets, prefix_targets, prefix_log = list(targets), [], []
+        # Each call is gated against the text it is handed: span check, then -- when a
+        # committee is present -- V5, the blind side-by-side reading that its label change
+        # is realized and nothing else moved. Labels are built call by call from the
+        # running label set; `apply_calls` composes exactly (checked on all 456 rungs of
+        # both corpora), so they equal the old single-pass labels.
+        outcome, failed, gates = realize.realize_rung(
+            caller,
+            v5_panel,
+            calls=inc,
+            targets=inc_targets,
+            alternates=alternates,
+            operator_for=_operator_for,
+            parent_text=start_text,
+            parent_relations=start_rels,
+            parent_non_relations=start_nons,
+            plan_json=json.dumps(plan),
+            atom_text=atom_text,
+            generator=generator,
+            already_used=prefix_targets,
+        )
+        for g in gates:
+            res.verdict.add(g)
+        if outcome is None:
             res.verdict.add(
                 validate.GateResult(
                     f"P5.rung{rung.index}",
@@ -935,23 +1147,13 @@ def generate_family(
             }
             res.calls = caller.counts
             return res
-        texts[rung.index] = current
-        # The label-side counterpart of the text edit: this rung's gold relations are the
-        # base relations with this rung's own perturbations applied, targeting the same
-        # edges P5 was asked to edit.
-        (
-            rung_relations[rung.index],
-            rung_non_relations[rung.index],
-            rung_edit_logs[rung.index],
-        ) = apply_calls(
-            base_relations,
-            rung.calls,
-            targets=targets,
-            # In SCHEMA shape (atom ids), not the plan's positional shape, since
-            # `apply_calls` works on schema edges throughout.
-            non_relations=base_non_relations,
-            generator=generator,
-        )
+        texts[rung.index] = outcome.text
+        rung_relations[rung.index] = outcome.relations
+        rung_non_relations[rung.index] = outcome.non_relations
+        # Recorded in full (parent's edits + this increment), so `expected.perturbation`
+        # describes the rung against the base whichever way it was built.
+        rung_edit_logs[rung.index] = prefix_log + list(outcome.log)
+        rung_targets[rung.index] = prefix_targets + list(outcome.targets)
     # The edge sets of ADJACENT rungs must differ wherever the ladder asserts a coherence
     # difference between them. This is Defect 2's residue at pair granularity: if rungs 3
     # and 4 build the same MRF, no readout can separate them and the C1 assertion for the

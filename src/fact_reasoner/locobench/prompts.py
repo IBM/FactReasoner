@@ -338,7 +338,10 @@ Instructions:
    like "In an unrelated matter", "Separately", or "On a different note" read as
    stitched-together annotation rather than prose and will be marked down.
 5. For a resolved Concession, assert the resolver atom after both endpoints and
-   present it as settling the tension.
+   present it as settling the tension. Conversely, a relation marked
+   "keep_open": true is a tension the answer must leave STANDING: state the
+   opposition, but write no sentence that adjudicates it, reconciles the two
+   claims, or reports which one prevailed.
 6. Write it as a continuous expository answer to the QUESTION - an argument a
    domain expert would publish, organized into 3-5 paragraphs, in which the
    planned relations are simply how the argument hangs together. Do NOT walk the
@@ -372,7 +375,10 @@ PROMPT_P5 = r"""
 Instructions:
 1. You are given a RESPONSE, its RELATION PLAN, and one PERTURBATION to apply.
 2. Apply ONLY the named perturbation. Change the minimum number of words
-   needed. Every other relation, atom, and sentence must be preserved verbatim.
+   needed. Every other relation, atom, and sentence must be preserved verbatim:
+   a sentence containing none of the spans you list in spans_removed or
+   spans_added must come back word for word, and an automated check rejects any
+   other change. Never rewrite a sentence that realizes a different relation.
 3. The perturbations are defined as follows.
    - wrong_sense(edge, new_sense): rewrite the connective realizing that edge so
      the text draws new_sense instead. Keep both atoms' content unchanged.
@@ -385,20 +391,31 @@ Instructions:
      it, leaving the conceded tension unresolved. Change nothing else.
    - add_resolution(edge): the edge is a conflict the response leaves open. Add
      ONE sentence, after both of its atoms, in which an authority reaches a
-     determination that settles the tension. Do not delete either atom or change
-     the connective realizing the edge. Change nothing else.
+     determination that names BOTH claims and states how the tension between them
+     is settled. Do not delete either atom or change the connective realizing the
+     edge. Change nothing else.
    - inject_contradiction(atom): add ONE new sentence asserting a claim that
      directly contradicts the named atom. Place it at least two sentences later.
-   - break_chain(edge): remove or negate the link realizing that edge so the
-     causal chain no longer connects, keeping both endpoint atoms present.
+   - break_chain(edge): remove or negate EVERY span that presents one atom as
+     supporting, causing or leading to the other, so the chain no longer connects
+     at that link. Keep both endpoint atoms present, verbatim.
    - shuffle_order(level): reorder the response's sentences without changing any
      wording. level=full permutes all sentences; level=block permutes paragraph
      blocks; level=adjacent swaps one adjacent pair.
-   - spurious_relation(atom_a, atom_b): add a connective asserting a causal or
-     contradictory link between two atoms the original response kept separate.
-     Add no new factual content.
-   - drop_relation(edge): remove the connective realizing that edge so the two
-     atoms are merely adjacent assertions. Keep both atoms.
+   - spurious_relation(atom_a, atom_b): make the response set the two atoms
+     AGAINST each other, so it asserts they cannot both hold. The original response
+     kept them separate. Either add ONE connective that joins them as competing
+     claims ("by contrast", "which cannot be squared with"), or, when they sit far
+     apart, add ONE short sentence that names the subject both atoms bear on and
+     states that they cannot both be right. Do NOT assert a causal, evidential or
+     supporting link, and add no new factual claim: the added words may only
+     relate the two atoms already present.
+   - drop_relation(edge): find EVERY span that presents the two atoms as related -
+     a connective, a framing sentence that sets them against each other or calls
+     them alternatives, and any later sentence referring back to their opposition -
+     and delete or rewrite each one so the response still asserts both atoms
+     verbatim but no longer relates them. Deleting a connective alone is not
+     enough when a framing sentence still sets the atoms against each other.
    - ordering_only(edge): rewrite a Precedence edge as Succession, or the
      reverse, preserving the actual chronology and adding NO causal or
      inferential language. The truth of neither atom may become dependent on
@@ -410,7 +427,12 @@ Instructions:
    containing a JSON diff:
    {"operator": "...", "target": ..., "sentences_changed": [...],
     "relations_added": [...], "relations_removed": [...],
-    "relations_relabeled": [...]}
+    "relations_relabeled": [...],
+    "spans_removed": [...], "spans_added": [...]}
+   spans_removed lists, VERBATIM from the input RESPONSE, every span you deleted or
+   rewrote; spans_added lists, verbatim from your output, every span you wrote. For
+   drop_relation and break_chain, no span in spans_removed may survive in your
+   output.
 
 Your Task:
 RESPONSE: [RESPONSE_PLACEHOLDER]
@@ -560,6 +582,86 @@ interpreter, SO NO OTHER WORDS!
 check_atom_coverage(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])
 """
 
+# --- V5: rung realization (side-by-side, blind to the planted edit) --------
+# V1 only ever audited the BASE rung, so nothing checked that a perturbed rung's prose
+# carries the change its labels assert. Measured afterwards with exactly this reading:
+# 5/39 dev and 132/268 release transitions realized; drop_relation 0/18 and 31/113. The
+# rater is shown two adjacent rungs and two claims and is NOT told what was edited, so
+# a "realized" verdict cannot be the rater agreeing with the plan.
+PROMPT_V5 = r"""
+Let's define a function named compare_texts(text_1: str, text_2: str, x: str, y: str).
+The two texts are nearly identical versions of one expert answer and may differ in
+a few sentences. Read ONLY what each TEXT itself says about how claims X and Y
+relate. Do not use outside knowledge about whether X or Y is true.
+
+For each text the function reports:
+  "relation": one of
+     "conflict"   - the text presents X and Y as in tension, incompatible or
+                    competing (contrast, concession, mutually exclusive alternatives)
+     "support"    - the text presents one as supporting, causing, implying or
+                    exemplifying the other
+     "equivalent" - the text presents them as restatements of each other
+     "either"     - the text says at least one of them holds
+     "none"       - the text draws no connection between X and Y, even if both appear
+  "resolved": only for "conflict" - true if the text explicitly dissolves or
+     adjudicates the tension (both hold under different conditions, or the
+     opposition is only apparent); false if it leaves the tension standing; null
+     otherwise
+  "evidence": the shortest verbatim quote from that text carrying the answer, or ""
+
+and then
+  "differs": true or false - whether the texts treat X and Y differently
+  "change": one short sentence describing the difference, or ""
+
+The function returns a JSON object:
+{"text_1": {"relation": ..., "resolved": ..., "evidence": ...},
+ "text_2": {"relation": ..., "resolved": ..., "evidence": ...},
+ "differs": ..., "change": ...}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+compare_texts(text_1="[TEXT_A_PLACEHOLDER]", text_2="[TEXT_B_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+"""
+
+# --- V5c: content-only compatibility (target screen for drop_relation) ------
+# A drop keeps both atoms, so it can only remove a conflict the TEXT constructs. When the
+# two claims are incompatible on their face, no edit that keeps them both can drop it.
+PROMPT_V5C = r"""
+Let's define a function named jointly_assertable(x: str, y: str).
+Consider ONLY the two statements, with no surrounding text and no outside context.
+The function returns whether a single consistent account of the world could hold
+BOTH true at once, taking each at face value, as a JSON object:
+  {"compatible": true or false, "why": "one short sentence"}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+jointly_assertable(x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+"""
+
+
+# --- V5r: is a conflict already resolved in ONE text (add_resolution screen) --
+# The pilot first screened resolution targets with V5 on (base, base); identical texts plus
+# a conflict-framing quote led 3/3 raters to call two plainly OPEN conflicts "resolved",
+# quoting only the sentence that states the opposition. A resolved verdict must now name
+# a resolving sentence distinct from the one that states the tension.
+PROMPT_V5R = r"""
+Let's define a function named find_resolution(text: str, x: str, y: str).
+Read ONLY what the TEXT says about claims X and Y. Do not use outside knowledge.
+
+The text RESOLVES the tension between X and Y only if some sentence explicitly
+dissolves or adjudicates it: it explains that both hold under different conditions,
+says the opposition is only apparent, or reports a determination that settles which
+holds. A sentence that merely STATES the opposition ("whereas", "by contrast",
+"two mutually exclusive readings") does not resolve it.
+
+The function returns a JSON object:
+  {"tension_sentence": the verbatim sentence that sets X against Y, or "",
+   "resolving_sentence": the verbatim sentence that resolves it, or "",
+   "resolved": true only if resolving_sentence is non-empty and is NOT the
+               tension_sentence}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+find_resolution(text="[TEXT_A_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+"""
+
 # ----------------------------------------------------------------------------
 # The registry, and the spec the drift test checks against.
 # ----------------------------------------------------------------------------
@@ -573,10 +675,13 @@ PROMPTS: dict[str, str] = {
     "V1": PROMPT_V1,
     "V3": PROMPT_V3,
     "V4": PROMPT_V4,
+    "V5": PROMPT_V5,
+    "V5c": PROMPT_V5C,
+    "V5r": PROMPT_V5R,
 }
 
 GENERATION_PROMPTS = ("P1", "P2", "P3", "P4", "P5")
-VALIDATION_PROMPTS = ("V1", "V3", "V4")
+VALIDATION_PROMPTS = ("V1", "V3", "V4", "V5", "V5c", "V5r")
 
 # Per prompt: (numbered-instruction count, required placeholders). Transcribed from
 # Phase 1 Appendix A; the test asserts the constants above still match. V1-V4 use
@@ -591,6 +696,9 @@ PROMPT_SPEC: dict[str, tuple[int, tuple[str, ...]]] = {
     "V1": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
     "V3": (0, ("RESPONSE_PLACEHOLDER",)),
     "V4": (0, ("ATOMS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
+    "V5": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER", "TEXT_A_PLACEHOLDER", "TEXT_B_PLACEHOLDER")),
+    "V5c": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER")),
+    "V5r": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER", "TEXT_A_PLACEHOLDER")),
 }
 
 #: P3's ladder-specific structural quota, substituted for ``[LADDER_PLACEHOLDER]``.
@@ -608,9 +716,19 @@ PROMPT_SPEC: dict[str, tuple[int, tuple[str, ...]]] = {
 LADDER_REQUIREMENTS: dict[str, str] = {
     "CONFLICT": (
         "AT LEAST FOUR of your 10 relations must\n"
-        "   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT MOST\n"
-        "   ONE of those four may be a resolved Concession. Only three senses conflict, so\n"
-        "   reaching four means using one of them TWICE, on a different claim pair."
+        "   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT LEAST\n"
+        "   TWO of those must be VALID and UNRESOLVED: later versions of the answer\n"
+        "   settle them one at a time, so the answer you plan must leave both open.\n"
+        "   Only three senses conflict, so reaching four means using one of them more\n"
+        "   than once, on a different claim pair. A planted-invalid conflict does not\n"
+        "   count toward the two. Neither may be a HEAD-ON pair (two claims that\n"
+        "   flatly negate each other, which an expert answer cannot leave unsettled):\n"
+        "   make both TEXT-DRAWN - claims that could both be true taken alone, which the\n"
+        "   answer sets against each other. Declare at least FOUR non-relations: later\n"
+        "   versions also add two\n"
+        "   spurious links between pairs the answer keeps separate. The worked example\n"
+        "   below fits this quota only if two of its conflicting relations are valid and\n"
+        "   unresolved; adjust it so they are."
     ),
     "CHAIN": (
         "AT LEAST THREE of your 6 VALID relations\n"
@@ -621,11 +739,22 @@ LADDER_REQUIREMENTS: dict[str, str] = {
         "   slots go to this chain, the worked example below does NOT fit this plan as it\n"
         "   stands: it has only two valid entailments. Keep its structure, but make at\n"
         "   least three valid relations entailments, and you need not reach four\n"
-        "   conflicting relations."
+        "   conflicting relations. Include AT LEAST ONE conflicting relation (Alternative,\n"
+        "   Concession or Contrast) that is TEXT-DRAWN: the two claims could both be true\n"
+        "   taken alone, and only the response's framing sets them against each other -\n"
+        "   not two claims that flatly negate each other."
     ),
 }
-LADDER_REQUIREMENTS["ORDER"] = LADDER_REQUIREMENTS["CONFLICT"]
-LADDER_REQUIREMENTS["CONTROL"] = LADDER_REQUIREMENTS["CONFLICT"]
+# ORDER and CONTROL never drop a conflict, so they keep the quota they were generated
+# with; the TEXT-DRAWN clause exists only for ladders whose rungs call `drop_relation`.
+_CONFLICT_QUOTA_V1 = (
+    "AT LEAST FOUR of your 10 relations must\n"
+    "   carry a CONFLICTING sense - Alternative, Concession or Contrast - and AT MOST\n"
+    "   ONE of those four may be a resolved Concession. Only three senses conflict, so\n"
+    "   reaching four means using one of them TWICE, on a different claim pair."
+)
+LADDER_REQUIREMENTS["ORDER"] = _CONFLICT_QUOTA_V1
+LADDER_REQUIREMENTS["CONTROL"] = _CONFLICT_QUOTA_V1
 
 
 _PLACEHOLDER_RE = re.compile(r"\[([A-Z_]+_PLACEHOLDER)\]")

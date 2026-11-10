@@ -190,13 +190,10 @@ def mock_plan(question: str, claims: str, seed: int = 0) -> str:
         {
             "source_pos": 7,
             "target_pos": 8,
-            # A CONFLICT sense rather than Condition. The CONFLICT ladder's `coherent` rung
-            # composes add_resolution + drop_relation + drop_relation, so it needs THREE
-            # unresolved conflict edges; with only two its edge set collapsed onto rung 3's
-            # and the per-rung edge-effect gate rejected the family. Retyping an existing
-            # edge (rather than adding one) keeps the plan at 11 relations, which both the
-            # 8-12 count gate and the duplicate-pair tests depend on. Condition is the one
-            # retyped because it is not among the six no-prior-gold senses this fixture is
+            # A CONFLICT sense rather than Condition. Retyping an existing edge (rather
+            # than adding one) keeps the plan at 11 relations, which both the 8-12 count
+            # gate and the duplicate-pair tests depend on. Condition is the one retyped
+            # because it is not among the six no-prior-gold senses this fixture is
             # required to exhibit.
             "sense": "Contrast",
             "strength_band": "moderate",
@@ -226,6 +223,22 @@ def mock_plan(question: str, claims: str, seed: int = 0) -> str:
             "resolver_pos": None,
         },
     ]
+    # Ladder-aware, as a live P3 is: the requirement block is rendered into the prompt
+    # this mock is handed. A resolution-only CONFLICT plan needs THREE valid open
+    # conflicts and CHAIN needs THREE valid entailments; both cannot fit one 11-relation
+    # plan inside the 0.70 valid ceiling, so the CONFLICT plan trades CHAIN's third
+    # entailment (3->4) for a valid Contrast.
+    if "settle them one at a time" in (question or ""):
+        relations[1] = {
+            "source_pos": 3,
+            "target_pos": 4,
+            "sense": "Contrast",
+            "strength_band": "strong",
+            "validity": "valid",
+            "error_kind": None,
+            "resolved": None,
+            "resolver_pos": None,
+        }
     non_relations = [
         {"source_pos": 1, "target_pos": 5},
         {"source_pos": 4, "target_pos": 8},
@@ -255,15 +268,22 @@ def mock_response(question: str, plan_json: str, seed: int = 0) -> str:
         "Precedence": "Before that,",
         "Condition": "Provided that this held,",
         "Instantiation": "Specifically,",
+        "Contrast": "By contrast,",
     }
-    by_target = {r["target_pos"]: r for r in plan.get("relations", [])}
+    # One lead per RELATION, not per target atom: two relations into the same atom
+    # (the plan's 1->2 and 2->4 both end at 4) previously kept only the last lead, so the
+    # other edge was realized by nothing and no edit could ever drop it.
+    leads_by_target: dict[int, list[str]] = {}
+    for r in plan.get("relations", []):
+        lead = connectives.get(r["sense"], "")
+        if lead and lead not in leads_by_target.setdefault(r["target_pos"], []):
+            leads_by_target[r["target_pos"]].append(lead)
 
     paras: list[str] = []
     body: list[str] = []
     for a in atoms:
-        rel = by_target.get(a["pos"])
-        lead = connectives.get(rel["sense"], "") if rel else ""
-        body.append(f"{lead} {a['text']}".strip())
+        leads = leads_by_target.get(a["pos"], [])
+        body.append(" ".join([*leads, a["text"]]).strip())
         if len(body) == 4:
             paras.append(" ".join(body))
             body = []
@@ -282,6 +302,50 @@ def mock_response(question: str, plan_json: str, seed: int = 0) -> str:
     while len(text.split()) < 520:
         text += "\n\n" + filler
     return "RESPONSE:\n```\n" + text + "\n```\n"
+
+
+_LEADS = (
+    "As a direct consequence,",
+    "This is confirmed by the record:",
+    "That is to say,",
+    "Either of these must be false, and one of them must hold:",
+    "At least one of the following applied:",
+    "Although this was initially maintained,",
+    "Before that,",
+    "Provided that this held,",
+    "Specifically,",
+    "By contrast,",
+)
+
+
+def _strip_lead(base: str, plan_json: str, operator: str) -> str:
+    """Remove the connective in front of the targeted edge's target atom."""
+    import re as _re
+
+    m = _re.search(r"\((r\d+)\)", operator)
+    try:
+        plan = json.loads(plan_json) if isinstance(plan_json, str) else plan_json
+    except json.JSONDecodeError:
+        plan = {}
+    atoms = {a["pos"]: a["text"] for a in plan.get("atoms", [])}
+    rels = plan.get("relations", [])
+    lead_of = dict(zip(
+        ("Cause-Effect", "Evidence", "Restatement", "Alternative", "Disjunction",
+         "Concession", "Precedence", "Condition", "Instantiation", "Contrast"),
+        _LEADS,
+    ))
+    if m:
+        idx = int(m.group(1)[1:])
+        if 0 <= idx < len(rels):
+            lead = lead_of.get(rels[idx].get("sense"))
+            target_text = atoms.get(rels[idx].get("target_pos"))
+            if lead and target_text:
+                # The lead sits somewhere in the run of leads before the target atom.
+                pat = _re.compile(r"((?:[A-Z][^.:]*?[,:] )*?)" + _re.escape(lead + " ")
+                                  + r"((?:[A-Z][^.:]*?[,:] )*?" + _re.escape(target_text) + ")")
+                if pat.search(base):
+                    return pat.sub(lambda mm: mm.group(1) + mm.group(2), base, count=1)
+    return base
 
 
 def mock_perturbation(
@@ -306,16 +370,24 @@ def mock_perturbation(
     elif call == "remove_resolution":
         out = "\n".join(ln for ln in base.split("\n") if "tribunal" not in ln.lower())
     elif call == "add_resolution":
+        # One DISTINCT resolving sentence per targeted edge, naming it: the resolution-only
+        # CONFLICT ladder composes up to three resolutions in one rung, and a fixed string
+        # would repeat verbatim and declare nothing new.
+        import re as _re
+
+        m = _re.search(r"\((r\d+)\)", operator)
+        tag = m.group(1) if m else "the open question"
         out = (
             base
-            + "\n\nThe tribunal ultimately held the supplier liable, settling the point."
+            + f"\n\nOn the point recorded as {tag}, the tribunal ultimately held the "
+            "competing accounts reconcilable, settling it."
         )
-    elif call == "break_chain":
-        out = base.replace("As a direct consequence,", "Separately,", 1)
-    elif call == "drop_relation":
-        out = base.replace(
-            "Either of these must be false, and one of them must hold:", "", 1
-        )
+    elif call in ("break_chain", "drop_relation"):
+        # Delete the connective that realizes the TARGETED edge: `mock_response` writes
+        # each relation as its sense's lead phrase in front of the target atom, so
+        # stripping that lead is the faithful local edit, and it works for every target
+        # of a composed rung rather than only the first fixed string.
+        out = _strip_lead(base, plan_json, operator)
     elif call == "wrong_sense":
         out = base.replace("As a direct consequence,", "Before that,", 1)
     elif call == "direction_reversal":
@@ -329,9 +401,12 @@ def mock_perturbation(
             1,
         )
     elif call == "spurious_relation":
+        # One DISTINCT sentence per linked pair: CONFLICT's `worse_two` rung adds a second
+        # spurious link on top of `worse_one`, and a fixed string would repeat verbatim.
+        tag = operator.split("(", 1)[1].rstrip(")") if "(" in operator else "two records"
         out = (
             base
-            + "\n\nIt follows from the vibration record that the framework agreement was void."
+            + f"\n\nSet against each other, the records {tag} cannot both stand."
         )
     elif call == "shuffle_order":
         paras = [p for p in base.split("\n\n") if p.strip()]
@@ -352,6 +427,17 @@ def mock_perturbation(
     if " ".join(out.split()) == " ".join(base.split()):
         out = f"{base}\n\nOn the {operator} point, the record is unchanged in substance."
 
+    # Report the spans truthfully, by diffing sentences, as a live P5 is now asked to:
+    # `validate.gate_spans` checks a removing call's spans are gone and an adding call's
+    # are present, and a mock that reported nothing would fail every removing rung.
+    import re as _re
+
+    def _sents(t: str) -> list[str]:
+        return [x.strip() for x in _re.split(r"(?<=[.!?:])\s+|\n+", t) if x.strip()]
+
+    before, after = _sents(base), _sents(out.strip())
+    removed = [x for x in before if x not in after]
+    added = [x for x in after if x not in before]
     diff = {
         "operator": call,
         "target": operator,
@@ -359,8 +445,33 @@ def mock_perturbation(
         "relations_added": [],
         "relations_removed": [],
         "relations_relabeled": [],
+        "spans_removed": removed,
+        "spans_added": added,
     }
     return "```\n" + out.strip() + "\n```\n\n```json\n" + json.dumps(diff) + "\n```\n"
+
+
+def mock_realization(expected_lo: tuple, expected_hi: tuple) -> str:
+    """V5's output for a faithful reader: report the two rungs' gold readings.
+
+    The dry run has no prose a mock could actually read, so the mock is told what a
+    faithful reader would see (the caller derives it from the rung labels). That is
+    enough to exercise the gate's majority, ordering and retry machinery; whether real
+    prose realizes the change is what the LIVE gate measures.
+    """
+    def blk(r):
+        rel, res = r
+        return {"relation": rel, "resolved": res, "evidence": ""}
+
+    return json.dumps(
+        {"text_1": blk(expected_lo), "text_2": blk(expected_hi),
+         "differs": expected_lo != expected_hi, "change": ""}
+    )
+
+
+def mock_compatibility(compatible: bool = True) -> str:
+    """V5c's output. Compatible by default, so no dry-run drop target is screened out."""
+    return json.dumps({"compatible": compatible, "why": "mock"})
 
 
 def mock_recovery(

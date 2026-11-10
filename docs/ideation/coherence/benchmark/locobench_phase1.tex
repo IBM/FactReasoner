@@ -2078,7 +2078,10 @@ Instructions:
    like "In an unrelated matter", "Separately", or "On a different note" read as
    stitched-together annotation rather than prose and will be marked down.
 5. For a resolved Concession, assert the resolver atom after both endpoints and
-   present it as settling the tension.
+   present it as settling the tension. Conversely, a relation marked
+   "keep_open": true is a tension the answer must leave STANDING: state the
+   opposition, but write no sentence that adjudicates it, reconciles the two
+   claims, or reports which one prevailed.
 6. Write it as a continuous expository answer to the QUESTION - an argument a
    domain expert would publish, organized into 3-5 paragraphs, in which the
    planned relations are simply how the argument hangs together. Do NOT walk the
@@ -2165,7 +2168,10 @@ readable.
 Instructions:
 1. You are given a RESPONSE, its RELATION PLAN, and one PERTURBATION to apply.
 2. Apply ONLY the named perturbation. Change the minimum number of words
-   needed. Every other relation, atom, and sentence must be preserved verbatim.
+   needed. Every other relation, atom, and sentence must be preserved verbatim:
+   a sentence containing none of the spans you list in spans_removed or
+   spans_added must come back word for word, and an automated check rejects any
+   other change. Never rewrite a sentence that realizes a different relation.
 3. The perturbations are defined as follows.
    - wrong_sense(edge, new_sense): rewrite the connective realizing that edge so
      the text draws new_sense instead. Keep both atoms' content unchanged.
@@ -2178,20 +2184,31 @@ Instructions:
      it, leaving the conceded tension unresolved. Change nothing else.
    - add_resolution(edge): the edge is a conflict the response leaves open. Add
      ONE sentence, after both of its atoms, in which an authority reaches a
-     determination that settles the tension. Do not delete either atom or change
-     the connective realizing the edge. Change nothing else.
+     determination that names BOTH claims and states how the tension between them
+     is settled. Do not delete either atom or change the connective realizing the
+     edge. Change nothing else.
    - inject_contradiction(atom): add ONE new sentence asserting a claim that
      directly contradicts the named atom. Place it at least two sentences later.
-   - break_chain(edge): remove or negate the link realizing that edge so the
-     causal chain no longer connects, keeping both endpoint atoms present.
+   - break_chain(edge): remove or negate EVERY span that presents one atom as
+     supporting, causing or leading to the other, so the chain no longer connects
+     at that link. Keep both endpoint atoms present, verbatim.
    - shuffle_order(level): reorder the response's sentences without changing any
      wording. level=full permutes all sentences; level=block permutes paragraph
      blocks; level=adjacent swaps one adjacent pair.
-   - spurious_relation(atom_a, atom_b): add a connective asserting a causal or
-     contradictory link between two atoms the original response kept separate.
-     Add no new factual content.
-   - drop_relation(edge): remove the connective realizing that edge so the two
-     atoms are merely adjacent assertions. Keep both atoms.
+   - spurious_relation(atom_a, atom_b): make the response set the two atoms
+     AGAINST each other, so it asserts they cannot both hold. The original response
+     kept them separate. Either add ONE connective that joins them as competing
+     claims ("by contrast", "which cannot be squared with"), or, when they sit far
+     apart, add ONE short sentence that names the subject both atoms bear on and
+     states that they cannot both be right. Do NOT assert a causal, evidential or
+     supporting link, and add no new factual claim: the added words may only
+     relate the two atoms already present.
+   - drop_relation(edge): find EVERY span that presents the two atoms as related -
+     a connective, a framing sentence that sets them against each other or calls
+     them alternatives, and any later sentence referring back to their opposition -
+     and delete or rewrite each one so the response still asserts both atoms
+     verbatim but no longer relates them. Deleting a connective alone is not
+     enough when a framing sentence still sets the atoms against each other.
    - ordering_only(edge): rewrite a Precedence edge as Succession, or the
      reverse, preserving the actual chronology and adding NO causal or
      inferential language. The truth of neither atom may become dependent on
@@ -2203,7 +2220,12 @@ Instructions:
    containing a JSON diff:
    {"operator": "...", "target": ..., "sentences_changed": [...],
     "relations_added": [...], "relations_removed": [...],
-    "relations_relabeled": [...]}
+    "relations_relabeled": [...],
+    "spans_removed": [...], "spans_added": [...]}
+   spans_removed lists, VERBATIM from the input RESPONSE, every span you deleted or
+   rewrote; spans_added lists, verbatim from your output, every span you wrote. For
+   drop_relation and break_chain, no span in spans_removed may survive in your
+   output.
 
 Your Task:
 RESPONSE: [RESPONSE_PLACEHOLDER]
@@ -2494,5 +2516,83 @@ check_atom_coverage(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER]
 Gate: 100\% \texttt{asserted}. The \texttt{position} field has a second job --- P3 constrains
 \emph{planned} positions, but P4's realized sentence order may drift, so the window constraint
 must be re-verified against realized positions post hoc (Section~\ref{sec:risks}, R2).
+
+
+\section*{Addendum (2026-11-07): rung realization gate}
+The perturbed rungs were never audited for whether their prose realizes the planted change; a blind side-by-side reading found 5/39 dev and 132/268 release transitions realized. V5 gates every P5 call on that reading; V5c screens drop targets whose claims are incompatible on content alone.
+
+\subsection*{V5}
+\begin{verbatim}
+Let's define a function named compare_texts(text_1: str, text_2: str, x: str, y: str).
+The two texts are nearly identical versions of one expert answer and may differ in
+a few sentences. Read ONLY what each TEXT itself says about how claims X and Y
+relate. Do not use outside knowledge about whether X or Y is true.
+
+For each text the function reports:
+  "relation": one of
+     "conflict"   - the text presents X and Y as in tension, incompatible or
+                    competing (contrast, concession, mutually exclusive alternatives)
+     "support"    - the text presents one as supporting, causing, implying or
+                    exemplifying the other
+     "equivalent" - the text presents them as restatements of each other
+     "either"     - the text says at least one of them holds
+     "none"       - the text draws no connection between X and Y, even if both appear
+  "resolved": only for "conflict" - true if the text explicitly dissolves or
+     adjudicates the tension (both hold under different conditions, or the
+     opposition is only apparent); false if it leaves the tension standing; null
+     otherwise
+  "evidence": the shortest verbatim quote from that text carrying the answer, or ""
+
+and then
+  "differs": true or false - whether the texts treat X and Y differently
+  "change": one short sentence describing the difference, or ""
+
+The function returns a JSON object:
+{"text_1": {"relation": ..., "resolved": ..., "evidence": ...},
+ "text_2": {"relation": ..., "resolved": ..., "evidence": ...},
+ "differs": ..., "change": ...}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+compare_texts(text_1="[TEXT_A_PLACEHOLDER]", text_2="[TEXT_B_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+\end{verbatim}
+
+\subsection*{V5c}
+\begin{verbatim}
+Let's define a function named jointly_assertable(x: str, y: str).
+Consider ONLY the two statements, with no surrounding text and no outside context.
+The function returns whether a single consistent account of the world could hold
+BOTH true at once, taking each at face value, as a JSON object:
+  {"compatible": true or false, "why": "one short sentence"}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+jointly_assertable(x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+\end{verbatim}
+
+
+\subsection*{V5r}
+Screens add\_resolution targets: a conflict counts as already resolved only when a resolving sentence distinct from the tension sentence is quoted.
+\begin{verbatim}
+Let's define a function named find_resolution(text: str, x: str, y: str).
+Read ONLY what the TEXT says about claims X and Y. Do not use outside knowledge.
+
+The text RESOLVES the tension between X and Y only if some sentence explicitly
+dissolves or adjudicates it: it explains that both hold under different conditions,
+says the opposition is only apparent, or reports a determination that settles which
+holds. A sentence that merely STATES the opposition ("whereas", "by contrast",
+"two mutually exclusive readings") does not resolve it.
+
+The function returns a JSON object:
+  {"tension_sentence": the verbatim sentence that sets X against Y, or "",
+   "resolving_sentence": the verbatim sentence that resolves it, or "",
+   "resolved": true only if resolving_sentence is non-empty and is NOT the
+               tension_sentence}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+find_resolution(text="[TEXT_A_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+\end{verbatim}
+
+
+\section*{Addendum (2026-11-08): resolution-only CONFLICT ladder}
+The CONFLICT ladder's rungs 3 and 4 previously dropped one and two conflicts while keeping both claims. The edit was realized in the prose 0/18 (dev) and 31/113 (release) times, and the ladder's own mean\_marginal predictions failed on gold at 2$\rightarrow$3 (16/54) and 3$\rightarrow$4 (29/54). Rungs 2--4 now resolve one, two and three of the base's valid open conflicts. Directions are declared from gold over all 54 CONFLICT families: mean\_marginal increases at every step (52--54/54); consistency decreases at every resolution step (48--53/54) and at the endpoint (44/54); log\_partition decreases at 1$\rightarrow$2 (45/54), is unconstrained at 2$\rightarrow$3, and increases at 3$\rightarrow$4 (44/54). All declared checks hold on gold in 680/756 (0.899), against 592/710 (0.834) for the previous ladder.
 
 \end{document}

@@ -1,0 +1,349 @@
+<title>LoCoBench Dev Rung Repair</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; evidence tables break out to a wider measure; status encoded as chips. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #18212c;
+  --muted: #586473;
+  --rule: #d9dee5;
+  --accent: #0e5f73;
+  --accent-soft: #e2eef1;
+  --good: #2c6e49;
+  --good-soft: #e3f0e8;
+  --warn: #8a5a12;
+  --warn-soft: #f6ecd9;
+  --bad: #9e2f3c;
+  --bad-soft: #f6e2e4;
+  --font-display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171d; --surface: #19212a; --ink: #e4e9ef; --muted: #9aa6b4; --rule: #2c3743;
+    --accent: #6cc0d3; --accent-soft: #1b3139; --good: #7fcb9e; --good-soft: #1c3226;
+    --warn: #e2b469; --warn-soft: #382d1a; --bad: #ec8d98; --bad-soft: #3a2026;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171d; --surface: #19212a; --ink: #e4e9ef; --muted: #9aa6b4; --rule: #2c3743;
+  --accent: #6cc0d3; --accent-soft: #1b3139; --good: #7fcb9e; --good-soft: #1c3226;
+  --warn: #e2b469; --warn-soft: #382d1a; --bad: #ec8d98; --bad-soft: #3a2026;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.page { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+.prose { max-width: 68ch; }
+header { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(28px, 4.4vw, 38px); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 23px; line-height: 1.25; margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 15.5px; font-weight: 600; margin: 0; }
+p { margin: 0; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.lede { font-size: 17px; color: var(--ink); }
+.meta { font-size: 13px; color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: .9em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+
+.verdict { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 20px 22px; display: grid; gap: 14px; }
+.verdict ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); white-space: nowrap; }
+tfoot td { font-weight: 600; }
+
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.good { background: var(--good-soft); color: var(--good); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+
+.defects { display: grid; gap: 12px; }
+.defect { display: grid; grid-template-columns: 56px 1fr; gap: 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; }
+.defect .id { font-family: var(--font-mono); font-weight: 500; color: var(--accent); font-size: 14px; padding-top: 1px; }
+.defect .body { display: grid; gap: 6px; min-width: 0; }
+.defect .fix { color: var(--muted); font-size: 14px; }
+.defect .fix strong { color: var(--ink); font-weight: 600; }
+
+.op { display: grid; gap: 8px; padding: 16px 0; border-top: 1px solid var(--rule); }
+.op:first-of-type { border-top: 0; padding-top: 4px; }
+.op .head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.op .head code { font-size: 14px; }
+.op blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-size: 14px; border-radius: 0 4px 4px 0; }
+.op .was { font-size: 13.5px; color: var(--muted); }
+
+ol.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: ph; }
+ol.phases li { display: grid; grid-template-columns: 92px 1fr; gap: 16px; padding: 16px 0; border-top: 1px solid var(--rule); }
+ol.phases li:first-child { border-top: 0; }
+ol.phases .tag { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); padding-top: 2px; }
+ol.phases .what { display: grid; gap: 6px; min-width: 0; }
+ol.phases .gate { font-size: 13.5px; color: var(--muted); }
+
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.decision { border-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .defect { grid-template-columns: 1fr; gap: 6px; }
+  ol.phases li { grid-template-columns: 1fr; gap: 4px; }
+  .two { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="page">
+
+<header>
+  <div class="verdict" role="note">
+    <p><strong>Superseded in part (2026-11-10).</strong> This is the plan as first proposed. The drop-operator redefinition below was implemented and still failed: dropped conflicts stayed readable in the text, and the old ladder's own predictions failed on gold (mean_marginal at 2&rarr;3: 16/54). The CONFLICT ladder was redesigned instead, as variant B: two spurious links down, two resolutions up, each rung adding one edit to its neighbour. Its declared checks hold on gold in 687/756 (0.909). The repaired set, <code>data/locobench-claude-5-test-v2</code>, has 9 of 14 families, with 3 CONFLICT, because five CONFLICT families' spurious links could not be made to read as conflicts. See its <code>config.json</code> for provenance.</p>
+  </div>
+  <div class="eyebrow">locobench-claude-5-test · 14 families · 70 items · remedy plan</div>
+  <h1>Repairing the perturbed rungs of the LoCoBench dev set</h1>
+  <p class="lede prose">The relation miners are no longer the bottleneck. Their ladder pass rates stay flat because the perturbed rungs do not say what their gold labels claim. A blind side-by-side reading found the planted change realized in only 5 of 39 dev transitions, and in 132 of 268 on the 100-family release. This plan fixes the operators, adds a realization gate at every rung boundary, regenerates only the affected rungs, and checks the result with judges that took no part in generating or gating it.</p>
+  <p class="meta">Prepared 2026-11-06 · scope: dev set only; the same code ports to the release afterwards · estimated spend ≈ $30, about 3 hours of wall-clock</p>
+</header>
+
+<section>
+  <h2>Summary</h2>
+  <div class="verdict">
+    <ul>
+      <li><strong>Keep every base rung.</strong> Base rungs already passed V1, V3 and V4. Keeping them holds the item ids, atoms and plans fixed, and confines the change to the 40 perturbed rungs of the 8 CONFLICT and 2 CHAIN families.</li>
+      <li><strong>Redefine four operators</strong> so that each edit has to remove or create a specific span of text that a checker can locate, rather than "change a connective".</li>
+      <li><strong>Make labels follow text that has been checked.</strong> A new gate (V5) checks every rung boundary. A rung is admitted only when a majority of the committee reads the planted change, and only that change.</li>
+      <li><strong>Audit with judges held out from the process</strong> (gpt-6.1-sol, claude-opus-5-5): neither wrote the text nor sat on the gate. Then re-measure gold and mined ladder pass rates on the repaired set.</li>
+      <li>Expect the gold arm's 0.81 to move. Part of it was earned on labels the text did not support, so the repaired number is the one to publish.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>What is broken, with evidence</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Operator</th><th class="num">Dev realized</th><th class="num">Release realized</th><th>Judge-free signal</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><code>drop_relation</code></td><td class="num">0 / 18</td><td class="num">31 / 113</td><td>conflict-carrying sentence survives verbatim in 17/18 dev, 72/113 release; median edit 6–12 words</td><td><span class="chip bad">broken</span></td></tr>
+        <tr><td><code>add_resolution</code></td><td class="num">2 / 8</td><td class="num">31 / 46</td><td>in 4/8 dev, both judges already read the conflict as resolved in the lower rung</td><td><span class="chip bad">unreliable</span></td></tr>
+        <tr><td><code>spurious_relation</code></td><td class="num">2 / 8</td><td class="num">35 / 46</td><td>when it is realized, the text writes a <em>support</em> link in ~65/70 cases, but gold always labels the edge <code>Contrast</code></td><td><span class="chip bad">mislabelled</span></td></tr>
+        <tr><td><code>break_chain</code></td><td class="num">1 / 5</td><td class="num">35 / 63</td><td>targets can include non-entailment edges (f005 broke a <code>Restatement</code>)</td><td><span class="chip warn">weak</span></td></tr>
+        <tr><td><code>shuffle_order</code>, <code>ordering_only</code>, <code>direction_reversal</code></td><td class="num">not tested</td><td class="num">not tested</td><td>these change no coupling-bearing edge, so the reading check did not cover them</td><td><span class="chip info">check only</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta prose">"Realized" means a majority of 2 blind judges × 2 text orders read the planted change in the planted direction. Dev judges: gpt-6.1-sol and claude-opus-5-5. Release judges: gpt-6.1-sol and claude-opus-5 (the release's generator, opus-5-5, was excluded). Swapping the text order changed the verdict in 2 of 78 dev and 26 of 536 release judge/transition pairs.</p>
+
+  <div class="defects">
+    <div class="defect">
+      <div class="id">D1</div>
+      <div class="body">
+        <h3>A drop removes a connective, but the conflict lives in the framing</h3>
+        <p>Asked about two claims in isolation, a judge rated 17 of the 18 dropped dev pairs <em>compatible</em>. The tension comes from the text's framing: "by contrast", "two mutually exclusive readings, exactly one of which must be right". P5's definition of the drop ("remove the connective … so the two atoms are merely adjacent") leaves that framing in place. A smaller group is incompatible on content alone: 1 of 18 dev pairs and 13 of 82 unrealized release pairs. No edit that keeps both atoms can drop those.</p>
+        <p class="fix"><strong>Fix:</strong> redefine the drop to delete every framing span, and exclude content-incompatible pairs from drop targets.</p>
+      </div>
+    </div>
+    <div class="defect">
+      <div class="id">D2</div>
+      <div class="body">
+        <h3>No gate checks that a perturbed rung realizes its label change</h3>
+        <p>V1 runs only on the base rung. After P5, the pipeline checks only that the text changed, that its length stayed within bounds, that adjacent label sets differ, and that identical texts carry identical labels. None of these reads the edit.</p>
+        <p class="fix"><strong>Fix:</strong> a new V5 realization gate at every rung boundary, with retry and then rejection.</p>
+      </div>
+    </div>
+    <div class="defect">
+      <div class="id">D3</div>
+      <div class="body">
+        <h3>The spurious-relation text and its label disagree</h3>
+        <p>P5 allows "a causal or contradictory link". The text almost always writes a causal one, while <code>apply_calls</code> hardcodes <code>Contrast</code>. So the "worse" rung's MRF penalizes a contradiction the text does not contain.</p>
+        <p class="fix"><strong>Fix:</strong> pin the operator to a contrastive link, and verify it.</p>
+      </div>
+    </div>
+    <div class="defect">
+      <div class="id">D4</div>
+      <div class="body">
+        <h3>Resolutions can target conflicts that are already resolved</h3>
+        <p>Target choice reads the plan's labels, not the text. Where the base prose already resolves the tension, adding a resolution changes nothing a reader can see.</p>
+        <p class="fix"><strong>Fix:</strong> pre-screen resolution targets against the base text, and require the resolution sentence to address both claims.</p>
+      </div>
+    </div>
+    <div class="defect">
+      <div class="id">D5</div>
+      <div class="body">
+        <h3>Chain breaks can target links that are not chain links</h3>
+        <p>A CHAIN ladder's "break" is meant to cut an inferential step. Breaking a <code>Restatement</code> changes an equivalence instead.</p>
+        <p class="fix"><strong>Fix:</strong> restrict <code>break_chain</code> targets to entailment edges.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Operator redefinitions</h2>
+  <p class="prose">Every operator gets the same contract. The P5 diff must <strong>name the spans</strong> it removed or added, and a deterministic check must confirm that removed spans are gone and added spans are present before any LLM gate runs. That cheap check catches most failures without spending a judge call.</p>
+
+  <div>
+    <div class="op">
+      <div class="head"><code>drop_relation(edge)</code><span class="chip bad">D1</span></div>
+      <blockquote>Find EVERY span that presents the two claims as related: connectives, framing sentences that set them against each other or call them alternatives, and any later sentence that refers back to their opposition. Delete or rewrite each span so the text still asserts both claims verbatim but no longer relates them. List each removed span verbatim in <span class="mono">spans_removed</span>.</blockquote>
+      <p class="was">Target filter: skip any pair that a content-only check rates incompatible (≈ $0.002 per pair). Deterministic check: no removed span may survive verbatim in the output.</p>
+    </div>
+    <div class="op">
+      <div class="head"><code>spurious_relation(atom_a, atom_b)</code><span class="chip bad">D3</span></div>
+      <blockquote>Add ONE connective that sets claim A against claim B, so the text asserts they cannot both hold. Do not assert a causal, evidential or supporting link. Add no new factual content. Report the added span in <span class="mono">spans_added</span>.</blockquote>
+      <p class="was">The label stays <code>Contrast</code>. Now the text has to match it.</p>
+    </div>
+    <div class="op">
+      <div class="head"><code>add_resolution(edge)</code><span class="chip bad">D4</span></div>
+      <blockquote>Add ONE sentence, after both claims, in which an authority reaches a determination that names BOTH claims and explains how the tension between them is settled. Leave the rest of the text unchanged.</blockquote>
+      <p class="was">Target filter: a reader must rate the edge an unresolved conflict in the base text (one V5-style call per candidate).</p>
+    </div>
+    <div class="op">
+      <div class="head"><code>break_chain(edge)</code><span class="chip warn">D5</span></div>
+      <blockquote>Remove or negate the inferential step realizing this link, so the text no longer says one claim supports or leads to the other. Keep both claims verbatim. List the removed span.</blockquote>
+      <p class="was">Target filter: entailment-coupled edges only, in chain order.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>V5: the rung realization gate</h2>
+  <div class="two">
+    <div class="panel">
+      <h3>What it checks</h3>
+      <ul class="plain">
+        <li><strong>Targeted edges:</strong> the side-by-side reading prompt from the reading check, applied to the lower and upper rung. The committee majority must read the planted change.</li>
+        <li><strong>Untouched edges:</strong> 3 coupling-bearing edges that the edit did not target, sampled per boundary. The majority must read each one the same way on both rungs. This catches edits that spill over onto other relations, which also adds noise to the score differences the ladder checks compare.</li>
+        <li><strong>Span check first:</strong> the deterministic span check runs before any LLM call.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>How it decides</h3>
+      <ul class="plain">
+        <li>Raters: the existing committee (gpt-5.6-terra, gemini-3.1-pro, claude-sonnet-5), majority rule, each in a random text order.</li>
+        <li>On failure: retry P5 up to 3 times, with the gate's reason fed back into the prompt.</li>
+        <li>On a third failure: re-target to the next eligible edge once. If that also fails, reject the family, as the pipeline already does for a missing rung.</li>
+        <li>The generator never rates its own edits (rule R3, unchanged).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Execution</h2>
+  <ol class="phases">
+    <li>
+      <div class="tag">Phase 0<br>code</div>
+      <div class="what">
+        <h3>Operators, gate and a rung-only regeneration mode</h3>
+        <p>Edit <code>PROMPT_P5</code> and <code>perturb.py</code> (target filters, the <span class="mono">spans_removed</span>/<span class="mono">spans_added</span> diff fields). Add <code>gate_realization</code> to <code>validate.py</code>, and a <code>--regen-rungs</code> mode to the CLI that loads an admitted family, keeps its base rung, and reruns only the perturb stage. Add tests for the span check, the target filters and the gate's majority logic. Write output to a new directory, <code>data/locobench-claude-5-test-v2</code>, and keep the original for comparison.</p>
+        <p class="gate">No spend. Exit when all existing tests plus the new ones pass and a mock-backend dry run completes.</p>
+      </div>
+    </li>
+    <li>
+      <div class="tag">Phase 1<br>pilot</div>
+      <div class="what">
+        <h3>f001 (CONFLICT) and f005 (CHAIN)</h3>
+        <p>Regenerate 8 rungs, then run the held-out reading check on them.</p>
+        <p class="gate">Go/no-go: every targeted transition realized, no unrealized drop, V3 naturalness ≥ 4 on every regenerated rung. ≈ $4.</p>
+      </div>
+    </li>
+    <li>
+      <div class="tag">Phase 2<br>regenerate</div>
+      <div class="what">
+        <h3>The remaining 6 CONFLICT families and 1 CHAIN family</h3>
+        <p>Then run the cheap invariance check on the 4 ORDER and CONTROL families. Regenerate those only if one fails.</p>
+        <p class="gate">Exit when every family is admitted or explicitly rejected with its reason recorded. ≈ $14 including retries.</p>
+      </div>
+    </li>
+    <li>
+      <div class="tag">Phase 3<br>audit</div>
+      <div class="what">
+        <h3>Held-out reading check and re-measurement</h3>
+        <p>Rerun <code>locobench_rung_reading_check.py</code> and <code>locobench_rung_evidence_check.py</code> with gpt-6.1-sol and claude-opus-5-5. Re-score the gold arms. Re-mine the 40 regenerated items with the gpt-6.1-sol and opus-5-5 graph arms (K=5). Base-rung samples are reused from cache.</p>
+        <p class="gate">Report the acceptance table below against the original dev set. ≈ $11.</p>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Acceptance criteria</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Criterion</th><th class="num">Now</th><th class="num">Target</th></tr></thead>
+      <tbody>
+        <tr><td>Targeted transitions realized, held-out judges, every operator</td><td class="num">5 / 39</td><td class="num">≥ 90% each</td></tr>
+        <tr><td>Drop: conflict span surviving verbatim</td><td class="num">17 / 18</td><td class="num">0</td></tr>
+        <tr><td>Spurious link read as a conflict, not support</td><td class="num">—</td><td class="num">≥ 90%</td></tr>
+        <tr><td>Untouched edges read the same across the boundary</td><td class="num">not measured</td><td class="num">≥ 95%</td></tr>
+        <tr><td>Existing gates (V1 base, V3, V4, adjacency, text-label)</td><td class="num">pass</td><td class="num">pass</td></tr>
+        <tr><td>Ordering constraints achievable by construction</td><td class="num">202 / 202</td><td class="num">all</td></tr>
+        <tr><td>Gold arm ladder pass rate (mean_marginal)</td><td class="num">0.81</td><td class="num">report</td></tr>
+        <tr><td>Best mined arm's share of the gold–RITS gap closed</td><td class="num">14%</td><td class="num">report; ≥ 50% hoped</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta prose">The last two rows are measurements, not gates. If the gold pass rate drops on the repaired set, the old figure was inflated, and the paper should cite the new one.</p>
+</section>
+
+<section>
+  <h2>Cost</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Item</th><th class="num">Calls</th><th class="num">Estimate</th></tr></thead>
+      <tbody>
+        <tr><td>Target pre-screens (content check for drops, base-text check for resolutions)</td><td class="num">≈ 60</td><td class="num">$0.60</td></tr>
+        <tr><td>P5 regeneration, claude-opus-5, 70 calls × up to 2 attempts on average</td><td class="num">≈ 140</td><td class="num">$7.70</td></tr>
+        <tr><td>V5 gate, 3 raters, targeted plus 3 untouched edges per boundary, with retries</td><td class="num">≈ 900</td><td class="num">$9.00</td></tr>
+        <tr><td>V3 naturalness on regenerated rungs, 3 raters</td><td class="num">≈ 120</td><td class="num">$2.40</td></tr>
+        <tr><td>Held-out reading audit, 2 judges × 2 orders</td><td class="num">≈ 160</td><td class="num">$1.70</td></tr>
+        <tr><td>Re-mining 40 items, gpt-6.1-sol and opus-5-5, K=5</td><td class="num">400</td><td class="num">$8.60</td></tr>
+      </tbody>
+      <tfoot><tr><td>Total, before ≈ 10% margin</td><td class="num"></td><td class="num">≈ $30</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="meta prose">Rates are the IBM LiteLLM gateway's per-token prices, applied to token counts measured in this session's runs. Generation is sequential at about 45 s per call, so Phase 2 takes most of the wall-clock time.</p>
+</section>
+
+<section>
+  <h2>Risks</h2>
+  <ul class="plain prose">
+    <li><strong>Deleting framing can make prose read like a list.</strong> The "coherent" rung loses two conflicts and gains a resolution. The V3 naturalness gate and the 15% length-drift limit catch the worst cases; Phase 1 tests this before the spend scales.</li>
+    <li><strong>The gate shares its raters with V1 admission.</strong> Those raters could share blind spots. The Phase 3 audit uses two different models for this reason, and its numbers are the ones to report.</li>
+    <li><strong>Fewer drop targets.</strong> Excluding content-incompatible pairs leaves CONFLICT families with fewer eligible edges. Every dev CONFLICT family has 4 conflict edges and needs 3. A family left without enough targets is rejected rather than patched, and the run report says so.</li>
+    <li><strong>The fix to the miner's resolved-flag rule is already in place</strong> (resolution on any conflict coupling, not only on Concession). Re-measurement uses the corrected code.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Decisions needed before Phase 0</h2>
+  <div class="two">
+    <div class="panel decision">
+      <h3>Generator for regenerated rungs</h3>
+      <p>Recommended: <strong>claude-opus-5</strong>, the author of the base text, so each rung stays in one voice. That keeps claude-opus-5-5 available as a held-out audit judge. Switching to opus-5-5 would mean finding a new second judge.</p>
+    </div>
+    <div class="panel decision">
+      <h3>Treatment of the original dev set</h3>
+      <p>Recommended: <strong>keep it unchanged</strong> beside <code>-v2</code>, so the paper can report before and after. Item ids stay the same; the directory name and the <code>config.json</code> provenance distinguish the two.</p>
+    </div>
+  </div>
+</section>
+
+</div>

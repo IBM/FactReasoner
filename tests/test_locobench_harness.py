@@ -261,13 +261,22 @@ class TestDefectOneEncoded:
     pair is now declared nothing at all -- neither an increase nor an invariance.
     """
 
-    def test_conflict_rung_two_leaves_log_partition_unconstrained(self):
-        dirs = perturb.readout_directions("CONFLICT", 2)
-        assert dirs["log_partition"] == "unconstrained"
+    def test_the_first_resolution_predicts_a_log_partition_decrease(self):
+        # Variant B (2026-11-09): the first resolution (rung 2->3) lowers the normalized
+        # log partition on gold in 48/54 CONFLICT families; the second splits (32/22).
+        assert perturb.readout_directions("CONFLICT", 3)["log_partition"] == "decrease"
+        assert perturb.readout_directions("CONFLICT", 4)["log_partition"] == "unconstrained"
 
-    def test_conflict_rung_two_expects_the_consistency_inversion(self):
+    def test_consistency_falls_at_each_resolution_and_rises_on_the_spurious_steps(self):
+        # Finding 1 at each resolution (53/54, 48/54); the spurious steps rise (37-38/54).
+        for rung in (3, 4):
+            assert perturb.readout_directions("CONFLICT", rung)["consistency"] == "decrease"
+        for rung in (1, 2):
+            assert perturb.readout_directions("CONFLICT", rung)["consistency"] == "increase"
+
+    def test_the_first_resolution_expects_the_consistency_inversion(self):
         # Phase 1's Finding 1, asserted as a positive prediction rather than exempted.
-        dirs = perturb.readout_directions("CONFLICT", 2)
+        dirs = perturb.readout_directions("CONFLICT", 3)
         assert dirs["consistency"] == "decrease"
 
     def test_mean_marginal_is_monotone_across_the_whole_chain(self):
@@ -284,17 +293,22 @@ class TestDefectOneEncoded:
     def test_the_declaration_reaches_the_generated_item(self):
         res = generate_family("f001", "Civil Engineering", "CONFLICT", _dry_cfg())
         assert res.admitted
-        rung2 = next(i for i in res.items if i["expected"]["rung_index"] == 2)
-        assert rung2["expected"]["readout_directions"]["log_partition"] == "unconstrained"
+        rung4 = next(i for i in res.items if i["expected"]["rung_index"] == 4)
+        assert rung4["expected"]["readout_directions"]["log_partition"] == "unconstrained"
 
     def test_constraints_split_c1_from_c2(self):
         cons = {c["id"]: c for c in perturb.ordering_constraints("CONFLICT")}
         c2_pairs = {(p["readout"], tuple(p["pair"])) for p in cons["c2"]["pairs"]}
         # Unconstrained pairs sit in NEITHER list: no prediction is made about them.
-        assert ("log_partition", (1, 2)) not in c2_pairs
-        assert ("consistency", (1, 2)) in c2_pairs
+        assert ("log_partition", (3, 4)) not in c2_pairs
+        assert ("consistency", (2, 3)) in c2_pairs
+        assert ("log_partition", (2, 3)) in c2_pairs
         c1_pairs = {(p["readout"], tuple(p["pair"])) for p in cons["c1"]["pairs"]}
-        assert ("log_partition", (1, 2)) not in c1_pairs
+        assert ("log_partition", (3, 4)) not in c1_pairs
+        assert ("consistency", (0, 1)) in c1_pairs  # the spurious steps rise
+        # C3: consistency's endpoint is declared to FALL (44/54 on gold).
+        assert cons["c3"]["decrease_readouts"] == ["consistency"]
+        assert "consistency" not in cons["c3"]["readouts"]
 
 
 class TestCallBudget:
@@ -308,7 +322,8 @@ class TestCallBudget:
         # The trap the hand-derived table fell into: one call per non-base rung would
         # give a flat 4, but a rung may compose several calls.
         per_family = {f: perturb.p5_calls_for(f) for f in perturb.FAMILY_TYPES}
-        assert per_family == {"CONFLICT": 7, "CHAIN": 7, "ORDER": 4, "CONTROL": 4}
+        # CONFLICT is incremental (variant B): one P5 call per non-base rung.
+        assert per_family == {"CONFLICT": 4, "CHAIN": 7, "ORDER": 4, "CONTROL": 4}
 
     def test_documented_corpus_budget(self):
         # One attempt per family, three eligible voters on the base response only. The
@@ -316,8 +331,9 @@ class TestCallBudget:
         # an inline call, which the pipeline never did, and put the inline V1/V3/V4 calls in
         # `generation`.
         b = perturb.call_budget(perturb.family_type_slots(120))
-        assert b["total"] == 2280
-        assert b["generation"] == 1200
+        # 55 CONFLICT families x 4 P5 calls (variant B, incremental) instead of x 7.
+        assert b["total"] == 2115
+        assert b["generation"] == 1035
         assert b["committee"] == 1080
 
     def test_documented_per_prompt_budget(self):
@@ -327,7 +343,7 @@ class TestCallBudget:
             "P2": 120,
             "P3": 120,
             "P4": 120,
-            "P5": 720,
+            "P5": 555,
         }
         assert {k: b[k] for k in ("V1", "V3", "V4")} == {
             "V1": 360,
@@ -380,8 +396,8 @@ class TestCallBudget:
         shipped = perturb.call_budget(perturb.family_type_slots(120))
         complete = perturb.call_budget(perturb.family_type_slots(120), audited_rungs=5)
         assert complete["committee"] == 5 * shipped["committee"] == 5400
-        assert complete["total"] == 6600
-        assert round(complete["total"] / shipped["total"], 2) == 2.89
+        assert complete["total"] == 6435
+        assert round(complete["total"] / shipped["total"], 2) == 3.04
 
     def test_budget_accepts_a_mapping_and_agrees_with_a_list(self):
         from_list = perturb.call_budget(perturb.family_type_slots(120))
@@ -408,14 +424,16 @@ class TestPromptDrift:
         assert prompts.instruction_count(pid) == want_n
         assert prompts.placeholders(pid) == tuple(sorted(want_ph))
 
-    def test_all_eight_prompts_present(self):
+    def test_all_ten_prompts_present(self):
         assert set(prompts.PROMPTS) == set(prompts.GENERATION_PROMPTS) | set(
             prompts.VALIDATION_PROMPTS
         )
-        # Eight, not Phase 1's nine: V2 was removed with the rest of the exhaustiveness
-        # adjudicator, since COMPILE derives `exclusive`/`co_necessity` from the sense.
-        assert len(prompts.PROMPTS) == 8
+        # Phase 1's nine, minus V2 (removed with the exhaustiveness adjudicator, since
+        # COMPILE derives `exclusive`/`co_necessity` from the sense), plus V5 and V5c: the
+        # rung realization gate and its content-only drop-target screen.
+        assert len(prompts.PROMPTS) == 11
         assert "V2" not in prompts.PROMPTS
+        assert {"V5", "V5c", "V5r"} <= set(prompts.VALIDATION_PROMPTS)
 
     def test_fill_requires_every_placeholder(self):
         with pytest.raises(ValueError, match="missing value"):
@@ -455,7 +473,9 @@ class TestParsers:
     def test_plan_round_trip_and_gates(self):
         plan, err = parse.parse_plan(mock.mock_plan("q", "c"))
         assert err is None
-        assert validate.gate_plan(plan).passed
+        # The unconditioned mock is the ORDER/CONTROL/CHAIN plan; CONFLICT's resolution
+        # quota needs the ladder-conditioned one (see the mock's ladder switch).
+        assert validate.gate_plan(plan, family="ORDER").passed
 
     def test_plan_with_a_contradicting_coupling_is_rejected(self):
         plan, _ = parse.parse_plan(mock.mock_plan("q", "c"))
@@ -2259,7 +2279,7 @@ class TestP3Gates:
         return plan
 
     def test_the_mock_plan_is_still_the_positive_witness(self):
-        assert validate.gate_plan(self._plan()).passed
+        assert validate.gate_plan(self._plan(), family="ORDER").passed
 
     def test_a_far_edge_is_recorded_but_does_not_block(self):
         # Phase 1 R2 gives instruction 4 the weakest role ("biases generation"); the
@@ -2268,7 +2288,7 @@ class TestP3Gates:
         plan = self._no_shared_entities(self._plan(), 1, 16)
         plan["relations"][0]["source_pos"] = 1
         plan["relations"][0]["target_pos"] = 16
-        v = validate.gate_plan(plan)
+        v = validate.gate_plan(plan, family="ORDER")
         window = next(r for r in v.results if r.gate == "plan.window")
         assert window.passed, "the window gate must not block"
         assert window.observed == [(1, 16, 15)], "but it must still report the far edge"
@@ -2303,8 +2323,12 @@ class TestP3PromptTeachesAConformingAnswer:
     def test_the_example_parses_and_passes_every_gate(self):
         plan, err = parse.parse_plan(prompts.PROMPTS["P3"])
         assert err is None, err
-        v = validate.gate_plan(plan)
+        # The example is ORDER/CONTROL-shaped; CONFLICT and CHAIN say in their ladder
+        # requirement that it does not fit them, and how to adapt it.
+        v = validate.gate_plan(plan, family="ORDER")
         assert v.passed, v.reason()
+        assert "does NOT fit" in prompts.LADDER_REQUIREMENTS["CHAIN"]
+        assert "adjust it so they are" in prompts.LADDER_REQUIREMENTS["CONFLICT"]
 
     def test_the_example_matches_what_the_instructions_ask_for(self):
         plan, _ = parse.parse_plan(prompts.PROMPTS["P3"])
@@ -4122,15 +4146,14 @@ class TestDefectTwoPerRungRelations:
 
     # -- the target chooser ---------------------------------------------------
 
-    def test_successive_drops_target_different_edges(self):
-        """The old code passed the literal `r000` to every call, so a two-drop rung
-        asked twice for the same edge and the second call had nothing to do."""
-        targets = perturb.plan_targets("CONFLICT", self._base_relations())
-        coherent = targets[4]  # add_resolution, drop_relation, drop_relation
-        assert len(coherent) == 3
-        named = [t for t in coherent if t]
+    def test_successive_breaks_target_different_edges(self):
+        """The old code passed the literal `r000` to every call, so a multi-call rung
+        asked twice for the same edge and the second call had nothing to do. CHAIN's
+        `break_3` rung is the remaining three-call rung."""
+        targets = perturb.plan_targets("CHAIN", self._base_relations())
+        named = [t for t in targets[0] if t]
         assert len(named) == len(set(named)), (
-            f"a rung must not target the same edge twice: {coherent}"
+            f"a rung must not target the same edge twice: {targets[0]}"
         )
 
     def test_no_call_targets_the_hardcoded_r000_by_default(self):
@@ -4140,15 +4163,29 @@ class TestDefectTwoPerRungRelations:
 
     def test_drop_prefers_the_invalid_conflict(self):
         """The planted-invalid conflict is the one a "fix" should remove first."""
-        targets = perturb.plan_targets("CONFLICT", self._base_relations())
-        # rung 3 = add_resolution + drop_relation.
-        assert targets[3][1] == "r002"
+        targets = perturb.plan_targets("CHAIN", self._base_relations())
+        # CHAIN rung 4 (`coherent`) is the remaining drop; CONFLICT is resolution-only.
+        assert targets[4][0] == "r002"
+
+    def test_conflict_rungs_nest_one_more_resolution_each(self):
+        def e(i, sense, coupling):
+            return {"id": f"r{i:03d}", "source_id": f"a{2*i}", "target_id": f"a{2*i+1}",
+                    "level2_sense": sense, "level1_coupling": coupling, "validity": "valid",
+                    "intended_strength_band": "strong", "is_resolved_concession": False,
+                    "is_concession": sense == "Concession"}
+        rels = [e(0, "Contrast", "contradiction"), e(1, "Alternative", "exclusive"),
+                e(2, "Concession", "contradiction"), e(3, "Cause-Effect", "entailment")]
+        targets = perturb.plan_targets("CONFLICT", rels)
+        # Variant B: resolve_one (3) then resolve_two (4), nested.
+        assert len(targets[3]) == 1 and targets[4][:1] == targets[3]
+        assert len(set(targets[4])) == 2 and "" not in targets[4]
+        assert "r003" not in targets[4]  # never an entailment
 
     def test_resolution_targets_a_valid_conflict(self):
         """Resolving a planted error would dress up a mistake, not settle a tension."""
         rels = self._base_relations()
         targets = perturb.plan_targets("CONFLICT", rels)
-        resolved_id = targets[2][0]
+        resolved_id = targets[3][0]
         edge = next(e for e in rels if e["id"] == resolved_id)
         assert edge["validity"] == "valid"
         assert edge["level1_coupling"] in ("contradiction", "exclusive")
@@ -4188,21 +4225,18 @@ class TestDefectTwoPerRungRelations:
 
     # -- P3 must plan enough droppable conflict edges --------------------------
 
-    def test_p3_demands_four_conflict_edges_with_at_most_one_resolved(self):
-        """A CONFLICT ladder's deepest rung needs `add_resolution` plus TWO DISTINCT
-        `drop_relation` targets, and the resolution consumes one edge from the same pool.
-
-        Only three senses compile to a conflict coupling (Alternative -> exclusive,
-        Concession and Contrast -> contradiction), so instruction 5's one-of-each mandate
-        yields exactly three -- and if the Concession is resolved, only TWO are droppable
-        and rung 4 collapses onto rung 3. Measured live: droppable==3 admitted 4/4 and
-        droppable==2 was rejected 4/4 across 8 distinct topics.
+    def test_p3_demands_two_valid_unresolved_conflicts(self):
+        """Variant B settles two conflicts in turn, and `add_resolution` targets only
+        VALID unresolved ones, so P3 must ask for two; its rung 0 adds two spurious
+        links, so P3 must also declare enough non-relations. ORDER and CONTROL keep the
+        quota they were generated with.
         """
         req = prompts.LADDER_REQUIREMENTS["CONFLICT"]
-        assert "AT LEAST FOUR" in req
-        assert "AT MOST" in req and "resolved Concession" in req
+        assert "AT LEAST FOUR" in req and "AT LEAST\n   TWO" in req
+        assert "FOUR non-relations" in req
+        assert "VALID and UNRESOLVED" in req and "planted-invalid" in req
         for fam in ("ORDER", "CONTROL"):
-            assert prompts.LADDER_REQUIREMENTS[fam] == req
+            assert prompts.LADDER_REQUIREMENTS[fam] == prompts._CONFLICT_QUOTA_V1
 
     def test_gate_plan_rejects_too_few_droppable_conflicts(self):
         """The prompt alone did not work, so the PLAN GATE enforces the pool.
@@ -4236,7 +4270,8 @@ class TestDefectTwoPerRungRelations:
         assert parsed is not None, err  # structurally fine
         verdict = validate.gate_plan(parsed, family="CONFLICT")
         assert not verdict.passed
-        assert "conflicting relation" in verdict.reason() and "unresolved" in verdict.reason()
+        reason = verdict.reason().lower()
+        assert "conflicting relation" in reason and "unresolved" in reason
 
     def test_p3_worked_example_is_itself_admissible(self):
         """The example in instruction 10 must satisfy the rule instruction 5 states.
@@ -4503,10 +4538,9 @@ class TestDefectTwoPerRungRelations:
         ), "drop_relation must not be exempt from the edge-effect gate"
 
     def test_the_gate_compares_adjacent_rungs_not_parentage(self):
-        """Every CONFLICT rung's `parent` is the base, so a parent-only comparison passes
-        a rung that duplicates the rung immediately BELOW it -- and the C1 constraints are
-        stated over adjacent pairs. A plan with only two unresolved conflicts cannot feed
-        the `coherent` rung's third call, so rungs 3 and 4 collide and must be rejected."""
+        """The C1 constraints are stated over ADJACENT pairs, so the edge-effect gate
+        compares adjacent rungs. A plan whose second resolution has no valid target makes
+        rungs 3 and 4 build the same edge set, and the family must be rejected."""
         # Two unresolved conflicts only: one for add_resolution, one for the first drop.
         rels = [
             e
@@ -4532,7 +4566,10 @@ class TestDefectTwoPerRungRelations:
         assert len(unresolved) == 2, "fixture must have exactly two to force the collision"
 
         lad = perturb.ladder_for("CONFLICT")
+        # One VALID open conflict only (the fixture's other open conflict is planted-
+        # invalid), so variant B's second resolution has no target.
         targets = perturb.plan_targets("CONFLICT", rels)
+        assert targets[4][1] == "", "fixture must leave the second resolution unfillable"
         sigs = {}
         for rung in lad.rungs:
             new = (
@@ -4543,19 +4580,11 @@ class TestDefectTwoPerRungRelations:
                 )[0]
             )
             sigs[rung.index] = pipeline._edge_set_signature(new)
-
-        # Rungs 3 and 4 collide...
+        # Rungs 3 and 4 collide, and the gate states the C1 constraints over ADJACENT
+        # pairs, so it must reject the family.
         assert sigs[3] == sigs[4]
-        # ...even though rung 4 differs from its declared parent, the base.
-        parent = next(r.parent for r in lad.rungs if r.index == 4)
-        assert parent == 1
-        assert sigs[4] != sigs[parent], (
-            "this is precisely why a parent-only comparison misses the collision"
-        )
-
-
-class TestGatewayCacheBypass:
-    """LOCOBENCH_NO_CACHE reaches the backend as LiteLLM's no-cache flag, and only then."""
+        res = generate_family("f001", "Law", "CONFLICT", _dry_cfg())
+        assert res.admitted  # the shipped mock plan has two valid open conflicts
 
     def _options(self, monkeypatch, value):
         from fact_reasoner.locobench import pipeline

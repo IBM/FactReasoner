@@ -302,23 +302,46 @@ def gate_plan(
             if coupling_for_sense(str(r.get("sense"))) in ("contradiction", "exclusive")
         ]
         unresolved = [r for r in conflicts if not r.get("resolved")]
-        v.add(
-            GateResult(
-                "plan.conflict_edges",
-                len(unresolved) >= 3,
-                threshold=">= 3 unresolved conflict relations",
-                observed=len(unresolved),
-                detail="" if len(unresolved) >= 3 else (
-                    f"plan has {len(conflicts)} conflicting relation(s) "
-                    f"({sorted(r['sense'] for r in conflicts)}) of which only "
-                    f"{len(unresolved)} are unresolved; a CONFLICT ladder needs AT LEAST 4 "
-                    "relations with a conflicting sense (Alternative, Concession or "
-                    "Contrast) and AT MOST 1 of them marked resolved, because its deepest "
-                    "rung resolves one and then drops two others. Only three senses "
-                    "conflict, so use one of them TWICE on a different pair of claims"
-                ),
+        if family == "CONFLICT":
+            # Variant B: rungs 3-4 resolve one, then two conflicts, and `add_resolution`
+            # targets only VALID unresolved ones (resolving a planted error would dress it
+            # up). Measured: 31 of 54 existing CONFLICT plans meet this (3 met three).
+            open_valid = [r for r in unresolved if r.get("validity") == "valid"]
+            v.add(
+                GateResult(
+                    "plan.conflict_edges",
+                    len(open_valid) >= 2,
+                    threshold=">= 2 valid unresolved conflict relations",
+                    observed=len(open_valid),
+                    detail="" if len(open_valid) >= 2 else (
+                        f"plan has {len(conflicts)} conflicting relation(s), of which "
+                        f"{len(open_valid)} are VALID and UNRESOLVED; a CONFLICT ladder "
+                        "settles two of them in turn, so it needs AT LEAST TWO "
+                        "conflicting relations (Alternative, Concession or Contrast) that "
+                        "are valid and not marked resolved. Planted-invalid conflicts do "
+                        "not count. Only three senses conflict, so use one of them more "
+                        "than once on different pairs of claims"
+                    ),
+                )
             )
-        )
+        else:
+            # ORDER and CONTROL keep the quota they were generated with.
+            v.add(
+                GateResult(
+                    "plan.conflict_edges",
+                    len(unresolved) >= 3,
+                    threshold=">= 3 unresolved conflict relations",
+                    observed=len(unresolved),
+                    detail="" if len(unresolved) >= 3 else (
+                        f"plan has {len(conflicts)} conflicting relation(s) "
+                        f"({sorted(r['sense'] for r in conflicts)}) of which only "
+                        f"{len(unresolved)} are unresolved; the ladder needs AT LEAST 4 "
+                        "relations with a conflicting sense (Alternative, Concession or "
+                        "Contrast) and AT MOST 1 of them marked resolved. Only three senses "
+                        "conflict, so use one of them TWICE on a different pair of claims"
+                    ),
+                )
+            )
 
     # Rare-facet floor: the categories with no prior gold data must be present, or the
     # corpus will not grade the couplings the benchmark exists for.
@@ -1429,6 +1452,281 @@ def gate_text_changed(base: str, perturbed: str, *, operator: str = "") -> GateR
             "the rung is not a distinct item; its labels would assert a coherence "
             "difference no reader or scorer could see in the text"
         ),
+    )
+
+
+# Calls whose edit must REMOVE text that relates two atoms. For these, a span the model
+# itself reports removing must not survive in its output -- the deterministic half of the
+# realization check, run before any rater is asked.
+REMOVING_CALLS = ("drop_relation", "break_chain", "remove_resolution")
+# Calls whose edit must ADD text. A span the model reports adding must be present.
+ADDING_CALLS = ("add_resolution", "spurious_relation", "inject_contradiction")
+
+
+def _norm_span(s: str) -> str:
+    return " ".join(str(s or "").split()).strip().lower()
+
+
+# Calls that MOVE sentences without changing their words. Every other call must confine
+# its edit to the spans it declares (see `_undeclared_edits`).
+REORDERING_CALLS = ("shuffle_order",)
+
+
+def _sentences(text: str) -> list[str]:
+    # Whitespace (line wrapping included) is collapsed BEFORE splitting: Phase 2's f012
+    # P5 re-wrapped its lines, and splitting on newlines turned 26 untouched sentences
+    # into "undeclared edits".
+    flat = " ".join(str(text or "").split())
+    return [_norm_span(x) for x in re.split(r"(?<=[.!?])\s+", flat) if _norm_span(x)]
+
+
+def _undeclared_edits(
+    parent: str, perturbed: str, removed: list[str], added: list[str]
+) -> list[str]:
+    """Parent sentences changed or deleted, and output sentences new, that no declared
+    span accounts for.
+
+    Pilot 4's second drop rewrote an earlier rung's resolution sentence and cut a clause
+    from a summary sentence -- neither declared -- and V5's 3-edge spill sample missed
+    both. A change is ACCOUNTED FOR when the changed parent sentence contains a declared
+    removed span, or the new output sentence contains a declared added span. Sentences
+    are matched as multisets, so a sentence that merely moved is not an edit.
+    """
+    rem = [_norm_span(x) for x in removed if _norm_span(x)]
+    add = [_norm_span(x) for x in added if _norm_span(x)]
+    ps, os_ = _sentences(parent), _sentences(perturbed)
+    pool = list(os_)
+    gone = []
+    for x in ps:
+        if x in pool:
+            pool.remove(x)
+        else:
+            gone.append(x)
+    new = pool  # output sentences with no verbatim parent
+    out = []
+    for x in gone:
+        if not any(r in x or x in r for r in rem):
+            # A rewrite may be declared from the NEW side only.
+            if not any(any(a in n or n in a for a in add) and _overlap(x, n) for n in new):
+                out.append(x)
+    for n in new:
+        if any(a in n or n in a for a in add):
+            continue
+        # The rewritten remainder of a sentence whose removed span was declared.
+        if any(any(r in g for r in rem) and _overlap(g, n) for g in gone):
+            continue
+        out.append(n)
+    return out
+
+
+def _overlap(a: str, b: str, floor: float = 0.5) -> bool:
+    """Whether two sentences share most of their words (a rewrite, not a new claim)."""
+    wa, wb = set(a.split()), set(b.split())
+    if not wa or not wb:
+        return False
+    return len(wa & wb) / min(len(wa), len(wb)) >= floor
+
+
+def gate_spans(
+    parent: str, perturbed: str, diff: dict[str, Any], *, operator: str = ""
+) -> GateResult:
+    """Deterministic span check on a P5 edit, run before the V5 raters.
+
+    A drop measured on the dev set left the conflict-carrying sentence VERBATIM in 17 of
+    18 "dropped" rungs. That failure needs no model to detect: P5 must name what it
+    removed, and a removed span still present in the output is an edit that did not
+    happen. The check also catches a model that reports nothing at all for a removing
+    call, which is how a connective-only deletion presents.
+
+    Args:
+        parent: The text the call was handed.
+        perturbed: P5's output.
+        diff: P5's parsed JSON diff (``spans_removed`` / ``spans_added``).
+        operator: The call name (``drop_relation`` ...), which selects the rule.
+
+    Returns:
+        The gate result. Calls that neither add nor remove relating text (shuffles,
+        ordering-only, reversals) pass vacuously.
+    """
+    call = operator.split("(")[0]
+    removed = [x for x in (diff.get("spans_removed") or []) if _norm_span(x)]
+    added = [x for x in (diff.get("spans_added") or []) if _norm_span(x)]
+    out_n, par_n = _norm_span(perturbed), _norm_span(parent)
+    problems: list[str] = []
+    if call in REMOVING_CALLS:
+        if not removed:
+            problems.append("reported no spans_removed for a removing operator")
+        survivors = [x for x in removed if _norm_span(x) in out_n]
+        if survivors:
+            problems.append(f"{len(survivors)} removed span(s) survive verbatim: {survivors[:2]!r}")
+        phantom = [x for x in removed if _norm_span(x) not in par_n]
+        if phantom:
+            problems.append(f"{len(phantom)} 'removed' span(s) were never in the parent: {phantom[:2]!r}")
+    if call in ADDING_CALLS:
+        if not added:
+            problems.append("reported no spans_added for an adding operator")
+        missing = [x for x in added if _norm_span(x) not in out_n]
+        if missing:
+            problems.append(f"{len(missing)} added span(s) absent from the output: {missing[:2]!r}")
+    if call not in REORDERING_CALLS:
+        undeclared = _undeclared_edits(parent, perturbed, removed, added)
+        if undeclared:
+            problems.append(
+                f"{len(undeclared)} sentence(s) changed that the edit did not declare - "
+                "leave every sentence not containing a listed span VERBATIM: "
+                + " | ".join(f'"{u[:160]}"' for u in undeclared[:3])
+            )
+    ok = not problems
+    return GateResult(
+        "P5.spans",
+        ok,
+        threshold="removed spans gone, added spans present",
+        observed="ok" if ok else "; ".join(problems),
+        detail="" if ok else f"{operator}: " + "; ".join(problems),
+    )
+
+
+# What a faithful reader should report for an edge, by its Level-1 coupling.
+_READING_OF_COUPLING = {
+    "contradiction": "conflict",
+    "exclusive": "conflict",
+    "entailment": "support",
+    "equivalence": "equivalent",
+    "co_necessity": "either",
+}
+
+# V5 thresholds. Targeted edges decide the rung; untouched edges guard against an edit
+# that spills onto relations it was not asked to change (which adds rung-to-rung noise the
+# ladder's small deltas cannot absorb -- the gold-swap diagnostic measured 20-27% of
+# ladder-invariant edges flipping across rungs under mining).
+THRESHOLDS["v5_untouched_agreement"] = 1.0
+
+
+def expected_reading(edge: dict[str, Any] | None) -> tuple[str, bool | None]:
+    """The (relation, resolved) a V5 reader should report for a gold edge state."""
+    if edge is None or edge.get("level1_coupling") in (None, "none"):
+        return ("none", None)
+    rel = _READING_OF_COUPLING.get(str(edge.get("level1_coupling")), "none")
+    resolved = bool(edge.get("is_resolved_concession")) if rel == "conflict" else None
+    return (rel, resolved)
+
+
+def _reading_pair(reading: dict[str, Any], flipped: bool) -> tuple[tuple, tuple]:
+    a = (reading["text_1"]["relation"], reading["text_1"]["resolved"])
+    b = (reading["text_2"]["relation"], reading["text_2"]["resolved"])
+    return (b, a) if flipped else (a, b)
+
+
+def realized(
+    lower: tuple[str, bool | None],
+    upper: tuple[str, bool | None],
+    reading: dict[str, Any],
+    *,
+    flipped: bool = False,
+) -> bool:
+    """Whether one V5 reading shows exactly the gold change from lower to upper.
+
+    A resolution is judged on the ``resolved`` flag (the relation stays a conflict); every
+    other change on presence of the relation and its kind. ``flipped`` says the rater was
+    shown the upper rung as text_1, which is how order bias is controlled.
+    """
+    lo, hi = _reading_pair(reading, flipped)
+    if lower[0] == upper[0] == "conflict":
+        return lo[0] == "conflict" and hi[0] == "conflict" and lo[1] == lower[1] and hi[1] == upper[1]
+    return lo[0] == lower[0] and hi[0] == upper[0]
+
+
+def unchanged(reading: dict[str, Any], *, flipped: bool = False) -> bool:
+    """Whether one V5 reading reports the same treatment of the pair on both rungs."""
+    lo, hi = _reading_pair(reading, flipped)
+    return lo == hi
+
+
+def gate_realization(
+    targeted: list[dict[str, Any]],
+    untouched: list[dict[str, Any]],
+    *,
+    rung: str = "",
+) -> GateResult:
+    """Apply V5: did this rung's edit realize its label change, and only that?
+
+    Args:
+        targeted: One entry per edge the rung's calls changed, each
+            ``{"edge": id, "lower": (rel, res), "upper": (rel, res),
+            "readings": [(reading, flipped), ...]}`` -- one reading per rater.
+        untouched: Same shape, for sampled coupling-bearing edges the edit did not
+            target; ``lower``/``upper`` are equal there.
+        rung: A label for the message.
+
+    Returns:
+        PASS when a strict majority of raters read every targeted change as planted, and
+        a strict majority read every untouched edge as unchanged. The detail names the
+        first failing edge and what the raters actually saw, which is what the P5 retry
+        is fed so the next attempt knows what to fix.
+    """
+    problems: list[str] = []
+    for t in targeted:
+        votes = [realized(t["lower"], t["upper"], r, flipped=f) for r, f in t["readings"]]
+        if not votes or sum(votes) * 2 <= len(votes):
+            seen = [_reading_pair(r, f)[1] for r, f in t["readings"]]
+            # Quote what the dissenting raters cited in the EDITED text. A relation is
+            # often stated more than once (pilot f005: a closing sentence restated the
+            # whole chain after its link sentence was removed), and naming the surviving
+            # span is what lets the retry remove it rather than re-edit the same place.
+            quotes = []
+            for (r, f), ok in zip(t["readings"], votes):
+                if ok:
+                    continue
+                ev = (r["text_1"] if f else r["text_2"]).get("evidence") or ""
+                ev = " ".join(ev.split())
+                if ev and ev not in quotes:
+                    quotes.append(ev)
+            if t["upper"][0] == "none" and quotes:
+                # A removal: name the wording that still carries the relation.
+                where = (
+                    " The relation is still carried by: "
+                    + " | ".join(f'"{q[:240]}"' for q in quotes[:3])
+                    + ". Remove or rewrite each of these as well."
+                )
+            elif t["lower"][0] == "none":
+                # An addition: the link is missing, so quoting the text that shows "no
+                # relation" and asking for its removal would point the edit the wrong way.
+                want = {"conflict": "sets the two claims against each other so they cannot "
+                        "both hold", "support": "presents one claim as supporting the other"}
+                where = (
+                    f" The added wording does not make a reader see a link: add one "
+                    f"connective that {want.get(t['upper'][0], 'draws the relation')}, "
+                    "joining the two claims directly."
+                )
+            elif t["upper"][1] is True:
+                where = (
+                    " The tension still reads as unsettled: the added sentence must name "
+                    "both claims and state how the tension between them is resolved."
+                )
+            else:
+                where = ""
+            problems.append(
+                f"edge {t['edge']}: expected {t['lower']} -> {t['upper']}, but "
+                f"{len(votes) - sum(votes)}/{len(votes)} rater(s) did not see it; the "
+                f"edited text still reads as {seen[0] if seen else '?'}.{where}"
+            )
+    spill = []
+    for u in untouched:
+        votes = [unchanged(r, flipped=f) for r, f in u["readings"]]
+        if votes and sum(votes) * 2 <= len(votes):
+            spill.append(u["edge"])
+    if spill:
+        problems.append(
+            f"the edit also changed how the text relates untouched edge(s) {spill}; "
+            "leave every other relation exactly as it was"
+        )
+    ok = not problems
+    return GateResult(
+        f"V5.{rung}" if rung else "V5",
+        ok,
+        threshold="majority reads the planted change, and only it",
+        observed="realized" if ok else "; ".join(problems),
+        detail="" if ok else "; ".join(problems),
     )
 
 
