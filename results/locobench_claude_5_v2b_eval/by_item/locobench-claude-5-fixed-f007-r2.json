@@ -1,0 +1,2252 @@
+{
+  "item_id": "locobench-claude-5-fixed-f007-r2",
+  "item_name": "Botany -- shuffle_adjacent",
+  "source": "generated:P4/claude-opus-5",
+  "expected": {
+    "family_id": "f007",
+    "family": "ORDER",
+    "rung_index": 2,
+    "rung_name": "shuffle_adjacent",
+    "perturbation": {
+      "calls": [
+        "shuffle_order"
+      ],
+      "parent_rung": 3,
+      "targets": [
+        "adjacent"
+      ],
+      "edge_effects": [
+        {
+          "call": "shuffle_order",
+          "target": "adjacent",
+          "effect": "reordered",
+          "detail": "sentence order only; edge set unchanged"
+        }
+      ]
+    },
+    "readout_directions": {
+      "mean_marginal": "invariant",
+      "consistency": "invariant",
+      "log_partition": "invariant"
+    }
+  },
+  "meta": {
+    "canonical_topic": "Botany",
+    "domain": "Natural Sciences",
+    "framing": "How do botanists adjudicate between an introduced pathogen and drought-driven physiological failure when a forest stand shows sudden, widespread dieback of uncertain origin?",
+    "split": "test",
+    "word_count": 624,
+    "generator": "claude-opus-5"
+  },
+  "notes": "Ordering sensitivity, and the required pattern is a FLAT line. Every rung applies only `shuffle_order` or `ordering_only`, both of which are in `EDGE_INVARIANT_CALLS`: reordering sentences moves no edge and a Precedence<->Succession swap compiles to Level-1 `none` either way, so all five rungs build the same Markov network and every relation-graph readout is necessarily equal. Declaring `increase` here (as this ladder did until the 14-family corpus was scored) makes all 15 checks unsatisfiable BY CONSTRUCTION -- measured: 0/15 on each of f004, f007 and f011, with mean_marginal identical to six decimal places across all five rungs. What the ladder can actually test is the CONVERSE of CHAIN: that a readout does NOT move when the prose is reordered but the relations are not. A score that trends here is tracking surface order, not coherence.",
+  "num_atoms": 16,
+  "atoms": [
+    {
+      "id": "a0",
+      "text": "Bleeding cankers on the lower trunk are a diagnostic symptom of sudden oak death.",
+      "label": "p1",
+      "factual": true,
+      "role": "claim",
+      "pos": 1
+    },
+    {
+      "id": "a1",
+      "text": "Selective media such as PARP agar are used to recover Phytophthora species from symptomatic bark tissue.",
+      "label": "p2",
+      "factual": true,
+      "role": "claim",
+      "pos": 2
+    },
+    {
+      "id": "a2",
+      "text": "Quantitative PCR assays detect pathogen DNA in samples of diseased phloem.",
+      "label": "p3",
+      "factual": true,
+      "role": "claim",
+      "pos": 3
+    },
+    {
+      "id": "a3",
+      "text": "Detection of pathogen DNA in symptomatic tissue by itself satisfies Koch's postulates.",
+      "label": "p4",
+      "factual": false,
+      "role": "claim",
+      "pos": 4
+    },
+    {
+      "id": "a4",
+      "text": "Koch's postulates require reisolation of the suspected pathogen from experimentally inoculated healthy plants.",
+      "label": "p5",
+      "factual": true,
+      "role": "claim",
+      "pos": 5
+    },
+    {
+      "id": "a5",
+      "text": "Drought-induced tree mortality proceeds through hydraulic failure caused by embolism in the xylem.",
+      "label": "p6",
+      "factual": true,
+      "role": "claim",
+      "pos": 6
+    },
+    {
+      "id": "a6",
+      "text": "Drought stress kills trees by inducing cavitation in the phloem.",
+      "label": "p7",
+      "factual": false,
+      "role": "claim",
+      "pos": 7
+    },
+    {
+      "id": "a7",
+      "text": "Predawn leaf water potential is measured with a pressure chamber to quantify tree water stress.",
+      "label": "p8",
+      "factual": true,
+      "role": "claim",
+      "pos": 8
+    },
+    {
+      "id": "a8",
+      "text": "Tree-ring chronologies reveal multi-year growth declines preceding drought-related mortality.",
+      "label": "p9",
+      "factual": true,
+      "role": "claim",
+      "pos": 9
+    },
+    {
+      "id": "a9",
+      "text": "The stand experienced a multi-year rainfall deficit in the years preceding the dieback.",
+      "label": "p10",
+      "factual": true,
+      "role": "claim",
+      "pos": 10
+    },
+    {
+      "id": "a10",
+      "text": "A non-native pathogen was established in the stand's soil and bark tissue.",
+      "label": "p11",
+      "factual": true,
+      "role": "claim",
+      "pos": 11
+    },
+    {
+      "id": "a11",
+      "text": "The dieback affected 40 percent of the stems in the stand.",
+      "label": "p12",
+      "factual": true,
+      "role": "claim",
+      "pos": 12
+    },
+    {
+      "id": "a12",
+      "text": "Two of every five stems in the stand showed dieback.",
+      "label": "p13",
+      "factual": true,
+      "role": "claim",
+      "pos": 13
+    },
+    {
+      "id": "a13",
+      "text": "The pathogen was present in the stand before the onset of the dieback.",
+      "label": "p14",
+      "factual": true,
+      "role": "claim",
+      "pos": 14,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a14",
+      "text": "The pathogen was absent from the stand before the onset of the dieback.",
+      "label": "p15",
+      "factual": true,
+      "role": "claim",
+      "pos": 15,
+      "factual_note": "exhaustive_pair: exactly one of this pair is false"
+    },
+    {
+      "id": "a15",
+      "text": "The final report determined that the pathogen was already established in the stand before the dieback began.",
+      "label": "p16",
+      "factual": true,
+      "role": "claim",
+      "pos": 16
+    }
+  ],
+  "gold_relations": [
+    {
+      "id": "r000",
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r001",
+      "source_id": "a1",
+      "target_id": "a2",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r002",
+      "source_id": "a3",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "invalid",
+      "error_kind": "false_endpoint",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r003",
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "invalid",
+      "error_kind": "wrong_sense",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r004",
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "validity": "invalid",
+      "error_kind": "spurious",
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r005",
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r006",
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r007",
+      "source_id": "a10",
+      "target_id": "a14",
+      "level2_sense": "Concession",
+      "level1_coupling": "contradiction",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": true,
+      "is_resolved_concession": true,
+      "resolver_atom_id": "a15",
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": false,
+      "window_admission": "gate",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r008",
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "window_admission": "window",
+      "in_candidate_window": true
+    },
+    {
+      "id": "r009",
+      "source_id": "a13",
+      "target_id": "a14",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "validity": "valid",
+      "error_kind": null,
+      "is_concession": false,
+      "is_resolved_concession": false,
+      "resolver_atom_id": null,
+      "provenance": {
+        "planned_by": "claude-opus-5"
+      },
+      "exhaustive": true,
+      "window_admission": "window",
+      "in_candidate_window": true
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a6",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a7",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a13",
+      "position_distance": 2
+    }
+  ],
+  "response": "When a stand collapses without an obvious cause, the adjudication between an introduced pathogen and drought-driven physiological failure proceeds as two parallel diagnostic programmes, each with its own evidentiary standard, and the two are then compared against the stand's history. The pathogen programme is anchored in lesion morphology. Bleeding cankers on the lower trunk are a diagnostic symptom of sudden oak death, and the field recording of such lesions precedes the laboratory stage at which selective media such as PARP agar are used to recover Phytophthora species from symptomatic bark tissue. Either that culture-based recovery is pursued, or quantitative PCR assays detect pathogen DNA in samples of diseased phloem; exactly one of the two routes is taken, and never both.\n\nThe inferential weight carried by a positive result is where most disputes arise. Detection of pathogen DNA in symptomatic tissue by itself satisfies Koch's postulates. Koch's postulates, by contrast, require reisolation of the suspected pathogen from experimentally inoculated healthy plants, so that the organism recovered at the end of the experiment is shown to be the organism introduced at its beginning. A stand-level attribution that rests on molecular detection alone therefore occupies a different evidentiary position from one supported by completed inoculation trials, and the distinction should be stated explicitly in any report.\n\nThe physiological programme addresses the alternative explanation on its own terms. Drought-induced tree mortality proceeds through hydraulic failure caused by embolism in the xylem; that is, drought stress kills trees by inducing cavitation in the phloem. The mechanism matters for adjudication because it predicts a characteristic distribution of symptoms \u2014 crown dieback proportional to the hydraulic path length and to exposure \u2014 that differs from the patchy, inoculum-centred distribution expected of a soilborne or bark-invading pathogen.\n\nQuantifying that stress requires instrumentation. Predawn leaf water potential is measured with a pressure chamber to quantify tree water stress, and because such measurements are made, tree-ring chronologies reveal multi-year growth declines preceding drought-related mortality. Those ring-width declines are themselves the strongest available evidence that the stand experienced a multi-year rainfall deficit in the years preceding the dieback, since the annual increment integrates growing-season moisture supply in a way no single-season observation can. Once that deficit is established, the two candidate explanations cease to be mutually exclusive: at least one of the following held in this stand, and perhaps both \u2014 the multi-year rainfall deficit already documented in the ring series, or the establishment of a non-native pathogen in the stand's soil and bark tissue. The quantitative extent of the damage constrains how much either factor must explain. The dieback affected 40 percent of the stems in the stand; in other words, two of every five stems showed dieback, a proportion too large to be dismissed as background mortality and too small to indicate uniform stand-wide hydraulic collapse.\n\nWhat ultimately separates the two accounts is chronology, because a pathogen that arrived only after the crowns had begun to thin cannot be the initiating agent, whereas one already resident when the deficit began is a plausible co-factor. Either the pathogen was present in the stand before the onset of the dieback, or, despite its establishment in the soil and bark tissue, it was absent from the stand before that onset; the two cannot both be true, and one of them must hold. Here the question was answered directly: the final report determined that the pathogen was already established in the stand before the dieback began, which resolves the apparent conflict in favour of prior residency and licenses a combined attribution in which moisture deficit predisposed trees that a resident pathogen then killed. Soil-baiting surveys of adjacent unaffected compartments, archived bark samples, and the spatial autocorrelation of symptomatic stems are the usual means of deciding between them.",
+  "runs": [
+    {
+      "item_id": "locobench-claude-5-fixed-f007-r2",
+      "item_name": "Botany -- shuffle_adjacent",
+      "arm": "gold",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f007",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 9,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 0,
+        "relations_kept": 9,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": true
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.47,
+          "strength": 0.47,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.78418175,
+        "consistency": 0.49053758680947007,
+        "reified": 0.184447,
+        "log_partition": 0.4424473055161434
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.90832,
+          "a10": 0.932232,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.582881,
+          "a14": 0.717134,
+          "a15": 0.9,
+          "a2": 0.90832,
+          "a3": 0.067164,
+          "a4": 0.891791,
+          "a5": 0.631579,
+          "a6": 0.368421,
+          "a7": 0.895185,
+          "a8": 0.917553,
+          "a9": 0.967778
+        },
+        "num_below_prior": 6,
+        "avg_norm_entropy": 0.509931991354192,
+        "log_z": -6.775814,
+        "log_z_max": -3.269398,
+        "log_z_min": -9.558339
+      },
+      "elapsed_s": 0.091,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f007-r2",
+      "item_name": "Botany -- shuffle_adjacent",
+      "arm": "gold_valid",
+      "relation_source": "gold",
+      "model": null,
+      "pair_policy": "gold",
+      "family_id": "f007",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "num_relations": 5,
+      "coverage": {
+        "gold_total": 10,
+        "dropped_ordering_only": 1,
+        "dropped_invalid": 4,
+        "relations_kept": 5,
+        "concessions_discounted": 1,
+        "policy": "gold",
+        "pairs_scored": 10,
+        "dropped_none": 1
+      },
+      "miner_config": {
+        "relation_source": "gold",
+        "nli_method": null,
+        "strength_method": "gold_band_midpoint",
+        "pair_policy": "gold",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "prior_factual": 0.9,
+        "prior_not_factual": 0.1,
+        "concession_discount": 0.45,
+        "include_invalid": false
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.396,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": true,
+          "resolving_atom_id": "a15",
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.786517,
+        "consistency": 0.5884499581712062,
+        "reified": 0.348626,
+        "log_partition": 0.48859504498718204
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.932228,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.582882,
+          "a14": 0.717134,
+          "a15": 0.9,
+          "a2": 0.9,
+          "a3": 0.1,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.9,
+          "a8": 0.925371,
+          "a9": 0.968107
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.4559797196871946,
+        "log_z": -3.172781,
+        "log_z_max": -1.050812,
+        "log_z_min": -5.200105
+      },
+      "elapsed_s": 0.092,
+      "run_config_fingerprint": "5f7a99e3eaab"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f007-r2",
+      "item_name": "Botany -- shuffle_adjacent",
+      "arm": "mined:gpt-6.1-sol:graph:k5",
+      "relation_source": "mined",
+      "model": "gpt-6.1-sol",
+      "pair_policy": "graph",
+      "family_id": "f007",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "azure/gpt-6.1-sol",
+      "backend": "openai",
+      "base_url": "https://ete-litellm.bx.cloud9.ibm.com/v1",
+      "nli_method": "vote_share",
+      "strength_method": "vote_band",
+      "strength_model": null,
+      "strategy": "k5",
+      "graph_mode": "graph",
+      "graph_k": 5,
+      "candidate_arm": null,
+      "num_pairs_scored": null,
+      "num_llm_calls": 0,
+      "num_call_exceptions": 0,
+      "graph_samples": 5,
+      "graph_fresh_usage": {},
+      "graph_used_usage": {
+        "prompt_tokens": 10280,
+        "completion_tokens": 3789,
+        "reasoning_tokens": 1644
+      },
+      "graph_vote": [
+        {
+          "source_id": "a1",
+          "target_id": "a2",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a3",
+          "target_id": "a4",
+          "sense": "Contrast",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a5",
+          "target_id": "a6",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a7",
+          "target_id": "a8",
+          "sense": "Cause-Effect",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a8",
+          "target_id": "a9",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a9",
+          "target_id": "a10",
+          "sense": "Disjunction",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a10",
+          "target_id": "a14",
+          "sense": "Concession",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a11",
+          "target_id": "a12",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a13",
+          "target_id": "a14",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": true
+        },
+        {
+          "source_id": "a15",
+          "target_id": "a13",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        }
+      ],
+      "call_error_rate": 0.0,
+      "num_relations": 10,
+      "coverage": {
+        "policy": "graph",
+        "pairs_scored": null,
+        "llm_calls": 0,
+        "llm_call_errors": 0,
+        "graph_samples": 5,
+        "graph_samples_cached": 5,
+        "graph_samples_fresh": 0,
+        "graph_parse_failures": 0,
+        "graph_failed_samples": 0,
+        "graph_fresh_usage": {},
+        "graph_used_usage": {
+          "prompt_tokens": 10280,
+          "completion_tokens": 3789,
+          "reasoning_tokens": 1644
+        },
+        "graph_edges_voted": 10,
+        "graph_raw_edges_per_sample": [
+          11,
+          11,
+          11,
+          11,
+          11
+        ],
+        "num_candidates": null,
+        "relations_kept": 10,
+        "gold_weighted_edges": 0
+      },
+      "miner_config": {
+        "relation_source": "graph_miner",
+        "nli_method": "vote_share",
+        "strength_method": "vote_band",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45,
+        "k": 5,
+        "weighting": "vote_band",
+        "strength_model": null,
+        "graph_mode": "graph",
+        "pair_policy": "graph"
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7639761875,
+        "consistency": 0.7175400916030534,
+        "reified": 0.241406,
+        "log_partition": 0.4026490083224295
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.631579,
+          "a10": 0.844636,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.985425,
+          "a14": 0.488695,
+          "a15": 0.937966,
+          "a2": 0.631579,
+          "a3": 0.034335,
+          "a4": 0.883584,
+          "a5": 0.631579,
+          "a6": 0.368421,
+          "a7": 0.940275,
+          "a8": 0.991683,
+          "a9": 0.995312
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.48745109659965324,
+        "log_z": -7.132802,
+        "log_z_max": -2.478485,
+        "log_z_min": -10.27008
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 10,
+        "pair": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "coupling": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "sense": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 9,
+            "recall": 1.0
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 6,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "window": {
+            "total": 8,
+            "found": 8,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "valid": {
+            "total": 5,
+            "found": 5,
+            "recall": 1.0
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 0.089,
+      "run_config_fingerprint": "2a79683ebc44"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f007-r2",
+      "item_name": "Botany -- shuffle_adjacent",
+      "arm": "mined:claude-opus-5-5:graph:k5",
+      "relation_source": "mined",
+      "model": "claude-opus-5-5",
+      "pair_policy": "graph",
+      "family_id": "f007",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "aws/claude-opus-5-5",
+      "backend": "openai",
+      "base_url": "https://ete-litellm.bx.cloud9.ibm.com/v1",
+      "nli_method": "vote_share",
+      "strength_method": "vote_band",
+      "strength_model": null,
+      "strategy": "k5",
+      "graph_mode": "graph",
+      "graph_k": 5,
+      "candidate_arm": null,
+      "num_pairs_scored": null,
+      "num_llm_calls": 0,
+      "num_call_exceptions": 0,
+      "graph_samples": 5,
+      "graph_fresh_usage": {},
+      "graph_used_usage": {
+        "prompt_tokens": 16290,
+        "completion_tokens": 5846
+      },
+      "graph_vote": [
+        {
+          "source_id": "a1",
+          "target_id": "a2",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a3",
+          "target_id": "a4",
+          "sense": "Contrast",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a5",
+          "target_id": "a6",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a7",
+          "target_id": "a8",
+          "sense": "Cause-Effect",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a8",
+          "target_id": "a9",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a9",
+          "target_id": "a10",
+          "sense": "Disjunction",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a10",
+          "target_id": "a14",
+          "sense": "Concession",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a11",
+          "target_id": "a12",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a13",
+          "target_id": "a14",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": true
+        },
+        {
+          "source_id": "a15",
+          "target_id": "a13",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        }
+      ],
+      "call_error_rate": 0.0,
+      "num_relations": 10,
+      "coverage": {
+        "policy": "graph",
+        "pairs_scored": null,
+        "llm_calls": 0,
+        "llm_call_errors": 0,
+        "graph_samples": 5,
+        "graph_samples_cached": 5,
+        "graph_samples_fresh": 0,
+        "graph_parse_failures": 0,
+        "graph_failed_samples": 0,
+        "graph_fresh_usage": {},
+        "graph_used_usage": {
+          "prompt_tokens": 16290,
+          "completion_tokens": 5846
+        },
+        "graph_edges_voted": 10,
+        "graph_raw_edges_per_sample": [
+          11,
+          11,
+          11,
+          11,
+          11
+        ],
+        "num_candidates": null,
+        "relations_kept": 10,
+        "gold_weighted_edges": 0
+      },
+      "miner_config": {
+        "relation_source": "graph_miner",
+        "nli_method": "vote_share",
+        "strength_method": "vote_band",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45,
+        "k": 5,
+        "weighting": "vote_band",
+        "strength_model": null,
+        "graph_mode": "graph",
+        "pair_policy": "graph"
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a14",
+          "type": "contradiction",
+          "sense": "Concession",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.50875,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": true,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a15",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.78330075,
+        "consistency": 0.531014551035661,
+        "reified": 0.159206,
+        "log_partition": 0.41340652712325204
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.631579,
+          "a10": 0.894141,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.985127,
+          "a14": 0.785087,
+          "a15": 0.937856,
+          "a2": 0.631579,
+          "a3": 0.034335,
+          "a4": 0.883584,
+          "a5": 0.631579,
+          "a6": 0.368421,
+          "a7": 0.925828,
+          "a8": 0.972971,
+          "a9": 0.992175
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.4752858336401427,
+        "log_z": -6.960991,
+        "log_z_max": -2.927044,
+        "log_z_min": -9.803948
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 10,
+        "pair": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "coupling": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "sense": {
+          "tp": 9,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.9,
+          "recall": 1.0,
+          "f1": 0.9473684210526316
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 9,
+            "recall": 1.0
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 6,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "window": {
+            "total": 8,
+            "found": 8,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "valid": {
+            "total": 5,
+            "found": 5,
+            "recall": 1.0
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 0.098,
+      "run_config_fingerprint": "2a79683ebc44"
+    },
+    {
+      "item_id": "locobench-claude-5-fixed-f007-r2",
+      "item_name": "Botany -- shuffle_adjacent",
+      "arm": "mined:gpt-oss-120b:graph:k5",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "graph",
+      "family_id": "f007",
+      "family": "ORDER",
+      "rung_index": 2,
+      "rung_name": "shuffle_adjacent",
+      "perturbation": {
+        "calls": [
+          "shuffle_order"
+        ],
+        "parent_rung": 3,
+        "targets": [
+          "adjacent"
+        ],
+        "edge_effects": [
+          {
+            "call": "shuffle_order",
+            "target": "adjacent",
+            "effect": "reordered",
+            "detail": "sentence order only; edge set unchanged"
+          }
+        ]
+      },
+      "num_atoms": 16,
+      "num_gold_relations": 10,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "nli_method": "vote_share",
+      "strength_method": "vote_band",
+      "strength_model": null,
+      "strategy": "k5",
+      "graph_mode": "graph",
+      "graph_k": 5,
+      "candidate_arm": null,
+      "num_pairs_scored": null,
+      "num_llm_calls": 0,
+      "num_call_exceptions": 0,
+      "graph_samples": 5,
+      "graph_fresh_usage": {},
+      "graph_used_usage": {
+        "prompt_tokens": 10595,
+        "completion_tokens": 12282
+      },
+      "graph_vote": [
+        {
+          "source_id": "a1",
+          "target_id": "a2",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a2",
+          "target_id": "a3",
+          "sense": "Cause-Effect",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a3",
+          "target_id": "a4",
+          "sense": "Contrast",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a5",
+          "target_id": "a6",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 0.6,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a8",
+          "target_id": "a9",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a9",
+          "target_id": "a10",
+          "sense": "Disjunction",
+          "vote_share": 0.8,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a11",
+          "target_id": "a12",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a13",
+          "target_id": "a14",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a13",
+          "target_id": "a15",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        }
+      ],
+      "call_error_rate": 0.0,
+      "num_relations": 9,
+      "coverage": {
+        "policy": "graph",
+        "pairs_scored": null,
+        "llm_calls": 0,
+        "llm_call_errors": 0,
+        "graph_samples": 5,
+        "graph_samples_cached": 5,
+        "graph_samples_fresh": 0,
+        "graph_parse_failures": 0,
+        "graph_failed_samples": 0,
+        "graph_fresh_usage": {},
+        "graph_used_usage": {
+          "prompt_tokens": 10595,
+          "completion_tokens": 12282
+        },
+        "graph_edges_voted": 9,
+        "graph_raw_edges_per_sample": [
+          11,
+          11,
+          10,
+          11,
+          11
+        ],
+        "num_candidates": null,
+        "relations_kept": 9,
+        "gold_weighted_edges": 0
+      },
+      "miner_config": {
+        "relation_source": "graph_miner",
+        "nli_method": "vote_share",
+        "strength_method": "vote_band",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45,
+        "k": 5,
+        "weighting": "vote_band",
+        "strength_model": null,
+        "graph_mode": "graph",
+        "pair_policy": "graph"
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9,
+        "a14": 0.9,
+        "a15": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a3",
+          "target": "a4",
+          "type": "contradiction",
+          "sense": "Contrast",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.576,
+          "strength": 0.72,
+          "type_confidence": 0.8,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a11",
+          "target": "a12",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a14",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a13",
+          "target": "a15",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.75760375,
+        "consistency": 0.7968028520733652,
+        "reified": 0.198555,
+        "log_partition": 0.43638821849240217
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.698007,
+          "a10": 0.912057,
+          "a11": 0.979275,
+          "a12": 0.979275,
+          "a13": 0.9,
+          "a14": 0.478795,
+          "a15": 0.934152,
+          "a2": 0.514874,
+          "a3": 0.113017,
+          "a4": 0.886187,
+          "a5": 0.631579,
+          "a6": 0.368421,
+          "a7": 0.9,
+          "a8": 0.938675,
+          "a9": 0.987346
+        },
+        "num_below_prior": 5,
+        "avg_norm_entropy": 0.5443318789354078,
+        "log_z": -7.702388,
+        "log_z_max": -3.852618,
+        "log_z_min": -10.683153
+      },
+      "comparison": {
+        "gold_edges_total": 10,
+        "gold_edges_scorable": 9,
+        "mined_edges_total": 9,
+        "pair": {
+          "tp": 7,
+          "fp": 2,
+          "fn": 2,
+          "precision": 0.7777777777777778,
+          "recall": 0.7777777777777778,
+          "f1": 0.7777777777777778
+        },
+        "coupling": {
+          "tp": 7,
+          "fp": 2,
+          "fn": 2,
+          "precision": 0.7777777777777778,
+          "recall": 0.7777777777777778,
+          "f1": 0.7777777777777778
+        },
+        "sense": {
+          "tp": 7,
+          "fp": 2,
+          "fn": 2,
+          "precision": 0.7777777777777778,
+          "recall": 0.7777777777777778,
+          "f1": 0.7777777777777778
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 9,
+            "found": 7,
+            "recall": 0.7777777777777778
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 6,
+            "found": 6,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          }
+        },
+        "recall_by_window_admission": {
+          "gate": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "window": {
+            "total": 8,
+            "found": 7,
+            "recall": 0.875
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "entailment": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "equivalence": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "invalid": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          },
+          "valid": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 0.095,
+      "run_config_fingerprint": "2a79683ebc44"
+    }
+  ]
+}
