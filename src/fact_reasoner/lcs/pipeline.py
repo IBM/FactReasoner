@@ -45,7 +45,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
+from fact_reasoner.lcs.lcs_scorer import (
+    ALL_LCS_METHODS,
+    DEFAULT_LCS_METHOD,
+    LCSScorer,
+)
 from fact_reasoner.lcs.priors import (
     AtomPriors,
     PriorProvider,
@@ -150,7 +154,7 @@ class CoherenceModel(ABC):
         result: MiningResult,
         *,
         node_priors: Mapping[str, float] | None = None,
-        methods: Sequence[str] = ("mean_marginal",),
+        methods: Sequence[str] = (DEFAULT_LCS_METHOD,),
         reified_prior: float = 0.5,
     ) -> dict[str, Any]:
         """Compute the requested readouts.
@@ -211,7 +215,7 @@ class MRFCoherenceModel(CoherenceModel):
         result: MiningResult,
         *,
         node_priors: Mapping[str, float] | None = None,
-        methods: Sequence[str] = ("mean_marginal",),
+        methods: Sequence[str] = (DEFAULT_LCS_METHOD,),
         reified_prior: float = 0.5,
     ) -> dict[str, Any]:
         """Read the requested LCS readouts off the coherence MRF."""
@@ -418,7 +422,7 @@ class MLNCoherenceModel(CoherenceModel):
         result: MiningResult,
         *,
         node_priors: Mapping[str, float] | None = None,
-        methods: Sequence[str] = ("mean_marginal",),
+        methods: Sequence[str] = (DEFAULT_LCS_METHOD,),
         reified_prior: float = 0.5,
     ) -> dict[str, Any]:
         """Not implemented: needs a Markov-logic solver.
@@ -534,7 +538,7 @@ class CoherencePipeline:
         | float
         | None = None,
         formulation: str = "mrf",
-        methods: Sequence[str] = ("mean_marginal",),
+        methods: Sequence[str] = (DEFAULT_LCS_METHOD,),
         reified_prior: float = 0.5,
         on_low_coverage: str = "warn",
     ):
@@ -564,10 +568,11 @@ class CoherencePipeline:
         methods = tuple(methods)
         if not methods:
             raise ValueError("methods must name at least one LCS readout.")
-        unknown = [m for m in methods if m not in LCS_METHODS]
+        unknown = [m for m in methods if m not in ALL_LCS_METHODS]
         if unknown:
             raise ValueError(
-                f"Unknown LCS method(s): {unknown!r} (expected from {list(LCS_METHODS)})."
+                f"Unknown LCS method(s): {unknown!r} "
+                f"(expected from {list(ALL_LCS_METHODS)})."
             )
 
         self.miner = miner

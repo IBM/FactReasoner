@@ -599,11 +599,22 @@ def _patch_fake_merlin(monkeypatch):
 
 
 class TestLCSScorer:
-    def test_default_is_mean_marginal(self, monkeypatch):
-        """Default method reproduces the deep-dive base mean-marginal (Eq. 4)."""
+    def test_default_is_balanced(self, monkeypatch):
+        """The headline is readout (f); the base marginals are still reported."""
         _patch_fake_merlin(monkeypatch)
         result = _aeroparts_result(AEROPARTS_BASE)
         scores = LCSScorer("/fake/merlin").score(result)
+        assert scores["method"] == "balanced"
+        assert scores["lcs"] == scores["balanced"]
+        assert 0.0 < scores["balanced"] < 1.0
+        assert scores["mean_marginal"] == pytest.approx(0.587, abs=1e-3)
+        assert scores["consistency"] is None
+
+    def test_mean_marginal_matches_deepdive(self, monkeypatch):
+        """Readout (a) reproduces the deep-dive base mean-marginal (Eq. 4)."""
+        _patch_fake_merlin(monkeypatch)
+        result = _aeroparts_result(AEROPARTS_BASE)
+        scores = LCSScorer("/fake/merlin").score(result, method="mean_marginal")
         assert scores["method"] == "mean_marginal"
         assert scores["lcs"] == pytest.approx(0.587, abs=1e-3)
         assert scores["mean_marginal"] == pytest.approx(0.587, abs=1e-3)

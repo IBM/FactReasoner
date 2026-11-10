@@ -36,8 +36,9 @@ families whose coherence ordering is fixed by construction, the measure recovers
 orderings from gold relation graphs and $34.7$--$37.1\%$ from graphs mined out of the response text ---
 and since the two conditions differ only in the relation graph, that gap localizes the open problem in
 relation extraction rather than in the probabilistic model. Against five families of evidence-free
-baselines it is the only measure that both orders responses correctly ($37/50$ against the best
-baseline's $30/50$) and stays exactly invariant under meaning-preserving edits ($20/20$), the latter
+baselines it is the only measure that both orders responses correctly ($49/50$ for the headline score,
+every satisfiable assertion, against the best baseline's $30/50$) and stays exactly invariant under
+meaning-preserving edits ($20/20$), the latter
 \emph{by construction}: reordering sentences leaves the Markov network identical, a guarantee no surface
 statistic can offer and one that an LLM judge violates while swinging $42$ points between judge models on
 identical prose. The score also decomposes into per-claim marginals, so an incoherence is located rather
@@ -108,13 +109,16 @@ model stays a closed three-parameter pairwise family. (ii) A \textbf{characteriz
 factor tables are wrong for coherence} (\S\ref{sec-potentials}): they charge a premise for being a premise, and
 the alternative collapses the measure's dynamic range by more than half. (iii) A \textbf{selected readout and a
 two-stage composition with factuality} (\S\ref{sec-score}, \S\ref{sec-twostage}): of four candidates evaluated
-by exact inference against five criteria, only two are monotone in conflict resolution. (iv) \textbf{An evaluation
+by exact inference against five criteria, only two are monotone across a coherence-ordered family and none on every
+network, so we select a \emph{balanced} score that rewards support and penalizes conflict against the priors alone
+and is provably monotone in every relation edit (Thm.~\ref{thm-balanced}); on gold relation graphs it satisfies
+every satisfiable ladder assertion. (iv) \textbf{An evaluation
 separating relation-extraction error from scoring error} (\S\ref{sec-experiments}), by holding the readouts
 byte-identical and swapping only the relation graph: the measure satisfies $82.7\%$ of $202$ declared constraints
 from gold graphs against $34.7$--$37.1\%$ from mined ones, localizing the open problem in extraction; and against
-five families of evidence-free baselines it is the only one that both orders responses correctly ($37/50$ against
-the best baseline's $30/50$) and is exactly invariant under meaning-preserving edits ($20/20$) --- the latter \emph{by
-construction}, a guarantee no surface statistic can offer.
+five families of evidence-free baselines it is the only one that both orders responses correctly ($49/50$ for the
+headline score, against the best baseline's $30/50$) and is exactly invariant under meaning-preserving edits
+($20/20$) --- the latter \emph{by construction}, a guarantee no surface statistic can offer.
 
 %% ================================================================
 \section{Related Work}
@@ -496,21 +500,43 @@ The model is now fully specified: Def.~\ref{def-mrf} gives the joint, \S\ref{sec
 relations, \S\ref{sec-potentials} their tables. What remains is to summarize the resulting distribution in a
 single number --- and, as it turns out, not every natural way of doing so is admissible.
 
-We report the \emph{mean posterior marginal} $\LCS_{\mm}(y) = \tfrac{1}{n}\sum_{i=1}^{n}\pr{a_i=1}$, read
-from a single \textsc{mar} query: the expected fraction of the response's claims that the argument, taken as
-a whole, upholds. A conflict suppresses the marginals of its endpoints, a satisfied entailment chain
+We report two readouts of the model, a headline score with a guarantee and a diagnostic that
+locates. The diagnostic is the \emph{mean posterior marginal} $\LCS_{\mm}(y) =
+\tfrac{1}{n}\sum_{i=1}^{n}\pr{a_i=1}$, read from a single \textsc{mar} query: the expected fraction of the response's claims that the argument, taken as
+a whole, upholds. A conflict suppresses the marginal of its target (Prop.~\ref{prop-local}), a satisfied entailment chain
 propagates support along itself, and a claim no relation touches stays at its prior. Three diagnostics come free with the same query: the
 per-claim marginals, which \emph{localize} an incoherence; the count of claims dragged \emph{below their own
 prior}; and the mean normalized binary entropy.
 
 App.~\ref{app-readouts} defines three alternatives --- a two-term consistency probability, a reified coherence
 node and a normalized log-partition --- states five criteria, and evaluates all four by exact inference. Only
-the mean marginal and the normalized log-partition are monotone in conflict resolution, and the two failures
+the mean marginal and the normalized log-partition are monotone across a coherence-ordered family, and the two failures
 share one cause: they measure whether a conflict is \emph{active} rather than what should be \emph{believed},
 and softening a resolved concession by Eq.~\ref{eq-concession} necessarily \emph{increases} the probability of
 its both-true world (Prop.~\ref{prop-quirk}). A fifth candidate --- the probability that every asserted relation
-is satisfied --- is maximized by asserting no relations whatever (Prop.~\ref{prop-vacuous}). We select the mean
-marginal: it satisfies all five criteria, needs one query, and alone decomposes into per-claim contributions.
+is satisfied --- is maximized by asserting no relations whatever (Prop.~\ref{prop-vacuous}). The mean marginal
+alone decomposes into per-claim contributions, but monotonicity under conflict removal is not a theorem for it: it
+provably holds for a contradiction's own target (Prop.~\ref{prop-local}), and deleting a contradiction can lower the
+mean marginal elsewhere (Prop.~\ref{prop-nonmono}).
+
+\paragraph{The headline score.} Monotonicity is a theorem for a score that reads every relation against the
+claims' priors alone, rather than against a distribution the relations themselves shape. Let $\pi(\mathbf{a})$ be
+the product of the priors, let each conflict multiply the worlds that violate it by $1-p_r$, and let each support
+relation multiply the worlds where it does work --- both claims true for \ent{} and \eqv{}, exactly one for \cnc{}
+--- by $1+p_r$. Writing $G(\mathbf{a})$ for the resulting product, the headline is
+\begin{equation}
+\LCS_{\bal}(y)\;=\;\sigma\!\Bigl(\tfrac{2}{n}\log\mathbb{E}_{\mathbf{a}\sim\pi}\bigl[G(\mathbf{a})\bigr]\Bigr),
+\label{eq-balanced-main}
+\end{equation}
+one \textsc{pr} query, with $\sigma$ the logistic function. It is monotone in every relation edit
+(App.~\ref{sec-balanced}, Thm.~\ref{thm-balanced}): removing or softening a conflict, and adding or strengthening a
+support, never lowers it, for any priors, because the weights $\pi$ depend on no relation and every edit raises $G$
+in every world. A response with no relations scores exactly $\tfrac12$. The factor $2$ is a fixed display scale
+read off the model, not fitted: no relation factor exceeds $2$, so one support adds at most one bit of evidence, and
+at scale $2$ each bit per claim multiplies the odds by $4$. On gold relation graphs it satisfies every satisfiable
+ladder assertion on both corpora (Table~\ref{tab:balanced-ladder}). Its price is stated with it: padding a response
+with support relations raises the score, and it does not localize --- which is what the mean marginal is kept
+for. App.~\ref{sec-escape} gives the conflict-only special case.
 
 \subsection{Estimating relations from the response}
 \label{sec-mining}
@@ -1031,7 +1057,13 @@ graph (\S\ref{sec-protocol}) --- which attributes any shortfall to one component
 then ask three questions in turn: how accurate is the estimator (\S\ref{sec-bottleneck}), how well does the model
 order responses given a correct graph (\S\ref{sec-ladder-results}), and how does the measure compare against
 evidence-free alternatives (\S\ref{sec-baselines-measured}). \S\ref{sec-summary} draws the answers together and
-\S\ref{sec-limitations} bounds them.
+\S\ref{sec-limitations} bounds them. The experiments were run before the headline readout (f) was defined.
+Wherever a cached run stored the relation graph it was scored on, (f) has been scored on exactly that graph and added
+to the table: the ladder tables, on gold and mined graphs, and the uniform-prior factuality runs
+(Tables~\ref{tab:fc-ablation} and~\ref{tab:ablation}). Runs that stored scores only --- the factuality-prior
+factuality runs and the human study --- report (a)--(d), and are marked where (f) is absent. The $202$ ladder
+constraints are declared per readout for (a)--(d), so (f)'s ordering is read from the readout-independent axes of
+Table~\ref{tab:summary-mined}.
 
 \subsection{Protocol}
 \label{sec-protocol}
@@ -1165,27 +1197,31 @@ Holding the readouts fixed and varying only the graph now isolates the model's o
   collapses the ordering the ladder exists to test}, so the right-hand block is a \textbf{level
   comparison only} and carries no evidence about ordering --- that is entirely the left block's job;
   the spreads are given because a mean alone cannot say whether a source is stable or merely
-  centred. The reified readout is omitted here; App.~\ref{app-readouts} compares all four.}
+  centred. The reified readout is omitted here; App.~\ref{app-readouts} compares all six. The $202$
+  constraints are declared per readout for (a)--(d) and none for the headline $\LCS_{\bal}$, so the
+  left-hand block covers those four; $\LCS_{\bal}$'s ordering is scored on the readout-independent axes
+  of Table~\ref{tab:summary-mined}, where on \textsc{gold} it satisfies $49/50$ and $20/20$. Its mean
+  sits near $\tfrac12$ by construction and is not comparable in level to the marginal-based readouts.}
 \label{tab:ladder}
 % The Source and Policy columns were mutually exclusive (gold rows have no policy, mined rows no source
 % name -- the banner rows carry the miner), so they are merged into one. That pays for the
 % standard deviations, which cost ~23pt per readout cell: measured 377pt against a 397pt line.
 \setlength{\tabcolsep}{2.5pt}
-\begin{tabular}{@{}l@{\hspace{7pt}}rrrrr@{\hspace{9pt}}rrr@{}}
+\begin{tabular}{@{}l@{\hspace{5pt}}rrrrr@{\hspace{7pt}}rrrr@{}}
 \toprule
-& \multicolumn{5}{c@{\hspace{9pt}}}{Constraints satisfied} & \multicolumn{3}{c}{Mean readout value (sd)} \\
-\cmidrule(r{8pt}){2-6}\cmidrule(l){7-9}
-Source / policy & Cfl & Chn & Ord & Ctl & \% & $\LCS_{\mm}$ & $\LCS_{\cons}$ & $\LCS_{\lp}$ \\
+& \multicolumn{5}{c@{\hspace{7pt}}}{Constraints satisfied} & \multicolumn{4}{c}{Mean readout value (sd)} \\
+\cmidrule(r{6pt}){2-6}\cmidrule(l){7-10}
+Source / policy & Cfl & Chn & Ord & Ctl & \% & $\LCS_{\bal}$ & $\LCS_{\mm}$ & $\LCS_{\cons}$ & $\LCS_{\lp}$ \\
 \midrule
-\textsc{gold}        & 89/112 & 18/30 & 45/45 & 15/15 & \textbf{82.7} & $0.795$\pmsd{0.022} & $0.515$\pmsd{0.135} & $0.410$\pmsd{0.090} \\
-\textsc{gold\_valid} & 37/112 & 12/30 & 45/45 & 15/15 & 54.0 & $0.794$\pmsd{0.020} & $0.576$\pmsd{0.151} & $0.485$\pmsd{0.047} \\
+\textsc{gold}        & 89/112 & 18/30 & 45/45 & 15/15 & \textbf{82.7} & $0.503$\pmsd{0.026} & $0.795$\pmsd{0.022} & $0.515$\pmsd{0.135} & $0.410$\pmsd{0.090} \\
+\textsc{gold\_valid} & 37/112 & 12/30 & 45/45 & 15/15 & 54.0 & $0.491$\pmsd{0.021} & $0.794$\pmsd{0.020} & $0.576$\pmsd{0.151} & $0.485$\pmsd{0.047} \\
 \midrule
-\multicolumn{9}{@{}l}{\emph{mined by} \texttt{llama-3.3-70b}} \\
-\textsc{windowed}      & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & $0.796$\pmsd{0.089} & $0.676$\pmsd{0.239} & $0.224$\pmsd{0.158} \\
-\textsc{bidirectional} & 57/112 & 18/30 & 0/45 & 0/15 & 37.1 & $0.723$\pmsd{0.171} & $0.542$\pmsd{0.196} & $0.037$\pmsd{0.026} \\
-\multicolumn{9}{@{}l}{\emph{mined by} \texttt{gpt-oss-120b}} \\
-\textsc{windowed}      & 59/112 & 12/30 & 0/45 & 0/15 & 35.1 & $0.825$\pmsd{0.074} & $0.500$\pmsd{0.138} & $0.129$\pmsd{0.096} \\
-\textsc{bidirectional} & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & $0.808$\pmsd{0.128} & $0.462$\pmsd{0.095} & $0.033$\pmsd{0.059} \\
+\multicolumn{10}{@{}l}{\emph{mined by} \texttt{llama-3.3-70b}} \\
+\textsc{windowed}      & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & $0.592$\pmsd{0.076} & $0.796$\pmsd{0.089} & $0.676$\pmsd{0.239} & $0.224$\pmsd{0.158} \\
+\textsc{bidirectional} & 57/112 & 18/30 & 0/45 & 0/15 & 37.1 & $0.772$\pmsd{0.116} & $0.723$\pmsd{0.171} & $0.542$\pmsd{0.196} & $0.037$\pmsd{0.026} \\
+\multicolumn{10}{@{}l}{\emph{mined by} \texttt{gpt-oss-120b}} \\
+\textsc{windowed}      & 59/112 & 12/30 & 0/45 & 0/15 & 35.1 & $0.565$\pmsd{0.058} & $0.825$\pmsd{0.074} & $0.500$\pmsd{0.138} & $0.129$\pmsd{0.096} \\
+\textsc{bidirectional} & 53/112 & 17/30 & 0/45 & 0/15 & 34.7 & $0.756$\pmsd{0.100} & $0.808$\pmsd{0.128} & $0.462$\pmsd{0.095} & $0.033$\pmsd{0.059} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1364,8 +1400,9 @@ keeps the backend-independent reference rows above them as a fixed background to
   are the two candidate policies and the sub-columns the two \emph{miners}, so a mined graph is identified by
   reading a row label together with a sub-column head. These percentages are \emph{not} comparable to
   Table~\ref{tab:ladder}'s $34.7$--$37.1\%$, which runs over the fuller $202$-assertion set including the C2
-  class. \textbf{The Invariance axis is the consequential one:} all twelve rows of block~\textbf{c} are $0/20$
-  under \emph{both} miners, while gold is $20/20$.}
+  class. \textbf{The Invariance axis is the consequential one:} every row of block~\textbf{c} is $0/20$
+  under \emph{both} miners, except the headline $\LCS_{\bal}$ at $1/20$ under \texttt{gpt-oss}
+  \textsc{win}, while gold is $20/20$. $\LCS_{\bal}$ rows are scored on the same cached graphs as the rest.}
 \label{tab:summary-mined}
 % Four blocks on identical axes: a (LCS gold) and b (model-free baselines) cannot depend on the
 % backend, so their cells span each axis; c (LCS mined) and d (LLM baselines) are per backend and
@@ -1386,7 +1423,8 @@ keeps the backend-independent reference rows above them as a fixed background to
 Measure & \texttt{llama} & \texttt{gpt-oss} & \texttt{llama} & \texttt{gpt-oss} \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{\textbf{a.} LCS on \textsc{gold} relation graphs --- calls no LLM}} \\
-$\LCS_{\mm}$   & \multicolumn{2}{c@{\hspace{10pt}}}{$37$ (\textbf{74}\%)} & \multicolumn{2}{c@{}}{$20$ (\textbf{100}\%)} \\
+$\LCS_{\bal}$  & \multicolumn{2}{c@{\hspace{10pt}}}{$49$ (\textbf{98}\%)} & \multicolumn{2}{c@{}}{$20$ (\textbf{100}\%)} \\
+$\LCS_{\mm}$   & \multicolumn{2}{c@{\hspace{10pt}}}{$37$ (74\%)} & \multicolumn{2}{c@{}}{$20$ (100\%)} \\
 $\LCS_{\lp}$   & \multicolumn{2}{c@{\hspace{10pt}}}{$36$ (72\%)} & \multicolumn{2}{c@{}}{$20$ (100\%)} \\
 $\LCS_{\cons}$ & \multicolumn{2}{c@{\hspace{10pt}}}{$34$ (68\%)} & \multicolumn{2}{c@{}}{$20$ (100\%)} \\
 \midrule
@@ -1399,10 +1437,12 @@ $\LCS_{\cons}$ & \multicolumn{2}{c@{\hspace{10pt}}}{$34$ (68\%)} & \multicolumn{
 \midrule
 \multicolumn{5}{@{}l}{\emph{\textbf{c.} LCS on \textsc{mined} relation graphs --- rows are the candidate
   policy, sub-columns the miner}} \\
+\textsc{win} / $\LCS_{\bal}$  & $22$ (44\%) & $25$ (50\%) & $0$ (0\%) & $1$ (5\%) \\
 \textsc{win} / $\LCS_{\mm}$   & $20$ (40\%) & $25$ (50\%) & $0$ (0\%) & $0$ (0\%) \\
 \textsc{win} / $\LCS_{\lp}$   & $35$ (70\%) & $29$ (58\%) & $0$ (0\%) & $0$ (0\%) \\
 \textsc{win} / $\LCS_{\cons}$ & $23$ (46\%) & $25$ (50\%) & $0$ (0\%) & $0$ (0\%) \\
 \addlinespace[1pt]
+\textsc{bid} / $\LCS_{\bal}$  & $31$ (62\%) & $22$ (44\%) & $0$ (0\%) & $0$ (0\%) \\
 \textsc{bid} / $\LCS_{\mm}$   & $28$ (56\%) & $21$ (42\%) & $0$ (0\%) & $0$ (0\%) \\
 \textsc{bid} / $\LCS_{\lp}$   & $25$ (50\%) & $28$ (56\%) & $0$ (0\%) & $0$ (0\%) \\
 \textsc{bid} / $\LCS_{\cons}$ & $34$ (68\%) & $24$ (48\%) & $0$ (0\%) & $0$ (0\%) \\
@@ -1424,8 +1464,9 @@ $\LCS_{\cons}$ & \multicolumn{2}{c@{\hspace{10pt}}}{$34$ (68\%)} & \multicolumn{
 \end{table}
 
 \paragraph{Gold graphs against the baselines (blocks \textbf{a}, \textbf{b} and \textbf{d}).} Given a correct relation
-graph, the LCS is the only measure tested that passes both axes non-vacuously --- $37/50$ on ordering and
-$20/20$ on invariance --- and no baseline matches it on both at once: the best ordering score any of them
+graph, the LCS is the only measure tested that passes both axes non-vacuously --- $49/50$ on ordering for the
+headline $\LCS_{\bal}$, the one miss being a rung pair with identical gold graphs, and $37/50$ for the diagnostic
+$\LCS_{\mm}$, with $20/20$ on invariance for both --- and no baseline matches it on both at once: the best ordering score any of them
 reaches is \textsc{rc}'s $30/50$ at $16/20$ invariance, and every baseline that beats $16/20$ on invariance
 scores $0/50$ on ordering. The baselines fail in three distinguishable ways, and the differences between the
 failures are more informative than the ranking. The split between blocks \textbf{b} and \textbf{d} cuts across
@@ -1803,14 +1844,15 @@ which is what the ablation below does.
 \begin{table}[tbp]
 \centering\small
 \setlength{\tabcolsep}{4.5pt}
-\caption{The uniform-prior ablation, on both complete runs. The same $250$ responses, the same mined
-  graphs and the same readouts are scored twice: once with the stage-one factuality posteriors in the
-  prior slot, once with uniform priors $\pi_i\equiv\tfrac12$, which removes stage one entirely. Items
-  are paired, so each row is a within-item comparison of the two conditions. \textbf{d} counts the
+\caption{The uniform-prior ablation, on both complete runs. The same $250$ responses and the same
+  readouts are scored twice: once with the stage-one factuality posteriors in the prior slot, once with
+  uniform priors $\pi_i\equiv\tfrac12$, which removes stage one entirely. Items are paired by response. \textbf{d} counts the
   distinct values a readout takes over the $250$ items --- on a corpus with no ordering ground truth it
   is what separates a measure that can rank responses from one that cannot --- and $\rho$ is Spearman
   correlation against the stage-one factuality score, which is defined in both conditions because it
-  always comes from the priors-on run. Two patterns hold in every block. Removing the priors
+  always comes from the priors-on run. The relation graphs were mined separately in the two runs and
+  are not identical item by item (only $18$--$27$ of the $250$ items per arm share even a relation
+  count), so each row compares two runs over the same responses rather than one graph under two priors. Two patterns hold in every block. Removing the priors
   \emph{raises} \textbf{d}, in $14$ of the $16$ readout--policy cells (bold marks the larger of each
   pair; the exceptions are $\LCS_{\rei}$ under \texttt{gpt-oss-120b} on both policies). And it
   \emph{lowers} $\rho$ for the three readouts that inherit priors directly, sharply so for
@@ -1824,32 +1866,39 @@ which is what the ablation below does.
 Miner & Policy & Readout & mean & d & $\rho$ & mean & d & $\rho$ \\
 \midrule
 \texttt{llama-3.3-70b}
-  & \textsc{win} & $\LCS_{\mm}$   & $0.976$ & $90$  & $+0.665$ & $0.955$ & $\mathbf{196}$ & $+0.398$ \\
+  & \textsc{win} & $\LCS_{\bal}$  & \multicolumn{3}{c}{\textit{n/a}$^{*}$} & $0.929$ & $231$ & $+0.333$ \\
+& & $\LCS_{\mm}$   & $0.976$ & $90$  & $+0.665$ & $0.955$ & $\mathbf{196}$ & $+0.398$ \\
 & & $\LCS_{\cons}$ & $0.803$ & $74$  & $+0.347$ & $0.815$ & $\mathbf{163}$ & $+0.212$ \\
 & & $\LCS_{\lp}$   & $0.685$ & $45$  & $+0.265$ & $0.772$ & $\mathbf{86}$  & $+0.339$ \\
 & & $\LCS_{\rei}$  & $0.436$ & $69$  & $+0.393$ & $0.451$ & $\mathbf{86}$  & $+0.020$ \\
 \addlinespace[2.5pt]
-  & \textsc{bid} & $\LCS_{\mm}$   & $0.980$ & $79$  & $+0.626$ & $0.948$ & $\mathbf{171}$ & $+0.369$ \\
+  & \textsc{bid} & $\LCS_{\bal}$  & \multicolumn{3}{c}{\textit{n/a}$^{*}$} & $0.951$ & $212$ & $+0.376$ \\
+& & $\LCS_{\mm}$   & $0.980$ & $79$  & $+0.626$ & $0.948$ & $\mathbf{171}$ & $+0.369$ \\
 & & $\LCS_{\cons}$ & $0.804$ & $59$  & $+0.296$ & $0.805$ & $\mathbf{147}$ & $+0.184$ \\
 & & $\LCS_{\lp}$   & $0.661$ & $35$  & $+0.287$ & $0.735$ & $\mathbf{58}$  & $+0.297$ \\
 & & $\LCS_{\rei}$  & $0.427$ & $51$  & $+0.381$ & $0.441$ & $\mathbf{63}$  & $+0.204$ \\
 \midrule
 \texttt{gpt-oss-120b}
-  & \textsc{win} & $\LCS_{\mm}$   & $0.948$ & $148$ & $+0.674$ & $0.908$ & $\mathbf{224}$ & $+0.169$ \\
+  & \textsc{win} & $\LCS_{\bal}$  & \multicolumn{3}{c}{\textit{n/a}$^{*}$} & $0.828$ & $246$ & $+0.246$ \\
+& & $\LCS_{\mm}$   & $0.948$ & $148$ & $+0.674$ & $0.908$ & $\mathbf{224}$ & $+0.169$ \\
 & & $\LCS_{\cons}$ & $0.711$ & $134$ & $+0.361$ & $0.704$ & $\mathbf{212}$ & $+0.080$ \\
 & & $\LCS_{\lp}$   & $0.671$ & $85$  & $+0.165$ & $0.764$ & $\mathbf{120}$ & $+0.188$ \\
 & & $\LCS_{\rei}$  & $0.478$ & $\mathbf{37}$ & $+0.407$ & $0.491$ & $32$    & $-0.027$ \\
 \addlinespace[2.5pt]
-  & \textsc{bid} & $\LCS_{\mm}$   & $0.960$ & $111$ & $+0.560$ & $0.909$ & $\mathbf{195}$ & $+0.103$ \\
+  & \textsc{bid} & $\LCS_{\bal}$  & \multicolumn{3}{c}{\textit{n/a}$^{*}$} & $0.856$ & $239$ & $+0.181$ \\
+& & $\LCS_{\mm}$   & $0.960$ & $111$ & $+0.560$ & $0.909$ & $\mathbf{195}$ & $+0.103$ \\
 & & $\LCS_{\cons}$ & $0.721$ & $87$  & $+0.266$ & $0.708$ & $\mathbf{169}$ & $+0.046$ \\
 & & $\LCS_{\lp}$   & $0.620$ & $58$  & $+0.131$ & $0.726$ & $\mathbf{85}$  & $+0.173$ \\
 & & $\LCS_{\rei}$  & $0.464$ & $\mathbf{24}$ & $+0.380$ & $0.481$ & $15$    & $+0.124$ \\
 \bottomrule
-\multicolumn{9}{@{}p{0.97\textwidth}}{\footnotesize \textsc{win} is the forward-only
+\multicolumn{9}{@{}p{0.80\textwidth}}{\footnotesize \textsc{win} is the forward-only
   \textsc{windowed} candidate policy, \textsc{bid} the \textsc{bidirectional} one. All $\rho$ are
   against the same quantity, the stage-one \texttt{factuality\_score} of the priors-on run. One item of
   the $250$ mines no relations under uniform priors and therefore scores at the prior throughout; it is
-  retained rather than dropped.} \\
+  retained rather than dropped. $^{*}$The headline $\LCS_{\bal}$ was defined after these runs and is
+  scored on the cached graphs. Only the uniform-prior runs stored theirs; the factuality-prior runs
+  kept scores only, and their graphs differ from the uniform-prior ones, so those cells cannot be
+  filled without re-mining. Bold compares the two prior conditions for readouts (a)--(d) only.} \\
 \end{tabular}
 \end{table}
 
@@ -2032,23 +2081,26 @@ axes order the corpora differently for reasons of their own.
   \textsc{windowed} policy. It is the two-miner slice of Table~\ref{tab:fc-ablation}, repeated here
   with both miners adjacent so they can be read against each other directly. \textbf{d} counts the \emph{distinct} values a readout takes across the corpus; on a corpus
   with no ordering ground truth it is the column that separates a measure which can rank responses from
-  one which cannot. Bold marks the higher \textbf{d} within each miner--readout pair.}
+  one which cannot. Bold marks the higher \textbf{d} within each miner--readout pair, for (a)--(d).
+  $^{*}$Not cached: the headline $\LCS_{\bal}$ is scored on stored graphs, and only the uniform-prior
+  runs stored theirs (Table~\ref{tab:fc-ablation}).}
 \label{tab:ablation}
-\begin{tabular}{@{}llrrrrrrrr@{}}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}llrrrrrrrrrr@{}}
 \toprule
-& & \multicolumn{2}{c}{$\LCS_{\mm}$} & \multicolumn{2}{c}{$\LCS_{\cons}$}
+& & \multicolumn{2}{c}{$\LCS_{\bal}$} & \multicolumn{2}{c}{$\LCS_{\mm}$} & \multicolumn{2}{c}{$\LCS_{\cons}$}
   & \multicolumn{2}{c}{$\LCS_{\lp}$} & \multicolumn{2}{c}{$\LCS_{\rei}$} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(l){9-10}
-Miner & Priors & mean & d & mean & d & mean & d & mean & d \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-10}\cmidrule(l){11-12}
+Miner & Priors & mean & d & mean & d & mean & d & mean & d & mean & d \\
 \midrule
-\texttt{llama-3.3-70b} & factuality & $0.9759$ & $90$ & $0.8032$ & $74$ & $0.6850$ & $45$
+\texttt{llama-3.3-70b} & factuality & \multicolumn{2}{c}{\textit{n/a}$^{*}$} & $0.9759$ & $90$ & $0.8032$ & $74$ & $0.6850$ & $45$
   & $0.4358$ & $69$ \\
-                       & uniform    & $0.9547$ & $\mathbf{196}$ & $0.8150$ & $\mathbf{163}$
+                       & uniform    & $0.9294$ & $231$ & $0.9547$ & $\mathbf{196}$ & $0.8150$ & $\mathbf{163}$
   & $0.7719$ & $\mathbf{86}$ & $0.4507$ & $\mathbf{86}$ \\
 \midrule
-\texttt{gpt-oss-120b}  & factuality & $0.9475$ & $148$ & $0.7107$ & $134$ & $0.6713$ & $85$
+\texttt{gpt-oss-120b}  & factuality & \multicolumn{2}{c}{\textit{n/a}$^{*}$} & $0.9475$ & $148$ & $0.7107$ & $134$ & $0.6713$ & $85$
   & $0.4775$ & $\mathbf{37}$ \\
-                       & uniform    & $0.9084$ & $\mathbf{224}$ & $0.7037$ & $\mathbf{212}$
+                       & uniform    & $0.8278$ & $246$ & $0.9084$ & $\mathbf{224}$ & $0.7037$ & $\mathbf{212}$
   & $0.7641$ & $\mathbf{120}$ & $0.4914$ & $32$ \\
 \bottomrule
 \end{tabular}
@@ -2117,8 +2169,10 @@ LCS readouts take $120$--$224$ values on the same responses.
 
 Everything so far has compared miners by the scores they produce and, in \S\ref{sec-bottleneck}, by
 their agreement with gold labels. Neither says what a miner \emph{extracts}. That matters here because
-the previous part attributed a score difference to the priors by holding the graph fixed; the graph
-itself is the other input, and it has not yet been looked at. Because the uniform-prior runs record
+the previous part attributed a score difference to the priors across two runs over the same responses;
+the graph itself is the other input, and it has not yet been looked at. (The two runs mined their graphs
+separately, and those graphs are not identical item by item --- Table~\ref{tab:fc-ablation} --- so part of
+that difference may come from mining variation rather than from the priors.) Because the uniform-prior runs record
 every mined relation with its Level-1 coupling and Level-2 sense rather than merely a count, the two
 miners can be compared by the content of their output over the same $250$ responses
 (Table~\ref{tab:relation-inventory}). This separates them more sharply than any score does.
@@ -2601,7 +2655,9 @@ and must be narrow at the inferential one: twelve senses compiling onto five cou
 pairwise family while leaving the labels interpretable. And not every reading of ``how coherent is this?'' is
 admissible: two of four candidate readouts are non-monotone in conflict resolution, measuring whether a conflict
 is active rather than what should be believed, and a fifth is maximized by asserting no relations at all
-(Prop.~\ref{prop-vacuous}).
+(Prop.~\ref{prop-vacuous}). The score that is admissible by construction reads every relation against the priors
+alone, and is monotone in every relation edit (Thm.~\ref{thm-balanced}); we make it the headline and keep the mean
+marginal to locate an incoherence.
 
 \paragraph{Contributions.} Beyond the model and its taxonomy, we contribute an evaluation built to answer a
 question the field has not been able to ask cleanly: when a coherence measure fails, is the scoring wrong or the
@@ -2621,8 +2677,8 @@ scores $0/20$ under \emph{both} miners on ladders that permute prose without tou
 model's own answer cannot move because the network is literally identical. Only the negative controls could have
 surfaced it: mined sources are \emph{not} uniformly weak on the increase-type ladders, so a corpus without them
 would have judged extraction far closer to gold than it is. Against five families of evidence-free baselines, the
-measure on a correct graph is the only one that both orders responses ($37/50$ against the best baseline's
-$30/50$) and stays exactly invariant ($20/20$), the latter by construction rather than by fitting. The incumbent
+measure on a correct graph is the only one that both orders responses ($49/50$ for the headline score against
+the best baseline's $30/50$) and stays exactly invariant ($20/20$), the latter by construction rather than by fitting. The incumbent
 fails in two opposite ways that took both corpora to see: an LLM judge swings $42$ points between judge models on
 identical prose, then saturates to $3$--$16$ distinct scores on $250$ real responses where our readouts return
 $37$--$148$.
@@ -2682,9 +2738,9 @@ without those labels.
 
 The model is fully specified in the paper: Def.~\ref{def-mrf} gives the joint,
 \S\ref{sec-potentials} the potentials, Def.~\ref{def-couplings} the penalized sets,
-\S\ref{sec-levels} the compile map, and Eq.~\ref{eq-mm} the selected readout, with the three
-alternatives and the auxiliary-variable constructions two of them require in
-App.~\ref{app-readouts}. Algorithms~\ref{alg-pairs} and~\ref{alg-lcs} give candidate selection and
+\S\ref{sec-levels} the compile map, Eq.~\ref{eq-balanced-main} the headline readout and
+Eq.~\ref{eq-mm} the diagnostic, with the alternatives and the auxiliary-variable constructions two of
+them require in App.~\ref{app-readouts}. Algorithms~\ref{alg-pairs} and~\ref{alg-lcs} give candidate selection and
 the end-to-end procedure. App.~\ref{app-prompts} reproduces all four estimation prompts verbatim,
 including the trailing token boundary the surrogate readout depends on. The exact values in
 \S\ref{sec-example} and App.~\ref{app-examples} are computed by explicit $2^n$ enumeration --- $2^5$
@@ -2833,19 +2889,21 @@ the next paragraph rather than a defect.
 
 \begin{table}[htbp]
 \centering\small
-\caption{The four readouts on \texttt{f001}, \textsc{gold} source. $\mm$ rises across the ladder; the
-  $\cons$ dip at $\rho_2$ is predicted, not incidental (Prop.~\ref{prop-quirk}). $\rei$ is stored but
-  ungraded. These are the values every constraint in Table~\ref{tab:f001-checks} is checked against.}
+\caption{The readouts on \texttt{f001}, \textsc{gold} source. The headline $\bal$ rises on every pair
+  of rungs, including $\rho_2\to\rho_3$ where $\mm$ does not. $\mm$ rises across the ladder otherwise;
+  the $\cons$ dip at $\rho_2$ is predicted, not incidental (Prop.~\ref{prop-quirk}). $\rei$ is stored
+  but ungraded. The constraints of Table~\ref{tab:f001-checks} are declared for $\mm$, $\cons$ and
+  $\lp$, and are checked against those columns.}
 \label{tab:f001-scores}
-\begin{tabular}{@{}llrrrr@{}}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-& Rung & $\mm$ & $\cons$ & $\lp$ & $\rei$ \\
+& Rung & $\bal$ & $\mm$ & $\cons$ & $\lp$ & $\rei$ \\
 \midrule
-$\rho_0$ & \textsf{worse}               & $0.750400$ & $0.499618$ & $0.342596$ & $0.150678$ \\
-$\rho_1$ & \textsf{base}                & $0.760539$ & $0.649468$ & $0.374712$ & $0.221853$ \\
-$\rho_2$ & \textsf{concession\_resolved} & $0.789580$ & $0.494457$ & $0.374268$ & $0.252912$ \\
-$\rho_3$ & \textsf{fix\_one\_conflict}   & $0.789239$ & $0.500444$ & $0.425367$ & $0.261813$ \\
-$\rho_4$ & \textsf{coherent}            & $0.822792$ & $0.523759$ & $0.488651$ & $0.320921$ \\
+$\rho_0$ & \textsf{worse}               & $0.437648$ & $0.750400$ & $0.499618$ & $0.342596$ & $0.150678$ \\
+$\rho_1$ & \textsf{base}                & $0.465949$ & $0.760539$ & $0.649468$ & $0.374712$ & $0.221853$ \\
+$\rho_2$ & \textsf{concession\_resolved} & $0.495681$ & $0.789580$ & $0.494457$ & $0.374268$ & $0.252912$ \\
+$\rho_3$ & \textsf{fix\_one\_conflict}   & $0.497086$ & $0.789239$ & $0.500444$ & $0.425367$ & $0.261813$ \\
+$\rho_4$ & \textsf{coherent}            & $0.541393$ & $0.822792$ & $0.523759$ & $0.488651$ & $0.320921$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2904,10 +2962,11 @@ all three has not implemented the concession discount, and the C2 class is what 
 \end{tabular}
 \end{table}
 
-\paragraph{What the two failures show.} Both are at the tie floor, and both are the same phenomenon
-rather than two. $\mm$ on $2 \to 3$ misses by $-3.4 \times 10^{-4}$: the two rungs differ by one
-dropped \con{} edge against one added resolution, and on this family those nearly cancel on the belief
-readout, so the declared strict increase is not delivered. $\lp$ on $1 \to 2$ misses by
+\paragraph{What the two failures show.} Both are at the tie floor, but they have different causes.
+$\mm$ on $2 \to 3$ misses by $-3.4 \times 10^{-4}$: the two rungs differ by a single
+dropped \con{} edge of weak strength $p=0.47$ (the resolution is already present at $\rho_2$; $\rho_3$ is
+derived from $\rho_1$), and since a sub-$\tfrac12$ contradiction raises belief in its own both-true world,
+dropping it lowers the belief readout slightly, so the declared strict increase is not delivered. $\lp$ on $1 \to 2$ misses by
 $-4.4 \times 10^{-4}$ against a prediction of \emph{exact} flatness. The prediction is sound --- the
 edit is weight-only --- but it is checked at a tie tolerance of $10^{-6}$ against values from weighted
 mini-bucket at i-bound $6$, whose own approximation error is larger than that. The failure is therefore
@@ -2917,6 +2976,14 @@ families pass their flatness assertions $45/45$ and $15/15$ only because their r
 the tolerance to absorb it, and note the consequence: \texttt{f001}'s $12/14$ is slightly above the
 corpus-wide \textsc{conflict} rate of $89/112$, and one of its two failures is a statement about
 \citet{wmb} at i-bound $6$, not about the coherence model.
+
+The headline readout makes the first failure concrete. On the same five rungs $\bal$ rises at every
+step (Table~\ref{tab:f001-scores}): $+0.028$, $+0.030$, $+0.0014$ and $+0.044$, and $+0.104$ end to
+end. At $\rho_2\to\rho_3$, where $\mm$ falls by $3.4\times10^{-4}$, $\bal$ rises by $1.4\times10^{-3}$,
+three orders of magnitude above the tie tolerance. The single edit there, deleting the weak
+\sense{Contrast} contradiction $a_3\Rightarrow\neg a_2$, is a conflict deletion, which
+Thm.~\ref{thm-balanced} guarantees cannot lower $\bal$ at any weight; the belief readout has no such
+guarantee and moves the other way.
 
 \paragraph{The same family under mined relations.} Holding everything but the relation source fixed
 (\S\ref{sec-protocol}) and re-running \texttt{f001} from graphs mined out of its own response text gives
@@ -3441,14 +3508,16 @@ having no source-prior term to correct.
 
 Definition~\ref{def-mrf} specifies a distribution; a coherence score is a functional of it, and
 several are defensible. We state five criteria, define four candidates with their exact
-constructions, and then decide between them by exact inference rather than by preference.
+constructions, and then decide between them by exact inference rather than by preference. Two more,
+introduced after the comparison, come with proofs of R3: (e) in conflict edits (\S\ref{sec-escape})
+and (f) in support edits as well (\S\ref{sec-balanced}).
 
 \begin{definition}[Criteria]
 \label{def-criteria}
 A coherence readout should be:
 \textbf{(R1)} a genuine functional of the joint $\pr{\mathbf{a}}$, not of the relation list alone;
 \textbf{(R2)} valued in $[0,1]$ and interpretable;
-\textbf{(R3)} \emph{monotone} --- resolving or removing a conflict must not decrease it;
+\textbf{(R3)} \emph{monotone} --- resolving or removing a conflict should not decrease it;
 \textbf{(R4)} sensitive to conflict without hand-tuned constants;
 \textbf{(R5)} computable from standard inference queries.
 \end{definition}
@@ -3456,7 +3525,10 @@ A coherence readout should be:
 R1 deserves comment, since it is the criterion that does the most work. A readout that depends only
 on $\mathcal{R}$ --- how many relations there are, what types, what weights --- is not measuring the
 response; it is measuring its own annotation. Proposition~\ref{prop-vacuous} below shows this is not
-a hypothetical concern.
+a hypothetical concern. R3 is harder than it looks: none of the four candidates satisfies it on every network
+(Prop.~\ref{prop-nonmono}, Rem.~\ref{rem-floor}), so \S\ref{sec-selection} tests it on a
+coherence-ordered family and Prop.~\ref{prop-local} states the part that can be proved for them.
+\S\ref{sec-escape} and \S\ref{sec-balanced} then give readouts for which it is a theorem.
 
 \subsection{(a) Mean posterior marginal}
 
@@ -3467,8 +3539,9 @@ a hypothetical concern.
 
 The marginals come directly from a single \textsc{mar} query. The interpretation is the expected
 fraction of the response's claims that the argument, taken as a whole, upholds. A conflict
-suppresses the marginals of its endpoints; a satisfied entailment chain propagates support along
-itself; a claim no relation touches stays at its prior and contributes neutrally.
+suppresses the marginal of its target (Prop.~\ref{prop-local}), while its source and the rest of the
+graph may move either way; a satisfied entailment chain propagates support along itself; a claim no
+relation touches stays at its prior and contributes neutrally.
 
 Alongside the scalar we report three diagnostics that come free with the same query: the per-claim
 marginals themselves, which localize an incoherence to specific claims; the count of claims dragged
@@ -3588,16 +3661,36 @@ removed: deleting constraint factors only adds mass, so $\log Z\le\log Z_{\max}$
 floor we take the \emph{MAP world mass} of the base network,
 $Z_{\min}=\max_{\mathbf{a}}\prod_i\phi_i\prod_r\psi_r$.
 
-\begin{lemma}[The MAP world mass is a valid, coherence-graded floor]
+\begin{lemma}[The MAP world mass is a valid floor]
 \label{lem-floor}
-$\log Z_{\min}\le\log Z$ for every network, and $Z_{\min}$ is non-increasing in conflict strength.
+$\log Z_{\min}\le\log Z\le\log Z_{\max}$ for every network, so Eq.~\ref{eq-logz} lies in $[0,1]$
+whenever $Z_{\max}>Z_{\min}$.
 \end{lemma}
 \begin{proof}
 $Z=\sum_{\mathbf{a}}\mathrm{mass}(\mathbf{a})$ is a sum of non-negative terms, so its single largest
-term is a lower bound. For the second claim, increasing $p_r$ on a conflict edge multiplies the mass
-of every world in $V(\tau_r)$ by a factor below one and leaves other worlds unchanged, so the maximum
-over worlds cannot increase.
+term $Z_{\min}$ is a lower bound. Every entry of every table in Table~\ref{tab:factors} lies in
+$[0,1]$, so deleting a conflict factor multiplies no world's mass by less than one, and
+$Z\le Z_{\max}$.
 \end{proof}
+
+\begin{remark}[The floor is not monotone in conflict strength]
+\label{rem-floor}
+It is tempting to add that $Z_{\min}$ is non-increasing in conflict strength, on the grounds that
+raising $p_r$ only down-weights the penalized worlds $V(\tau_r)$. That is false for the with-priors
+tables. Raising $p_r$ does lower the $(1,1)$ cell $1-p_r$ of a \con{} table
+$[1-\pi_s,\,\pi_s,\,p_r,\,1-p_r]$, but it \emph{raises} the $(1,0)$ cell $p_r$, so the
+source-true, target-false world gains mass and the maximum over worlds can grow. For a lone \con{}
+edge at uniform priors, $Z_{\min}=\max(\tfrac18,\tfrac18,\tfrac{p}{4},\tfrac{1-p}{4})=p/4$ for
+$p\ge\tfrac12$, which \emph{increases} from $0.150$ to $0.200$ to $0.2375$ as $p$ goes
+$0.6\to0.8\to0.95$. The same holds for \exc{}, whose $(0,1)$ and $(1,0)$ cells are $p_r$. Only the
+first half of the original statement, the bound, is needed for Eq.~\ref{eq-logz} to be well
+defined. Because the floor moves with the edge set, though, $\LCS_{\lp}$ inherits no monotonicity
+from it: on four claims at uniform priors with relations $a_3\,\exc\,a_1$ ($0.8$),
+$a_4\Rightarrow\neg a_2$ ($0.9$), $a_4\Rightarrow\neg a_3$ ($0.8$) and $a_1\Rightarrow\neg a_4$
+($0.8$), deleting the last conflict raises $\log Z$ from $-2.828$ to $-2.079$ but raises
+$\log Z_{\min}$ further, from $-4.605$ to $-3.324$, so $\LCS_{\lp}$ \emph{falls} from $0.386$ to
+$0.374$ (exact, $\log Z_{\max}=0$ in both).
+\end{remark}
 
 Lemma~\ref{lem-floor} is not a technicality; it replaces two floors that look more natural and are
 wrong. Retyping every edge to \con{}, or saturating conflicts to $p=1$, both fail to bound $\log Z$
@@ -3615,39 +3708,49 @@ i-bound and small tolerance violations are possible.
 
 \begin{table}[tbp]
 \centering\small
-\caption{All four readouts across a coherence-ordered family of five variants of one response, by
-  exact inference over $2^{16}$ worlds. The variants run from least to most coherent left to right in
+\caption{All five readouts across a coherence-ordered family of five variants of one response, by
+  exact inference over $2^{16}$ worlds. The variants run from least to most coherent top to bottom in
   the intended ordering. Bold marks a value that moves the \emph{wrong} way relative to its
-  predecessor. Only (a) and (d) are monotone throughout.}
+  predecessor. (a), (d), (e) and (f) are monotone throughout on this family. Only (e) and (f) are
+  monotone on every network (Thms.~\ref{thm-escape} and~\ref{thm-balanced}); (a) and (d) are not
+  (Prop.~\ref{prop-nonmono}, Rem.~\ref{rem-floor}).}
 \label{tab:allcands}
-\begin{tabular}{@{}lccccc@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccccc@{}}
 \toprule
-Variant & (a) $\LCS_{\mm}$ & (b) $\LCS_{\cons}$ & (c) $\LCS_{\rei}$ & $\log Z$ & (d) $\LCS_{\lp}$ \\
+Variant & (a) $\LCS_{\mm}$ & (b) $\LCS_{\cons}$ & (c) $\LCS_{\rei}$ & $\log Z$ & (d) $\LCS_{\lp}$
+  & (e) $\LCS_{\esc}$ & (f) $\LCS_{\bal}$ \\
 \midrule
-\emph{worse}       & $0.586$ & $\mathbf{0.778}$ & $0.116$ & $-10.54$ & $0.68$ \\
-\emph{base}        & $0.607$ & $0.781$          & $0.148$ & $-9.64$  & $0.78$ \\
-\emph{concession}  & $0.612$ & $\mathbf{0.772}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$ \\
-\emph{fixcasualty} & $0.613$ & $\mathbf{0.764}$ & $0.156$ & $-8.95$  & $0.89$ \\
-\emph{coherent}    & $0.620$ & $\mathbf{0.752}$ & $0.181$ & $-8.25$  & $1.00$ \\
+\emph{worse}       & $0.586$ & $\mathbf{0.778}$ & $0.116$ & $-10.54$ & $0.68$ & $0.181$ & $0.5286$ \\
+\emph{base}        & $0.607$ & $0.781$          & $0.148$ & $-9.64$  & $0.78$ & $0.321$ & $0.5418$ \\
+\emph{concession}  & $0.612$ & $\mathbf{0.772}$ & $\mathbf{0.134}$ & $-9.64$ & $0.80$ & $0.388$ & $0.5477$ \\
+\emph{fixcasualty} & $0.613$ & $\mathbf{0.764}$ & $0.156$ & $-8.95$  & $0.89$ & $0.600$ & $0.5612$ \\
+\emph{coherent}    & $0.620$ & $\mathbf{0.752}$ & $0.181$ & $-8.25$  & $1.00$ & $1.000$ & $0.5768$ \\
 \midrule
-\textbf{monotone?} & \textbf{yes} & no & no & \textbf{yes} & \textbf{yes} \\
+\textbf{monotone?} & \textbf{yes} & no & no & \textbf{yes} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[tbp]
 \centering\small
-\caption{The four readouts against the criteria of Def.~\ref{def-criteria}, with the inference
-  queries each requires.}
+\caption{The five readouts against the criteria of Def.~\ref{def-criteria}, with the inference
+  queries each requires. Under R3, \checkmark{} means monotone on every network
+  (Thm.~\ref{thm-escape}); ($\checkmark$) means monotone on the family of
+  Table~\ref{tab:allcands} but not on every network (Prop.~\ref{prop-nonmono},
+  Rem.~\ref{rem-floor}); $\times$ means non-monotone on that family itself. \checkmark$^{+}$: monotone
+  on every network in support edits as well as conflict edits (Thm.~\ref{thm-balanced}).}
 \label{tab:criteria}
 \begin{tabular}{@{}llccccc l@{}}
 \toprule
 Readout & Queries & R1 & R2 & R3 & R4 & R5 & Note \\
 \midrule
-(a) mean marginal   & \textsc{mar} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \textbf{selected} \\
+(a) mean marginal   & \textsc{mar} & \checkmark & \checkmark & ($\checkmark$) & \checkmark & \checkmark & diagnostic \\
 (b) consistency     & \textsc{mar}$\times2$ & \checkmark & \checkmark & $\times$ & \checkmark & \checkmark & concession dip \\
 (c) reified         & \textsc{mar} & \checkmark & \checkmark & $\times$ & $\times$ & \checkmark & free $\rho$; dip \\
-(d) norm.\ $\log Z$ & \textsc{pr}, \textsc{map} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & needs 2 references \\
+(d) norm.\ $\log Z$ & \textsc{pr}, \textsc{map} & \checkmark & \checkmark & ($\checkmark$) & \checkmark & \checkmark & needs 2 references \\
+(e) conflict escape & \textsc{pr}$\times2$ & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & ignores support \\
+(f) balanced        & \textsc{pr} & \checkmark & \checkmark & \checkmark$^{+}$ & \checkmark & \checkmark & \textbf{selected}; paddable \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -3676,10 +3779,16 @@ The consequence sorts the four readouts into two kinds. A readout that asks \emp
 active} --- (b) counts exactly that event, (c) charges $1-p_r$ for it --- must register a softened
 conflict as \emph{more} often active, and therefore dips. A readout that asks \emph{how strongly
 should each claim be believed} --- (a) through marginals, (d) through mass --- sees less suppression
-and rises. Since resolving a concession is by construction an increase in coherence, a coherence
+of the conflict's target, which provably rises (Prop.~\ref{prop-local}), and on this family the
+readout rises with it; Prop.~\ref{prop-nonmono} shows that the readout's rise is not guaranteed
+elsewhere. Since resolving a concession is by construction an increase in coherence, a coherence
 score must track belief rather than event activity. That is the substantive finding of this section,
 and it is not specific to our parameterization: any readout defined as the probability of a
-conflict-free configuration will invert under any discount-based treatment of resolved concessions.
+conflict-free configuration \emph{under the posterior} will invert under any discount-based
+treatment of resolved concessions, because the posterior already contains the conflict being
+measured. The qualifier matters. Measured instead under a distribution from which the conflicts have
+been removed, the same event does not invert, and \S\ref{sec-escape} builds a readout on exactly
+that observation.
 
 \paragraph{A second failure mode of (b).} Table~\ref{tab:allcands} shows (b) failing worse than a
 single dip, and the reason is instructive about $\mathcal{K}$ and $\mathcal{S}$ jointly. In this
@@ -3692,12 +3801,423 @@ $0.576 \to 0.654 \to \mathbf{0.582} \to 0.672 \to 0.752$: correctly ordered apar
 dip. Either way it is non-monotone, and the lesson is that $\mathcal{K}$ and $\mathcal{S}$ should be
 read separately as diagnostics rather than averaged into a headline.
 
-\paragraph{Selection.} We report (a) as the headline. It satisfies all five criteria, needs a single
-\textsc{mar} query, and is the only one of the four whose value decomposes into per-claim
-contributions --- which is what makes an incoherence \emph{locatable} rather than merely detectable.
-We compute and report all four, since (d) is a genuine alternative satisfying the same criteria
-through a different route (mass rather than marginals), and $\mathcal{K}$, $\mathcal{S}$ carry
-diagnostic information the mean marginal does not expose.
+\paragraph{What R3 does and does not guarantee.} Table~\ref{tab:allcands} is evidence on one
+family, not a proof, and the property it exhibits does not extend to every network. What does
+extend is local to the edited relation:
+
+\begin{proposition}[A contradiction suppresses its target]
+\label{prop-local}
+Let $r$ be a \con{} relation from $s$ to $t$, and fix the priors and every other factor. Then
+$\pr{a_t{=}1}$ is non-increasing in $p_r$, for any priors and any other relations. If in addition
+the table's source-prior entry is $\pi_s=\tfrac12$, deleting $r$ is equivalent to setting
+$p_r=\tfrac12$, so deleting a contradiction with $p_r\ge\tfrac12$ never lowers its target's
+marginal.
+\end{proposition}
+\begin{proof}
+Write $p=p_r$. The idea is that $p$ only moves mass among worlds where the source is true,
+from worlds where the target is true to worlds where it is false.
+
+\emph{Step 1: reduce the network to four numbers.} Group the worlds by the values $(a_s,a_t)$ of the
+two endpoints, and let $M_{ij}\ge0$ be the total mass that every factor \emph{other than} $\psi_r$
+gives to the worlds with $(a_s,a_t)=(i,j)$. None of the $M_{ij}$ depends on $p$. The factor
+$\psi_r=[1-\pi_s,\,\pi_s,\,p,\,1-p]$ then multiplies each group by one constant:
+\begin{center}\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+$(a_s,a_t)$ & $(0,0)$ & $(0,1)$ & $(1,0)$ & $(1,1)$ \\
+\midrule
+mass with $\psi_r$ & $(1-\pi_s)M_{00}$ & $\pi_s M_{01}$ & $p\,M_{10}$ & $(1-p)M_{11}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\emph{Step 2: split by the target.} The mass of the target-true worlds, $(0,1)$ and $(1,1)$, and the
+mass of the target-false worlds, $(0,0)$ and $(1,0)$, are
+\[
+T(p)=\pi_s M_{01}+(1-p)\,M_{11},
+\qquad
+F(p)=(1-\pi_s)M_{00}+p\,M_{10} .
+\]
+Since $M_{11},M_{10}\ge0$, $T$ is non-increasing and $F$ non-decreasing in $p$.
+
+\emph{Step 3: conclude.} The target's marginal is the target-true share of the mass,
+\[
+\pr{a_t{=}1}=\frac{T(p)}{T(p)+F(p)}=\frac{1}{1+F(p)/T(p)} ,
+\]
+and $F/T$ is non-decreasing in $p$, so $\pr{a_t{=}1}$ is non-increasing. If $T(p)=0$ the marginal is
+$0$, its least possible value, so the claim holds there too.
+
+\emph{Deletion.} At $\pi_s=p=\tfrac12$ every entry of $\psi_r$ is $\tfrac12$. A constant factor
+cancels on normalization, so this network is exactly the one without $r$. Deleting $r$ is therefore
+the same as lowering $p_r$ to $\tfrac12$, and by Step 3 that cannot lower $\pr{a_t{=}1}$ when
+$p_r\ge\tfrac12$.
+\end{proof}
+
+Softening a resolved concession by Eq.~\ref{eq-concession} therefore always raises belief in the
+conflict's target, which is the sense in which belief-tracking readouts respond correctly to it. The
+guarantee is about the target alone. The source's marginal can move either way, the deletion
+corollary can fail when $\pi_s\neq\tfrac12$ (a lone \con{} at $p=\tfrac12$ with $\pi_s=0.75$,
+$\pi_t=0.45$ holds the target at $0.513$, and deleting it returns the target to $0.45$), and the
+other claims can move against the edited pair:
+
+\begin{proposition}[Removing a contradiction can lower $\LCS_{\mm}$]
+\label{prop-nonmono}
+There are networks in which deleting a \con{} relation, or softening it towards $p=\tfrac12$,
+strictly decreases $\LCS_{\mm}$.
+\end{proposition}
+\begin{proof}
+We build a small network in which the score can be computed by hand. All priors are $\tfrac12$. A
+\emph{hub} claim $a_2$ contradicts $k$ \emph{spoke} claims $a_3,\dots,a_{k+2}$, each relation
+$a_2\Rightarrow\neg a_j$ at weight $p$. A \emph{blocker} claim $a_1$ contradicts the hub,
+$a_1\Rightarrow\neg a_2$, at weight $b$. We show that $\LCS_{\mm}$ strictly increases with $b$
+whenever $k(2p-1)>2$. Softening the blocker then lowers the score, and so does deleting it.
+
+\emph{Step 1: read the network as a Bayesian network.} With $\pi_s=\tfrac12$ each \con{} table is
+$[\tfrac12,\tfrac12,p,1-p]$, whose rows are the conditionals $\pr{a_t\mid a_s}$
+(Prop.~\ref{prop-rowstoch}). Multiplying in the target's prior $\tfrac12$ gives
+$\tfrac12\,\pr{a_t\mid a_s}$. Every claim except $a_1$ is the target of exactly one relation, so up
+to a constant the joint is
+\[
+\pr{a_1}\;\pr{a_2\mid a_1}\;\prod_{j=3}^{k+2}\pr{a_j\mid a_2},
+\qquad \pr{a_1{=}1}=\tfrac12 .
+\]
+The marginals can therefore be read off from the top down: first $a_1$, then the hub, then the spokes.
+
+\emph{Step 2: compute the marginals.} The blocker stays at $\tfrac12$. The hub is true with
+probability $\tfrac12$ when the blocker is false and $1-b$ when it is true, so
+\[
+c \;:=\; \pr{a_2{=}1} \;=\; \tfrac12\cdot\tfrac12+\tfrac12\,(1-b) \;=\; \frac{3-2b}{4} .
+\]
+Each spoke is true with probability $\tfrac12$ when the hub is false and $1-p$ when it is true, so
+\[
+\pr{a_j{=}1} \;=\; \tfrac12\,(1-c)+(1-p)\,c \;=\; \tfrac12-c\,\bigl(p-\tfrac12\bigr) .
+\]
+
+\emph{Step 3: add them up.} Over the $k+2$ claims,
+\[
+(k+2)\,\LCS_{\mm} \;=\; \tfrac12 + c + k\Bigl(\tfrac12 - c\,\bigl(p-\tfrac12\bigr)\Bigr)
+ \;=\; \frac{k+1}{2} + c\,\Bigl(1-k\,\bigl(p-\tfrac12\bigr)\Bigr).
+\]
+Raising belief in the hub by $c$ adds $c$ to the hub's marginal but takes $c\,(p-\tfrac12)$ from each
+of the $k$ spokes. When $k(2p-1)>2$ the bracket is negative, so $\LCS_{\mm}$ strictly decreases in
+$c$. Since $c=(3-2b)/4$ strictly decreases in $b$, $\LCS_{\mm}$ strictly increases in $b$. Deleting
+the blocker gives the same network as $b=\tfrac12$, because its table is then the constant
+$\tfrac12$. So for any $b>\tfrac12$ deletion lowers $\LCS_{\mm}$ too.
+
+\emph{Step 4: a concrete instance.} Take $k=3$ and $p=b=0.95$, so $k(2p-1)=2.7>2$ and the bracket
+is $1-3\times0.45=-0.35$. With the blocker, $c=\tfrac{11}{40}$, each spoke is at
+$\tfrac{301}{800}$, and $\LCS_{\mm}=\bigl(2-0.35\times\tfrac{11}{40}\bigr)/5=1523/4000=0.381$.
+Without it, $c=\tfrac12$, each spoke is at $\tfrac{11}{40}$, and
+$\LCS_{\mm}=(2-0.35\times\tfrac12)/5=73/200=0.365$. Softening instead of deleting gives $0.381$,
+$0.376$, $0.369$ and $0.365$ at $b=0.95$, $0.8$, $0.6$ and $0.5$. Exact enumeration over the
+$2^5$ worlds gives the same values.
+\end{proof}
+
+Step 3 isolates the mechanism. The deleted conflict was holding down a hub that contradicts three
+other claims. Once released, the hub suppresses all three: one marginal rises by $0.225$ and three
+fall by $0.101$ each. Proposition~\ref{prop-local} holds, since $a_2$ is the target
+and rises, yet the mean falls. The failure is not an artefact of the with-priors tables either. With
+a penalty-only table $[1,1,1,1-p]$ and five spokes at $p=0.99$, the same deletion lowers the mean from
+$0.376$ to $0.325$. Any readout that averages per-claim belief is exposed to it, and
+Remark~\ref{rem-floor} gives the corresponding counterexample for (d). For (a) and (d), R3 is
+therefore reported in Table~\ref{tab:criteria} as satisfied on the test family rather than in
+general, and the ladder constraints of \S\ref{sec-locobench} remain empirical tests of it rather than
+consequences of the model.
+
+\subsection{(e) Conflict escape: a readout that is provably monotone}
+\label{sec-escape}
+
+The two failures above have one source. Both (a) and (d) read the conflicts through the posterior,
+where a conflict's effect on everything else is part of what is measured, so deleting one conflict
+can strengthen another (Prop.~\ref{prop-nonmono}). The remedy is to evaluate the conflicts against a
+distribution that does not contain them. Let $\mathcal{R}_{\mathrm{c}}=\{r:\tau_r\in
+\mathcal{T}_{\mathrm{conf}}\}$ be the conflict relations, and let $P_0$ be the MRF of
+Def.~\ref{def-mrf} with every conflict factor removed --- priors and support relations only, the
+network whose partition function is the ceiling $Z_{\max}$ of Eq.~\ref{eq-logz}. Give each conflict
+a \emph{penalty} $w_r=p_r$, clipped below $1$, and define
+\begin{equation}
+\LCS_{\esc}(y)\;=\;\mathbb{E}_{\mathbf{a}\sim P_0}\Bigl[\,\prod_{r\in\mathcal{R}_{\mathrm{c}}}
+  \bigl(1-w_r\,\mathbb{1}[(a_{s_r},a_{t_r})\in V(\tau_r)]\bigr)\Bigr]
+\;=\;\frac{Z_{\mathrm{pen}}}{Z_{\max}} ,
+\label{eq-escape}
+\end{equation}
+where $Z_{\mathrm{pen}}$ is the partition function of $P_0$ multiplied by one \emph{penalty-only}
+factor per conflict, equal to $1-w_r$ on $V(\tau_r)$ and to $1$ elsewhere. The reading is a
+probability: draw a world from what the response's priors and support relations make plausible, let
+each conflict independently catch its violation with probability $w_r$, and ask whether the world
+escapes every conflict. Any penalty map non-decreasing in $p_r$ with values in $[0,1)$ would serve
+the theorem below; the linear map is the one that leaves no conflict invisible, and the ladders
+(\S\ref{sec-escape}, Table~\ref{tab:escape-ladder}) show why that matters: a map that is zero below
+some weight makes resolving a conflict of that weight a no-op.
+
+\begin{theorem}[$\LCS_{\esc}$ is monotone in conflict resolution]
+\label{thm-escape}
+For any priors and any support relations, deleting a conflict relation or lowering its weight
+$p_r$ never decreases $\LCS_{\esc}$. Moreover $\LCS_{\esc}\in[0,1]$, with $\LCS_{\esc}=1$ when no
+conflict has $p_r>\tfrac12$.
+\end{theorem}
+\begin{proof}
+Write $g(\mathbf{a})=\prod_{r\in\mathcal{R}_{\mathrm{c}}}\bigl(1-w_r\,\mathbb{1}[(a_{s_r},
+a_{t_r})\in V(\tau_r)]\bigr)$, so that $\LCS_{\esc}=\mathbb{E}_{P_0}[g]$. Three facts suffice.
+
+\emph{(i) $P_0$ does not move.} By construction $P_0$ contains no conflict factor, so neither
+deleting a conflict nor changing its weight changes $P_0$.
+
+\emph{(ii) Each factor of $g$ lies in $[0,1]$ and only grows when the conflict is relaxed.} The
+factor for $r$ is $1-w_r$ in the worlds that violate $r$ and $1$ in the others. Lowering $p_r$ lowers
+$w_r$, which raises $1-w_r$ and leaves the other worlds at $1$. Deleting $r$ replaces the factor by
+the constant $1$, which is the same as setting $w_r=0$.
+
+\emph{(iii) So $g$ grows world by world, and so does its mean.} By (ii), relaxing a conflict
+multiplies $g(\mathbf{a})$ in every world by a number at least one (or leaves it unchanged). Since
+$g\ge0$, $g(\mathbf{a})$ cannot decrease in any world, and by (i) the weights $P_0(\mathbf{a})$
+that average it are unchanged. An average of non-decreasing terms with fixed non-negative weights
+cannot decrease.
+
+Finally, $g$ is a product of numbers in $[0,1]$, so its mean is in $[0,1]$; and when every $w_r=0$,
+$g\equiv1$.
+\end{proof}
+
+The proof is short because the construction removes the mechanism behind
+Prop.~\ref{prop-nonmono}: in (a) a conflict changes the very distribution against which the other
+conflicts are scored, so removing one can strengthen another, whereas in (e) the scoring
+distribution $P_0$ is fixed and conflicts interact only by multiplying their penalties. Two
+consequences are worth recording. On the star of Prop.~\ref{prop-nonmono}, deleting the blocker
+raises $\LCS_{\esc}$ from $2754481/5120000=0.538$ to $73261/128000=0.572$, where it lowered
+$\LCS_{\mm}$. And softening a lone contradiction at uniform priors from $p=0.80$ to $0.55$ raises it
+from $1-p/4=0.800$ to $0.863$, where (b) and (c) dip (Prop.~\ref{prop-quirk}): the both-true world is now weighed under
+$P_0$, which the softening does not touch, rather than under a posterior that the softening
+enlarges.
+
+Both ingredients of the construction are needed. Keeping the with-priors conflict tables and taking
+$Z/Z_{\max}$ instead fails R3 under softening, because the $(1,0)$ cell $p$ of the \con{} table rises
+with $p$: a lone \con{} with $\pi_s=\tfrac12$, $\pi_t=0.2$ gives $Z/Z_{\max}=0.59$ at $p=0.8$ and
+$0.50$ at $p=0.5$. Penalty-only tables alone are not enough either, as long as the conflicts are read
+through the posterior: Prop.~\ref{prop-nonmono} survives them.
+
+What (e) gives up is equally definite. It is a statement about conflicts only; support relations
+enter through $P_0$ but earn no credit of their own, so a disconnected bag of claims and a
+well-supported spine both score $1$ if neither has a conflict. That is what R3 demands of a
+conflict-free response, and it is the opposite failure from Prop.~\ref{prop-vacuous}, which
+concerned support. A support term computed under $P_0$ --- such as $\mathcal{S}$ of
+Eq.~\ref{eq-cons} with $P_0$ in place of the posterior --- is independent of the conflicts and may be
+averaged in without losing Thm.~\ref{thm-escape}. It also does not decompose into per-claim
+contributions; its natural diagnostic is per conflict, the gain
+$\LCS_{\esc}(\mathcal{R}\setminus\{r\})-\LCS_{\esc}(\mathcal{R})\ge0$ from deleting $r$. On the
+family of Table~\ref{tab:allcands} it is strictly monotone and separates the rungs more widely than
+any other readout, $0.181 < 0.321 < 0.388 < 0.600 < 1.000$; in particular it is the only readout
+to move appreciably at the concession rung, where $\log Z$ is flat and (d) moves only through its
+floor.
+
+\paragraph{(e) on the ladders.} Readout (e) postdates the ladder runs, but every cached run stores
+the relation graph and priors it was scored on, so (e) can be added without re-mining: we rebuild
+each item's network from its record, rescore it, and require the rebuilt (a) and (d) to match the
+cached values before any (e) value is used (exactly on the seventy-item corpus, scored by
+enumeration; to $2\times10^{-5}$ on the hundred-family release, scored by Merlin, whose printed
+$\log Z$ carries five to six decimals). The ladder constraints are declared per readout and none
+are declared for (e), so Table~\ref{tab:escape-ladder} uses the two readout-independent axes of
+Table~\ref{tab:summary-mined}: \emph{Increase}, the C1 and C3 pairs of the \textsc{conflict} and
+\textsc{chain} ladders, and \emph{Invariance}, every declared pair of the \textsc{order} and
+\textsc{control} ladders. Since Thm.~\ref{thm-escape} leaves the penalty map free, we also report
+an ablation, the \emph{threshold} map $w_r=\max(0,2p_r-1)$, which charges nothing below
+$p_r=\tfrac12$; (e) as defined in Eq.~\ref{eq-escape} uses the linear map.
+
+\begin{table}[tbp]
+\centering\small
+\caption{Readout (e) on the ladders, against (a), (d) and (b), on the two readout-independent axes
+  of Table~\ref{tab:summary-mined}. \emph{Increase}: C1 and C3 pairs of \textsc{conflict} and
+  \textsc{chain} ladders, satisfied by a strict rise. \emph{Invariance}: all declared pairs of
+  \textsc{order} and \textsc{control} ladders, satisfied when the score moves by at most $10^{-6}$.
+  (e) uses the linear map $w_r=p_r$ of Eq.~\ref{eq-escape}; (e$_{\mathrm{th}}$) is the threshold
+  ablation $w_r=\max(0,2p_r-1)$. Mined rows give the
+  range over the four miner--policy sources. Generated by
+  \texttt{scripts/rescore\_ladder\_conflict\_escape.py}.}
+\label{tab:escape-ladder}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+& & \multicolumn{2}{c}{Seventy items} & \multicolumn{2}{c}{Hundred-family release} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Graph & Readout & Increase & Invariance & Increase & Invariance \\
+\midrule
+\textsc{gold} & (a) $\LCS_{\mm}$   & $37/50$ & $20/20$ & $\mathbf{273}/335$ & $165/165$ \\
+              & (d) $\LCS_{\lp}$   & $36/50$ & $20/20$ & $233/335$ & $165/165$ \\
+              & (b) $\LCS_{\cons}$ & $34/50$ & $20/20$ & $242/335$ & $165/165$ \\
+              & (e) $\LCS_{\esc}$     & $\mathbf{44}/50$ & $20/20$ & $271/335$ & $165/165$ \\
+              & (e$_{\mathrm{th}}$)  & $34/50$ & $20/20$ & $205/335$ & $165/165$ \\
+\midrule
+mined & (a) $\LCS_{\mm}$   & $20$--$28$ & $0/20$ & $158$--$188$ & $0$--$5$ \\
+      & (d) $\LCS_{\lp}$   & $25$--$35$ & $0/20$ & $162$--$175$ & $0$--$4$ \\
+      & (b) $\LCS_{\cons}$ & $23$--$34$ & $0/20$ & $149$--$170$ & $0$--$6$ \\
+      & (e) $\LCS_{\esc}$     & $22$--$27$ & $0$--$3$ & $117$--$177$ & $6$--$62$ \\
+      & (e$_{\mathrm{th}}$)  & $19$--$23$ & $0$--$3$ & $117$--$158$ & $19$--$62$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{The theorem's prediction holds on every gold pair to which it applies.} On a gold
+\textsc{conflict} ladder consecutive rungs differ only in conflict relations, so
+Thm.~\ref{thm-escape} predicts that (e) never falls; it rises on all $40$ such
+pairs of the seventy-item corpus and all $230$ of the release. (a) falls on $11$ of the seventy-item
+pairs. The pairs on which (e) does fall are all \textsc{chain} pairs whose edit adds or removes a
+\emph{support} relation ($3$ of $50$ seventy-item pairs, $23$ of $335$ release pairs), which changes
+$P_0$ and so lies outside the theorem.
+
+\emph{Why the map is linear.} An earlier version of (e) used the threshold map, and under it gold
+(e) ties on ten seventy-item pairs, all from a single interaction: the gold strength band \emph{weak}
+spans $[0.35,0.59]$ and enters at its midpoint $0.47$, just below the threshold's zero at
+$p=\tfrac12$, so every weak conflict carries no penalty and resolving it cannot move the score.
+Under the with-priors table such a relation acts as support, which is why (a) instead \emph{falls}
+on those pairs. The linear map charges weak conflicts and resolves every tie, giving $44/50$, the
+best gold Increase count of any of (a)--(e) on that corpus. On the release, which played no part
+in choosing the map, (e) gives $271/335$ against $273/335$ for (a), so the advantage over (a)
+does not replicate, although the threshold map's deficit ($205/335$) does. The cause is the map, not
+the construction: the same threshold applied to the penalties of readout (f) below lowers it from
+$49/50$ to $39/50$ and from $335/335$ to $275/335$.
+
+\emph{On mined graphs (e) is not more robust.} Its Increase counts lie at or below the other
+readouts' on both corpora, consistent with \S\ref{sec-bottleneck}: a guarantee about the score cannot
+repair the graph it is computed on, and every mined rung pair changes support and conflict relations
+together, so the theorem never applies there. The higher Invariance counts on the release should
+\emph{not} be read as robustness to reordering. They come from relations that (e) cannot see ---
+mined conflicts at weight $10^{-6}$, which carry no penalty under either map, so rungs that differ
+only in such relations score identically --- and from scores saturating near $0$ or $1$, where rung
+differences fall below the $10^{-6}$ tie tolerance.
+
+\subsection{(f) Balanced: monotone in support as well as conflict}
+\label{sec-balanced}
+
+Readout (e) is monotone only in conflict edits, and the \textsc{chain} pairs on which it falls show
+why: its base distribution $P_0$ contains the support relations, so adding one changes the
+distribution the conflicts are scored against. Every edit a gold ladder makes is of one of four
+kinds --- weaken or delete a conflict, strengthen or add a support --- and never the reverse; claim
+sets and priors are fixed within a family. A readout monotone in each relation, in the direction
+that edit requires, would therefore satisfy every satisfiable gold ladder assertion by
+construction. The construction that gives this takes (e) one step further: move the supports out of
+the base distribution and into the product, as \emph{rewards}. Let $\mathcal{R}_{\mathrm{s}}$ be the
+support relations, every edge-producing coupling that is not a conflict, and write $\pi$ for the
+product of the priors, $\pi(\mathbf{a})=\prod_i\pi_i^{a_i}(1-\pi_i)^{1-a_i}$. Define
+\begin{equation}
+\begin{aligned}
+G(\mathbf{a})&=\prod_{r\in\mathcal{R}_{\mathrm{c}}}\bigl(1-p_r\,\mathbb{1}[(a_{s_r},a_{t_r})\in
+  V(\tau_r)]\bigr)\prod_{r\in\mathcal{R}_{\mathrm{s}}}\bigl(1+p_r\,\mathbb{1}[(a_{s_r},a_{t_r})\in
+  C(\tau_r)]\bigr),\\
+\LCS_{\bal}(y)&=\sigma\!\Bigl(\tfrac{2}{n}\log\mathbb{E}_{\mathbf{a}\sim\pi}\bigl[G(\mathbf{a})\bigr]\Bigr),
+\end{aligned}
+\label{eq-balanced}
+\end{equation}
+with $\sigma$ the logistic function and $C(\tau)$ the worlds in which a support is credited: the
+both-true world for \ent{} and \eqv{}, where the relation is actively upheld as in
+\S\ref{sec-consistency}, and the two exactly-one worlds for \cnc{}, where a disjunction does work.
+Penalties use the linear map $w_r=p_r$ of Eq.~\ref{eq-escape} and rewards the same, $u_r=p_r$.
+$\mathbb{E}_\pi[G]$ is the partition function of the prior unaries times one pairwise factor per
+relation, so (f) costs one \textsc{pr} call. The factor $2$ is a fixed display scale, not a fitted
+constant, and its value comes from the model: since $p_r\le1$, no relation factor exceeds $2$, so
+one support relation adds at most one bit of log-evidence. Writing $b=\log_2\mathbb{E}_\pi[G]/n$ for
+the net evidence per claim in bits, $\LCS_{\bal}=4^{b}/(1+4^{b})$: each bit per claim multiplies the
+odds by $4$, so one maximal support per claim reads $0.8$. Any fixed scale $c>0$ in place of $2$
+gives the same orderings and the same theorem; $c$ only sets the spread.
+
+\begin{theorem}[$\LCS_{\bal}$ is monotone in every relation]
+\label{thm-balanced}
+For any priors, deleting or weakening a conflict relation, and adding or strengthening a support
+relation, never decreases $\LCS_{\bal}$. A response with no relations scores exactly $\tfrac12$.
+\end{theorem}
+\begin{proof}
+The weights $\pi(\mathbf{a})$ of the expectation are the priors alone and depend on no relation.
+Each conflict factor lies in $[0,1]$ and does not increase with $p_r$; deleting the conflict replaces
+it by $1$, which is at least as large. Each support factor is at least $1$ and does not decrease
+with $p_r$; adding a support multiplies $G$ by a factor at least $1$. So each of the four edits
+leaves $G(\mathbf{a})$ unchanged or larger in every world, and since $G\ge0$ and the weights are
+fixed, $\mathbb{E}_\pi[G]$ does not decrease. The map $x\mapsto\sigma(2x/n)$ is strictly increasing
+and $n$ is unchanged by any relation edit, so the order passes to $\LCS_{\bal}$. With no relations
+$G\equiv1$, the expectation is $1$, and $\sigma(0)=\tfrac12$.
+\end{proof}
+
+The difference from (e) is exactly the one that matters. In (e) the supports shape the distribution
+under which conflicts are counted, so a support edit can move the score either way; in (f) both kinds
+of relation enter only as factors of $G$ against a base that neither touches. On
+the star of Prop.~\ref{prop-nonmono} it rises from $0.438$ to $0.444$ when the blocker is deleted, and
+on the family of Table~\ref{tab:allcands} it is strictly ordered. The theorem is also checked
+directly: on random networks of two to seven claims with arbitrary priors and all five couplings, none
+of $20{,}000$ edits in the coherence-improving direction lowered it.
+
+\paragraph{On the ladders.} Table~\ref{tab:balanced-ladder} scores (f) exactly as
+Table~\ref{tab:escape-ladder} scores (e), from the cached graphs with (a) and (d) reproduced first.
+On gold graphs it satisfies \emph{every satisfiable} assertion on both corpora, with no rung pair on
+which it falls: $49/50$ Increase on the seventy-item corpus, the one miss being family \texttt{f009}'s
+rungs~$2$ and~$3$, whose gold graphs are byte-identical so that no function of the graph can separate
+them; $335/335$ on the hundred-family release; and $20/20$, $165/165$ Invariance. Held instead to the
+seventy assertions declared for (a), it satisfies $69$ against (a)'s own $57$. The remaining C2
+assertions are predictions about the internals of (b) and (d) --- that (b) dips at a resolved
+concession, that (d) is flat under a weight-only edit --- and (f) is constructed not to satisfy the
+first, so it is not scored on them. On mined graphs (f) is the strongest Increase readout on the
+release ($168$--$198$ of $335$, against $158$--$188$ for (a)) but does not escape
+\S\ref{sec-bottleneck}: Invariance stays near zero, because a mined graph changes when the prose is
+reordered and Thm.~\ref{thm-balanced} says nothing about a graph that changes in both directions at
+once.
+
+\begin{table}[tbp]
+\centering\small
+\caption{Readout (f) on the ladders, on the axes of Table~\ref{tab:escape-ladder}, with (a) and
+  (e) for comparison. Gold Increase is bounded by the satisfiable assertions: $49$ of the
+  seventy-item corpus's $50$, since one pair has identical gold graphs. Mined rows give the range over
+  the four sources. Generated by \texttt{scripts/rescore\_ladder\_conflict\_escape.py}.}
+\label{tab:balanced-ladder}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+& & \multicolumn{2}{c}{Seventy items} & \multicolumn{2}{c}{Hundred-family release} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Graph & Readout & Increase & Invariance & Increase & Invariance \\
+\midrule
+\textsc{gold} & (a) $\LCS_{\mm}$     & $37/50$ & $20/20$ & $273/335$ & $165/165$ \\
+              & (e) $\LCS_{\esc}$    & $44/50$ & $20/20$ & $271/335$ & $165/165$ \\
+              & (f) $\LCS_{\bal}$    & $\mathbf{49}/50$ & $20/20$ & $\mathbf{335}/335$ & $165/165$ \\
+\midrule
+mined & (a) $\LCS_{\mm}$     & $20$--$28$ & $0/20$ & $158$--$188$ & $0$--$5$ \\
+      & (e) $\LCS_{\esc}$    & $22$--$27$ & $0$--$3$ & $117$--$177$ & $6$--$62$ \\
+      & (f) $\LCS_{\bal}$    & $22$--$31$ & $0$--$1$ & $168$--$198$ & $0$--$9$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What it costs.} Three properties come with the guarantee, and none can be removed without
+removing it. \emph{Padding.} If adding a support can never lower the score then adding many must raise
+it: fifteen entailments at $p=0.99$ over six claims lift a response with one contradiction from
+$0.476$ to $0.783$. This is the converse of Prop.~\ref{prop-vacuous}, whose trap was that asserting
+nothing scored perfectly; here asserting much scores well. (f) measures how strongly the asserted
+relations cohere, not whether they were worth asserting, so it inherits the estimator's precision
+(\S\ref{sec-mining}) as its only defence against over-assertion. Crediting \cnc{} in its exactly-one
+worlds rather than in all three of its satisfying worlds keeps a near-vacuous disjunction from being
+the cheapest relation to pad with. \emph{Compression.} With $p_r\le1$ each relation moves
+$\log\mathbb{E}_\pi[G]$ by at most $\log2$, and the division by $n$ that keeps the order fixed also
+keeps gold scores near $\tfrac12$: within $0.40$--$0.60$ at the display scale $2$, against
+$0.45$--$0.55$ at scale $1$, with a median rung rise of $0.019$ and a minimum of $5\times10^{-5}$,
+well clear of the $10^{-6}$ tie tolerance. A larger fixed scale would widen the range further at no
+cost to the theorem, but the scale is chosen by the bit-per-claim reading above, not to spread the
+ladders. Normalizing instead by references built from the response's own graph, or by the relation
+count, breaks the theorem, for the same reason as the floor of Rem.~\ref{rem-floor}: the reference
+moves with the edit. \emph{Belief.} The expectation is
+under the priors, not the posterior, so (f) does not propagate support along a chain the way the
+marginals do and does not localize an incoherence to a claim; its natural diagnostic is per relation,
+the change in (f) from deleting $r$.
+
+\paragraph{Selection.} We report (f) as the headline. It is the only readout of the six that
+satisfies R3 as a theorem in every kind of relation edit (Thm.~\ref{thm-balanced}); on gold relation
+graphs that guarantee shows up as every satisfiable ladder assertion satisfied, on both corpora
+(Table~\ref{tab:balanced-ladder}); it satisfies R1, R2, R4 and R5; and it needs one \textsc{pr}
+call. Its costs are stated above and are the price of the guarantee: a response padded with support
+relations scores higher, and the score does not decompose into per-claim contributions. We
+therefore report (a) alongside it as the \emph{diagnostic} readout. (a) is the only one of the six
+whose value decomposes per claim, which is what makes an incoherence \emph{locatable} rather than
+merely detectable; it satisfies R3 on the family of Table~\ref{tab:allcands} but not on every
+network (Prop.~\ref{prop-nonmono}). (e) is the conflict-only special case of (f), for a use that
+should ignore support. (d) is a genuine alternative to (a) through a different route, mass rather
+than marginals, and $\mathcal{K}$, $\mathcal{S}$ carry diagnostic information the marginals do not
+expose. The experiments of \S\ref{sec-experiments} were run before (f) was defined and report
+(a)--(d); (f) is scored on their cached graphs in Tables~\ref{tab:escape-ladder}
+and~\ref{tab:balanced-ladder}.
 
 \subsection{Algorithm and cost}
 \label{sec-algo}
@@ -3707,7 +4227,7 @@ diagnostic information the mean marginal does not expose.
 \label{alg-lcs}
 \begin{algorithmic}[1]
 \Require response $y$; relation estimator $\mathcal{M}$; discount $\lambda$; priors $\pi$
-\Ensure $\LCS\in[0,1]$, marginals $\{q_i\}$, diagnostics
+\Ensure headline $\LCS_{\bal}\in(0,1)$, marginals $\{q_i\}$, diagnostics
 \State $\mathcal{A} \gets \textsc{AtomizeAndDecontextualize}(y)$
 \State $P \gets \textsc{SelectCandidatePairs}(\mathcal{A}, y, \dots)$ \Comment{Algorithm~\ref{alg-pairs}}
 \State $\mathcal{R} \gets \varnothing$
@@ -3724,7 +4244,9 @@ diagnostic information the mean marginal does not expose.
 \State $\mathcal{N} \gets$ network of Eq.~\ref{eq-joint} over $(\mathcal{A},\mathcal{R},\pi)$
   \Comment{with-priors tables}
 \State $\{q_i\} \gets \textsc{Infer}(\mathcal{N}, \textsc{mar})$
-\State \Return $\tfrac1n\sum_i q_i$, $\{q_i\}$, $\bigl(\#\{q_i<\pi_i\},\ \mathcal{E},\ \log Z\bigr)$
+\State $\ell \gets \log\mathbb{E}_\pi[G]$ \Comment{one \textsc{pr}, Eq.~\ref{eq-balanced}}
+\State \Return $\LCS_{\bal}=1/(1+e^{-2\ell/n})$, diagnostic $\tfrac1n\sum_i q_i$, $\{q_i\}$,
+  $\bigl(\#\{q_i<\pi_i\},\ \mathcal{E},\ \log Z\bigr)$
 \end{algorithmic}
 \end{algorithm}
 
@@ -3735,7 +4257,10 @@ is negligible by comparison.
 Answering all four readouts requires seven inference calls: the base \textsc{mar} and \textsc{pr},
 the $\mathcal{K}$ accumulator \textsc{mar}, the $\mathcal{S}$ indicator \textsc{mar}, the reified
 \textsc{mar}, the conflict-free ceiling \textsc{pr}, and the base \textsc{map}. Computed
-independently they would cost fourteen, since each readout re-runs the shared base pair. Production
+independently they would cost fourteen, since each readout re-runs the shared base pair. Readout (e)
+adds one \textsc{pr}, on the penalty network $Z_{\mathrm{pen}}$; its denominator is the ceiling
+already computed for (d), so (a)--(e) cost eight calls. Readout (f) adds one more \textsc{pr}, on
+the prior unaries with one reward or penalty factor per relation, for nine. Production
 inference is weighted mini-bucket \citep{wmb} with i-bound $6$; every \emph{exact} value reported in
 this paper instead comes from explicit $2^n$ enumeration, which we use as a regression oracle for
 $n\le20$ and which is the source of Tables~\ref{tab:allcands} and the values in
@@ -4336,7 +4861,8 @@ Measure & \multicolumn{2}{c}{Assertions satisfied} & \\
 \cmidrule(r){2-3}
  & \texttt{llama-3.3-70b} & \texttt{gpt-oss-120b} & Uses LLM \\
 \midrule
-$\LCS_{\mm}$ (gold relations)     & \multicolumn{2}{c}{$37/50$ \quad \textbf{74.0}} & no \\
+$\LCS_{\bal}$ (gold relations)    & \multicolumn{2}{c}{$49/50$ \quad \textbf{98.0}} & no \\
+$\LCS_{\mm}$ (gold relations)     & \multicolumn{2}{c}{$37/50$ \quad 74.0} & no \\
 $\LCS_{\lp}$ (gold relations)     & \multicolumn{2}{c}{$36/50$ \quad 72.0} & no \\
 $\LCS_{\cons}$ (gold relations)   & \multicolumn{2}{c}{$34/50$ \quad 68.0} & no \\
 \midrule

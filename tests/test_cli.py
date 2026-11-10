@@ -601,7 +601,7 @@ class TestLCSCliRunnerWiring:
     def test_defaults_reach_the_runner(self):
         kwargs, _runner = self._run_and_capture([])
         assert kwargs["merlin_path"] == "/m"
-        assert kwargs["methods"] == ("mean_marginal",)
+        assert kwargs["methods"] == ("balanced",)
         assert kwargs["formulation"] == "mrf"
         assert kwargs["prior_source"] == "none"
         assert kwargs["pair_policy"] == "windowed"

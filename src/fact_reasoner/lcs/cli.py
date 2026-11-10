@@ -34,7 +34,11 @@ from fact_reasoner.cli import _add_backend_args, _backend_context
 from fact_reasoner.env import load_dotenv
 from fact_reasoner.core.nli_config import NLI_MODES
 from fact_reasoner.lcs.candidate_pairs import PAIR_POLICIES
-from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
+from fact_reasoner.lcs.lcs_scorer import (
+    ALL_LCS_METHODS,
+    DEFAULT_LCS_METHOD,
+    LCS_METHODS,
+)
 from fact_reasoner.lcs.pipeline import COHERENCE_FORMULATIONS
 from fact_reasoner.lcs.relation_miner import STRENGTH_METHODS
 from fact_reasoner.lcs.runner import CoherenceRunner, atom_texts_from_item
@@ -98,10 +102,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     s.add_argument(
         "--methods",
-        default="mean_marginal",
+        default=DEFAULT_LCS_METHOD,
         help="Comma-separated LCS readouts to compute, or 'all'. The first is the "
-        f"headline. Choices: {', '.join(LCS_METHODS)}. Several readouts share the "
-        "base inference runs, so asking for all four costs 7 Merlin calls, not 13.",
+        f"headline (default: {DEFAULT_LCS_METHOD}). "
+        f"headline. Choices: {', '.join(ALL_LCS_METHODS)}. 'all' means the four "
+        f"defaults ({', '.join(LCS_METHODS)}); they share the base inference runs, "
+        "so asking for all four costs 7 Merlin calls, not 13.",
     )
     s.add_argument(
         "--formulation",
@@ -256,11 +262,11 @@ def _resolve_methods(spec: str) -> tuple[str, ...]:
     if spec.strip().lower() == "all":
         return tuple(LCS_METHODS)
     methods = tuple(m.strip() for m in spec.split(",") if m.strip())
-    unknown = [m for m in methods if m not in LCS_METHODS]
+    unknown = [m for m in methods if m not in ALL_LCS_METHODS]
     if unknown:
         raise SystemExit(
             f"Unknown --methods entry/entries: {', '.join(unknown)} "
-            f"(expected from {', '.join(LCS_METHODS)}, or 'all')."
+            f"(expected from {', '.join(ALL_LCS_METHODS)}, or 'all')."
         )
     if not methods:
         raise SystemExit("--methods must name at least one readout.")

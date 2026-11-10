@@ -42,7 +42,7 @@ from mellea.backends import Backend
 from fact_reasoner.core.atomizer import Atomizer
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.lcs.candidate_pairs import GATE_METHODS, PAIR_POLICIES
-from fact_reasoner.lcs.lcs_scorer import LCS_METHODS
+from fact_reasoner.lcs.lcs_scorer import ALL_LCS_METHODS, DEFAULT_LCS_METHOD
 from fact_reasoner.lcs.pipeline import (
     COHERENCE_FORMULATIONS,
     CoherencePipeline,
@@ -190,7 +190,7 @@ class CoherenceRunner:
         *,
         merlin_path: str,
         # --- coherence scoring ---
-        methods: Sequence[str] = ("mean_marginal",),
+        methods: Sequence[str] = (DEFAULT_LCS_METHOD,),
         formulation: str = "mrf",
         reified_prior: float = 0.5,
         ibound: int = 6,
@@ -239,11 +239,11 @@ class CoherenceRunner:
         methods = tuple(methods)
         if not methods:
             raise ValueError("methods must name at least one LCS readout.")
-        unknown = [m for m in methods if m not in LCS_METHODS]
+        unknown = [m for m in methods if m not in ALL_LCS_METHODS]
         if unknown:
             raise ValueError(
                 f"Unknown LCS method(s): {unknown!r} "
-                f"(expected from {list(LCS_METHODS)})."
+                f"(expected from {list(ALL_LCS_METHODS)})."
             )
         if formulation not in COHERENCE_FORMULATIONS:
             raise ValueError(

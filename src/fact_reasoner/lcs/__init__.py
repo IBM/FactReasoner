@@ -110,7 +110,12 @@ from fact_reasoner.factors import (
     edge_factor_values,
     pairwise_prior,
 )
-from fact_reasoner.lcs.lcs_scorer import LCS_METHODS, LCSScorer
+from fact_reasoner.lcs.lcs_scorer import (
+    ALL_LCS_METHODS,
+    DEFAULT_LCS_METHOD,
+    LCS_METHODS,
+    LCSScorer,
+)
 from fact_reasoner.lcs.pipeline import (
     COHERENCE_FORMULATIONS,
     RULE_SCHEMA,
@@ -169,6 +174,8 @@ __all__ = [
     "MiningResult",
     "LCSScorer",
     "LCS_METHODS",
+    "ALL_LCS_METHODS",
+    "DEFAULT_LCS_METHOD",
     "mine_and_score",
     # The runner: one object over a single response or a jsonl dataset.
     "CoherenceRunner",

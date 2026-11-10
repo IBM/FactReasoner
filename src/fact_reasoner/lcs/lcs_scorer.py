@@ -85,6 +85,76 @@
 # would silently fall back to a uniform prior while (a) used the real one -- and
 # (d) would normalize a real-prior log Z against a uniform-prior ceiling.
 #
+# THE CONFLICT-ESCAPE READOUT (e), AND WHY IT IS PROVABLY MONOTONE.
+#
+#   conflict_escape = E_{P0}[ prod_r (1 - w_r * [r violated]) ] = Z_pen / Z_0
+#
+# P0 is the network with every CONFLICT factor (contradiction, exclusive) removed --
+# priors plus support relations, i.e. the log-partition ceiling network. Each conflict
+# r gets a penalty weight w_r = p_r (capped below 1) and is "violated" in its penalized
+# worlds V(tau_r): (1,1) for contradiction, (0,0) and (1,1) for exclusive. Z_pen is
+# the partition function of P0 times one penalty-only factor [1 - w_r on V(tau_r),
+# 1 elsewhere] per conflict.
+#
+# Every penalty factor lies in [0, 1] and is non-increasing in w_r, and P0 does not
+# depend on any conflict. Deleting a conflict (factor -> 1) or softening it (w_r
+# down) therefore cannot lower the product in any world, so cannot lower its
+# expectation: the readout is monotone in conflict removal and resolution for ANY
+# priors and support structure. (a) and (d) are not -- see the paper's
+# Prop. prop-nonmono and Rem. rem-floor. The argument holds for ANY penalty map that
+# is non-decreasing in p with values in [0, 1). The linear map is the default: an
+# earlier threshold map, w = max(0, 2p - 1), charged nothing for p <= 1/2, and since
+# LoCoBench's gold "weak" band enters at p = 0.47, resolving any weak conflict left
+# (e) tied (gold Increase 34/50 and 205/335, against 44/50 and 271/335 linear). On
+# the AeroParts family (worse < base < concession < fixcasualty < coherent) it reads
+# 0.181 0.321 0.388 0.600 1.000.
+#
+# It is NOT in ``LCS_METHODS``, the default set that the batch pipelines compute,
+# so adding it moved no existing output; request it by name (``ALL_LCS_METHODS``).
+#
+# THE BALANCED READOUT (f): SUPPORT AND CONFLICT, MONOTONE IN BOTH.
+#
+#   balanced = sigmoid( c * log E_pi[ prod_conf (1 - w_r V_r) * prod_sup (1 + u_r C_r) ] / n )
+#
+# The expectation is under the PRIORS ALONE (independent Bernoulli(pi_i)), not under
+# any network that contains relations. Each conflict multiplies the worlds that
+# violate it (V_r: (1,1) for contradiction; (0,0),(1,1) for exclusive) by 1 - w_r;
+# each support multiplies the worlds where it does work (C_r: (1,1) for entailment
+# and equivalence; exactly-one for co_necessity) by 1 + u_r. Both weights are
+# linear in p: w_r = p_r (capped below 1), u_r = p_r.
+#
+# Monotone in EVERY relation, in the right direction: pi does not depend on any
+# relation, conflict factors lie in [0,1] and fall with w_r, support factors are
+# >= 1 and rise with u_r, so in every world the product moves the right way when a
+# conflict is removed/softened or a support is added/strengthened -- hence so does
+# its expectation, and the fixed-scale sigmoid of c * log/n preserves order (n never
+# changes along a ladder, and c is a constant).
+#
+# THE DISPLAY SCALE c. Any fixed c > 0 gives the same orderings and the same theorem,
+# so c only sets how far the score moves. It is fixed by the model, not fitted: a
+# relation factor lies in (0, 2] since p <= 1, so the most log-evidence one support
+# can add is log 2 -- one bit. With c = 2 the score is 4^b / (1 + 4^b) for b the net
+# evidence per claim in bits: each bit per claim multiplies the odds by 4, so one
+# maximal support per claim reads 0.8 (odds 4:1) and one maximal conflict per claim
+# drives the score toward 0. c = 1 compresses gold ladder scores into ~0.45-0.55;
+# c = 2 widens them to ~0.40-0.60. Override with ``LCSScorer(balanced_scale=...)``. (e) is monotone only in conflicts, because its base
+# distribution P0 contains the supports; this readout fixes that by moving the
+# supports out of the base and into rewards.
+#
+# A relation-free response scores exactly 0.5; support lifts it, conflict lowers it.
+# Because adding support can never lower the score, PADDING a response with support
+# relations raises it -- that is the price of support-monotonicity, not a bug. The
+# co_necessity credit (exactly-one worlds only, not all three satisfying worlds) is
+# what keeps a near-vacuous disjunction from being the cheapest way to pad.
+#
+# Gold ladders (exact enumeration): every satisfiable Increase pair rises -- 49/50 on
+# the 70-item corpus (the miss is a pair with byte-identical gold graphs), 335/335 on
+# the 100-family release -- with zero falls and every Invariance pair flat.
+#
+# HEADLINE. (f) is the default headline of ``score`` (``method="balanced"``). The
+# batch pipelines (locoeval, experiments, demo) store readouts by name and keep their
+# own readout lists, so their records -- and the published tables -- are unchanged.
+#
 # INFERENCE SHARING. ``score(method=...)`` answers one readout; ``score_all`` answers
 # several while running the base MAR and the base PR only ONCE. Per-method calls cost
 # 14 Merlin invocations for all four readouts (each re-running the shared base pair);
@@ -99,10 +169,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from fact_reasoner.fact_graph import Edge, FactGraph, Node
-from fact_reasoner.factors import build_markov_network
+from fact_reasoner.factors import PROB_EPS, build_markov_network
 from fact_reasoner.inference import run_merlin
 from fact_reasoner.lcs.relation_miner import MiningResult, _atom_sort_key
 from fact_reasoner.lcs.taxonomy import (
+    LEVEL1_CONECESSITY,
     LEVEL1_CONFLICT_COUPLINGS,
     LEVEL1_CONTRADICTION,
     LEVEL1_ENTAILMENT,
@@ -113,6 +184,13 @@ from fact_reasoner.markov_network import MarkovNetwork
 
 # The four LCS readouts. ``mean_marginal`` is the default headline (deep-dive Eq. 4).
 LCS_METHODS = ("mean_marginal", "consistency", "reified", "log_partition")
+
+# Readouts computed only when requested by name. Kept out of ``LCS_METHODS`` so the
+# pipelines that default to "all readouts" produce the same records as before.
+EXTRA_LCS_METHODS = ("conflict_escape", "balanced")
+
+# Every readout ``score`` / ``score_all`` accept.
+ALL_LCS_METHODS = LCS_METHODS + EXTRA_LCS_METHODS
 
 # Conflict couplings whose both-true world is the incoherent configuration the
 # conflict-free (log-partition ceiling) readout keys on: contradiction and
@@ -142,6 +220,13 @@ _CONSISTENCY_SUPPORT_TYPES = frozenset(
     {LEVEL1_ENTAILMENT, LEVEL1_EQUIVALENCE, LEVEL1_EXCLUSIVE}
 )
 
+# Supports the balanced readout (f) rewards: every edge-producing coupling that is
+# not a conflict. co_necessity is included here (it is excluded from (b)'s support
+# term), credited only in its exactly-one worlds -- see ``_credited``.
+_BALANCED_SUPPORT_TYPES = frozenset(
+    {LEVEL1_ENTAILMENT, LEVEL1_EQUIVALENCE, LEVEL1_CONECESSITY}
+)
+
 # Prefix for derived / auxiliary variables (consistency U-chain, reified R). It
 # sorts after atom ids "a..." under Merlin's (cardinality, name) ordering, so the
 # atom marginals keep their positions and the derived variable is addressable by
@@ -152,6 +237,13 @@ _AUX = "z"
 # term's aux-var batches. Set high enough that any real network is a single batch
 # (one MAR); callers on a variable-limited backend lower it (see ``LCSScorer``).
 DEFAULT_MAX_NETWORK_VARS = 1_000_000
+
+# Readout (f)'s display scale: score = sigmoid(c * log E / n). c = 2 makes one maximal
+# support relation per claim (one bit each) read 0.8, odds 4:1. See the module docstring.
+DEFAULT_BALANCED_SCALE = 2.0
+
+# The headline ``score`` reports when no ``method`` is given.
+DEFAULT_LCS_METHOD = "balanced"
 
 # How many support aux vars to add per MAR when ``max_network_vars`` binds. Small on
 # purpose: a variable-limited backend is typically one that enumerates, where each
@@ -182,6 +274,7 @@ class LCSScorer:
         ibound: int = 6,
         verbose: bool = False,
         max_network_vars: int | None = None,
+        balanced_scale: float = DEFAULT_BALANCED_SCALE,
     ):
         """Initialize the scorer.
 
@@ -197,6 +290,11 @@ class LCSScorer:
                 full network at once -- the offline brute-force oracle caps at 20
                 variables. Batching is exact either way (the per-edge aux vars are
                 mutually independent), so this only trades variables for MAR calls.
+            balanced_scale: The fixed display scale ``c`` of readout (f),
+                ``sigmoid(c * log E / n)``. Any ``c > 0`` preserves every ordering
+                and the monotonicity theorem; it only sets the spread. Defaults to
+                :data:`DEFAULT_BALANCED_SCALE` (2: one maximal support per claim
+                reads 0.8).
         """
         if not merlin_path:
             raise ValueError("merlin_path is required to run inference.")
@@ -206,6 +304,9 @@ class LCSScorer:
             max_network_vars = DEFAULT_MAX_NETWORK_VARS
         if max_network_vars < 1:
             raise ValueError("max_network_vars must be at least 1.")
+        if not balanced_scale > 0:
+            raise ValueError("balanced_scale must be positive.")
+        self.balanced_scale = float(balanced_scale)
         self.merlin_path = merlin_path
         self.ibound = ibound
         self.verbose = verbose
@@ -217,7 +318,7 @@ class LCSScorer:
         self,
         result: MiningResult,
         *,
-        method: str = "mean_marginal",
+        method: str = DEFAULT_LCS_METHOD,
         prior: float | None = None,
         reified_prior: float = 0.5,
         node_priors: dict[str, float] | None = None,
@@ -231,7 +332,7 @@ class LCSScorer:
         Args:
             result: The :class:`MiningResult` from ``RelationMiner``.
             method: Which readout is the headline ``"lcs"`` value. One of
-                ``LCS_METHODS`` (default ``"mean_marginal"``). The selected
+                ``ALL_LCS_METHODS`` (default ``"balanced"``, readout (f)). The selected
                 method's score is also stored under its own key; the other
                 alternative keys are ``None`` unless that method was selected
                 (they each need extra inference, so they are computed on demand).
@@ -250,8 +351,12 @@ class LCSScorer:
               * ``"method"``: the selected method.
               * ``"lcs"``: the selected method's score (the headline).
               * ``"mean_marginal"``: Eq. 4 value (always computed).
-              * ``"consistency"`` / ``"reified"`` / ``"log_partition"``: the
-                alternative scores, populated when selected (else ``None``).
+              * ``"consistency"`` / ``"reified"`` / ``"log_partition"`` /
+                ``"conflict_escape"``: the alternative scores, populated when
+                selected (else ``None``).
+              * ``"log_z_pen"``: log partition of the conflict-free network with
+                penalty-only conflict factors (only for
+                ``method="conflict_escape"``, else ``None``).
               * ``"consistency_conflict"`` / ``"consistency_support"``: the two
                 terms ``consistency`` averages, for diagnostics (else ``None``).
               * ``"marginals"``: ``{atom_id: P(a_i=1)}`` from the base network.
@@ -267,9 +372,10 @@ class LCSScorer:
         Raises:
             ValueError: If ``method`` is not one of ``LCS_METHODS``.
         """
-        if method not in LCS_METHODS:
+        if method not in ALL_LCS_METHODS:
             raise ValueError(
-                f"Unknown LCS method: {method!r} (expected one of {list(LCS_METHODS)})."
+                f"Unknown LCS method: {method!r} "
+                f"(expected one of {list(ALL_LCS_METHODS)})."
             )
         out = self.score_all(
             result,
@@ -305,8 +411,9 @@ class LCSScorer:
 
         Args:
             result: The :class:`MiningResult` from ``RelationMiner``.
-            methods: Which readouts to compute (default: all of ``LCS_METHODS``).
-                Unrequested readout keys are ``None``.
+            methods: Which readouts to compute (default: all of ``LCS_METHODS``;
+                ``"conflict_escape"`` must be named explicitly). Unrequested
+                readout keys are ``None``.
             prior: A uniform atom prior override (see :meth:`score`).
             reified_prior: The Bernoulli prior ``rho`` on the reified node ``R``.
             node_priors: Explicit per-atom priors (see :meth:`score`).
@@ -322,11 +429,11 @@ class LCSScorer:
         methods = tuple(methods)
         if not methods:
             raise ValueError("methods must name at least one LCS readout.")
-        unknown = [m for m in methods if m not in LCS_METHODS]
+        unknown = [m for m in methods if m not in ALL_LCS_METHODS]
         if unknown:
             raise ValueError(
                 f"Unknown LCS method(s): {unknown!r} "
-                f"(expected from {list(LCS_METHODS)})."
+                f"(expected from {list(ALL_LCS_METHODS)})."
             )
 
         atoms = result.atoms
@@ -341,6 +448,8 @@ class LCSScorer:
             "consistency_support": None,
             "reified": None,
             "log_partition": None,
+            "conflict_escape": None,
+            "balanced": None,
             "marginals": {},
             "num_atoms": n,
             "num_below_prior": 0,
@@ -349,6 +458,8 @@ class LCSScorer:
             "log_z": None,
             "log_z_max": None,
             "log_z_min": None,
+            "log_z_pen": None,
+            "log_z_balanced": None,
         }
         if n == 0:
             return out
@@ -390,6 +501,18 @@ class LCSScorer:
             out["log_partition"] = norm
             out["log_z_max"] = log_z_max
             out["log_z_min"] = log_z_min
+        if "conflict_escape" in methods:
+            # Shares the conflict-free PR with the log-partition ceiling when that
+            # readout was also requested.
+            escape, log_z_pen, log_z_0 = self._conflict_escape(
+                result, priors, log_z_0=out["log_z_max"]
+            )
+            out["conflict_escape"] = escape
+            out["log_z_pen"] = log_z_pen
+            if out["log_z_max"] is None:
+                out["log_z_max"] = log_z_0
+        if "balanced" in methods:
+            out["balanced"], out["log_z_balanced"] = self._balanced(result, priors)
 
         headline = out[methods[0]]
         out["lcs"] = headline if headline is not None else 0.0
@@ -688,6 +811,110 @@ class LCSScorer:
 
     # -- network construction helpers ----------------------------------------
 
+    # -- (e) conflict escape -------------------------------------------------
+
+    def _conflict_escape(
+        self,
+        result: MiningResult,
+        priors: dict[str, float] | None = None,
+        *,
+        log_z_0: float | None = None,
+    ) -> tuple[float | None, float | None, float | None]:
+        """``E_{P0}[prod_r (1 - w_r [r violated])]`` -- the monotone readout (e).
+
+        See the module docstring for the definition and the monotonicity argument.
+        Computed as ``Z_pen / Z_0`` from two PR runs on the conflict-free network:
+        ``Z_0`` as is, ``Z_pen`` with one penalty-only factor per conflict.
+
+        Args:
+            result: The mining result holding the fact graph.
+            priors: The resolved per-atom priors (resolved from ``result`` if
+                omitted).
+            log_z_0: The conflict-free ``log Z`` if already computed (it is the
+                log-partition ceiling), to skip one PR run.
+
+        Returns:
+            ``(score, log_z_pen, log_z_0)``. ``score`` is 1.0 when no conflict
+            carries positive weight, and ``None`` when a PR run is unavailable.
+        """
+        if priors is None:
+            priors = self._node_priors(result)
+        penalties = [
+            (edge.source, edge.target, edge.type, _penalty_weight(edge.probability))
+            for edge in result.fact_graph.get_edges()
+            if edge.type in _CONFLICT_TYPES
+        ]
+        penalties = [p for p in penalties if p[3] > 0.0]
+        if not penalties:
+            # Nothing is charged: the expectation of an empty product is 1.
+            return 1.0, log_z_0, log_z_0
+
+        cf_graph = _contradiction_free_graph(result.fact_graph)
+        if log_z_0 is None:
+            log_z_0 = self._log_z(
+                build_markov_network(cf_graph, use_priors=True, node_priors=priors)
+            )
+        pen_network = build_markov_network(
+            cf_graph, use_priors=True, node_priors=priors
+        )
+        for source, target, level1_type, w in penalties:
+            pen_network.add_factor(
+                [source, target], [2, 2], _penalty_factor(level1_type, w)
+            )
+        log_z_pen = self._log_z(pen_network)
+        if log_z_0 is None or log_z_pen is None:
+            return None, log_z_pen, log_z_0
+        # Clamp for numerical safety: the ratio is in [0, 1] exactly, but WMB
+        # computes both partition functions approximately.
+        score = max(0.0, min(1.0, math.exp(log_z_pen - log_z_0)))
+        return score, log_z_pen, log_z_0
+
+    # -- (f) balanced: support rewards and conflict penalties ----------------
+
+    def _balanced(
+        self, result: MiningResult, priors: dict[str, float] | None = None
+    ) -> tuple[float | None, float | None]:
+        """``sigmoid(c * log E_pi[prod penalties * prod rewards] / n)`` -- readout (f).
+
+        See the module docstring for the definition and the monotonicity argument.
+        One PR run: the network is the prior unaries (which sum to one, so its
+        partition function is the expectation under the priors) times one
+        penalty-only factor per conflict and one reward-only factor per support.
+
+        Returns:
+            ``(score, log_z)``. ``score`` is 0.5 with no relations, and ``None``
+            when the PR run is unavailable.
+        """
+        if priors is None:
+            priors = self._node_priors(result)
+        n = len(result.atoms)
+        if n == 0:
+            return None, None
+        network = MarkovNetwork()
+        for aid in sorted(result.atoms, key=_atom_sort_key):
+            pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
+            network.add_node(aid)
+            network.add_factor([aid], [2], [1.0 - pi, pi])
+        any_factor = False
+        for edge in result.fact_graph.get_edges():
+            if edge.type in _CONFLICT_TYPES:
+                values = _penalty_factor(edge.type, _penalty_weight(edge.probability))
+            elif edge.type in _BALANCED_SUPPORT_TYPES:
+                values = _reward_factor(edge.type, max(0.0, float(edge.probability)))
+            else:
+                continue
+            network.add_edge(edge.source, edge.target)
+            network.add_factor([edge.source, edge.target], [2, 2], values)
+            any_factor = True
+        if not any_factor:
+            return 0.5, 0.0
+        log_z = self._log_z(network)
+        if log_z is None:
+            return None, None
+        x = self.balanced_scale * log_z / n
+        score = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
+        return score, log_z
+
     def _node_priors(
         self,
         result: MiningResult,
@@ -843,6 +1070,63 @@ def _vote_factor(level1_type: str, p: float) -> list[float]:
                 else:
                     vals.append(1.0 if _satisfied(level1_type, s, t) else 1.0 - p)
     return vals
+
+
+def _penalty_weight(p: float) -> float:
+    """Conflict weight ``p`` -> penalty ``w = p``, clipped to ``[0, 1 - PROB_EPS]``.
+
+    Shared by readouts (e) and (f). Their monotonicity theorems hold for any map
+    non-decreasing in ``p`` with values in ``[0, 1)``; linear is the choice because a
+    threshold at ``p = 1/2`` makes every weak conflict invisible (see the module
+    docstring). The cap keeps every penalty factor strictly positive, since a zero
+    entry would make ``log Z_pen`` undefined when every world violates some conflict.
+    """
+    return min(1.0 - PROB_EPS, max(0.0, float(p)))
+
+
+def _penalty_factor(level1_type: str, w: float) -> list[float]:
+    """Penalty-only conflict factor over [s, t] (row-major, 4 values).
+
+    ``1 - w`` on the conflict's penalized worlds ``V(tau)`` and 1 elsewhere:
+    (1,1) for contradiction; (0,0) and (1,1) for exclusive.
+    """
+    if level1_type not in _CONFLICT_TYPES:
+        raise ValueError(
+            f"{level1_type!r} is not a conflict coupling "
+            f"(expected one of {sorted(_CONFLICT_TYPES)})."
+        )
+    return [
+        1.0 - w if not _satisfied(level1_type, s, t) else 1.0
+        for s in (0, 1)
+        for t in (0, 1)
+    ]
+
+
+def _credited(level1_type: str, s: int, t: int) -> bool:
+    """Whether support ``level1_type`` earns credit at (s, t) under readout (f).
+
+    entailment / equivalence: (1, 1), where the relation is actively upheld -- the
+    same world (b)'s support term credits. co_necessity: exactly one endpoint holds,
+    the worlds where the disjunction does work; crediting all three satisfying
+    worlds would make it the cheapest relation to pad a response with.
+    """
+    if level1_type in (LEVEL1_ENTAILMENT, LEVEL1_EQUIVALENCE):
+        return s == 1 and t == 1
+    if level1_type == LEVEL1_CONECESSITY:
+        return s != t
+    raise ValueError(
+        f"{level1_type!r} is not a support coupling "
+        f"(expected one of {sorted(_BALANCED_SUPPORT_TYPES)})."
+    )
+
+
+def _reward_factor(level1_type: str, u: float) -> list[float]:
+    """Reward-only support factor over [s, t] (row-major): ``1 + u`` where credited."""
+    return [
+        1.0 + u if _credited(level1_type, s, t) else 1.0
+        for s in (0, 1)
+        for t in (0, 1)
+    ]
 
 
 def _satisfied(level1_type: str, s: int, t: int) -> bool:
