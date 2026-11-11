@@ -696,3 +696,62 @@ class TestTransientRetry:
         assert is_transient_error(httpx.ReadError("", request=req))
         assert is_transient_error(TimeoutError())
         assert not is_transient_error(KeyError("x"))
+
+
+class _FakeOllamaTokenLogprob:
+    """Duck-types `ollama.ChatResponse.logprobs` entries (token/logprob attrs)."""
+
+    def __init__(self, token, logprob):
+        self.token = token
+        self.logprob = logprob
+
+
+class _FakeOllamaChatResponse:
+    def __init__(self, logprobs):
+        self.logprobs = logprobs
+
+
+class _FakeProviderRaw:
+    """Stand-in for mellea's RawProviderResponse, including `.provider`."""
+
+    def __init__(self, provider, response):
+        self.provider = provider
+        self.response = response
+
+
+class _FakeProviderOutput:
+    def __init__(self, provider, response):
+        self.raw = _FakeProviderRaw(provider, response)
+
+
+class TestExtractLogprobsFromOllamaOutput:
+    """Ollama's raw response is an `ollama.ChatResponse`, not an OpenAI dict."""
+
+    def test_ollama_raw_shape(self):
+        output = _FakeProviderOutput(
+            "ollama",
+            _FakeOllamaChatResponse(
+                [
+                    _FakeOllamaTokenLogprob("hi", -0.1),
+                    _FakeOllamaTokenLogprob("!", -0.2),
+                ]
+            ),
+        )
+        assert extract_logprobs_from_output(output) == [
+            {"token": "hi", "logprob": -0.1},
+            {"token": "!", "logprob": -0.2},
+        ]
+
+    def test_ollama_raw_shape_missing_logprobs_raises(self):
+        output = _FakeProviderOutput("ollama", _FakeOllamaChatResponse(None))
+        with pytest.raises(AssertionError):
+            extract_logprobs_from_output(output)
+
+    def test_non_ollama_provider_uses_openai_shape(self):
+        output = _FakeProviderOutput(
+            "openai",
+            {"choices": [{"logprobs": {"content": [{"token": "a", "logprob": -1.0}]}}]},
+        )
+        assert extract_logprobs_from_output(output) == [
+            {"token": "a", "logprob": -1.0}
+        ]

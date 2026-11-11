@@ -125,9 +125,10 @@ class TestContextSummarizerGetProbability:
         assert result == 1.0
 
     def test_get_probability_without_logprobs_keeps_the_prior(self, capsys):
-        # Ollama returns no logprobs at all. The confidence multiplies the
-        # context prior, so 0.0 here would zero every prior and leave every atom
-        # at 0.5 whatever the NLI found.
+        # Some backends (e.g. Anthropic's OpenAI-compatible endpoint) return no
+        # logprobs at all. The confidence multiplies the context prior, so 0.0
+        # here would zero every prior and leave every atom at 0.5 whatever the
+        # NLI found.
         summarizer = ContextSummarizer(backend=MagicMock())
         mock_output = MagicMock()
         mock_output.raw.response = {"choices": [{"logprobs": None}]}

@@ -71,7 +71,8 @@ class TestModelSpec:
     def test_has_logprobs(self):
         assert ModelSpec("a", "a", "vllm").has_logprobs
         assert ModelSpec("a", "a", "rits").has_logprobs
-        assert not ModelSpec("a", "a", "ollama").has_logprobs
+        assert ModelSpec("a", "a", "ollama").has_logprobs
+        assert not ModelSpec("a", "a", "openai").has_logprobs
 
     def test_parse(self):
         m = ModelSpec.parse("granite-4-1-30b:vllm:http://x/v1")
@@ -124,7 +125,7 @@ class TestRunner:
 
     def test_no_logprobs_backend_skips_surrogate_logprobs(self, tmp_path):
         cfg = _dry_config(
-            tmp_path, models=[ModelSpec("ollama-model", "granite", "ollama")]
+            tmp_path, models=[ModelSpec("openai-model", "gpt-4o", "openai")]
         )
         results = ExperimentRunner(cfg).run()
         methods = {r["strength_method"] for r in results["records"]}

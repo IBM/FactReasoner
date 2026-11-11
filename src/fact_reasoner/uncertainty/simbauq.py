@@ -16,7 +16,7 @@
 
 Ported (nearly verbatim) from ``mellea.stdlib.sampling.simbauq`` so it can be
 used to estimate NLI relationship probabilities on backends that do not expose
-token logprobs (e.g. Ollama). The only intentional deviations from the upstream
+token logprobs (e.g. Claude via Anthropic's OpenAI-compatible endpoint). The only intentional deviations from the upstream
 copy are:
 
 * imports use absolute ``mellea`` paths instead of the package-relative form; and

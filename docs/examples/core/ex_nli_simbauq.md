@@ -8,7 +8,7 @@ Demonstrates how to estimate the probability of a predicted NLI relationship usi
 
 FactReasoner turns each (context, atom) pair into an NLI relationship — `entailment`, `contradiction`, or `neutral` — together with a probability that becomes the strength of the corresponding edge in the Markov Network. By default `NLIExtractor` derives that probability from the **token logprobs** of the generated label.
 
-The **Ollama** backend does not expose logprobs, so the default method degrades to a fixed neutral relation for every pair. This example uses the alternative **SIMBA-UQ** method (`nli_method="simbauq"`): it samples the NLI label several times across a range of temperatures, scores each sample by how consistent it is with the consensus, and takes the winning sample's label as the prediction and its confidence as the probability of that label. This needs no logprobs and works on any backend.
+Some backends don't expose logprobs at all — e.g. Claude via Anthropic's OpenAI-compatible endpoint — so the default method degrades to a fixed neutral relation for every pair there. This example uses the alternative **SIMBA-UQ** method (`nli_method="simbauq"`): it samples the NLI label several times across a range of temperatures, scores each sample by how consistent it is with the consensus, and takes the winning sample's label as the prediction and its confidence as the probability of that label. This needs no logprobs and works on any backend, including ones that do have logprobs (like the Ollama backend used by default below).
 
 ## Prerequisites
 
