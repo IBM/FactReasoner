@@ -15,6 +15,7 @@
 # Atomic fact decontextualization using LLMs
 
 import json
+import re
 from typing import Any
 
 import mellea.stdlib.functional as mfuncs
@@ -38,7 +39,7 @@ from ._async_runner import run_coroutine
 
 INSTRUCTION_REVISER = """
 Instructions:
-You task is to decontextualize a UNIT to make it standalone. Each UNIT is an independent content unit or atomic unit extracted from the broader context of a RESPONSE.   
+You task is to decontextualize a UNIT to make it standalone. Each UNIT is an independent content unit or atomic unit extracted from the broader context of a RESPONSE, which was itself generated in answer to a QUESTION. Use the QUESTION to resolve a vague reference whenever the RESPONSE itself does not name the referent.
 
 Vague References:
 - Pronouns (e.g., "he", "she", "they", "it")
@@ -47,8 +48,9 @@ Vague References:
 - Incomplete names (e.g., "Jeff..." or "Bezos..." when referring to Jeff Bezos)
 
 Follow the steps below for unit decontextualization:
-1. If the UNIT contains vague references, minimally revise them with respect to the specific subjects they refer to in the RESPONSE.
+1. If the UNIT contains vague references, minimally revise them with respect to the specific subjects they refer to in the RESPONSE (or, if the RESPONSE does not name them, in the QUESTION).
 2. The decontextualized UNIT should be minimally revised by ONLY resolving vague references. No additional information must be added.
+   Only use a referent that is explicitly named in the RESPONSE or the QUESTION. Never answer the QUESTION yourself: if the QUESTION asks for something (e.g. "Who discovered X?") and neither the QUESTION nor the RESPONSE names it, leave that reference unresolved.
 3. UNIT extraction might decompose a conjunctive statement into multiple units (e.g. Democracy treats citizens as equals regardless of their race or religion -> (1) Democracy treats citizens as equals regardless of their race, (2) Democracy treats citizens as equals regardless of their religion). Avoid adding what is potentially part of another UNIT.
 4. Output ONLY the revised UNIT, with no explanation, in the following JSON format with a markdown code block:
 
@@ -112,15 +114,86 @@ OUTPUT:
 }
 ```
 
+Example 4:
+UNIT:
+It is roughly spherical in shape.
+
+QUESTION:
+What is the size, shape, and composition of the Moon?
+
+RESPONSE:
+It is roughly spherical in shape. It is composed primarily of rock and has no significant atmosphere.
+
+OUTPUT:
+```json
+{
+    "revised_unit": "The Moon is roughly spherical in shape."
+}
+```
+
+Example 5:
+UNIT:
+She won it in 1903.
+
+QUESTION:
+Who was the first woman to win a Nobel Prize?
+
+RESPONSE:
+She won it in 1903 for her work on radioactivity.
+
+OUTPUT:
+```json
+{
+    "revised_unit": "She won the Nobel Prize in 1903."
+}
+```
+
 Your task:
 UNIT:
 {{atomic_unit}}
+
+QUESTION:
+{{query}}
 
 RESPONSE:
 {{response}}
 
 OUTPUT:
 """
+
+
+# Function words a revision may add without them appearing in the source text
+# (e.g. "Born in 1879." -> "Einstein was born in 1879.").
+_FUNCTION_WORDS = frozenset(
+    """
+    a an the this that these those and or but nor of in on at to for from by
+    with as about into over under between among than then also both either
+    is are was were be been being has have had do does did will would can
+    could shall should may might must it its it's they them their there here
+    he him his she her hers we us our who whom whose which what s
+    """.split()
+)
+_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def _words(text: str) -> set[str]:
+    return {w.lower() for w in _WORD.findall(text or "")}
+
+
+def _ungrounded_words(
+    revised_unit: str, unit: str, response: str, query: str | None
+) -> set[str]:
+    """Words a revision adds that appear in neither the unit, the response nor
+    the query (ignoring function words).
+
+    A revision may only resolve references to subjects the RESPONSE or QUESTION
+    name. With the query in the prompt, a model can instead *answer* it (e.g.
+    "Who discovered penicillin?" + "He discovered it in 1928." -> "Alexander
+    Fleming discovered penicillin in 1928."), adding a claim the response never
+    made. Any word outside the source text is a sign of such an addition.
+    """
+    source = _words(unit) | _words(response) | _words(query or "")
+    return _words(revised_unit) - source - _FUNCTION_WORDS
 
 
 def _revised_unit(text: str) -> str | None:
@@ -200,7 +273,9 @@ class Reviser:
         # Disable Mellea logging
         MelleaLogger.get_logger().setLevel(MelleaLogger.ERROR)
 
-    def run(self, units: list[str], response: str) -> list[dict[str, Any]]:
+    def run(
+        self, units: list[str], response: str, query: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -213,15 +288,19 @@ class Reviser:
                 The atomic units to be decontextualized.
             response: str
                 The response from which the atomic units are decontextualized.
+            query: str | None
+                The question that produced the response. Used to resolve
+                vague references whose referent is named only in the
+                question, not in the response text itself.
         Returns:
             List[Dict[str, Any]]: One result per unit, in input order, each with
             the ``revised_unit``, an empty ``rationale`` and the original
             ``text``. A unit whose revision fails is returned unchanged.
         """
 
-        return run_coroutine(self.run_batch(units, response)) # type: ignore
+        return run_coroutine(self.run_batch(units, response, query)) # type: ignore
 
-    def _request(self, atom_text: str, response: str):
+    def _request(self, atom_text: str, response: str, query: str | None = None):
         """Build the (unawaited) revision request for a single atom."""
         return mfuncs.ainstruct(
             INSTRUCTION_REVISER,
@@ -236,7 +315,11 @@ class Reviser:
                     ),
                 )
             ],
-            user_variables={"atomic_unit": atom_text, "response": response},
+            user_variables={
+                "atomic_unit": atom_text,
+                "response": response,
+                "query": query or "",
+            },
             strategy=RejectionSamplingStrategy(loop_budget=LOOP_BUDGET),
             return_sampling_results=True,
             model_options=(
@@ -251,11 +334,18 @@ class Reviser:
         """Build a no-op revision result for a failed/unparsable atom."""
         return {"revised_unit": atom_text, "rationale": "", "text": atom_text}
 
-    def _parse_output(self, output: Any, atom_text: str) -> dict[str, Any]:
+    def _parse_output(
+        self,
+        output: Any,
+        atom_text: str,
+        response: str = "",
+        query: str | None = None,
+    ) -> dict[str, Any]:
         """Map a single sampling result to a revised-unit dict.
 
-        On any failure (unsuccessful sampling or unparsable output) the original
-        atom is returned unchanged so downstream callers that read
+        On any failure (unsuccessful sampling, unparsable output, or a revision
+        that adds words found in neither the unit, the response nor the query)
+        the original atom is returned unchanged so downstream callers that read
         ``result[i]["revised_unit"]`` positionally never crash.
         """
         if not getattr(output, "success", False):
@@ -266,11 +356,21 @@ class Reviser:
             print("[Reviser] Failed to parse output: no usable revised unit.")
             telemetry.count_fallback("reviser", "parse_error")
             return self._fallback(atom_text)
+        added = _ungrounded_words(revised_unit, atom_text, response, query)
+        if added:
+            print(
+                f"[Reviser] Rejected revision of {atom_text!r}: adds words not in "
+                f"the response or query ({', '.join(sorted(added))})."
+            )
+            telemetry.count_fallback("reviser", "ungrounded")
+            return self._fallback(atom_text)
         # The prompt no longer asks for a rationale; keep the key so callers
         # reading the old result shape still work.
         return {"revised_unit": revised_unit, "rationale": "", "text": atom_text}
 
-    async def run_batch(self, units: list[str], response: str) -> list[dict[str, Any]]:
+    async def run_batch(
+        self, units: list[str], response: str, query: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Decontextualize the input atomic units using the response as context.
 
@@ -279,6 +379,10 @@ class Reviser:
                 The atomic units to be decontextualized.
             response: str
                 The response from which the atomic units are decontextualized.
+            query: str | None
+                The question that produced the response. Used to resolve
+                vague references whose referent is named only in the
+                question, not in the response text itself.
         Returns:
             List[Dict[str, Any]]: One result per unit, in input order (see
             :meth:`run`).
@@ -288,7 +392,7 @@ class Reviser:
         # concurrency plus a per-minute rate limit, and captures per-item
         # exceptions so a single backend failure does not drop the rest.
         def factory(atom_text: str):
-            return self._request(atom_text, response)
+            return self._request(atom_text, response, query)
 
         print(f"[Reviser] Running throttled batch of {len(units)} requests ...")
         with telemetry.span(
@@ -313,6 +417,6 @@ class Reviser:
                 )
                 results.append(self._fallback(atom_text))
                 continue
-            results.append(self._parse_output(output, atom_text))
+            results.append(self._parse_output(output, atom_text, response, query))
 
         return results
