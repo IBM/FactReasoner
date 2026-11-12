@@ -201,9 +201,8 @@ class FactualityRunner:
         merlin_path: Path to the Merlin inference engine (required for
             FactReasoner).
         nli_method: How the NLI extractor estimates relation probabilities —
-            ``logprobs`` (needs a logprobs-capable backend like RITS/vLLM) or
-            ``simbauq`` (self-consistency; backend-agnostic, required for
-            Ollama which does not expose logprobs).
+            ``logprobs`` (needs a logprobs-capable backend like RITS/vLLM/Ollama)
+            or ``simbauq`` (self-consistency; backend-agnostic).
         nli_similarity_metric: Similarity metric for the SIMBA-UQ NLI method
             (only used when ``nli_method='simbauq'``).
         nli_prompt: The NLI prompt for the base model — ``"few_shot"``

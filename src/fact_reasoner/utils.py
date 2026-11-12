@@ -688,6 +688,23 @@ def extract_logprobs_from_output(output: dict[str, Any]) -> list[Any]:
     """
 
     raw = getattr(output, "raw", None)
+
+    # Ollama: `output.raw.response` is an `ollama.ChatResponse` whose
+    # `.logprobs` is a list of `Logprob` objects (token/logprob attributes),
+    # not the OpenAI-style dict-with-"content" shape handled below. (Mellea
+    # only converts Ollama responses to the OpenAI shape on its intrinsics
+    # path, not for ordinary chat generations.)
+    if getattr(raw, "provider", None) == "ollama":
+        ollama_logprobs = getattr(raw.response, "logprobs", None)
+        assert ollama_logprobs is not None, (
+            "logprobs missing from Ollama response. Ensure the backend was "
+            "called with logprobs=True (e.g. via ModelOption.LOGPROBS)."
+        )
+        return [
+            {"token": item.token, "logprob": item.logprob}
+            for item in ollama_logprobs
+        ]
+
     raw_response = raw.response if raw is not None else None
     logprobs_object = (
         raw_response.get("choices", [{}])[0].get("logprobs")

@@ -208,7 +208,7 @@ class ContextSummarizer:
         Compute the summary's confidence: the mean token probability.
 
         The confidence multiplies the context's prior, so when the backend gives
-        no logprobs (Ollama, Anthropic's OpenAI-compatible endpoint) there is no
+        no logprobs (e.g. Anthropic's OpenAI-compatible endpoint) there is no
         information and the result is 1.0, which leaves the prior unchanged.
         Returning 0.0 instead would zero every context prior, and a context with
         prior 0 supports nothing, leaving every atom at 0.5.

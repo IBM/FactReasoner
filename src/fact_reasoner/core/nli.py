@@ -229,10 +229,12 @@ class NLIExtractor:
                 How to estimate the probability of the predicted NLI label.
                 - "logprobs" (default): derive the probability from the token
                   logprobs of the generated label. Requires a backend that
-                  exposes logprobs (RITS / vLLM); does NOT work with Ollama.
+                  exposes logprobs (RITS / vLLM / Ollama).
                 - "simbauq": estimate the probability via SIMBA-UQ
                   self-consistency (samples across temperatures and scores by
-                  consensus). Backend-agnostic; use this for Ollama.
+                  consensus). Backend-agnostic; use this for backends without
+                  logprobs, e.g. Claude via Anthropic's OpenAI-compatible
+                  endpoint.
             simbauq_*:
                 SIMBA-UQ configuration, only used when nli_method="simbauq".
                 See SIMBAUQSamplingStrategy for details.

@@ -1,10 +1,11 @@
 # This is an example of estimating NLI relation probabilities with SIMBA-UQ.
 #
 # The default (logprobs) NLI method needs a backend that exposes token
-# logprobs. Ollama does not, so on Ollama every NLI call degrades to a fixed
-# neutral relation. The SIMBA-UQ method estimates the probability of the
-# predicted label via self-consistency (sampling across temperatures and
-# scoring by consensus) and works on any backend.
+# logprobs. Some backends don't (e.g. Claude via Anthropic's OpenAI-compatible
+# endpoint), so every NLI call there degrades to a fixed neutral relation. The
+# SIMBA-UQ method estimates the probability of the predicted label via
+# self-consistency (sampling across temperatures and scoring by consensus) and
+# works on any backend -- this example uses Ollama, but any --backend works.
 
 import argparse
 
@@ -51,7 +52,8 @@ def main() -> None:
         choices=["rits", "ollama", "vllm", "openai"],
         default="ollama",
         help="Which Mellea backend to use (default: ollama). SIMBA-UQ works on "
-        "any backend, including ones without logprobs like Ollama.",
+        "any backend, including ones without logprobs (e.g. Claude via "
+        "Anthropic's OpenAI-compatible endpoint).",
     )
     parser.add_argument(
         "--served-model",

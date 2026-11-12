@@ -330,7 +330,7 @@ class TestDispatch:
 
 
 class TestLogprobsWarning:
-    """The logprobs/backend mismatch warning (one if/elif, so never two at once)."""
+    """The logprobs/backend mismatch warning."""
 
     def _run_with(self, argv):
         fake_runner = MagicMock()
@@ -351,11 +351,10 @@ class TestLogprobsWarning:
                 ]
             )
 
-    def test_ollama_logprobs_warns(self, capsys):
+    def test_ollama_logprobs_does_not_warn(self, capsys):
         self._run_with(["--backend", "ollama", "--nli-method", "logprobs"])
         out = capsys.readouterr().out
-        assert "[warning]" in out
-        assert "simbauq" in out
+        assert "[warning]" not in out
 
     def test_claude_compat_logprobs_warns(self, capsys):
         self._run_with(

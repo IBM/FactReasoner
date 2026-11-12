@@ -39,7 +39,7 @@ from fact_reasoner.lcs.relation_miner import STRENGTH_METHODS
 # method (see ExperimentRunner._strength_methods_for). That is correct for Claude
 # and merely conservative for real OpenAI -- both still produce valid LCS scores
 # via surrogate_sampled / verbalized.
-LOGPROB_BACKENDS = ("rits", "vllm")
+LOGPROB_BACKENDS = ("rits", "vllm", "ollama")
 
 
 @dataclass
