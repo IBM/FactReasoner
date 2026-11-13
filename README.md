@@ -140,11 +140,10 @@ uv pip install fact_reasoner
 
 The default install is self-contained: the **Ollama** backend (via `mellea`), the
 Google / Wikipedia retrievers, SIMBA-UQ NLI uncertainty estimation, and the embedding
-similarity gate behind `--nli-mode fast`. Only backend-specific pieces are optional
-extras:
+similarity gate behind `--nli-mode fast`. The only optional extra is telemetry:
 
 ```bash
-uv pip install "fact_reasoner[rits]"   # RITS backends (needs mellea-ibm; see below)
+uv pip install "fact_reasoner[telemetry]"   # OpenTelemetry exporters (see Telemetry)
 ```
 
 > **Note on vLLM.** There is no `vllm` extra. The local vLLM server is launched as an
@@ -186,8 +185,10 @@ uv sync
 ```
 
 ### Internal IBM Usage
-The `rits` extra depends on `mellea-ibm`, which is an IBM-internal package not
-published to PyPI. Install it from its git source (requires access):
+The RITS backends need `mellea-ibm`, an IBM-internal package that is not published
+to PyPI and is deliberately not a dependency or extra of this project (that would
+make `uv lock` require access to github.ibm.com). Install it separately from its
+git source (requires access):
 ```bash
 pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ```
@@ -200,7 +201,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 | vLLM client       | default | OpenAI-compatible client via `mellea`; needs a running server. |
 | vLLM local server | `pip install "vllm>=0.28"` on the GPU node | Started via `fact-reasoner --backend vllm --model ...`; `vllm` runs as an external process. |
 | OpenAI / Claude   | default | Hosted frontier models via `mellea`'s `OpenAIBackend`. **No extra dependency** — Claude is reached over Anthropic's OpenAI-compatible endpoint, so the `anthropic` SDK is not required. Needs `OPENAI_API_KEY`. |
-| RITS (IBM)        | `[rits]` + `mellea-ibm` git install | IBM internal. |
+| RITS (IBM)        | `mellea-ibm` git install (see [Internal IBM Usage](#internal-ibm-usage)) | IBM internal. |
 | Atomizer / NLI LoRA adapters | vLLM `--enable-lora` | Fine-tuned granite-4.2-8b stages; see [LoRA adapters](#lora-adapters-atomization-and-nli). |
 | Telemetry         | `[telemetry]` | OpenTelemetry traces and metrics; see [Telemetry](#telemetry). |
 

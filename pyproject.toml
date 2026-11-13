@@ -106,8 +106,12 @@ dependencies = [
 # (through 0.31.0) also caps setuptools < 81, below the CVE-2026-59890 fix
 # (83.0.0), so no vllm version can be locked cleanly. Install it yourself on the
 # GPU node: `pip install "vllm>=0.28"` (0.28.0 patches its own known advisories).
-# RITS backends (IBM internal). See README for the mellea-ibm install source.
-rits = ["mellea-ibm"]
+#
+# There is likewise no `rits` extra. RITS backends need the IBM-internal
+# `mellea-ibm` package, which is not on PyPI and is only reachable over git-ssh
+# to github.ibm.com. Declaring it here made every `uv lock` fetch that private
+# source, so nobody without IBM access could re-resolve the lock. IBM users
+# install it separately (see CONTRIBUTING.md, "Internal IBM Usage").
 # OpenTelemetry exporters for traces/metrics (see README, "Telemetry"). Without
 # it, fact_reasoner.telemetry is a no-op. Mellea's extra is used rather than the
 # bare OTel packages because Mellea configures the providers our spans join.
@@ -130,10 +134,6 @@ addopts = "-ra -q"
 markers = ["asyncio: mark test as asyncio"]
 asyncio_mode = "auto"
 
-# uv-specific: tells `uv lock`/`uv sync` where to find the IBM-internal
-# `mellea-ibm` package (the `rits` extra). This metadata is ignored by the built
-# wheel and by pip/PyPI consumers; it only affects uv-based resolution and
-# requires git-ssh access to github.ibm.com.
 [tool.uv]
 # Security floors for transitive dependencies (not imported by fact_reasoner
 # directly) that only matter for the lock, not for pip consumers (see the IBM
@@ -151,9 +151,6 @@ constraint-dependencies = [
     "pyjwt>=2.15.0",
     "setuptools>=84.1.0",
 ]
-
-[tool.uv.sources]
-mellea-ibm = { git = "ssh://git@github.ibm.com/generative-computing/mellea-ibm.git" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fact_reasoner"]

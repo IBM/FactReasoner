@@ -220,7 +220,16 @@ def build_backend(
     if kind == "rits":
         # Remote IBM RITS backend (requires the mellea_ibm package and RITS
         # credentials/config in the environment).
-        from mellea_ibm.rits import RITSBackend
+        try:
+            from mellea_ibm.rits import RITSBackend
+        except ImportError as exc:
+            raise ImportError(
+                "The 'rits' backend requires mellea-ibm, an IBM-internal package "
+                "that is not on PyPI and is not a dependency of fact_reasoner. "
+                "Install it separately (requires access to github.ibm.com): "
+                'pip install "git+ssh://git@github.ibm.com/generative-computing/'
+                'mellea-ibm.git". See CONTRIBUTING.md, "Internal IBM Usage".'
+            ) from exc
 
         if custom_rits_endpoint:
             # Point RITS at a caller-supplied endpoint. RITSBackend appends "/v1"
