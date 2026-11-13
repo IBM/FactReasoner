@@ -413,7 +413,7 @@ cheaper pair set without giving up `v3`'s richer graph.
 | `--output-file` | Single mode: write the results dict as JSON (else print). |
 | `--list-models` | Print the available unified model ids (and aliases) and exit. |
 | `--progress-bar` | Show progress bars for NLI relations, summarization and atom labeling. |
-| `--raise-errors` | Stop with the backend's exception when an LLM call fails, instead of printing it and using a fallback result (see [Handling LLM errors](#handling-llm-errors)). |
+| `--raise-errors` | Stop with the backend's exception when an LLM call fails, or when the search API refuses a request, instead of printing it and using a fallback result (see [Handling LLM errors](#handling-llm-errors)). |
 
 ### SIMBA-UQ options (`--nli-method simbauq`)
 
@@ -554,7 +554,11 @@ traceback. `FactualityRunner` passes it to the Atomizer, Reviser, NLI and
 Summarizer stages, which also take it directly, as do `AtomizerReviser` and
 `NLIAdapterExtractor`. A stage batch raises once all its calls have finished;
 context retrieval raises on the first summarizer error and cancels the atoms still
-queued. Parsing failures and retrieval errors keep their fallbacks.
+queued. Context retrieval does the same when the search API refuses a request
+(`fact_reasoner.search_api.SearchAPIError`, e.g. an invalid key or no credits left),
+which would otherwise leave each atom without evidence; `FactualityRunner` passes
+`raise_errors` to its `ContextRetriever` too. Parsing failures and other retrieval
+errors (network failures, unreadable pages) keep their fallbacks.
 
 ### Serving a local model on a GPU cluster (LSF)
 

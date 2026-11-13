@@ -18,7 +18,6 @@ import json
 import logging
 import os
 import sqlite3
-import sys
 import threading
 from ast import literal_eval
 
@@ -42,6 +41,25 @@ _SQLITE_BUSY_TIMEOUT_S = 60.0
 # milliseconds; the search it saves takes seconds).
 _connections: dict[str, tuple[sqlite3.Connection, threading.Lock]] = {}
 _connections_lock = threading.Lock()
+
+
+class SearchAPIError(RuntimeError):
+    """The search API answered with an error instead of results.
+
+    Serper replies with a ``statusCode`` and ``message`` (and no results) when
+    it refuses a request, e.g. for an invalid API key, exhausted credits or a
+    rate limit.
+
+    Attributes:
+        message: The error message from the reply.
+        status_code: The status code from the reply, if any.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None):
+        self.message = message
+        self.status_code = status_code
+        detail = f" ({status_code})" if status_code is not None else ""
+        super().__init__(f"Search API error{detail}: {message}")
 
 
 def _shared_connection(database: str) -> tuple[sqlite3.Connection, threading.Lock]:
@@ -137,8 +155,15 @@ class SearchAPI:
         for query in claim_lst:
             search_result = self.get_search_res(query)
             if "statusCode" in search_result:
-                logger.error(search_result["message"])
-                sys.exit()
+                error = SearchAPIError(
+                    search_result.get("message", ""), search_result["statusCode"]
+                )
+                # Logged here too: by default ContextRetriever skips the item and
+                # its own warning is below the retriever logger's level.
+                logger.error(str(error))
+                # Raise rather than exit: the caller decides whether this item
+                # is skipped or the whole run stops (see ContextRetriever).
+                raise error
             organic_res = search_result.get("organic", [])
 
             search_res_lst = [
