@@ -430,12 +430,15 @@ class TestFactReasonerBuildRevision:
         ):
             with pytest.raises(_StopAfterRevision):
                 asyncio.run(
-                    pipeline.build(response="resp", has_atoms=True, revise_atoms=True)
+                    pipeline.build(
+                        query="q", response="resp", has_atoms=True, revise_atoms=True
+                    )
                 )
 
-        # The async batch is awaited; the blocking per-atom run() is not used.
+        # The async batch is awaited (with the query, so the reviser can resolve
+        # references named only in it); the blocking per-atom run() is not used.
         mock_reviser.run_batch.assert_awaited_once_with(
-            ["He was born in 1879.", "She won the prize."], "resp"
+            ["He was born in 1879.", "She won the prize."], "resp", "q"
         )
         mock_reviser.run.assert_not_called()
         assert pipeline.atoms["a0"].get_text() == "Revised first unit."

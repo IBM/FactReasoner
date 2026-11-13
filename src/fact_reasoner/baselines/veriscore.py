@@ -310,7 +310,9 @@ class VeriScore:
             assert self.response is not None, "The atom reviser requires a response."
             atom_ids = [aid for aid in sorted(self.atoms.keys())]
             old_atoms = [self.atoms[aid].get_text() for aid in atom_ids]
-            result = asyncio.run(self.atom_reviser.run_batch(old_atoms, self.response))
+            result = asyncio.run(
+                self.atom_reviser.run_batch(old_atoms, self.response, self.query)
+            )
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])

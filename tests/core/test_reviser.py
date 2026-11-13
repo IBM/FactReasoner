@@ -211,7 +211,8 @@ class TestReviserRunBatch:
             side_effect=fake_ainstruct,
         ):
             reviser = Reviser(backend=mock_backend)
-            results = asyncio.run(reviser.run_batch(["A", "B"], "resp"))
+            # The response names the revised words, so the grounding check passes.
+            results = asyncio.run(reviser.run_batch(["A", "B"], "resp A2 B2"))
 
         assert [r["revised_unit"] for r in results] == ["A2", "B2"]
         # The per-item original atom text is preserved (fixes loop-capture bug).
@@ -234,7 +235,9 @@ class TestReviserRunBatch:
             side_effect=fake_ainstruct,
         ):
             reviser = Reviser(backend=mock_backend)
-            results = asyncio.run(reviser.run_batch(["ok1", "bad", "ok2"], "resp"))
+            results = asyncio.run(
+                reviser.run_batch(["ok1", "bad", "ok2"], "resp OK")
+            )
 
         assert len(results) == 3
         assert results[0]["revised_unit"] == "OK"
@@ -259,7 +262,7 @@ class TestReviserRunBatch:
             side_effect=fake_ainstruct,
         ):
             reviser = Reviser(backend=mock_backend)
-            results = asyncio.run(reviser.run_batch(["A", "B", "C"], "resp"))
+            results = asyncio.run(reviser.run_batch(["A", "B", "C"], "resp A2 B2 C2"))
 
         assert [r["revised_unit"] for r in results] == ["A2", "B2", "C2"]
         assert [r["text"] for r in results] == ["A", "B", "C"]
@@ -279,7 +282,9 @@ class TestReviserOutputValidation:
             "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
             new=AsyncMock(return_value=out),
         ):
-            return Reviser(backend=mock_backend).run(["He was born."], "resp")
+            return Reviser(backend=mock_backend).run(
+                ["He was born."], "Einstein was born in Ulm."
+            )
 
     @pytest.mark.parametrize(
         "reply",
@@ -317,6 +322,80 @@ class TestReviserOutputValidation:
         assert _revised_unit('```json\n{"revised_unit": "A."}\n```') == "A."
         assert _revised_unit('```json\n["A."]\n```') is None
         assert _revised_unit("not json") is None
+
+
+class TestReviserGrounding:
+    """A revision may only add words found in the unit, response or query."""
+
+    @staticmethod
+    def _run(reply, unit, response, query=None):
+        mock_backend = MagicMock()
+        mock_backend.model_id = "test-model"
+        out = MagicMock()
+        out.success = True
+        out.__str__ = lambda self: reply
+        with patch(
+            "src.fact_reasoner.core.reviser.mfuncs.ainstruct",
+            new=AsyncMock(return_value=out),
+        ) as ainstruct:
+            (result,) = Reviser(backend=mock_backend).run([unit], response, query)
+        return result, ainstruct
+
+    def test_referent_named_only_in_query_is_accepted(self):
+        result, ainstruct = self._run(
+            '```json\n{"revised_unit": "The Moon is roughly spherical."}\n```',
+            unit="It is roughly spherical.",
+            response="It is roughly spherical. It has no atmosphere.",
+            query="What is the shape of the Moon?",
+        )
+        assert result["revised_unit"] == "The Moon is roughly spherical."
+        assert ainstruct.call_args.kwargs["user_variables"]["query"] == (
+            "What is the shape of the Moon?"
+        )
+
+    def test_answering_the_query_is_rejected(self):
+        # The model "resolves" He with an answer to the question that neither
+        # the question nor the response contains.
+        result, _ = self._run(
+            '```json\n{"revised_unit": "Alexander Fleming discovered penicillin '
+            'in 1928."}\n```',
+            unit="He discovered it in 1928.",
+            response="He discovered it in 1928 at St Mary's Hospital.",
+            query="Who discovered penicillin?",
+        )
+        assert result["revised_unit"] == "He discovered it in 1928."
+
+    def test_without_query_words_outside_the_response_are_rejected(self):
+        result, _ = self._run(
+            '```json\n{"revised_unit": "The Moon is roughly spherical."}\n```',
+            unit="It is roughly spherical.",
+            response="It is roughly spherical.",
+        )
+        assert result["revised_unit"] == "It is roughly spherical."
+
+    def test_added_function_words_are_allowed(self):
+        result, _ = self._run(
+            '```json\n{"revised_unit": "Albert Einstein was born in 1879."}\n```',
+            unit="Born in 1879.",
+            response="Albert Einstein, a physicist. Born in 1879.",
+        )
+        assert result["revised_unit"] == "Albert Einstein was born in 1879."
+
+    def test_few_shot_examples_pass_the_check(self):
+        # Every example output in the prompt must itself be grounded.
+        import re
+
+        from fact_reasoner.core.reviser import _ungrounded_words
+
+        examples = re.findall(
+            r"UNIT:\s*\n(.*?)\n\n(?:QUESTION:\s*\n(.*?)\n\n)?RESPONSE:\s*\n"
+            r"(.*?)\n\nOUTPUT:\s*\n```json\s*\{\s*\"revised_unit\": \"(.*?)\"",
+            INSTRUCTION_REVISER,
+            re.S,
+        )
+        assert len(examples) == 5
+        for unit, query, response, revised in examples:
+            assert not _ungrounded_words(revised, unit, response, query), revised
 
 
 class TestReviserReasoning:

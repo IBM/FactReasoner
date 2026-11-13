@@ -400,7 +400,9 @@ class FactReasoner:
                 "Atom revision",
                 **{"fact_reasoner.atoms": len(old_atoms)},
             ):
-                result = await self.atom_reviser.run_batch(old_atoms, self.response)
+                result = await self.atom_reviser.run_batch(
+                    old_atoms, self.response, self.query
+                )
             for i, aid in enumerate(atom_ids):
                 elem = result[i]
                 self.atoms[aid].set_text(elem["revised_unit"])
