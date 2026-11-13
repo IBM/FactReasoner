@@ -160,7 +160,12 @@ class TestDefaults:
         m = resolve(DEFAULT_MODEL_KEY)
         assert m.for_backend("ollama").ollama_name == "granite4:micro"
         assert isinstance(m.for_backend("vllm"), str) and m.for_backend("vllm")
-        assert m.rits is not None  # available on RITS too
+
+    def test_default_resolves_on_rits(self):
+        # RITS names are matched against mellea_ibm's catalog, so without the
+        # package there is nothing to match.
+        pytest.importorskip("mellea_ibm")
+        assert resolve(DEFAULT_MODEL_KEY).rits is not None
 
     def test_default_has_no_openai_name(self):
         # This is *why* build_backend gives the "openai" kind its own default
@@ -178,4 +183,7 @@ class TestRitsOverlay:
         assert resolve("mistral").rits == "MISTRAL_LARGE_3_675B_2512"
 
     def test_auto_matched_granite_small(self):
+        # Basename-matched against mellea_ibm's catalog (unlike the manual
+        # overrides above), so it needs the package.
+        pytest.importorskip("mellea_ibm")
         assert resolve("granite-4-0-h-small").rits == "GRANITE_4_H_SMALL"

@@ -15,6 +15,7 @@
 
 """Unit tests for fact_reasoner.backends.build_backend (offline)."""
 
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -116,6 +117,15 @@ def _make_rits(**kwargs):
         return_value=False,
     ):
         return build_backend("rits", **kwargs)
+
+
+class TestRITSMissingPackage:
+    def test_missing_mellea_ibm_explains_how_to_install(self):
+        # A None entry in sys.modules makes the import fail, whether or not
+        # mellea_ibm is actually installed.
+        with patch.dict(sys.modules, {"mellea_ibm": None, "mellea_ibm.rits": None}):
+            with pytest.raises(ImportError, match="Internal IBM Usage"):
+                build_backend("rits", model_id="my-org/my-model")
 
 
 class TestRITSCustomEndpoint:
