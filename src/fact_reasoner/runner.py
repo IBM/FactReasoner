@@ -243,6 +243,11 @@ class FactualityRunner:
             :class:`~fact_reasoner.core.nli.NLIAdapterExtractor` with the same
             ``nli_method`` and SIMBA-UQ settings; its verdicts have the format
             the pipeline already consumes.
+        reasoning: Whether the model may reason ("think") during atom
+            extraction and revision. False (default) turns it off, which
+            granite-4.2 needs (it thinks by default otherwise). None sends no
+            setting, which gpt-oss needs: Mellea sends False as
+            ``reasoning_effort="none"``, which gpt-oss rejects.
         raise_errors: If True, an exception raised by the backend during atom
             extraction, atom revision, NLI or context summarization propagates
             to the caller unchanged. Default False: the error is printed and the
@@ -289,6 +294,7 @@ class FactualityRunner:
         show_progress: bool = False,
         atomizer_backend: Backend | None = None,
         nli_backend: Backend | None = None,
+        reasoning: bool | None = False,
         raise_errors: bool = False,
         item_concurrency: int = 1,
     ) -> None:
@@ -376,11 +382,11 @@ class FactualityRunner:
 
         # Shared components.
         self.atom_extractor = (
-            AtomizerReviser(atomizer_backend, raise_errors=raise_errors)
+            AtomizerReviser(atomizer_backend, reasoning, raise_errors=raise_errors)
             if atomizer_backend is not None
-            else Atomizer(backend, raise_errors=raise_errors)
+            else Atomizer(backend, reasoning, raise_errors=raise_errors)
         )
-        self.atom_reviser = Reviser(backend, raise_errors=raise_errors)
+        self.atom_reviser = Reviser(backend, reasoning, raise_errors=raise_errors)
         self.nli_decision_model = nli_decision_model
         if nli_decision_model is not None:
             self.nli_extractor = DecisionNLIExtractor(

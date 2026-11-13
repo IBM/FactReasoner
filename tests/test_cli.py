@@ -842,3 +842,39 @@ class TestRetrieveContextsFlag:
             _run(["--pipeline", "factscore", "--backend", "rits", "--retrieve-contexts",
                   "--input-file", "d.jsonl", "--output-dir", str(tmp_path)])
         assert runner.assess_file.call_args.kwargs["retrieve_contexts"] is True
+
+
+class TestReasoningFlag:
+    _ARGV = [
+        "--pipeline",
+        "factscore",
+        "--backend",
+        "ollama",
+        "--query",
+        "q",
+        "--response",
+        "r",
+    ]
+
+    def _runner_kwargs(self, *flags):
+        fake_runner = MagicMock()
+        fake_runner.assess.return_value = {"factuality_score": 0.5}
+        with (
+            patch.object(cli, "build_backend", return_value=object()),
+            patch.object(cli, "FactualityRunner", return_value=fake_runner) as fr,
+        ):
+            _run([*self._ARGV, *flags])
+        return fr.call_args.kwargs
+
+    def test_default_is_off(self):
+        assert self._runner_kwargs()["reasoning"] is False
+
+    @pytest.mark.parametrize(
+        "choice, expected", [("off", False), ("on", True), ("server", None)]
+    )
+    def test_choice_reaches_runner(self, choice, expected):
+        assert self._runner_kwargs("--reasoning", choice)["reasoning"] is expected
+
+    def test_invalid_choice_rejected(self):
+        with pytest.raises(SystemExit):
+            _run([*self._ARGV, "--reasoning", "low"])

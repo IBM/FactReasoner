@@ -670,3 +670,20 @@ class TestRetrieveContexts:
         assert pipe.from_dict_with_contexts.call_args.args[0]["contexts"]
         assert pipe.build.call_args.kwargs["has_contexts"] is True
         assert "-retrieved" not in name
+
+
+class TestReasoningForwarding:
+    def test_default_is_off(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore")
+        assert r.atom_extractor.reasoning is False
+        assert r.atom_reviser.reasoning is False
+
+    @pytest.mark.parametrize("value", [False, True, None])
+    @pytest.mark.parametrize("adapter", [False, True])
+    def test_forwarded_to_atom_extractor_and_reviser(self, value, adapter):
+        kwargs = {"atomizer_backend": MagicMock()} if adapter else {}
+        r = FactualityRunner(
+            MagicMock(), pipeline="factscore", reasoning=value, **kwargs
+        )
+        assert r.atom_extractor.reasoning is value
+        assert r.atom_reviser.reasoning is value
