@@ -20,6 +20,7 @@ from unittest.mock import patch, MagicMock
 
 from fact_reasoner.core.retriever import (
     _clean_text,
+    _domain_matches,
     make_uniform,
     get_title,
     is_content_valid,
@@ -199,6 +200,173 @@ class TestSourceRetrieverInit:
         mock_query_builder = MagicMock()
         retriever.set_query_builder(mock_query_builder)
         assert retriever.query_builder == mock_query_builder
+
+    def test_default_domain_filters_are_none(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        retriever = SourceRetriever(service_type="wikipedia", top_k=3)
+        assert retriever.excluded_domains is None
+        assert retriever.included_domains is None
+
+
+class TestDomainMatches:
+    """Tests for the _domain_matches helper."""
+
+    def test_exact_match(self):
+        assert _domain_matches("facebook.com", "facebook.com") is True
+
+    def test_subdomain_matches(self):
+        assert _domain_matches("www.facebook.com", "facebook.com") is True
+        assert _domain_matches("m.facebook.com", "facebook.com") is True
+
+    def test_unrelated_domain_does_not_match(self):
+        assert _domain_matches("nasa.gov", "facebook.com") is False
+
+    def test_lookalike_domain_does_not_match(self):
+        # "notfacebook.com" is not a subdomain of "facebook.com"
+        assert _domain_matches("notfacebook.com", "facebook.com") is False
+
+    def test_bare_tld_matches_any_host_under_it(self):
+        assert _domain_matches("www.nasa.gov", "gov") is True
+        assert _domain_matches("nasa.gov", ".gov") is True  # leading dot allowed
+
+    def test_case_insensitive(self):
+        assert _domain_matches("WWW.Facebook.COM", "facebook.com") is True
+
+
+class TestSourceRetrieverDomainFilter:
+    """Tests for SourceRetriever's excluded_domains/included_domains handling."""
+
+    def _make_hit(self, link):
+        return {"title": "t", "snippet": "s", "link": link}
+
+    def test_excluded_domains_drops_matching_hits(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        retriever = SourceRetriever(
+            service_type="wikipedia", top_k=3, excluded_domains=["facebook.com"]
+        )
+        hits = [
+            self._make_hit("https://www.facebook.com/groups/climate"),
+            self._make_hit("https://www.nasa.gov/article"),
+        ]
+        filtered = retriever._filter_hits_by_domain(hits)
+        assert [h["link"] for h in filtered] == ["https://www.nasa.gov/article"]
+
+    def test_included_domains_keeps_only_matching_hits(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        retriever = SourceRetriever(
+            service_type="wikipedia", top_k=3, included_domains=["gov", "edu"]
+        )
+        hits = [
+            self._make_hit("https://www.facebook.com/groups/climate"),
+            self._make_hit("https://www.nasa.gov/article"),
+            self._make_hit("https://climate.mit.edu/article"),
+        ]
+        filtered = retriever._filter_hits_by_domain(hits)
+        assert [h["link"] for h in filtered] == [
+            "https://www.nasa.gov/article",
+            "https://climate.mit.edu/article",
+        ]
+
+    def test_included_domains_takes_precedence_over_excluded(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+
+        retriever = SourceRetriever(
+            service_type="wikipedia",
+            top_k=3,
+            included_domains=["nasa.gov"],
+            excluded_domains=["nasa.gov"],
+        )
+        hits = [self._make_hit("https://www.nasa.gov/article")]
+        # included_domains says keep it, excluded_domains says drop it --
+        # both conditions are checked, so it's dropped either way here since
+        # a hit must pass the allowlist AND not match the blocklist.
+        filtered = retriever._filter_hits_by_domain(hits)
+        assert filtered == []
+
+    def test_google_query_appends_exclusion_operators(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+        import os
+
+        with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
+            retriever = SourceRetriever(
+                service_type="google",
+                top_k=1,
+                cache_dir=None,
+                excluded_domains=["facebook.com", "reddit.com"],
+            )
+            retriever.google_retriever = MagicMock()
+            retriever.google_retriever.get_snippets.return_value = {
+                "claim -site:facebook.com -site:reddit.com": [
+                    {"title": "t", "snippet": "s", "link": "https://www.nasa.gov/x"}
+                ]
+            }
+            retriever.query("claim")
+            called_query = retriever.google_retriever.get_snippets.call_args[0][0][0]
+            assert "-site:facebook.com" in called_query
+            assert "-site:reddit.com" in called_query
+
+    def test_google_query_builds_included_domains_or_clause(self):
+        from src.fact_reasoner.core.retriever import SourceRetriever
+        import os
+
+        with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
+            retriever = SourceRetriever(
+                service_type="google",
+                top_k=1,
+                cache_dir=None,
+                included_domains=["nasa.gov", "noaa.gov"],
+            )
+            retriever.google_retriever = MagicMock()
+            retriever.google_retriever.get_snippets.return_value = {
+                "claim (site:nasa.gov OR site:noaa.gov)": [
+                    {"title": "t", "snippet": "s", "link": "https://www.nasa.gov/x"}
+                ]
+            }
+            retriever.query("claim")
+            called_query = retriever.google_retriever.get_snippets.call_args[0][0][0]
+            assert "site:nasa.gov" in called_query
+            assert "site:noaa.gov" in called_query
+            assert "OR" in called_query
+
+    def test_google_query_post_filters_hits_from_search_results(self):
+        """Even if a hit slips through (e.g. a stale cache entry), the
+        post-fetch filter should still drop it."""
+        from src.fact_reasoner.core.retriever import SourceRetriever
+        import os
+
+        with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
+            retriever = SourceRetriever(
+                service_type="google",
+                top_k=5,
+                cache_dir=None,
+                excluded_domains=["facebook.com"],
+            )
+            retriever.google_retriever = MagicMock()
+
+            def fake_get_snippets(queries):
+                return {
+                    queries[0]: [
+                        {
+                            "title": "t",
+                            "snippet": "s",
+                            "link": "https://www.facebook.com/groups/x",
+                        },
+                        {
+                            "title": "t2",
+                            "snippet": "s2",
+                            "link": "https://www.nasa.gov/x",
+                        },
+                    ]
+                }
+
+            retriever.google_retriever.get_snippets.side_effect = fake_get_snippets
+            results = retriever.query("claim")
+            links = [r["link"] for r in results]
+            assert "https://www.facebook.com/groups/x" not in links
+            assert "https://www.nasa.gov/x" in links
 
 
 class TestSourceRetrieverNTRSQuery:
