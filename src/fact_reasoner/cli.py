@@ -197,7 +197,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--raise-errors",
         action="store_true",
         help="Stop with the backend's exception when an LLM call fails in atom "
-        "extraction, revision, NLI or summarization, instead of printing it and "
+        "extraction, revision, NLI or summarization, or when the search API "
+        "refuses a request (e.g. an invalid key), instead of printing it and "
         "using a fallback result.",
     )
 

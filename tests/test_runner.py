@@ -313,6 +313,15 @@ class TestContextRetrieverWiring:
         # ContextRetriever wraps the SourceRetriever instance.
         assert "retriever" in captured["ctx_kwargs"]
         assert isinstance(captured["ctx_kwargs"]["retriever"], _FakeSourceRetriever)
+        assert captured["ctx_kwargs"]["raise_errors"] is False
+
+    def test_raise_errors_forwarded_to_the_context_retriever(self):
+        r = FactualityRunner(MagicMock(), pipeline="factscore", raise_errors=True)
+        with (
+            patch.object(runner_mod, "SourceRetriever"),
+            patch.object(runner_mod, "QueryBuilder"),
+        ):
+            assert r._build_context_retriever().raise_errors is True
 
 
 class TestAssessSingle:

@@ -46,6 +46,7 @@ from fact_reasoner.core.nli import NLIAdapterExtractor, NLIExtractor
 from fact_reasoner.core.retriever import ContextRetriever
 from fact_reasoner.core.reviser import Reviser
 from fact_reasoner.core.summarizer import ContextSummarizer
+from fact_reasoner.search_api import SearchAPIError
 
 
 class FailingBackend(DummyBackend):
@@ -250,11 +251,56 @@ class TestContextRetriever:
         assert source.query.call_count < len(atoms)
 
     def test_retrieval_errors_are_still_skipped_in_raise_mode(self):
-        # raise_errors covers the LLM call; a failed search keeps its fallback.
+        # The summarizer's raise_errors covers its LLM call; a failed search
+        # keeps its fallback.
         source = MagicMock()
         source.query.side_effect = RuntimeError("search failed")
         summarizer = ContextSummarizer(FailingBackend(), raise_errors=True)
         retriever = self._retriever(summarizer, source)
+        atoms = {"a0": Atom(id="a0", text="An atom.")}
+
+        assert retriever.retrieve_all(atoms) == {}
+
+
+class TestContextRetrieverSearchErrors:
+    """A search-service error reply (SearchAPIError) follows the retriever's
+    own raise_errors; other retrieval errors are always skipped."""
+
+    @staticmethod
+    def _retriever(error, raise_errors, num_workers=2):
+        source = MagicMock()
+        source.query.side_effect = error
+        return source, ContextRetriever(
+            retriever=source, num_workers=num_workers, raise_errors=raise_errors
+        )
+
+    def test_search_api_error_is_skipped_by_default(self):
+        source, retriever = self._retriever(
+            SearchAPIError("Unauthorized.", 403), False
+        )
+        atoms = {f"a{i}": Atom(id=f"a{i}", text=f"Atom {i}.") for i in range(3)}
+
+        assert retriever.retrieve_all(atoms) == {}
+        assert source.query.call_count == len(atoms)  # every item was tried
+
+    def test_search_api_error_stops_retrieval_in_raise_mode(self):
+        error = SearchAPIError("Not enough credits.", 400)
+
+        def query(text):
+            time.sleep(0.05)
+            raise error
+
+        source, retriever = self._retriever(query, True, num_workers=1)
+        atoms = {f"a{i}": Atom(id=f"a{i}", text=f"Atom {i}.") for i in range(8)}
+
+        with pytest.raises(SearchAPIError) as excinfo:
+            retriever.retrieve_all(atoms)
+        assert excinfo.value is error
+        # Atoms still waiting in the queue were cancelled, not searched.
+        assert source.query.call_count < len(atoms)
+
+    def test_other_retrieval_errors_are_skipped_in_raise_mode(self):
+        _, retriever = self._retriever(ConnectionError("network down"), True)
         atoms = {"a0": Atom(id="a0", text="An atom.")}
 
         assert retriever.retrieve_all(atoms) == {}

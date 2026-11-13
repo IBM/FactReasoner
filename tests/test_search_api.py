@@ -19,7 +19,9 @@ import tempfile
 import os
 from unittest.mock import patch
 
-from fact_reasoner.search_api import SearchAPI
+import pytest
+
+from fact_reasoner.search_api import SearchAPI, SearchAPIError
 
 
 class TestSearchAPIInit:
@@ -165,6 +167,24 @@ class TestSearchAPIHelpers:
                 assert results["test query"][0]["title"] == "Title Only"
                 assert results["test query"][0]["snippet"] == ""
                 assert results["test query"][0]["link"] == ""
+
+    def test_get_snippets_raises_on_an_error_reply(self, caplog):
+        # Serper's error reply (e.g. a bad key) used to call sys.exit(), which
+        # `except Exception` cannot catch, so it ended the whole process.
+        with patch.dict(os.environ, {"SERPER_API_KEY": "test_key"}):
+            api = SearchAPI(cache_dir=None)
+        error_reply = {"statusCode": 403, "message": "Unauthorized."}
+
+        with patch.object(api, "get_search_res", return_value=error_reply):
+            with pytest.raises(SearchAPIError) as excinfo:
+                api.get_snippets(["test query"])
+
+        assert isinstance(excinfo.value, Exception)  # not SystemExit
+        assert excinfo.value.status_code == 403
+        assert excinfo.value.message == "Unauthorized."
+        assert str(excinfo.value) == "Search API error (403): Unauthorized."
+        # Still logged, so a skipped item is not silent.
+        assert "Search API error (403): Unauthorized." in caplog.text
 
 
 class TestSearchCacheConcurrency:

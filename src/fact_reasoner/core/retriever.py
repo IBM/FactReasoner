@@ -41,7 +41,7 @@ from fact_reasoner.core.query_builder import QueryBuilder
 # Local imports
 from fact_reasoner.core.summarizer import ContextSummarizer
 from fact_reasoner.ntrs_api import NTRSAPI
-from fact_reasoner.search_api import SearchAPI
+from fact_reasoner.search_api import SearchAPI, SearchAPIError
 
 # chromadb is one of three retrieval backends (google / wikipedia / chromadb, milvus) and is
 # imported lazily inside ChromaReader rather than here. It is not a declared
@@ -882,6 +882,8 @@ class ContextRetriever:
         context_summarizer: ContextSummarizer | None = None,
         num_workers: int | None = None,
         per_atom_timeout: int = DEFAULT_PER_ATOM_TIMEOUT,
+        *,
+        raise_errors: bool = False,
     ):
         """
         Args:
@@ -897,11 +899,19 @@ class ContextRetriever:
             per_atom_timeout: int
                 Wall-clock cap (seconds) on the whole batch; items still running
                 at the deadline are logged and skipped.
+            raise_errors: bool
+                If True, a ``SearchAPIError`` (the search service refused the
+                request, e.g. an invalid key or no credits left) stops
+                :meth:`retrieve_all`: the items still queued are cancelled and
+                the error is re-raised. Default False: the item is logged and
+                skipped, like any other retrieval error. Other retrieval errors
+                (network failures, unreadable pages) are always skipped.
         """
         self.retriever = retriever
         self.context_summarizer = context_summarizer
         self.num_workers = num_workers
         self.per_atom_timeout = per_atom_timeout
+        self.raise_errors = raise_errors
 
     def _retrieve_for_item(
         self,
@@ -979,7 +989,9 @@ class ContextRetriever:
         started, is logged and skipped. If the context summarizer was created with
         ``raise_errors=True``, the first summarizer error to complete is
         re-raised here instead, the items still queued are cancelled, and the
-        ones still searching skip their summaries.
+        ones still searching skip their summaries. The same happens for a
+        ``SearchAPIError`` when this retriever was created with
+        ``raise_errors=True``.
         """
         all_contexts: dict[str, Context] = {}
         futures = {}
@@ -1014,6 +1026,12 @@ class ContextRetriever:
                     try:
                         contexts = future.result()
                     except Exception as e:  # noqa: BLE001
+                        if self.raise_errors and isinstance(e, SearchAPIError):
+                            # The search service refused the request; without
+                            # raise mode this item would silently get no evidence.
+                            stop.set()
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            raise
                         label = atom.text if atom is not None else "query"
                         logger.warning(
                             f"Retrieval failed for atom {aid!r} ({label[:120]!r}): {e}"
