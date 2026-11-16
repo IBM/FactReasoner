@@ -247,7 +247,7 @@ class TestMonotonicity:
 
 class TestInferenceCount:
     def test_shares_the_conflict_free_pr(self, monkeypatch):
-        """All readouts: 9 Merlin runs -- (e) and (f) each add one PR to the 7 of (a)-(d)."""
+        """All readouts: 10 Merlin runs -- (e), (f), (g) each add one PR to the 7 of (a)-(d)."""
         tasks = []
 
         def counting(network, merlin_path, **kwargs):
@@ -267,9 +267,9 @@ class TestInferenceCount:
         # The 3-coupling base: with contradiction edges present, consistency runs
         # its conflict MAR too, so the count matches the 7 of test_lcs_scorer_priors.
         s.score_all(_aeroparts_result(AEROPARTS_BASE), methods=ALL_LCS_METHODS)
-        assert len(tasks) == 9, tasks
-        # base, conflict-free Z0, penalty Z_pen, balanced
-        assert tasks.count("PR") == 4
+        assert len(tasks) == 10, tasks
+        # base, conflict-free Z0, penalty Z_pen, balanced, confirmation
+        assert tasks.count("PR") == 5
         tasks.clear()
         s.score(_aeroparts_result(AEROPARTS_BASE_5), method="conflict_escape")
         assert tasks == ["MAR", "PR", "PR", "PR"], tasks

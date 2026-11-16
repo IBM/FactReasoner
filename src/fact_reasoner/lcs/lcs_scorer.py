@@ -151,6 +151,41 @@
 # the 70-item corpus (the miss is a pair with byte-identical gold graphs), 335/335 on
 # the 100-family release -- with zero falls and every Invariance pair flat.
 #
+# THE CONFIRMATION READOUT (g): THE COMMITTED WORLD UNDER A SIGN-DEFINITE MRF.
+#
+#   Lambda      = log P_R(x*) - log pi(x*)
+#               = sum_{r: x*_e in V_r} log(1 - p_r) - log E_pi[ prod_r (1 - p_r [x in V_r]) ]
+#   confirmation = sigmoid(Lambda / n)
+#
+# x* is the COMMITTED WORLD: the truth value (polarity) each claim is given. Two
+# sources (``LCSScorer(polarity=...)``):
+#   * "verdict" (default) -- x*_i = 1 iff the claim's prior is at least 1/2, i.e. the
+#     factuality pipeline's verdict when the priors are its posteriors. x* then
+#     depends on the claims and the evidence only, so every response over the same
+#     claims is scored against the same world. A prior of exactly 1/2 (no evidence)
+#     keeps the claim as asserted (1).
+#   * "asserted" -- x* = 1: every claim taken as the response asserts it.
+# An explicit {atom_id: 0/1} mapping may also be passed to score/score_all.
+#
+# With uniform priors both sources give x* = 1. P_R is the coherence MRF with
+# SIGN-DEFINITE (penalty-only)
+# tables: every relation r, of any coupling, multiplies the worlds that violate it
+# (V_r) by 1 - p_r and leaves the rest at 1 -- a Markov-logic soft constraint of
+# weight -log(1 - p_r). Lambda is the log-ratio confirmation of the committed world by
+# the relational evidence. A relation is a SUPPORT when x* satisfies it and a CONFLICT
+# when x* violates it; with x* = 1 that is entailment / equivalence / co_necessity vs.
+# contradiction / exclusive, but under verdict polarity a contradiction between a
+# true and a false claim is a support and an entailment from a true claim to a false
+# one is a conflict. The classification is derived, not chosen.
+#
+# Edit identity: adding r changes Lambda by log psi_r(1) - log E_{P_R}[psi_r], in ANY
+# context. A support has psi_r(x*) = 1 >= E, a conflict has psi_r(x*) = 1 - p_r <= E,
+# so every addition/deletion/reweighting moves Lambda in its direction for every
+# priors and every other relation set -- monotone under ARBITRARY graph changes that
+# are each improvements, strictly so when the tables are positive. Unlike (f) the
+# expectation is under the MRF itself, so redundant supports saturate:
+# Lambda <= -log pi(x*). One PR call. See docs/arr2027/coherence/main.tex.
+#
 # HEADLINE. (f) is the default headline of ``score`` (``method="balanced"``). The
 # batch pipelines (locoeval, experiments, demo) store readouts by name and keep their
 # own readout lists, so their records -- and the published tables -- are unchanged.
@@ -187,7 +222,7 @@ LCS_METHODS = ("mean_marginal", "consistency", "reified", "log_partition")
 
 # Readouts computed only when requested by name. Kept out of ``LCS_METHODS`` so the
 # pipelines that default to "all readouts" produce the same records as before.
-EXTRA_LCS_METHODS = ("conflict_escape", "balanced")
+EXTRA_LCS_METHODS = ("conflict_escape", "balanced", "confirmation")
 
 # Every readout ``score`` / ``score_all`` accept.
 ALL_LCS_METHODS = LCS_METHODS + EXTRA_LCS_METHODS
@@ -242,6 +277,10 @@ DEFAULT_MAX_NETWORK_VARS = 1_000_000
 # support relation per claim (one bit each) read 0.8, odds 4:1. See the module docstring.
 DEFAULT_BALANCED_SCALE = 2.0
 
+# Where readout (g)'s committed world x* comes from (see the module docstring).
+POLARITIES = ("verdict", "asserted")
+DEFAULT_POLARITY = "verdict"
+
 # The headline ``score`` reports when no ``method`` is given.
 DEFAULT_LCS_METHOD = "balanced"
 
@@ -275,6 +314,7 @@ class LCSScorer:
         verbose: bool = False,
         max_network_vars: int | None = None,
         balanced_scale: float = DEFAULT_BALANCED_SCALE,
+        polarity: str = DEFAULT_POLARITY,
     ):
         """Initialize the scorer.
 
@@ -307,6 +347,11 @@ class LCSScorer:
         if not balanced_scale > 0:
             raise ValueError("balanced_scale must be positive.")
         self.balanced_scale = float(balanced_scale)
+        if polarity not in POLARITIES:
+            raise ValueError(
+                f"Unknown polarity {polarity!r} (expected one of {list(POLARITIES)})."
+            )
+        self.polarity = polarity
         self.merlin_path = merlin_path
         self.ibound = ibound
         self.verbose = verbose
@@ -322,6 +367,7 @@ class LCSScorer:
         prior: float | None = None,
         reified_prior: float = 0.5,
         node_priors: dict[str, float] | None = None,
+        polarity: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         """Compute the LCS and diagnostics for a mining result.
 
@@ -345,6 +391,8 @@ class LCSScorer:
                 precedence prior source (see the module docstring). Atoms absent
                 from the mapping fall back to their fact-graph node probability,
                 then to the uniform ``result.config["prior"]``.
+            polarity: Explicit committed world ``{atom_id: 0/1}`` for readout (g),
+                overriding the scorer's ``polarity`` source per atom.
 
         Returns:
             A dict with:
@@ -383,6 +431,7 @@ class LCSScorer:
             prior=prior,
             reified_prior=reified_prior,
             node_priors=node_priors,
+            polarity=polarity,
         )
         out["method"] = method
         out["lcs"] = out[method] if out[method] is not None else 0.0
@@ -396,6 +445,7 @@ class LCSScorer:
         prior: float | None = None,
         reified_prior: float = 0.5,
         node_priors: dict[str, float] | None = None,
+        polarity: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         """Compute several LCS readouts, sharing the base inference runs.
 
@@ -417,6 +467,7 @@ class LCSScorer:
             prior: A uniform atom prior override (see :meth:`score`).
             reified_prior: The Bernoulli prior ``rho`` on the reified node ``R``.
             node_priors: Explicit per-atom priors (see :meth:`score`).
+            polarity: Explicit committed world for readout (g) (see :meth:`score`).
 
         Returns:
             The same dict as :meth:`score`, with one populated key per requested
@@ -450,6 +501,9 @@ class LCSScorer:
             "log_partition": None,
             "conflict_escape": None,
             "balanced": None,
+            "confirmation": None,
+            "log_confirmation": None,
+            "committed_world": None,
             "marginals": {},
             "num_atoms": n,
             "num_below_prior": 0,
@@ -513,6 +567,12 @@ class LCSScorer:
                 out["log_z_max"] = log_z_0
         if "balanced" in methods:
             out["balanced"], out["log_z_balanced"] = self._balanced(result, priors)
+        if "confirmation" in methods:
+            x_star = self._committed_world(result, priors, polarity)
+            out["committed_world"] = x_star
+            out["confirmation"], out["log_confirmation"] = self._confirmation(
+                result, priors, x_star
+            )
 
         headline = out[methods[0]]
         out["lcs"] = headline if headline is not None else 0.0
@@ -915,6 +975,82 @@ class LCSScorer:
         score = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
         return score, log_z
 
+    # -- (g) confirmation: the asserted world under a sign-definite MRF --------
+
+    def _committed_world(
+        self,
+        result: MiningResult,
+        priors: dict[str, float],
+        polarity: dict[str, int] | None = None,
+    ) -> dict[str, int]:
+        """Resolve readout (g)'s committed world ``x*`` (see the module docstring).
+
+        An explicit ``polarity`` mapping wins per atom; otherwise ``"verdict"`` sets
+        ``x*_i = 1`` iff ``pi_i >= 1/2`` and ``"asserted"`` sets every ``x*_i = 1``.
+        """
+        x_star: dict[str, int] = {}
+        for aid in result.atoms:
+            if polarity is not None and aid in polarity:
+                x_star[aid] = 1 if int(polarity[aid]) else 0
+            elif self.polarity == "verdict":
+                x_star[aid] = 0 if float(priors.get(aid, 0.5)) < 0.5 else 1
+            else:
+                x_star[aid] = 1
+        return x_star
+
+    def _confirmation(
+        self,
+        result: MiningResult,
+        priors: dict[str, float] | None = None,
+        x_star: dict[str, int] | None = None,
+    ) -> tuple[float | None, float | None]:
+        """``sigmoid(Lambda / n)`` with ``Lambda = log P_R(x*) - log pi(x*)`` -- readout (g).
+
+        See the module docstring. One PR run on the network of prior unaries times
+        one penalty-only factor per relation (``1 - p`` on the relation's violated
+        worlds, 1 elsewhere). Because the unaries sum to one, its partition function
+        is ``E_pi[prod psi_r]``, and the committed world's unnormalized mass relative
+        to its prior is ``prod_r psi_r(x*_e)``, the product of ``1 - p_r`` over the
+        relations ``x*`` violates (the conflicts relative to ``x*``).
+
+        Returns:
+            ``(score, Lambda)``; ``(0.5, 0.0)`` with no relations, and
+            ``(None, None)`` when the PR run is unavailable.
+        """
+        if priors is None:
+            priors = self._node_priors(result)
+        if x_star is None:
+            x_star = self._committed_world(result, priors)
+        n = len(result.atoms)
+        if n == 0:
+            return None, None
+        network = MarkovNetwork()
+        for aid in sorted(result.atoms, key=_atom_sort_key):
+            pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
+            network.add_node(aid)
+            network.add_factor([aid], [2], [1.0 - pi, pi])
+        log_asserted = 0.0
+        any_factor = False
+        for edge in result.fact_graph.get_edges():
+            w = _penalty_weight(edge.probability)
+            if w <= 0.0:
+                continue
+            values = _violation_factor(edge.type, w)
+            network.add_edge(edge.source, edge.target)
+            network.add_factor([edge.source, edge.target], [2, 2], values)
+            cell = 2 * x_star.get(edge.source, 1) + x_star.get(edge.target, 1)
+            log_asserted += math.log(values[cell])  # the committed cell
+            any_factor = True
+        if not any_factor:
+            return 0.5, 0.0
+        log_z = self._log_z(network)
+        if log_z is None:
+            return None, None
+        lam = log_asserted - log_z
+        x = lam / n
+        score = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
+        return score, lam
+
     def _node_priors(
         self,
         result: MiningResult,
@@ -1095,6 +1231,21 @@ def _penalty_factor(level1_type: str, w: float) -> list[float]:
             f"{level1_type!r} is not a conflict coupling "
             f"(expected one of {sorted(_CONFLICT_TYPES)})."
         )
+    return [
+        1.0 - w if not _satisfied(level1_type, s, t) else 1.0
+        for s in (0, 1)
+        for t in (0, 1)
+    ]
+
+
+def _violation_factor(level1_type: str, w: float) -> list[float]:
+    """Sign-definite factor over [s, t] (row-major): ``1 - w`` on V(tau), 1 elsewhere.
+
+    Used by readout (g) for EVERY coupling: the table attains its maximum at the
+    asserted cell (1, 1) for supports and its minimum there for conflicts, which is
+    exactly the condition under which adding the relation moves the asserted
+    world's posterior in a fixed direction in every context.
+    """
     return [
         1.0 - w if not _satisfied(level1_type, s, t) else 1.0
         for s in (0, 1)
