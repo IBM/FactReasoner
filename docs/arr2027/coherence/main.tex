@@ -743,22 +743,35 @@ assertion come apart, and nowhere else.
 \label{sec:discussion}
 %% ============================================================================
 
-\paragraph{What monotonicity is a guarantee about.} Theorem~\ref{thm:mono} is a statement about
-the map from relation graphs to scores. It guarantees that the score never misranks two responses
-whose relations are ordered, and therefore that every ranking error is attributable to the
-relations it was given. This is what makes the gold/mined comparison diagnostic, and it is a
-property no learned or judge-based score offers. It does not make relation extraction easier.
+The results raise three questions about what the score is for: what its guarantee covers, how it
+divides the work with factuality evaluation, and what it deliberately leaves out.
 
-\paragraph{Coherence given the facts.} With verdict polarity the two stages divide the work, and
-the interface between them is a single bit per claim. Any factuality pipeline decides which claims
-are true; the coherence score asks how well the relations the response draws hold up under that
-verdict. It credits an argument for rejecting falsehoods, charges it for deriving a falsehood from
-a truth or denying a truth, and gives little weight to reasoning from a falsehood. A response that asserts false claims is not penalized by the coherence
-score for asserting them; that is the factuality score's job, and keeping the two separable is
-deliberate. Without evidence, assertion polarity gives the internal-coherence reading. The two
+\paragraph{What the guarantee covers.} Theorem~\ref{thm:mono} is a statement about the map from
+relation graphs to scores, not about the graphs themselves. It guarantees that the score never
+misranks two responses whose relations are ordered, so every ranking error is attributable to the
+relations the score was given. This is what made the gold/mined comparison of
+\S\ref{sec:exp-mined} diagnostic, and no learned or judge-based score offers it. The guarantee does
+not make relation extraction easier; it tells us that extraction is where the remaining work lies.
+
+\paragraph{Coherence given the facts.} With verdict polarity, factuality and coherence evaluation
+divide the work, and the interface between them is a single bit per claim. Any factuality pipeline
+decides which claims are true; the coherence score asks how well the relations the response draws
+hold up under that verdict. It credits an argument for refuting falsehoods, charges it for denying
+a truth or deriving a falsehood from one, and gives little weight to reasoning from a falsehood.
+It does not penalize a response for asserting false claims, which is the factuality score's job:
+keeping the two separable is deliberate, and the two scores can be reported side by side.
+Without a factuality stage, assertion polarity gives the internal-coherence reading, and the two
 polarities disagree exactly where a relation's truth differs from its assertion, as in the gold
-edit above. Comparisons are meaningful within a fixed claim set and committed world, which is
-exactly the setting of the requirement.
+edit of \S\ref{sec:exp-gold}.
+
+\paragraph{What the score leaves out.} The score measures \emph{logical} coherence, the fit between
+a response's claims and the truth-functional relations it draws between them. It is blind to
+discourse coherence: readers in the human study (\S\ref{sec-locobench}) preferred unshuffled
+\cp{order} rungs that the score, correctly by its own definition, rates as equal. It also
+compares responses only over a fixed claim set and committed world, which is the setting of the
+requirement but not of every evaluation; ranking responses with different claims requires a
+choice of normalization that the theory does not make. Both are natural extensions rather than
+defects of the construction, and the Limitations section lists the remaining caveats.
 
 %% ============================================================================
 \section{Related Work}
@@ -819,6 +832,19 @@ in prose. Its ladders encode internal coherence of the asserted claims, which ve
 reorders on one pair. Baselines outside the MRF (LLM judges, NLI contradiction rates, discourse
 metrics) have to be re-run on the repaired split and are marked as pending. Human judgments of
 coherence are not yet collected for this split.
+\textbf{Realism of the benchmark.} LoCoBench is a diagnostic benchmark, not a sample of how real
+responses argue. Its prose is expert in register and its relations are recoverable by blind
+readers, but its structure is engineered: every plan has ten relations, six valid and four
+planted-invalid, two or more false claims, and a quota of rare senses, so that every dev base
+response contains an exhaustive alternative and a disjunction, usually signalled by explicit
+markers (``at least one of\dots{} perhaps both'', ``exactly one''). Rungs differ by single minimal
+edits along one dimension, spurious links are sometimes realized by contrived constructions, and
+claims are given rather than extracted, so atomization errors are absent. The benchmark therefore
+tests whether a score satisfies the orderings its theory predicts and separates extraction errors
+from scoring errors; it does not measure agreement with human coherence judgements on natural
+responses, or how often incoherence occurs in practice. Because relations are explicitly marked,
+mined-graph results are best read as upper bounds on extraction from natural text. An evaluation on
+natural responses with human coherence ratings is needed to establish external validity.
 \textbf{Scope of the guarantee.} Monotonicity is with respect to the relation graph, for a fixed
 committed world. When an extractor changes relations in both directions, the score nets them and
 no ordering is guaranteed. The score does not compare responses with different claim sets.
