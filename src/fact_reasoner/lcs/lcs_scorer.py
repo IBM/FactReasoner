@@ -167,7 +167,12 @@
 #   * "asserted" -- x* = 1: every claim taken as the response asserts it.
 # An explicit {atom_id: 0/1} mapping may also be passed to score/score_all.
 #
-# With uniform priors both sources give x* = 1. P_R is the coherence MRF with
+# The MRF's own priors are UNIFORM by default (``confirmation_priors="uniform"``): the
+# factuality stage fixes x* but does not set the priors, because near-certain priors
+# leave nothing to confirm (Lambda -> 0 as priors -> 0/1 at x*, for every graph).
+# ``confirmation_priors="verdict"`` uses the resolved priors instead.
+#
+# With uniform node priors both sources give x* = 1. P_R is the coherence MRF with
 # SIGN-DEFINITE (penalty-only)
 # tables: every relation r, of any coupling, multiplies the worlds that violate it
 # (V_r) by 1 - p_r and leaves the rest at 1 -- a Markov-logic soft constraint of
@@ -281,6 +286,14 @@ DEFAULT_BALANCED_SCALE = 2.0
 POLARITIES = ("verdict", "asserted")
 DEFAULT_POLARITY = "verdict"
 
+# Which priors readout (g)'s MRF uses. "uniform" (default): every claim at 1/2, so the
+# factuality stage enters only through the committed world x*. "verdict": the resolved
+# per-atom priors themselves (e.g. factuality posteriors). The two are kept apart because
+# near-certain priors leave the relations no belief to move: as priors tend to 0/1 at
+# x*, Lambda -> 0 for EVERY relation graph (see docs/arr2027/coherence).
+CONFIRMATION_PRIORS = ("uniform", "verdict")
+DEFAULT_CONFIRMATION_PRIORS = "uniform"
+
 # The headline ``score`` reports when no ``method`` is given.
 DEFAULT_LCS_METHOD = "balanced"
 
@@ -315,6 +328,7 @@ class LCSScorer:
         max_network_vars: int | None = None,
         balanced_scale: float = DEFAULT_BALANCED_SCALE,
         polarity: str = DEFAULT_POLARITY,
+        confirmation_priors: str = DEFAULT_CONFIRMATION_PRIORS,
     ):
         """Initialize the scorer.
 
@@ -352,6 +366,12 @@ class LCSScorer:
                 f"Unknown polarity {polarity!r} (expected one of {list(POLARITIES)})."
             )
         self.polarity = polarity
+        if confirmation_priors not in CONFIRMATION_PRIORS:
+            raise ValueError(
+                f"Unknown confirmation_priors {confirmation_priors!r} "
+                f"(expected one of {list(CONFIRMATION_PRIORS)})."
+            )
+        self.confirmation_priors = confirmation_priors
         self.merlin_path = merlin_path
         self.ibound = ibound
         self.verbose = verbose
@@ -1026,7 +1046,10 @@ class LCSScorer:
             return None, None
         network = MarkovNetwork()
         for aid in sorted(result.atoms, key=_atom_sort_key):
-            pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
+            if self.confirmation_priors == "uniform":
+                pi = 0.5
+            else:
+                pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
             network.add_node(aid)
             network.add_factor([aid], [2], [1.0 - pi, pi])
         log_asserted = 0.0

@@ -93,10 +93,17 @@ def _is_support(rel, x):
     return (x[s], x[t]) not in VIOLATED[ty]
 
 
-def _reference_lambda(relations, priors, x=None):
-    """Independent enumeration of log P_R(x*) - log pi(x*) (verdict x* by default)."""
+def _reference_lambda(relations, priors, x=None, mrf_priors=None):
+    """Independent enumeration of log P_R(x*) - log pi(x*).
+
+    x* defaults to the verdict of ``priors``; the MRF's own priors default to
+    uniform (the scorer's ``confirmation_priors="uniform"``).
+    """
     if x is None:
         x = _verdict(priors)
+    if mrf_priors is None:
+        mrf_priors = {a: 0.5 for a in priors}
+    priors = mrf_priors
     ids = list(priors)
     idx = {a: i for i, a in enumerate(ids)}
     z = 0.0
@@ -226,7 +233,7 @@ def test_edit_identity(scorer):
     num = den = 0.0
     for x in itertools.product((0, 1), repeat=3):
         w = {a: v for a, v in zip(ids, x)}
-        m = math.prod(priors[a] if w[a] else 1 - priors[a] for a in ids)
+        m = 0.5 ** len(ids)  # the MRF's priors are uniform by default
         for s, t, ty, p in base:
             if (w[s], w[t]) in VIOLATED[ty]:
                 m *= 1 - p
@@ -257,3 +264,23 @@ def test_symmetric_reversal_and_ordering_only_are_invariant(scorer):
     a = [("a0", "a1", "equivalence", 0.9), ("a1", "a2", "exclusive", 0.9)]
     b = [("a1", "a0", "equivalence", 0.9), ("a2", "a1", "exclusive", 0.9)]
     assert _lam(scorer, a, priors)[0] == pytest.approx(_lam(scorer, b, priors)[0])
+
+
+def test_uniform_priors_do_not_collapse_under_certain_verdicts(monkeypatch):
+    """Near-certain verdicts fix x* but, with the default uniform MRF priors, leave
+    the score informative; using them as priors makes Lambda vanish."""
+    monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
+    priors = {"a0": 1 - 1e-6, "a1": 1 - 1e-6, "a2": 1e-6}
+    good = [("a0", "a1", "entailment", 0.9), ("a1", "a2", "contradiction", 0.9)]
+    bad = [("a0", "a1", "contradiction", 0.9), ("a0", "a2", "entailment", 0.9)]
+    uni = LCSScorer("/fake/merlin")
+    lg = uni.score(_result(good, priors), method="confirmation")["log_confirmation"]
+    lb = uni.score(_result(bad, priors), method="confirmation")["log_confirmation"]
+    assert lg - lb > 1.0
+    ver = LCSScorer("/fake/merlin", confirmation_priors="verdict")
+    vg = ver.score(_result(good, priors), method="confirmation")["log_confirmation"]
+    vb = ver.score(_result(bad, priors), method="confirmation")["log_confirmation"]
+    assert abs(vg) < 1e-3 and abs(vb) < 1e-3  # O(eps): nothing left to confirm
+    assert vg == pytest.approx(_reference_lambda(good, priors, mrf_priors=priors), abs=1e-9)
+    with pytest.raises(ValueError):
+        LCSScorer("/fake/merlin", confirmation_priors="bogus")

@@ -372,6 +372,51 @@ def theory(seed=0):
     out["xstar_steps"] = xsteps
     out["xstar_falls"] = xfalls
 
+    # Necessity with FIXED priors (and hence fixed verdict x*): concentrate the
+    # posterior on a cell c by relations alone -- strong singleton relations that
+    # exclude every other cell of the scope -- then add a positive table psi whose
+    # committed cell is not its maximum (minimum) and check it lowers (raises) Lambda.
+    singleton = {(1, 0): ("entailment", False), (0, 1): ("entailment", True),
+                 (1, 1): ("contradiction", False), (0, 0): ("co_necessity", False)}
+    nec_trials = nec_ok = 0
+    for _ in range(1000):
+        n = rng.randint(2, 5)
+        pri = np.array([rng.uniform(0.05, 0.95) for _ in range(n)])
+        x = verdict(pri)
+        _, ctx = _rand_case(rng, n, max_rel=3)
+        s_, t_ = rng.sample(range(n), 2)
+        tab = np.array([rng.uniform(0.05, 1.0) for _ in range(4)])  # cells 00,01,10,11
+        cstar = 2 * int(x[s_]) + int(x[t_])
+        up = rng.random() < 0.5  # test the "monotone up" (else "down") direction
+        target = int(np.argmax(tab)) if up else int(np.argmin(tab))
+        if target == cstar or abs(tab[target] - tab[cstar]) < 1e-3:
+            continue
+        c = (target >> 1, target & 1)
+        rels = list(ctx)
+        for d, (ty, rev) in singleton.items():
+            if d != c:
+                a_, b_ = (t_, s_) if rev else (s_, t_)
+                rels += [(a_, b_, ty, 1 - 1e-4)] * 3
+        X = World.grid(n)
+        base = log_prior_mass(X, pri) + penalty_logpot(X, rels)
+        cell = 2 * X[:, s_] + X[:, t_]
+        lam0 = -logsumexp(base)
+        lam1 = math.log(tab[cstar]) - logsumexp(base + np.log(tab)[cell])
+        # (the committed-world terms of rels cancel between lam0 and lam1)
+        nec_trials += 1
+        nec_ok += (lam1 < lam0) if up else (lam1 > lam0)
+    out["nec_trials"] = nec_trials
+    out["nec_ok"] = nec_ok
+
+    # Degeneracy of q-derived priors (Voyager, verdict x*): as priors -> 0/1 at x*,
+    # Lambda -> 0 for every graph; uniform priors keep the gap.
+    xv5 = np.array([1, 1, 1, 0, 0])
+    out["degen"] = []
+    for e in (0.1, 0.01, 0.001):
+        pe = np.array([1 - e] * 3 + [e] * 2)
+        out["degen"].append((e, confirmation(pe, VOYAGER["A"], xv5),
+                             confirmation(pe, VOYAGER["B"], xv5)))
+
     out["thm_sequences"] = seqs
     out["thm_steps"] = steps
     out["thm_falls"] = falls["lambda_not_strict"]
@@ -601,19 +646,38 @@ def voyager():
         assert abs(mm - resp["expected"]["mean_marginal"]) < 1e-4, (name, mm)
     res = {}
     xv = verdict(pri)  # (1,1,1,0,0): the factuality verdicts
+    # The MRF's priors are uniform (scorer default confirmation_priors="uniform"): the
+    # verdicts fix x* only. The earlier model's mean marginal keeps its 0.9/0.1 priors.
+    pu = np.full(len(pri), 0.5)
+    # Response A's MRF in numbers: partition function, prior and posterior of x*, and
+    # the most probable world, for the worked MRF of Sec. sec:mrf.
+    X = World.grid(5)
     for name, rels in VOYAGER.items():
-        lam = confirmation(pri, rels, xv)
-        lam_a = confirmation(pri, rels)
+        w = log_prior_mass(X, pu) + penalty_logpot(X, rels)
+        lz = logsumexp(w)
+        kx = int(sum(int(b) << i for i, b in enumerate(xv)))
+        kmap = int(np.argmax(w))
+        res[f"{name}_mrf"] = {
+            "Z": math.exp(lz), "prior_x": math.exp(log_prior_mass(X, pu)[kx]),
+            "post_x": math.exp(w[kx] - lz), "map": [int(v) for v in X[kmap]],
+            "post_map": math.exp(w[kmap] - lz),
+        }
+    for name, rels in VOYAGER.items():
+        lam = confirmation(pu, rels, xv)
+        lam_a = confirmation(pu, rels)
         res[name] = {
             "lambda": lam, "lcs": sigmoid(lam / 5),
             "lambda_assert": lam_a, "lcs_assert": sigmoid(lam_a / 5),
             "mm_earlier": float(marginals(pri, rels, withpriors_logpot).mean()),
             "marg_earlier": [float(v) for v in marginals(pri, rels, withpriors_logpot)],
-            "delta": [lam - confirmation(pri, rels[:k] + rels[k + 1:], xv)
+            "delta": [lam - confirmation(pu, rels[:k] + rels[k + 1:], xv)
                       for k in range(len(rels))],
-            "delta_assert": [lam_a - confirmation(pri, rels[:k] + rels[k + 1:])
+            "delta_assert": [lam_a - confirmation(pu, rels[:k] + rels[k + 1:])
                              for k in range(len(rels))],
             "signs": ["S" if is_support(r, xv) else "C" for r in rels],
+            "count": sum(p_ if is_support(r, xv) else -p_ for r in rels for p_ in [r[3]]),
+            "count_assert": sum(p_ if is_support(r, np.ones(5, dtype=int)) else -p_
+                                for r in rels for p_ in [r[3]]),
         }
     return res
 
@@ -684,8 +748,9 @@ def ladders():
             continue
         ids, pri_map, pri, rels = rec_graph(rec)
         xv = verdict(pri)
-        lam = confirmation(pri, rels, xv)
-        lam_a = confirmation(pri, rels)
+        pu = np.full(len(pri), 0.5)  # uniform MRF priors; x* from the factual labels
+        lam = confirmation(pu, rels, xv)
+        lam_a = confirmation(pu, rels)
         old = old_readouts(ids, pri_map, rec.get("relations") or [])
         assert abs(old["log_confirmation"] - lam) < 1e-6, (path, old["log_confirmation"], lam)
         cached = rec.get("lcs") or {}
@@ -904,6 +969,20 @@ def write_macros(path, th, res, dom, spread, gold_ladders, st):
             m(f"vy{nm}S{_alpha(str(k))}", "support" if sg == "S" else "conflict")
             m(f"vy{nm}DRaw{_alpha(str(k))}", f"{d:.4f}")
     m("vyBMargThree", f"{vy['B']['marg_earlier'][2]:.3f}")
+    for nm in ("A", "B"):
+        mr = vy[f"{nm}_mrf"]
+        m(f"vy{nm}Z", f"{mr['Z']:.3f}")
+        m(f"vy{nm}PiX", f"{mr['prior_x']:.3f}")
+        m(f"vy{nm}PX", f"{mr['post_x']:.3f}")
+        m(f"vy{nm}Map", "".join(str(v) for v in mr["map"]))
+    for nm in ("A", "B"):
+        m(f"vy{nm}Count", f"{vy[nm]['count']:.2f}")
+        m(f"vy{nm}Avg", f"{vy[nm]['count'] / len(VOYAGER[nm]):.3f}")
+    m("necTrials", f"{th['nec_trials']:,}".replace(",", "{,}"))
+    for k, (e, a, b) in enumerate(th["degen"], 1):
+        m(f"degA{_alpha(str(k))}", f"{a:+.3f}")
+        m(f"degB{_alpha(str(k))}", f"{b:+.3f}")
+    m("necOk", f"{th['nec_ok']:,}".replace(",", "{,}"))
     m("xsSteps", f"{th['xstar_steps']:,}".replace(",", "{,}"))
     m("xsFalls", th["xstar_falls"])
     m("uniqPairs", th["unique_pairs_n3"])
