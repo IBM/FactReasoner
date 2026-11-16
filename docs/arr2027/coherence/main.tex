@@ -87,28 +87,19 @@
 \maketitle
 
 \begin{abstract}
-Long-form factuality metrics decompose a response into atomic claims and verify each one in
-isolation, so they cannot see whether the claims hold together as an argument. We study
-\emph{logical coherence} as a property of the relations a response draws between its own claims ---
-entailments, contradictions, equivalences, exclusions and disjunctions --- and ask for a score
-with one non-negotiable property: over a fixed set of claims, making the relation graph more
-coherent must raise the score, \emph{whatever} else the graph contains. We show that the natural
-readouts of a Markov random field (MRF) over claim truth values, including the mean posterior
-marginal and normalized partition functions, violate this requirement, and that the failure is
-structural. We then derive a score that satisfies it from first principles. The claims, with the
-truth values a factuality pipeline assigns them, define a \emph{committed world}. The score is
-the log-ratio by which the coherence MRF raises the probability of that world above its prior: it
-measures how well the claims, as they stand, support one another. Relations are supports or
-conflicts by whether the committed world satisfies them. Rejecting a falsehood therefore counts
-as support, while inferring a falsehood from a truth counts as conflict. We prove that the score is
-strictly monotone under every coherence-improving edit, for any priors, any relation graph and
-relations of any arity; that this requires, and is guaranteed by, \emph{sign-definite} potentials;
-and that the committed world is the only world whose posterior has this property. The score is a
-Bayesian confirmation measure, needs one partition-function query, decomposes over independent
-sub-arguments, and saturates under redundant support. On the development split of a
-coherence-ladder benchmark, every gold rung pair the theory orders is scored correctly. On mined
-graphs, so is every pair whose two extracted graphs are correctly ordered, which localizes the
-remaining errors in relation extraction.
+Long-form factuality metrics verify claims one at a time, so they cannot tell whether a response's
+claims hold together as an argument. We study logical coherence as a property of the relations a
+response draws between its own claims, and require one property of any score for it: over a fixed
+set of claims, making the relations more coherent must raise the score, whatever else the response
+contains. The natural readouts of a Markov random field over claim truth values, such as the mean
+posterior marginal, violate this requirement. We derive a score that satisfies it. A factuality
+pipeline fixes each claim's truth value, and the score measures how much the response's relations
+raise the probability of that assignment. Rejecting a falsehood therefore counts as support, and
+deriving a falsehood from a truth counts as conflict. We prove the score strictly monotone for any
+priors and relation graph, show that no other readout of this form is, and compute it with one
+inference query. On a coherence-ladder benchmark, every pair of responses whose relation graphs
+are correctly ordered is scored correctly, which localizes the remaining errors in relation
+extraction.
 \end{abstract}
 
 %% ============================================================================
@@ -118,74 +109,46 @@ remaining errors in relation extraction.
 
 The dominant way to assess long-form generation is decompose-then-verify: split a response into
 atomic claims, check each against evidence, and aggregate
-\citep{factscore,safe,veriscore,factreasoner}. Treating claims as independently checkable
-discards exactly what distinguishes an argument from a list. A response can assert that no one
-was harmed and that three people died; it can join true statements with a spurious
-``therefore''; it can lean on a falsehood to reach a true conclusion. Every claim may receive the
-right verdict, and the response is still a bad argument. \citet{lorefact} measure how often this
-matters: on logic-related samples, standard factuality pipelines omit the logical dimension in
-roughly half of the cases or more.
+\citep{factscore,safe,veriscore,factreasoner}. Treating claims independently discards what makes a
+response an argument. A response can assert that no one was harmed and that three people died, or
+lean on a falsehood to reach a true conclusion, and every claim can still receive the right
+verdict. On logic-related samples, standard factuality pipelines miss the logical dimension in
+roughly half of the cases or more \citep{lorefact}. Two responses with the same claims and the
+same verdicts can differ only in how they relate those claims, and no per-claim check separates
+them.
 
-Coherence and factuality are different axes. Two responses built from the \emph{same} claims, with
-the same truth values, can differ only in the relations they draw between them, and no per-claim
-check can separate them. This paper is about that second axis, and specifically about what a score
-for it must guarantee.
+A score for that difference must guarantee one thing. Over a fixed set of claims, any change that
+makes the relations more coherent --- a new or stronger support, a weaker or deleted conflict ---
+must raise the score, wherever in the argument the change occurs. This is harder than it looks.
+The natural model is a Markov random field (MRF) over claim truth values with one factor per
+relation \citep{mln,factreasoner}, yet its natural readout, the mean posterior marginal, can fall
+when a contradiction is deleted, because the claims that contradiction held in check are released
+against others (\S\ref{sec:failures}). It falls on \fallsPctMmSigndef\% of random
+coherence-improving edits. The question is which quantity of the model to read.
 
-\paragraph{The requirement.} Fix the claims of a response. A second response over the same
-claims is more coherent if it draws more or stronger supporting relations, or fewer or weaker
-conflicting ones. A coherence score that ranks the second below the first is wrong, and wrong in
-a way no amount of calibration repairs, because the comparison holds everything else fixed. We
-therefore require \emph{monotonicity}: every coherence-improving change to the relation graph,
-in any context, raises the score. It is a strong requirement, because the change can occur
-anywhere in an arbitrary graph whose other relations interact with it.
+We answer it from what a factuality pipeline already provides. Its verdicts fix a
+\emph{committed world}, the truth value of each claim, and we score a response by how much its
+relations raise the probability of that world above its prior. Whether a relation helps or hurts
+then follows from the committed world, not from the relation's type alone. Rejecting a falsehood
+counts as support, while deriving a falsehood from a truth or denying a truth counts as conflict.
+The score needs one inference query and is the log-ratio measure of confirmation from Bayesian
+epistemology \citep{milne1996,fitelson1999}. Figure~\ref{fig:voyager} shows it on two responses
+that state the same five claims.
 
-\paragraph{Why it is not free.} The natural home for relations between claims is a Markov random
-field (MRF) over claim truth values, with one factor per relation
-\citep{mln,factreasoner}. Its natural readouts are not monotone. A contradiction that holds down
-a ``hub'' claim, which itself contradicts several others, can be deleted, and the mean posterior
-marginal \emph{falls}, because the released hub suppresses its neighbours (\S\ref{sec:failures}).
-Normalized partition functions fail through their references, and event probabilities such as
-``no contradiction is active'' fail when a conceded tension is resolved. On random networks, the
-mean marginal is lowered by \fallsPctMmSigndef\% of coherence-improving edits.
-
-\paragraph{The score.} We start from the world the argument is about. A factuality pipeline assigns
-each claim a truth value; together these form a \emph{committed world} $\xs$. The response's
-relations are evidence about which worlds are consistent with its structure, and we score the
-response by how much that evidence raises the probability of $\xs$:
-\begin{equation*}
-  \Lambda(\R) \;=\; \log \PR(\xs) - \log \pi(\xs),
-\end{equation*}
-where $\PR$ is the coherence MRF of the relation graph $\R$ and $\pi$ the prior over claims. It
-measures how well the claims, as they stand, support one another. Whether a relation helps or
-hurts is decided by $\xs$. An entailment between two true claims supports the argument, and so
-does a contradiction that sets a true claim against a false one. An entailment from a true claim
-to a false one is a conflict. Without evidence, every claim is taken as the response asserts it,
-and $\xs$ is the all-true world. One query on the MRF gives $\Lambda$, and it is the log-ratio
-measure of confirmation from Bayesian epistemology \citep{milne1996,fitelson1999}, applied to
-$\xs$.
-
-\paragraph{Contributions.}
+\noindent Our contributions are:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item A formal statement of the requirement: a \emph{coherence order} on relation graphs over a
-  fixed claim set and committed world, generated by four elementary improvements, and the axioms
-  a coherence score should satisfy (\S\ref{sec:setup}).
-\item A score, $\Lambda$ and its bounded form $\LCS=\sigma(\Lambda/n)$, read directly off the
-  coherence MRF at the committed world, with a proof that it is \emph{strictly} monotone in the
-  coherence order for any priors, any graph and relations of any arity (Thm.~\ref{thm:mono}). The
-  proof rests on an exact \emph{edit identity} (\S\ref{sec:score}). A worked pair shows how the
-  committed world decides which relations count against an argument (\S\ref{sec:voyager}).
-\item A characterization (\S\ref{sec:why}): monotonicity holds if and only if every factor is
-  \emph{sign-definite}, with its maximum or its minimum at the committed configuration
-  (Thm.~\ref{thm:necessity}). Earlier factor tables lose this property for weak relations. The
-  committed world is the \emph{only} world whose posterior is monotone (Prop.~\ref{prop:unique}),
-  and posterior-belief readouts fail (Prop.~\ref{prop:mm}).
-\item Further properties: neutrality, additivity over independent sub-arguments, a sign theorem,
-  and saturation, under which redundant support yields vanishing gains (\S\ref{sec:props}).
-\item Experiments on the development split of a coherence-ladder benchmark
-  (\S\ref{sec:experiments}). A dominance analysis classifies every rung pair by whether its two
-  relation graphs are ordered. On every ordered pair, gold or mined, the score moves exactly as
-  Theorem~\ref{thm:mono} says it must, which localizes the remaining errors in relation
-  extraction.
+\item \textbf{A provably monotone coherence score} (\S\ref{sec:setup}--\ref{sec:score}). The score
+  is strictly monotone in every coherence-improving edit, for any priors, relation graph and
+  relation arity, by a closed-form identity for the effect of each relation. It is also neutral,
+  additive over independent sub-arguments, and saturating under redundant support
+  (\S\ref{sec:props}).
+\item \textbf{A characterization of why this score} (\S\ref{sec:why}). Monotonicity holds exactly
+  when every factor is sign-definite, a property earlier coherence tables lose for weak relations.
+  The committed world is the only world whose posterior is monotone, and posterior-belief readouts
+  are not.
+\item \textbf{Evidence that separates scoring from extraction} (\S\ref{sec:experiments}). On
+  coherence ladders, every pair of responses whose relation graphs are ordered, gold or mined, is
+  scored as the theorem requires, so the remaining errors are errors of relation extraction.
 \end{itemize}
 
 %% ============================================================================
