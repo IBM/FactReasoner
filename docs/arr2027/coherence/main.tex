@@ -256,7 +256,8 @@ assignments of its endpoints $(a_s,a_t)$ that \emph{violate} it: entailment \ent
 A \emph{relation} $r=(e_r,\tau_r,p_r)$ has a scope $e_r=(s_r,t_r)$ of two claims, a coupling, and
 a weight $p_r\in[0,1)$, the strength with which the response draws it. For a world $x$ and any pair
 of claims $e=(s,t)$, we write $x_e=(x_s,x_t)$ for the truth values of the two claims; in particular
-$x_{e_r}=(x_{s_r},x_{t_r})$. A \emph{relation graph} $\R$ is a finite multiset of relations. Relations are annotated with a discourse \emph{sense}
+$x_{e_r}=(x_{s_r},x_{t_r})$. A \emph{relation graph} $\R$ is a finite multiset of relations, so the same relation may occur
+more than once; $\uplus$ denotes multiset union, under which multiplicities add. Relations are annotated with a discourse \emph{sense}
 grounded in PDTB~3.0 and RST \citep{pdtb,mann}, which a deterministic \emph{compile map} sends to a
 coupling (Table~\ref{tab:couplings}).
 \end{definition}
@@ -305,16 +306,40 @@ Whether a relation helps or hurts an argument depends on the truth of its endpoi
 A relation $r$ with weight $p_r>0$ and a non-trivial violated set,
 $\varnothing\neq V(\tau_r)\neq\{0,1\}^2$, is a \emph{support} if the committed world satisfies it,
 $\xs_{e_r}\notin V(\tau_r)$, and a \emph{conflict} if it violates it, $\xs_{e_r}\in V(\tau_r)$.
-Other relations produce no factor and are dropped. Write $\R=\Rsup\uplus\Rcon$.
+Other relations produce no factor and are dropped. The \emph{supports} of $\R$ form the
+multiset $\Rsup$ and its \emph{conflicts} the multiset $\Rcon$, so that $\R=\Rsup\uplus\Rcon$.
 \end{definition}
+
+In words, $\Rsup$ collects the relations that the committed world upholds and $\Rcon$ those it
+breaks. The split is a property of the relation graph \emph{together with} $\xs$: the relation alone
+says which joint values it rules out, and the verdicts say whether the response's own world is
+among them. It is also a partition, since every relation that produces a factor is exactly one of
+the two.
 
 The right block of Table~\ref{tab:couplings} reads the sign off. Between two true claims an
 entailment upholds the argument and a contradiction defeats it. A contradiction that sets a true
 claim against a false one is a support, and an entailment from a true claim to a false one is an
 unsound inference, a conflict. An entailment from a false claim cannot be violated at $\xs$, so it
 is a support; the verdicts decide only a relation's sign, and how much it earns depends on the rest
-of the model (\S\ref{sec:score}). In Figure~\ref{fig:voyager} all four of A's relations are
-supports, and B's only conflict is $a_2\ \con\ a_3$, its denial of a truth.
+of the model (\S\ref{sec:score}).
+
+Response~B of Figure~\ref{fig:voyager} shows each case. Its committed world is
+$\xs=(1,1,1,0,0)$: $a_1$--$a_3$ are true and $a_4,a_5$ false. Reading each of its six relations
+at $\xs$ gives
+\begin{align*}
+\Rsup&=\{a_1\Rightarrow a_2,\ a_4\Rightarrow a_3,\ a_4\Rightarrow a_5,\\
+ &\qquad a_1\con a_4,\ a_2\con a_5\},\\
+\Rcon&=\{a_2\con a_3\}.
+\end{align*}
+The entailment $a_1\Rightarrow a_2$ links two truths and is upheld. The contradictions
+$a_1\con a_4$ and $a_2\con a_5$ set a truth against a falsehood, which is what $\xs$ does, so they
+are supports too. The entailments $a_4\Rightarrow a_3$ and $a_4\Rightarrow a_5$ start from the false
+$a_4$ and cannot be broken at $\xs$, so they count as supports even though B reasons from a
+falsehood (callout~2); in Figure~\ref{fig:voyager} each earns less than $a_1\Rightarrow a_2$. The one conflict is
+$a_2\con a_3$, which sets two truths against each other (callout~1). By contrast, all four of A's
+relations are supports, so $\Rcon=\varnothing$ for A. The split also depends on the polarity
+source. Under assertion polarity, where every claim is taken as true, B's three contradictions
+would all be conflicts and its three entailments all supports.
 
 \subsection{Estimating Relations from the Response}
 \label{sec:mining}
@@ -390,11 +415,28 @@ Z_\R=\sum_{x\in\{0,1\}^n}\pi(x)\prod_{r\in\R}\psi_r(x_{e_r}).
 Read directly, Eq.~\ref{eq:mrf} keeps each world's prior weight and multiplies it by $1-p_r$ for
 every relation the world violates: a world that violates no relation keeps its prior weight, one
 that violates an entailment of weight $0.9$ keeps a tenth of it, and with no relations $\PR=\pi$.
-The weights also have a probabilistic reading, as a \emph{check} model. Suppose each relation
-independently raises an alarm with probability $p_r$ in a world that violates it, and never in a
-world that satisfies it. The probability that no alarm is raised in world $x$ is then
-$\prod_r\psi_r(x_{e_r})$, so $\PR$ is the posterior over worlds given that no alarm is raised, and
-$Z_\R$ is the prior probability that none is. A weight $p_r\to1$ makes the relation a hard
+
+\paragraph{Reading the MRF as a set of checks.} The weights also have a simple probabilistic
+meaning. Picture a candidate world, an assignment of true or false to every claim, drawn at random
+from the prior. Each relation of the response then acts as an independent \emph{check} on it. If the
+world breaks the relation, for example by making the premise of an entailment true and its
+conclusion false, the check raises an alarm with probability $p_r$. If the world respects the
+relation, the check never raises one. The weight $p_r$ is thus how reliably the relation catches a
+world that breaks it.
+
+Now keep only the worlds that pass every check. A world passes the check of relation $r$ with
+probability $\psi_r(x_{e_r})$: $1$ if it respects $r$ and $1-p_r$ if it breaks it. The checks are
+independent, so the world passes them all with probability $\prod_r\psi_r(x_{e_r})$. By Bayes' rule,
+the distribution of the surviving worlds is the prior times this product, renormalized, which is
+exactly $\PR$ in Eq.~\ref{eq:mrf}. The normalizer $Z_\R$ is the probability that a world drawn from
+the prior passes all checks. In short, $\PR$ is what we should believe about the claims after
+learning that the response's relations all hold, with each relation trusted to degree $p_r$.
+
+For example, take two claims with flat priors, so each of the four worlds has probability $\frac14$,
+and one entailment $a_1\Rightarrow a_2$ with $p_r=0.9$. Only the world $(1,0)$ breaks it, and it
+survives the check with probability $0.1$. Hence $Z_\R=\frac34+\frac14\cdot0.1=0.775$, the world
+$(1,0)$ falls to $0.025/0.775\approx0.03$, and each of the other three rises to $0.25/0.775\approx0.32$.
+As $p_r\to1$ the check never misses, $(1,0)$ is eliminated, and the relation becomes a hard
 constraint.
 
 A table $\psi$ over a pair $e$ is \emph{sign-definite} at $\xs$ if its value at $\xs_e$ is its
