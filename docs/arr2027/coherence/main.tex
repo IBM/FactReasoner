@@ -131,7 +131,7 @@ A score for that difference must guarantee one thing. Over a fixed set of claims
 makes the relations more coherent --- a new or stronger support, a weaker or deleted conflict ---
 must raise the score, wherever in the argument the change occurs. This is harder than it looks.
 The natural model is a Markov random field (MRF) over claim truth values with one factor per
-relation \citep{mln,factreasoner}, yet its natural readout, the mean posterior marginal, can fall
+relation \citep{factreasoner}, yet its natural readout, the mean posterior marginal, can fall
 when a contradiction is deleted, because the claims that contradiction held in check are released
 against others (\S\ref{sec:failures}). It falls on \fallsPctMmSigndef\% of random
 coherence-improving edits. The question is which quantity of the model to read.
@@ -254,8 +254,9 @@ assignments of its endpoints $(a_s,a_t)$ that \emph{violate} it: entailment \ent
 \begin{definition}[Relation and compile map]
 \label{def:relation}
 A \emph{relation} $r=(e_r,\tau_r,p_r)$ has a scope $e_r=(s_r,t_r)$ of two claims, a coupling, and
-a weight $p_r\in[0,1)$, the strength with which the response draws it. A \emph{relation graph}
-$\R$ is a finite multiset of relations. Relations are annotated with a discourse \emph{sense}
+a weight $p_r\in[0,1)$, the strength with which the response draws it. For a world $x$ and any pair
+of claims $e=(s,t)$, we write $x_e=(x_s,x_t)$ for the truth values of the two claims; in particular
+$x_{e_r}=(x_{s_r},x_{t_r})$. A \emph{relation graph} $\R$ is a finite multiset of relations. Relations are annotated with a discourse \emph{sense}
 grounded in PDTB~3.0 and RST \citep{pdtb,mann}, which a deterministic \emph{compile map} sends to a
 coupling (Table~\ref{tab:couplings}).
 \end{definition}
@@ -361,27 +362,46 @@ prompt is reproduced there.
 \input{figures/mrf-response-a}
 
 With relations and weights in hand, we turn them into evidence about which worlds are consistent
-with the response. The model is a Markov random field (MRF) with one binary variable per claim, a
-\emph{prior factor} $\phi_i(a_i)=[1-\pi_i,\;\pi_i]$ per claim, and a \emph{relation factor} per
-relation that keeps every assignment satisfying the relation at weight $1$ and multiplies every
-assignment violating it by $1-p_r$:
+with the response. The model is a Markov random field (MRF) with one binary variable $x_i$ per claim
+and two kinds of factor. A \emph{prior factor} $\phi_i(x_i)=\pi_i^{x_i}(1-\pi_i)^{1-x_i}$ per claim
+gives its plausibility before any relation is considered; together they multiply to the prior
+$\pi(x)=\prod_i\phi_i(x_i)$. A \emph{relation factor} $\psi_r$ per relation depends only on the truth
+values $(u,v)\in\{0,1\}^2$ of the relation's two claims, and down-weights exactly the joint values
+the relation rules out:
+\begin{equation}
+\psi_r(u,v)\;=\;
+\begin{cases}
+1-p_r & \text{if } (u,v)\in V(\tau_r),\\
+1 & \text{otherwise}.
+\end{cases}
+\label{eq:psi}
+\end{equation}
+For an entailment $a_s\Rightarrow a_t$, for example, $\psi_r(1,0)=1-p_r$ and $\psi_r=1$ on the other
+three cells; Figure~\ref{fig:mrf-a} lists every factor of Response~A this way. We also write
+$\psi_r(x)$ for $\psi_r(x_{e_r})$. The joint distribution is the prior times the relation factors,
 \begin{equation}
 \begin{gathered}
-\psi_r(x)=1-p_r\,\ind{x_{e_r}\in V(\tau_r)},\\
-\PR(x)=\frac{1}{Z_\R}\,\prod_{i=1}^n\phi_i(x_i)\prod_{r\in\R}\psi_r(x),
+\PR(x)=\frac{1}{Z_\R}\,\pi(x)\prod_{r\in\R}\psi_r(x_{e_r}),\\
+Z_\R=\sum_{x\in\{0,1\}^n}\pi(x)\prod_{r\in\R}\psi_r(x_{e_r}).
 \end{gathered}
 \label{eq:mrf}
 \end{equation}
-with $Z_\R=\sum_x\pi(x)\prod_r\psi_r(x)$. $\PR$ is the prior reweighted world by world by the
-relations each world violates; with no relations, $\PR=\pi$. Two readings make the weights
-precise. As Markov logic \citep{mln}, $\psi_r$ is a soft formula of weight $w_r=-\log(1-p_r)$. As a
-\emph{check} model, each relation raises an alarm with probability $p_r$ in a world violating it,
-and $\PR$ is the posterior over worlds given that no alarm is raised, whose probability is $Z_\R$.
-A table $\psi$ over a scope $e$ is \emph{sign-definite} at $\xs$ if $\psi(\xs_e)$ is its maximum or
-its minimum. Each table of Eq.~\ref{eq:mrf} takes only the values $1$ and $1-p_r$, so it is
-sign-definite at every $\xs$: its maximum when $\xs$ satisfies the relation and its minimum when
-$\xs$ violates it. \S\ref{sec:why} shows this is what monotonicity requires. The MRF itself does
-not depend on $\xs$; only the score read from it does.
+
+Read directly, Eq.~\ref{eq:mrf} keeps each world's prior weight and multiplies it by $1-p_r$ for
+every relation the world violates: a world that violates no relation keeps its prior weight, one
+that violates an entailment of weight $0.9$ keeps a tenth of it, and with no relations $\PR=\pi$.
+The weights also have a probabilistic reading, as a \emph{check} model. Suppose each relation
+independently raises an alarm with probability $p_r$ in a world that violates it, and never in a
+world that satisfies it. The probability that no alarm is raised in world $x$ is then
+$\prod_r\psi_r(x_{e_r})$, so $\PR$ is the posterior over worlds given that no alarm is raised, and
+$Z_\R$ is the prior probability that none is. A weight $p_r\to1$ makes the relation a hard
+constraint.
+
+A table $\psi$ over a pair $e$ is \emph{sign-definite} at $\xs$ if its value at $\xs_e$ is its
+maximum or its minimum. Because $\psi_r$ takes only the values $1$ and $1-p_r$, it is sign-definite
+at every $\xs$: maximal when $\xs$ satisfies $r$ and minimal when $\xs$ violates it. \S\ref{sec:why}
+shows this is exactly what monotonicity requires. The MRF itself does not depend on $\xs$; only the
+score read from it does.
 
 Figure~\ref{fig:mrf-a} shows the MRF of Response~A: five claims with flat priors, two entailment
 factors that penalize a premise holding while its conclusion fails, and two contradiction factors
@@ -430,29 +450,44 @@ pair that contradict each other, such as an exclusion and an equivalence of equa
 to a constant and leave $\PR$ unchanged, so a score satisfying A2 rates them as uninformative
 rather than as incoherent. A1 is the demanding axiom, because the edited relation can sit anywhere
 in an arbitrary graph. The requirement suggests reading the MRF at the one world whose standing the
-argument is about.
+argument is about, and comparing its probability after the relations with its probability before.
 
-\begin{definition}[Coherence score]
+\begin{definition}[Logical coherence score]
 \label{def:score}
-\begin{align}
-\Lambda(\R) &= \log\frac{\PR(\xs)}{\pi(\xs)}\notag\\
- &= \sum_{r\in\Rcon}\log(1-p_r)-\log Z_\R,
-\label{eq:lambda}\\
-\LCS(\R) &= \sigma\bigl(\Lambda(\R)/n\bigr).
+\begin{equation}
+\LCS(\R)=\sigma\bigl(\operatorname{logit}\PR(\xs)-\operatorname{logit}\pi(\xs)\bigr),
 \label{eq:lcs}
-\end{align}
+\end{equation}
+with $\sigma$ the logistic function and $\operatorname{logit}u=\log\frac{u}{1-u}$.
 \end{definition}
 
-$\Lambda$ is the log-ratio by which the relations raise the probability of the committed world. In
-the check model it is exactly the log-ratio measure of confirmation
-\citep{milne1996,fitelson1999}, $\log P(\xs\mid E)/P(\xs)$, with $\xs$ as the hypothesis and the
-event $E$ that no check raises an alarm as the evidence. The second form of Eq.~\ref{eq:lambda}
-holds because $\psi_r(\xs)$ is $1$ for a support and $1-p_r$ for a conflict, so $\Lambda$ costs one
-query for the partition function $Z_\R$. The \emph{logical coherence score} $\LCS$ is a display
-scale, strictly increasing in $\Lambda$ for a fixed claim set: $\LCS=\frac12$ means the relations
-neither confirm nor disconfirm $\xs$, and under flat priors $\LCS<\sigma(\log2)=\frac23$, since
-$\Lambda\le-\log\pi(\xs)=n\log2$. To see why this reading
-behaves well, consider adding a single relation.
+The difference of log-odds in Eq.~\ref{eq:lcs} is the \emph{weight of evidence} the relations give
+the committed world: in the check model it is $\log P(E\mid\xs)/P(E\mid\text{not }\xs)$, with $E$
+the event that no check raises an alarm. $\LCS$ is therefore the probability of $\xs$ after the
+relations for a reader who started from even odds on it. Its range is $[0,1]$, with three reference
+points (Figure~\ref{fig:lcs-range}). A \emph{completely incoherent} response, whose relations rule
+out the committed world ($\PR(\xs)\to0$, as when $\xs$ violates conflicts of weight approaching
+$1$), has $\LCS\to0$. A response whose relations neither confirm nor disconfirm $\xs$, including
+one with no relations, has $\PR(\xs)=\pi(\xs)$ and $\LCS=\frac12$. A \emph{completely coherent}
+response, whose relations force the committed world ($\PR(\xs)\to1$, as with strong supports that
+exclude every other world), has $\LCS\to1$.
+
+\input{figures/lcs-range}
+
+\paragraph{Analysing the score.} The properties of $\LCS$ are easiest to state through the
+log-ratio by which the relations raise the probability of the committed world,
+\begin{align}
+\Lambda(\R)&=\log\frac{\PR(\xs)}{\pi(\xs)}\notag\\
+ &=\sum_{r\in\Rcon}\log(1-p_r)-\log Z_\R,
+\label{eq:lambda}
+\end{align}
+where the second form holds because $\psi_r(\xs)$ is $1$ for a support and $1-p_r$ for a conflict.
+Computing $\LCS$ therefore costs one query for the partition function $Z_\R$. In the check model
+$\Lambda$ is the log-ratio measure of confirmation \citep{milne1996,fitelson1999},
+$\log P(\xs\mid E)/P(\xs)$. Since $\PR(\xs)=\pi(\xs)e^{\Lambda}$, $\LCS$ is a strictly increasing
+function of $\Lambda$ for a fixed claim set and prior, so every ordering statement about $\Lambda$
+holds for $\LCS$; we state the results for $\Lambda$, where they take a closed form. To see why
+the score behaves well, consider adding a single relation.
 
 \begin{lemma}[Edit identity]
 \label{lem:edit}
@@ -470,15 +505,16 @@ elementary improvement is a single addition, deletion or weight change, the main
 \begin{theorem}[Monotonicity]
 \label{thm:mono}
 Fix $\xs$. For all priors $\pi\in(0,1)^n$ and all relation graphs $\R,\R'$ with weights in $[0,1)$:
-if $\R'\coh\R$ then $\Lambda(\R')\ge\Lambda(\R)$, and if $\R'\scoh\R$ then
-$\Lambda(\R')>\Lambda(\R)$. The same holds for $\LCS$ and for relations of any arity.
+if $\R'\coh\R$ then $\LCS(\R')\ge\LCS(\R)$, and if $\R'\scoh\R$ then $\LCS(\R')>\LCS(\R)$. The
+same holds for $\Lambda$, and for relations of any arity.
 \end{theorem}
 
 No interaction with other relations can reverse an improving edit. For edits the order leaves
-unranked, Lemma~\ref{lem:edit} nets gains against costs along any edit path, so $\Lambda$ extends
-the coherence order to a total preorder. On Figure~\ref{fig:voyager}, A scores $\Lambda=\vyALam$
-($\LCS=\vyALCS$) and B $\vyBLam$ ($\vyBLCS$). B's denial of the true $a_3$ costs $\vyBDTwo$, more
-than all its supports earn together. Magnitudes come from context, not from the truth of a
+unranked, Lemma~\ref{lem:edit} nets gains against costs along any edit path, so the score extends
+the coherence order to a total preorder. On Figure~\ref{fig:voyager}, A scores $\LCS=\vyALCS$
+($\Lambda=\vyALam$) and B $\LCS=\vyBLCS$ ($\Lambda=\vyBLam$). The bars give each relation's
+leave-one-out contribution to $\Lambda$ (\S\ref{sec:props}). B's denial of the true $a_3$ costs
+$\vyBDTwo$, more than all its supports earn together. Magnitudes come from context, not from the truth of a
 premise. In isolation an entailment of a given weight earns the same whether its source is true or
 false. B's link from the false $a_4$ to $a_3$ earns $\vyBDThree$, against $\vyADTwo$ for A's link
 into $a_3$, because B's other relations have already made the violating worlds unlikely ($q_r$ is
@@ -536,8 +572,8 @@ These results single out $\Lambda$ only among readouts of one world under tables
 $\{1,1-p\}$; they do not make it the unique score satisfying A1--A4. For example, any reweighting
 $p\mapsto1-(1-p)^\beta$ with $\beta>0$ gives another monotone score of the same form, and different
 $\beta$ can rank incomparable graphs differently. We take $\beta=1$ because it makes $p_r$ the
-probability that a check catches a violation, so that the check and Markov-logic readings of
-\S\ref{sec:mrf} hold with the weights as estimated.
+probability that a check catches a violation, so that the check reading of
+\S\ref{sec:mrf} holds with the weights as estimated.
 
 \paragraph{Why not count relations?} Monotonicity alone admits trivial scores: the signed weight sum
 $\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is monotone by construction. But a count credits every relation
@@ -561,8 +597,7 @@ claims, $\Lambda(\R_1\uplus\R_2)=\Lambda(\R_1)+\Lambda(\R_2)$.
 \end{proposition}
 
 Additivity measures $\Lambda$ in nats of evidence that add across independent parts of an
-argument; $\LCS$ divides by $n$ only to make values readable across responses of different
-length, at the cost of additivity. Monotonicity in supports raises
+argument. Monotonicity in supports raises
 the question of padding: if supports never hurt, can a response gain without bound by adding them?
 
 \begin{proposition}[Bounds and saturation]
@@ -824,8 +859,7 @@ judges are the practical incumbent \citep{geval}. These methods measure cohesion
 rather than truth-functional constraints between claims, and none guarantees how its score responds
 to a change in those constraints.
 
-\paragraph{Logical constraints over claims.} Markov logic networks \citep{mln} and hinge-loss MRFs
-\citep{psl} encode soft logical rules as factors. BeliefBank \citep{beliefbank}, ConCoRD
+\paragraph{Logical constraints over claims.} BeliefBank \citep{beliefbank}, ConCoRD
 \citep{concord} and Maieutic prompting \citep{maieutic} use weighted MAX-SAT or factor-graph
 inference over NLI constraints to make a model's beliefs consistent. We use the same kind of model
 to \emph{measure} a response rather than correct it. That raises a question these methods do not
@@ -934,8 +968,8 @@ $V=\{0,1\}^{|e|}$ contributes a constant factor and leaves $\PR$ unchanged.
 $\PR=\tilde P/Z_\R$. After adding $r$, the unnormalized mass is $\tilde P\psi_r$, with normalizer
 $Z_{\R\uplus\{r\}}=\sum_x\tilde P(x)\psi_r(x)=Z_\R\,\E_{\PR}[\psi_r]$. Hence
 $P_{\R\uplus\{r\}}(\xs)=\PR(\xs)\psi_r(\xs)/\E_{\PR}[\psi_r]$; taking logarithms and subtracting
-the constant $\log\pi(\xs)$ gives the identity. For $\psi_r=1-p_r\ind{x_e\in V}$,
-$\E_{\PR}[\psi_r]=1-p_rq_r$ with $q_r=\PR(x_e\in V)\in(0,1)$, and $\psi_r(\xs)$ is $1$ for a
+the constant $\log\pi(\xs)$ gives the identity. For $\psi_r$ of Eq.~\ref{eq:psi},
+$\E_{\PR}[\psi_r]=1-p_rq_r$ with $q_r=\PR(x_{e_r}\in V(\tau_r))\in(0,1)$, and $\psi_r(\xs)$ is $1$ for a
 support and $1-p_r$ for a conflict, which gives the two closed forms and their signs. $\square$
 
 \paragraph{Theorem~\ref{thm:mono}.} By transitivity it suffices to show that each elementary
@@ -955,7 +989,8 @@ weight from $p$ to $p'>p$ changes it by $g^+(p')-g^+(p)>0$. (iii) Deleting a con
 $p>0$ changes it by $-g^-(p)>0$. (iv) Lowering a conflict's weight from $p$ to $p'<p$ changes it
 by $g^-(p')-g^-(p)>0$. A zero-weight addition or deletion leaves $\Lambda$ unchanged. Parallel
 copies of the edited relation are part of $\R_0$, so multisets are handled. $\LCS$ is a strictly
-increasing function of $\Lambda$ for fixed $n$. Nothing in the argument uses $|e|=2$, and $\xs$
+increasing function of $\Lambda$ for a fixed claim set and prior, which gives the statement for
+$\LCS$. Nothing in the argument uses $|e|=2$, and $\xs$
 enters only through which relations are supports, that is, through $\psi_r(\xs)\in\{1,1-p_r\}$.
 $\square$
 
@@ -1116,7 +1151,7 @@ weight-averaged probability that supports are actively upheld;
 (c) the posterior of a reified coherence node with noisy-AND votes;
 (d) $(\log Z-\log Z_{\min})/(\log Z_{\max}-\log Z_{\min})$ with the conflict-free network as
 ceiling and the most probable world's mass as floor;
-(e) \emph{conflict escape}, $\E_{P_0}[\prod_{r\in\Rcon}(1-p_r\ind{x_e\in V})]$, with $P_0$ the
+(e) \emph{conflict escape}, $\E_{P_0}[\prod_{r\in\Rcon}\psi_r(x_{e_r})]$, with $P_0$ the
 network without conflicts;
 (f) \emph{prior expectation}, $\sigma\bigl(\frac2n\log\E_\pi[\prod_{\Rcon}(1-p_rV_r)
 \prod_{\Rsup}(1+p_rC_r)]\bigr)$, where $V_r$ indicates that a conflict is violated and $C_r$ that a

@@ -155,7 +155,7 @@
 #
 #   Lambda      = log P_R(x*) - log pi(x*)
 #               = sum_{r: x*_e in V_r} log(1 - p_r) - log E_pi[ prod_r (1 - p_r [x in V_r]) ]
-#   confirmation = sigmoid(Lambda / n)
+#   confirmation = sigmoid(logit P_R(x*) - logit pi(x*))   (in [0, 1], 1/2 neutral)
 #
 # x* is the COMMITTED WORLD: the truth value (polarity) each claim is given. Two
 # sources (``LCSScorer(polarity=...)``):
@@ -1024,7 +1024,7 @@ class LCSScorer:
         priors: dict[str, float] | None = None,
         x_star: dict[str, int] | None = None,
     ) -> tuple[float | None, float | None]:
-        """``sigmoid(Lambda / n)`` with ``Lambda = log P_R(x*) - log pi(x*)`` -- readout (g).
+        """``sigmoid(logit P_R(x*) - logit pi(x*))`` and ``Lambda = log P_R(x*) - log pi(x*)`` -- readout (g).
 
         See the module docstring. One PR run on the network of prior unaries times
         one penalty-only factor per relation (``1 - p`` on the relation's violated
@@ -1045,6 +1045,7 @@ class LCSScorer:
         if n == 0:
             return None, None
         network = MarkovNetwork()
+        log_prior_x = 0.0  # log pi(x*) under the MRF's own priors
         for aid in sorted(result.atoms, key=_atom_sort_key):
             if self.confirmation_priors == "uniform":
                 pi = 0.5
@@ -1052,6 +1053,7 @@ class LCSScorer:
                 pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
             network.add_node(aid)
             network.add_factor([aid], [2], [1.0 - pi, pi])
+            log_prior_x += math.log(pi if x_star.get(aid, 1) else 1.0 - pi)
         log_asserted = 0.0
         any_factor = False
         for edge in result.fact_graph.get_edges():
@@ -1070,9 +1072,7 @@ class LCSScorer:
         if log_z is None:
             return None, None
         lam = log_asserted - log_z
-        x = lam / n
-        score = 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
-        return score, lam
+        return _odds_score(log_prior_x + lam, log_prior_x), lam
 
     def _node_priors(
         self,
@@ -1259,6 +1259,27 @@ def _penalty_factor(level1_type: str, w: float) -> list[float]:
         for s in (0, 1)
         for t in (0, 1)
     ]
+
+
+def _log1mexp(a: float) -> float:
+    """``log(1 - exp(a))`` for ``a < 0``, computed stably."""
+    if a > -0.6931471805599453:  # a > -log 2
+        return math.log(-math.expm1(a))
+    return math.log1p(-math.exp(a))
+
+
+def _odds_score(log_u: float, log_u0: float) -> float:
+    """Readout (g)'s display score ``sigmoid(logit u - logit u0)``.
+
+    ``u = P_R(x*)`` and ``u0 = pi(x*)``. The score is 1/2 when the relations leave the
+    committed world's probability at its prior, tends to 1 as they force it (u -> 1)
+    and to 0 as they rule it out (u -> 0). ``logit u - logit u0`` is the weight of
+    evidence the relations give x*, so the score is x*'s posterior from even odds.
+    """
+    log_u = min(log_u, -1e-15)
+    log_u0 = min(log_u0, -1e-15)
+    w = (log_u - _log1mexp(log_u)) - (log_u0 - _log1mexp(log_u0))
+    return 1.0 / (1.0 + math.exp(-w)) if w >= 0 else math.exp(w) / (1.0 + math.exp(w))
 
 
 def _violation_factor(level1_type: str, w: float) -> list[float]:

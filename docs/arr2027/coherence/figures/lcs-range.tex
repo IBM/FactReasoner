@@ -1,0 +1,39 @@
+% The range of the LCS: LCS = sigma(W), W = logit P_R(x*) - logit pi(x*), the weight of
+% evidence the relations give the committed world. Anchors: 0 (x* ruled out), 1/2
+% (uninformative), 1 (x* forced). Voyager points from numbers.tex.
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[x=5.9mm,y=36mm,font=\scriptsize]
+  % axes
+  \draw[-{Stealth[length=1.5mm]},black!70] (-5.6,0) -- (5.9,0) node[above left=0.3mm] {$W$};
+  \draw[-{Stealth[length=1.5mm]},black!70] (-5.6,0) -- (-5.6,1.08) node[above] {$\LCS$};
+  \foreach \y/\l in {0/0, 0.5/\frac12, 1/1}
+    \draw[black!50] (-5.65,\y) -- (-5.55,\y) node[left=1.2mm,text=black] {$\l$};
+  \foreach \x in {-4,-2,0,2,4}
+    \draw[black!50] (\x,-0.02) -- (\x,0.02) node[below=1.5mm,text=black] {$\x$};
+  \draw[dashed,black!40] (-5.6,1) -- (5.6,1);
+  \draw[dotted,black!55] (-5.6,0.5) -- (0,0.5) -- (0,0);
+  % the curve
+  \draw[thick,blue!60!black,domain=-5.6:5.6,samples=100,smooth]
+       plot (\x,{1/(1+exp(-\x))});
+  % anchors
+  \node[anchor=west,align=left,text=red!60!black] at (-5.4,0.36)
+       {$\to0$: relations\\rule out $\xs$\\($\PR(\xs)\to0$)};
+  \draw[red!60!black,-{Stealth[length=1.2mm]}] (-5.1,0.24) -- (-5.45,0.02);
+  \node[anchor=east,align=right] at (-0.6,0.74) {$\frac12$: uninformative\\($\PR(\xs)=\pi(\xs)$)};
+  \draw[black!70,-{Stealth[length=1.2mm]}] (-0.55,0.68) -- (-0.06,0.515);
+  \node[anchor=east,align=right,text=blue!55!black] at (5.5,0.58)
+       {$\to1$: relations force $\xs$\\($\PR(\xs)\to1$)};
+  \draw[blue!55!black,-{Stealth[length=1.2mm]}] (5.1,0.66) -- (5.45,0.975);
+  \fill[black] (0,0.5) circle (1pt);
+  % Voyager responses
+  \fill[blue!60!black] (\vyAW,\vyALCS) circle (1.4pt) node[above left=0.2mm] {A};
+  \fill[red!60!black] (\vyBW,\vyBLCS) circle (1.4pt) node[below right=0.2mm] {B};
+\end{tikzpicture}
+\caption{The range of the score. $\LCS=\sigma(W)$, where
+$W=\operatorname{logit}\PR(\xs)-\operatorname{logit}\pi(\xs)$ is the weight of evidence the
+relations give the committed world. $\LCS$ tends to $0$ when the relations rule $\xs$ out, equals
+$\frac12$ when they leave its probability at the prior, and tends to $1$ when they force it.
+Responses A and B of Figure~\ref{fig:voyager} score $\vyALCS$ and $\vyBLCS$.}
+\label{fig:lcs-range}
+\end{figure}

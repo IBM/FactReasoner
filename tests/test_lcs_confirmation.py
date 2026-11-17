@@ -15,7 +15,8 @@
 
 """The confirmation readout (g): the committed world under a sign-definite MRF.
 
-``Lambda = log P_R(x*) - log pi(x*)`` and ``confirmation = sigmoid(Lambda / n)``,
+``Lambda = log P_R(x*) - log pi(x*)`` and
+``confirmation = sigmoid(logit P_R(x*) - logit pi(x*))``,
 with ``x*`` the committed world (verdict polarity by default: ``x*_i = 1`` iff
 ``pi_i >= 1/2``). Its defining property (docs/arr2027/coherence, Thm. 1) is strict
 monotonicity under every coherence-improving edit -- add/strengthen a support,
@@ -148,7 +149,10 @@ def test_matches_independent_enumeration(scorer):
         lam, score = _lam(scorer, rels, priors)
         ref = _reference_lambda(rels, priors)
         assert lam == pytest.approx(ref, abs=1e-9)
-        assert score == pytest.approx(1 / (1 + math.exp(-ref / len(priors))))
+        u0 = 0.5 ** len(priors)  # flat MRF priors
+        u = u0 * math.exp(ref)
+        w = math.log(u / (1 - u)) - math.log(u0 / (1 - u0))
+        assert score == pytest.approx(1 / (1 + math.exp(-w)))
 
 
 def test_verdict_polarity_flips_signs(scorer):
@@ -284,3 +288,14 @@ def test_uniform_priors_do_not_collapse_under_certain_verdicts(monkeypatch):
     assert vg == pytest.approx(_reference_lambda(good, priors, mrf_priors=priors), abs=1e-9)
     with pytest.raises(ValueError):
         LCSScorer("/fake/merlin", confirmation_priors="bogus")
+
+
+def test_score_range_is_zero_to_one(scorer):
+    """1/2 neutral, -> 1 when the relations force x*, -> 0 when they rule it out."""
+    priors = {"a0": 0.5, "a1": 0.5, "a2": 0.5}
+    pairs = [("a0", "a1"), ("a0", "a2"), ("a1", "a2")]
+    force = [(s, t, ty, 1 - 1e-6) for s, t in pairs for ty in ("equivalence", "co_necessity")]
+    rule_out = [(s, t, "contradiction", 1 - 1e-6) for s, t in pairs]
+    assert _lam(scorer, [], priors)[1] == 0.5
+    assert _lam(scorer, force, priors)[1] > 0.999
+    assert _lam(scorer, rule_out, priors)[1] < 1e-3

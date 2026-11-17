@@ -195,8 +195,21 @@ def sigmoid(x):
     return 1 / (1 + math.exp(-x)) if x >= 0 else math.exp(x) / (1 + math.exp(x))
 
 
+def odds_lcs(lam, log_u0):
+    """LCS = sigmoid(logit u - logit u0), u = P_R(x*) = u0 * exp(Lambda), u0 = pi(x*)."""
+    log_u = min(log_u0 + lam, -1e-15)
+    def logit(a):  # logit of exp(a), a < 0
+        return a - (math.log(-math.expm1(a)) if a > -0.6931 else math.log1p(-math.exp(a)))
+    return sigmoid(logit(log_u) - logit(min(log_u0, -1e-15)))
+
+
+def lcs_flat(lam, n):
+    """LCS under flat MRF priors, where pi(x*) = 2^-n for every x*."""
+    return odds_lcs(lam, -n * math.log(2))
+
+
 def lcs(pri, rels):
-    return sigmoid(confirmation(pri, rels) / len(pri))
+    return lcs_flat(confirmation(pri, rels), len(pri))
 
 
 # ---------------------------------------------------------------------------
@@ -584,8 +597,8 @@ def theory(seed=0):
     for k in range(1, 7):
         e = 1 + 0.25 * ((1.9) ** k - 1)
         out["pad_balanced"].append(e / (1 + e))  # sigma(2 log E / n), n = 2
-        out["pad_lcs"].append(sigmoid(confirmation(np.array([0.5, 0.5]),
-                                                   [(0, 1, "equivalence", 0.9)] * k) / 2))
+        out["pad_lcs"].append(lcs_flat(confirmation(np.array([0.5, 0.5]),
+                                                    [(0, 1, "equivalence", 0.9)] * k), 2))
 
     # Worked example: three claims, uniform priors.
     #   a1 => a2 (entailment, 0.9), a2 => a3 (entailment, 0.9), a1 -x- a3 (contradiction, 0.8)
@@ -599,7 +612,7 @@ def theory(seed=0):
         lam = confirmation(pri, rels)
         X = World.grid(3)
         lz = logsumexp(log_prior_mass(X, pri) + penalty_logpot(X, rels))
-        ex[name] = {"lambda": lam, "lcs": sigmoid(lam / 3), "log_z": lz,
+        ex[name] = {"lambda": lam, "lcs": lcs_flat(lam, 3), "log_z": lz,
                     "p_asserted": math.exp(lam) * 0.125,
                     "marginals": [float(v) for v in marginals(pri, rels)]}
     out["worked"] = ex
@@ -666,8 +679,8 @@ def voyager():
         lam = confirmation(pu, rels, xv)
         lam_a = confirmation(pu, rels)
         res[name] = {
-            "lambda": lam, "lcs": sigmoid(lam / 5),
-            "lambda_assert": lam_a, "lcs_assert": sigmoid(lam_a / 5),
+            "lambda": lam, "lcs": lcs_flat(lam, 5),
+            "lambda_assert": lam_a, "lcs_assert": lcs_flat(lam_a, 5),
             "mm_earlier": float(marginals(pri, rels, withpriors_logpot).mean()),
             "marg_earlier": [float(v) for v in marginals(pri, rels, withpriors_logpot)],
             "delta": [lam - confirmation(pu, rels[:k] + rels[k + 1:], xv)
@@ -759,8 +772,8 @@ def ladders():
                 assert abs(cached[k] - old[k]) < 2e-5, (path, k, cached[k], old[k])
         key = (arm, rec["family_id"], rec["rung_index"])
         rows[key] = {
-            "lambda": lam, "lcs": sigmoid(lam / len(pri)),
-            "lambda_assert": lam_a, "lcs_assert": sigmoid(lam_a / len(pri)),
+            "lambda": lam, "lcs": lcs_flat(lam, len(pri)),
+            "lambda_assert": lam_a, "lcs_assert": lcs_flat(lam_a, len(pri)),
             "mean_marginal": old["mean_marginal"], "log_partition": old["log_partition"],
             "conflict_escape": old["conflict_escape"], "balanced": old["balanced"],
             "n": len(pri), "num_relations": len(rels),
@@ -969,6 +982,9 @@ def write_macros(path, th, res, dom, spread, gold_ladders, st):
             m(f"vy{nm}S{_alpha(str(k))}", "support" if sg == "S" else "conflict")
             m(f"vy{nm}DRaw{_alpha(str(k))}", f"{d:.4f}")
     m("vyBMargThree", f"{vy['B']['marg_earlier'][2]:.3f}")
+    for nm in ("A", "B"):
+        l = vy[nm]["lcs"]
+        m(f"vy{nm}W", f"{math.log(l / (1 - l)):.4f}")
     for nm in ("A", "B"):
         mr = vy[f"{nm}_mrf"]
         m(f"vy{nm}Z", f"{mr['Z']:.3f}")
