@@ -167,10 +167,9 @@
 #   * "asserted" -- x* = 1: every claim taken as the response asserts it.
 # An explicit {atom_id: 0/1} mapping may also be passed to score/score_all.
 #
-# The MRF's own priors are UNIFORM by default (``confirmation_priors="uniform"``): the
-# factuality stage fixes x* but does not set the priors, because near-certain priors
-# leave nothing to confirm (Lambda -> 0 as priors -> 0/1 at x*, for every graph).
-# ``confirmation_priors="verdict"`` uses the resolved priors instead.
+# The MRF's own priors follow ``confirmation_priors`` (default "auto"): factuality
+# posteriors strictly inside (0, 1) are used as priors, hard 0/1 labels and absent
+# evidence give the flat prior 1/2 (see CONFIRMATION_PRIORS below).
 #
 # With uniform node priors both sources give x* = 1. P_R is the coherence MRF with
 # SIGN-DEFINITE (penalty-only)
@@ -286,13 +285,21 @@ DEFAULT_BALANCED_SCALE = 2.0
 POLARITIES = ("verdict", "asserted")
 DEFAULT_POLARITY = "verdict"
 
-# Which priors readout (g)'s MRF uses. "uniform" (default): every claim at 1/2, so the
-# factuality stage enters only through the committed world x*. "verdict": the resolved
-# per-atom priors themselves (e.g. factuality posteriors). The two are kept apart because
-# near-certain priors leave the relations no belief to move: as priors tend to 0/1 at
-# x*, Lambda -> 0 for EVERY relation graph (see docs/arr2027/coherence).
-CONFIRMATION_PRIORS = ("uniform", "verdict")
-DEFAULT_CONFIRMATION_PRIORS = "uniform"
+# Which priors readout (g)'s MRF uses (docs/arr2027/coherence, Sec. 2.2 and App. I):
+#   * "auto" (default): per atom, a resolved prior strictly inside (0, 1) is read as a
+#     factuality POSTERIOR and used as the MRF prior; a hard label (exactly 0 or 1)
+#     carries no confidence and gets the flat prior 1/2. So a probabilistic pipeline
+#     (FactReasoner) feeds its posteriors in, a label-only one (FActScore) gets flat
+#     priors, and coherence-only scoring (resolved priors all 1/2) stays flat.
+#   * "uniform": every atom at 1/2, whatever the pipeline returned.
+#   * "posterior": every resolved prior, clipped into [PROB_EPS, 1 - PROB_EPS].
+# In every mode x* comes from the resolved priors (or an explicit polarity), and the
+# monotonicity theorem holds for any priors in (0, 1). Confident posteriors drive
+# Lambda -> 0 but leave the headline score (a weight of evidence) informative.
+CONFIRMATION_PRIORS = ("auto", "uniform", "posterior")
+DEFAULT_CONFIRMATION_PRIORS = "auto"
+# Accepted for backward compatibility; maps to "posterior".
+_CONFIRMATION_PRIOR_ALIASES = {"verdict": "posterior"}
 
 # The headline ``score`` reports when no ``method`` is given.
 DEFAULT_LCS_METHOD = "balanced"
@@ -366,6 +373,9 @@ class LCSScorer:
                 f"Unknown polarity {polarity!r} (expected one of {list(POLARITIES)})."
             )
         self.polarity = polarity
+        confirmation_priors = _CONFIRMATION_PRIOR_ALIASES.get(
+            confirmation_priors, confirmation_priors
+        )
         if confirmation_priors not in CONFIRMATION_PRIORS:
             raise ValueError(
                 f"Unknown confirmation_priors {confirmation_priors!r} "
@@ -524,6 +534,7 @@ class LCSScorer:
             "confirmation": None,
             "log_confirmation": None,
             "committed_world": None,
+            "confirmation_mrf_priors": None,
             "marginals": {},
             "num_atoms": n,
             "num_below_prior": 0,
@@ -590,6 +601,7 @@ class LCSScorer:
         if "confirmation" in methods:
             x_star = self._committed_world(result, priors, polarity)
             out["committed_world"] = x_star
+            out["confirmation_mrf_priors"] = self._confirmation_mrf_priors(result, priors)
             out["confirmation"], out["log_confirmation"] = self._confirmation(
                 result, priors, x_star
             )
@@ -1045,12 +1057,10 @@ class LCSScorer:
         if n == 0:
             return None, None
         network = MarkovNetwork()
+        mrf_priors = self._confirmation_mrf_priors(result, priors)
         log_prior_x = 0.0  # log pi(x*) under the MRF's own priors
         for aid in sorted(result.atoms, key=_atom_sort_key):
-            if self.confirmation_priors == "uniform":
-                pi = 0.5
-            else:
-                pi = min(1.0 - PROB_EPS, max(PROB_EPS, float(priors.get(aid, 0.5))))
+            pi = mrf_priors[aid]
             network.add_node(aid)
             network.add_factor([aid], [2], [1.0 - pi, pi])
             log_prior_x += math.log(pi if x_star.get(aid, 1) else 1.0 - pi)
@@ -1073,6 +1083,27 @@ class LCSScorer:
             return None, None
         lam = log_asserted - log_z
         return _odds_score(log_prior_x + lam, log_prior_x), lam
+
+    def _confirmation_mrf_priors(
+        self, result: MiningResult, priors: dict[str, float]
+    ) -> dict[str, float]:
+        """The unary priors of readout (g)'s MRF, per ``confirmation_priors``.
+
+        ``"auto"`` uses a resolved prior strictly inside (0, 1) as a factuality
+        posterior and gives a hard 0/1 label the flat prior 1/2; ``"uniform"`` is
+        1/2 throughout; ``"posterior"`` clips every resolved prior into
+        ``[PROB_EPS, 1 - PROB_EPS]``.
+        """
+        out: dict[str, float] = {}
+        for aid in result.atoms:
+            v = float(priors.get(aid, 0.5))
+            if self.confirmation_priors == "uniform" or (
+                self.confirmation_priors == "auto" and v in (0.0, 1.0)
+            ):
+                out[aid] = 0.5
+            else:
+                out[aid] = min(1.0 - PROB_EPS, max(PROB_EPS, v))
+        return out
 
     def _node_priors(
         self,

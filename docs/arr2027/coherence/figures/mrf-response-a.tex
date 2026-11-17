@@ -7,16 +7,16 @@
   \node[atomtrue]  (a1) at (0,0)       {$a_1$};
   \node[atomtrue]  (a2) at (1.2,0)     {$a_2$};
   \node[atomtrue]  (a3) at (2.4,0)     {$a_3$};
-  \node[atomfalse] (a4) at (1.8,-1.4)  {$a_4$};
+  \node[atomfalse] (a4) at (1.2,-1.4)  {$a_4$};
   \node[atomfalse] (a5) at (3.0,-1.4)  {$a_5$};
   \foreach \v/\x/\y/\lab in {a1/0/0.85/$\phi_1$, a2/1.2/0.85/$\phi_2$, a3/2.4/0.85/$\phi_3$,
-                              a4/1.8/-2.25/$\phi_4$, a5/3.0/-2.25/$\phi_5$}{
+                              a4/1.2/-2.25/$\phi_4$, a5/3.0/-2.25/$\phi_5$}{
     \node[unary] (u\v) at (\x,\y) {}; \draw[flink] (u\v) -- (\v);
     \node[prlab,left=0.5mm of u\v] {\lab};
   }
   \node[factor] (f1) at (0.6,0)     {}; \draw[flink] (a1) -- (f1) -- (a2);
   \node[factor] (f2) at (1.8,0)     {}; \draw[flink] (a2) -- (f2) -- (a3);
-  \node[factor] (f3) at (2.1,-0.7)  {}; \draw[flink] (a3) -- (f3) -- (a4);
+  \node[factor] (f3) at (1.2,-0.7)  {}; \draw[flink] (a2) -- (f3) -- (a4);
   \node[factor] (f4) at (2.7,-0.7)  {}; \draw[flink] (a3) -- (f4) -- (a5);
   \node[prlab,above=0.4mm of f1] {$\psi_1$};
   \node[prlab,above=0.4mm of f2] {$\psi_2$};
@@ -35,7 +35,7 @@ $\phi_{1,\dots,5}$ & $a_i$ & prior $\frac12$ & \multicolumn{4}{c}{$a_i{=}0$: $\f
 \midrule
 $\psi_1$ & $(a_1,a_2)$ & \ent, $p{=}.90$ & $1$ & $1$ & $\mathbf{.10}$ & $1$ \\
 $\psi_2$ & $(a_2,a_3)$ & \ent, $p{=}.85$ & $1$ & $1$ & $\mathbf{.15}$ & $1$ \\
-$\psi_3$ & $(a_3,a_4)$ & \con, $p{=}.90$ & $1$ & $1$ & $1$ & $\mathbf{.10}$ \\
+$\psi_3$ & $(a_2,a_4)$ & \con, $p{=}.90$ & $1$ & $1$ & $1$ & $\mathbf{.10}$ \\
 $\psi_4$ & $(a_3,a_5)$ & \con, $p{=}.85$ & $1$ & $1$ & $1$ & $\mathbf{.15}$ \\
 \bottomrule
 \end{tabular}

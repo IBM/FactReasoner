@@ -239,7 +239,10 @@ def old_readouts(ids, priors, relations):
     import contextlib
     import io
     with contextlib.redirect_stdout(io.StringIO()):
-        s = mod.LCSScorer("/oracle").score_all(
+        # The corpus stores its factuality LABELS as priors 0.9/0.1, so the paper's
+        # flat-prior score needs confirmation_priors="uniform" explicitly ("auto"
+        # would read 0.9/0.1 as posteriors).
+        s = mod.LCSScorer("/oracle", confirmation_priors="uniform").score_all(
             res,
             methods=("mean_marginal", "log_partition", "conflict_escape", "balanced",
                      "confirmation"),
@@ -421,14 +424,16 @@ def theory(seed=0):
     out["nec_trials"] = nec_trials
     out["nec_ok"] = nec_ok
 
-    # Degeneracy of q-derived priors (Voyager, verdict x*): as priors -> 0/1 at x*,
-    # Lambda -> 0 for every graph; uniform priors keep the gap.
+    # Posteriors as priors (Voyager, verdict x*): as priors -> 0/1 at x*, Lambda -> 0
+    # for every graph, but LCS (a weight of evidence) tends to a non-trivial limit.
     xv5 = np.array([1, 1, 1, 0, 0])
     out["degen"] = []
     for e in (0.1, 0.01, 0.001):
         pe = np.array([1 - e] * 3 + [e] * 2)
-        out["degen"].append((e, confirmation(pe, VOYAGER["A"], xv5),
-                             confirmation(pe, VOYAGER["B"], xv5)))
+        la = confirmation(pe, VOYAGER["A"], xv5)
+        lb = confirmation(pe, VOYAGER["B"], xv5)
+        lu0 = 5 * math.log(1 - e)  # log pi(x*)
+        out["degen"].append((e, la, lb, odds_lcs(la, lu0), odds_lcs(lb, lu0)))
 
     out["thm_sequences"] = seqs
     out["thm_steps"] = steps
@@ -617,8 +622,8 @@ def theory(seed=0):
                     "marginals": [float(v) for v in marginals(pri, rels)]}
     out["worked"] = ex
 
-    # Voyager pair (data/lcs/example-7-coherence-pair.json; ICLR worked example):
-    # same five claims, priors 0.9/0.9/0.9/0.1/0.1, two relation graphs.
+    # Voyager pair (Fig. fig:voyager): same five claims with the same stance (a1-a3
+    # asserted, a4-a5 rejected), verdicts 1/1/1/0/0, two relation graphs.
     out["voyager"] = voyager()
 
     # Edit identity on the worked example: gain of adding the conflict to the chain.
@@ -633,34 +638,29 @@ def theory(seed=0):
 
 
 VOYAGER_PRIORS = [0.9, 0.9, 0.9, 0.1, 0.1]
+# The paper's own pair (App. app:voyager). Both responses assert a1-a3 and reject
+# a4-a5 as misconceptions, so a stance-aware decomposer extracts the same claims and
+# verdicts from both; they differ only in the relations they draw.
+#   A: a1 => a2 (Cause-Effect), a2 => a3 (Evidence), a2 con a4 and a3 con a5
+#      (Refutation): a supported chain that refutes both falsehoods.
+#   B: a1 => a2 (Cause-Effect), a2 con a3 (Refutation: sets two truths against each
+#      other), a1 => a4 (Condition: derives a falsehood from a truth), a3 con a5.
 VOYAGER = {
     "A": [(0, 1, "entailment", 0.90), (1, 2, "entailment", 0.85),
-          (2, 3, "contradiction", 0.90), (2, 4, "contradiction", 0.85)],
+          (1, 3, "contradiction", 0.90), (2, 4, "contradiction", 0.85)],
     "B": [(0, 1, "entailment", 0.90), (1, 2, "contradiction", 0.90),
-          (3, 2, "entailment", 0.88), (3, 4, "entailment", 0.85),
-          (0, 3, "contradiction", 0.90), (1, 4, "contradiction", 0.88)],
+          (0, 3, "entailment", 0.85), (2, 4, "contradiction", 0.85)],
 }
 
 
 def voyager():
     """The five-claim Voyager 1 pair under Lambda, with per-relation contributions."""
     pri = np.array(VOYAGER_PRIORS)
-    path = os.path.join(REPO, "data", "lcs", "example-7-coherence-pair.json")
-    ex = json.load(open(path))
-    # Cross-check the transcription against the fixture's own gold relations, and
-    # the earlier mean marginal against the fixture's recorded expectation.
-    for name in ("A", "B"):
-        resp = ex["responses"][name]
-        got = sorted((int(r["source"][1:]), int(r["target"][1:]), r["coupling"],
-                      round(float(r["p"]), 2)) for r in resp["gold_relations"])
-        want = sorted((s_, t_, ty, round(p_, 2)) for s_, t_, ty, p_ in VOYAGER[name])
-        assert got == want, (name, got, want)
-        mm = float(marginals(pri, VOYAGER[name], withpriors_logpot).mean())
-        assert abs(mm - resp["expected"]["mean_marginal"]) < 1e-4, (name, mm)
     res = {}
     xv = verdict(pri)  # (1,1,1,0,0): the factuality verdicts
-    # The MRF's priors are uniform (scorer default confirmation_priors="uniform"): the
-    # verdicts fix x* only. The earlier model's mean marginal keeps its 0.9/0.1 priors.
+    # The Voyager claims carry labels only, so the MRF's priors are flat (what the
+    # scorer's default confirmation_priors="auto" does for hard labels): the verdicts
+    # fix x* only. The earlier model's mean marginal keeps its 0.9/0.1 priors.
     pu = np.full(len(pri), 0.5)
     # Response A's MRF in numbers: partition function, prior and posterior of x*, and
     # the most probable world, for the worked MRF of Sec. sec:mrf.
@@ -995,9 +995,11 @@ def write_macros(path, th, res, dom, spread, gold_ladders, st):
         m(f"vy{nm}Count", f"{vy[nm]['count']:.2f}")
         m(f"vy{nm}Avg", f"{vy[nm]['count'] / len(VOYAGER[nm]):.3f}")
     m("necTrials", f"{th['nec_trials']:,}".replace(",", "{,}"))
-    for k, (e, a, b) in enumerate(th["degen"], 1):
+    for k, (e, a, b, la, lb) in enumerate(th["degen"], 1):
         m(f"degA{_alpha(str(k))}", f"{a:+.3f}")
         m(f"degB{_alpha(str(k))}", f"{b:+.3f}")
+        m(f"degALCS{_alpha(str(k))}", f"{la:.3f}")
+        m(f"degBLCS{_alpha(str(k))}", f"{lb:.3f}")
     m("necOk", f"{th['nec_ok']:,}".replace(",", "{,}"))
     m("xsSteps", f"{th['xstar_steps']:,}".replace(",", "{,}"))
     m("xsFalls", th["xstar_falls"])

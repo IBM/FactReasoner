@@ -16,8 +16,9 @@
 """The confirmation readout (g): the committed world under a sign-definite MRF.
 
 ``Lambda = log P_R(x*) - log pi(x*)`` and
-``confirmation = sigmoid(logit P_R(x*) - logit pi(x*))``,
-with ``x*`` the committed world (verdict polarity by default: ``x*_i = 1`` iff
+``confirmation = sigmoid(logit P_R(x*) - logit pi(x*))``. The MRF's priors default
+to "auto": factuality posteriors are used, hard 0/1 labels give flat priors.
+``x*`` is the committed world (verdict polarity by default: ``x*_i = 1`` iff
 ``pi_i >= 1/2``). Its defining property (docs/arr2027/coherence, Thm. 1) is strict
 monotonicity under every coherence-improving edit -- add/strengthen a support,
 delete/weaken a conflict, both relative to ``x*`` -- for any priors and any other
@@ -94,16 +95,22 @@ def _is_support(rel, x):
     return (x[s], x[t]) not in VIOLATED[ty]
 
 
+def _auto_priors(priors):
+    """The scorer's default ``confirmation_priors="auto"``: posteriors strictly
+    inside (0, 1) are kept, hard 0/1 labels become the flat prior 1/2."""
+    return {a: 0.5 if pi in (0.0, 1.0) else pi for a, pi in priors.items()}
+
+
 def _reference_lambda(relations, priors, x=None, mrf_priors=None):
     """Independent enumeration of log P_R(x*) - log pi(x*).
 
     x* defaults to the verdict of ``priors``; the MRF's own priors default to
-    uniform (the scorer's ``confirmation_priors="uniform"``).
+    the scorer's ``"auto"`` rule applied to ``priors``.
     """
     if x is None:
         x = _verdict(priors)
     if mrf_priors is None:
-        mrf_priors = {a: 0.5 for a in priors}
+        mrf_priors = _auto_priors(priors)
     priors = mrf_priors
     ids = list(priors)
     idx = {a: i for i, a in enumerate(ids)}
@@ -149,7 +156,8 @@ def test_matches_independent_enumeration(scorer):
         lam, score = _lam(scorer, rels, priors)
         ref = _reference_lambda(rels, priors)
         assert lam == pytest.approx(ref, abs=1e-9)
-        u0 = 0.5 ** len(priors)  # flat MRF priors
+        x = _verdict(priors)
+        u0 = math.prod(pi if x[a] else 1 - pi for a, pi in priors.items())
         u = u0 * math.exp(ref)
         w = math.log(u / (1 - u)) - math.log(u0 / (1 - u0))
         assert score == pytest.approx(1 / (1 + math.exp(-w)))
@@ -237,7 +245,7 @@ def test_edit_identity(scorer):
     num = den = 0.0
     for x in itertools.product((0, 1), repeat=3):
         w = {a: v for a, v in zip(ids, x)}
-        m = 0.5 ** len(ids)  # the MRF's priors are uniform by default
+        m = math.prod(pi if w[a] else 1 - pi for a, pi in priors.items())
         for s, t, ty, p in base:
             if (w[s], w[t]) in VIOLATED[ty]:
                 m *= 1 - p
@@ -270,22 +278,55 @@ def test_symmetric_reversal_and_ordering_only_are_invariant(scorer):
     assert _lam(scorer, a, priors)[0] == pytest.approx(_lam(scorer, b, priors)[0])
 
 
-def test_uniform_priors_do_not_collapse_under_certain_verdicts(monkeypatch):
-    """Near-certain verdicts fix x* but, with the default uniform MRF priors, leave
-    the score informative; using them as priors makes Lambda vanish."""
+def test_auto_priors_use_posteriors_and_flatten_labels(monkeypatch):
+    """Default "auto": interior posteriors become the MRF priors; hard 0/1 labels
+    (a label-only pipeline) give the flat prior, as does "uniform"."""
+    monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
+    rels = [("a0", "a1", "entailment", 0.9), ("a1", "a2", "contradiction", 0.8)]
+    post = {"a0": 0.8, "a1": 0.7, "a2": 0.2}
+    labels = {"a0": 1.0, "a1": 1.0, "a2": 0.0}
+    auto = LCSScorer("/fake/merlin")
+    uni = LCSScorer("/fake/merlin", confirmation_priors="uniform")
+    out = auto.score(_result(rels, post), method="confirmation")
+    assert out["confirmation_mrf_priors"] == post
+    assert out["log_confirmation"] == pytest.approx(
+        _reference_lambda(rels, post, mrf_priors=post), abs=1e-9
+    )
+    lab = auto.score(_result(rels, labels), method="confirmation")
+    assert lab["committed_world"] == {"a0": 1, "a1": 1, "a2": 0}
+    assert lab["confirmation_mrf_priors"] == {"a0": 0.5, "a1": 0.5, "a2": 0.5}
+    flat = uni.score(_result(rels, post), method="confirmation")
+    assert lab["confirmation"] == pytest.approx(flat["confirmation"])
+    assert flat["log_confirmation"] == pytest.approx(
+        _reference_lambda(rels, post, mrf_priors={a: 0.5 for a in post}), abs=1e-9
+    )
+
+
+def test_confident_posteriors_vanish_lambda_but_not_the_score(monkeypatch):
+    """Near-certain posteriors as priors drive Lambda -> 0 for every graph, but the
+    headline score (a weight of evidence) still separates good from bad."""
     monkeypatch.setattr(lcs_scorer_mod, "run_merlin", _brute_force_run_merlin)
     priors = {"a0": 1 - 1e-6, "a1": 1 - 1e-6, "a2": 1e-6}
     good = [("a0", "a1", "entailment", 0.9), ("a1", "a2", "contradiction", 0.9)]
     bad = [("a0", "a1", "contradiction", 0.9), ("a0", "a2", "entailment", 0.9)]
-    uni = LCSScorer("/fake/merlin")
+    post = LCSScorer("/fake/merlin", confirmation_priors="posterior")
+    g = post.score(_result(good, priors), method="confirmation")
+    b = post.score(_result(bad, priors), method="confirmation")
+    assert abs(g["log_confirmation"]) < 1e-3 and abs(b["log_confirmation"]) < 1e-3
+    assert g["confirmation"] - b["confirmation"] > 0.3
+    assert g["log_confirmation"] == pytest.approx(
+        _reference_lambda(good, priors, mrf_priors=priors), abs=1e-9
+    )
+    uni = LCSScorer("/fake/merlin", confirmation_priors="uniform")
     lg = uni.score(_result(good, priors), method="confirmation")["log_confirmation"]
     lb = uni.score(_result(bad, priors), method="confirmation")["log_confirmation"]
     assert lg - lb > 1.0
-    ver = LCSScorer("/fake/merlin", confirmation_priors="verdict")
-    vg = ver.score(_result(good, priors), method="confirmation")["log_confirmation"]
-    vb = ver.score(_result(bad, priors), method="confirmation")["log_confirmation"]
-    assert abs(vg) < 1e-3 and abs(vb) < 1e-3  # O(eps): nothing left to confirm
-    assert vg == pytest.approx(_reference_lambda(good, priors, mrf_priors=priors), abs=1e-9)
+
+
+def test_confirmation_priors_option_validation():
+    assert LCSScorer("/fake/merlin").confirmation_priors == "auto"
+    legacy = LCSScorer("/fake/merlin", confirmation_priors="verdict")
+    assert legacy.confirmation_priors == "posterior"
     with pytest.raises(ValueError):
         LCSScorer("/fake/merlin", confirmation_priors="bogus")
 

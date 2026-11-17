@@ -1,12 +1,6 @@
-% ---------------------------------------------------------------------------
-% The Voyager 1 worked pair (Sec. sec:voyager), modelled on the ICLR motivating
-% figure and rescored with the committed-world score. Compact (~1/2 page): per
-% response, an abridged text, its relation graph and its per-relation
-% contributions Delta_r; one score line below. The full responses are in
-% App. app:voyager; the reading of the figure is in Secs. sec:voyager and sec:score.
-% Relations transcribe data/lcs/example-7-coherence-pair.json; every number is a
-% macro from numbers.tex (scripts/arr_coherence_eval.py, exact enumeration).
-% ---------------------------------------------------------------------------
+% The Voyager 1 worked pair (Sec. sec:voyager). Per response: an abridged text, its
+% relation graph and its per-relation contributions Delta_r; one score line below.
+% The full responses are in App. app:voyager. Every number is a macro from numbers.tex.
 \begin{figure*}[t]
 \centering
 \footnotesize
@@ -14,120 +8,12 @@
 \newcommand{\mtvy}{9.2mm}
 \newcommand{\mtvbox}{21mm}
 \newcommand{\dscale}{12}
-
-{\scriptsize\textbf{Query}\ \ \emph{Where is Voyager~1 now, and has it left the Solar System?}}
-
-\smallskip
-\noindent
-%% ===== Response A ========================================================
-\begin{minipage}[t]{0.495\textwidth}\centering
-  \colorbox{blue!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
-  \textbf{\textcolor{blue!55!black}{Response A}}\\[1pt]
-  \scriptsize
-  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and its instruments then
-  measured a sharp rise in plasma density\,\claimref{2} --- \emph{the measurement that
-  established the boundary had been passed.} Voyager~1 is \emph{therefore} in interstellar
-  space.\,\claimref{3} \emph{One misconception is that} the plasma wave instrument had failed
-  before the crossing;\,\claimref{4} \emph{it cannot have, since that instrument returned the
-  density profile.} \emph{Another is that} it has left the Solar System;\,\claimref{5}
-  \emph{being in interstellar space is not the same thing.}\strut}}
-
-  \smallskip
-  \begin{tikzpicture}[x=\mtvx, y=\mtvy]
-    \node[atomtrue]  (a1) at (0,0)        {$a_1$};
-    \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
-    \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
-    \node[atomfalse] (a4) at (1.7,-1.5)   {$a_4$};
-    \node[atomfalse] (a5) at (2.9,-1.5)   {$a_5$};
-    \node[prlab,above=0.3mm of a1] {$\xs{=}1$};
-    \node[prlab,above=0.3mm of a2] {$\xs{=}1$};
-    \node[prlab,above=0.3mm of a3] {$\xs{=}1$};
-    \node[prlab,below=0.3mm of a4] {$\xs{=}0$};
-    \node[prlab,below=0.3mm of a5] {$\xs{=}0$};
-    \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
-    \draw[ent,relw=0.85] (a2) -- (a3) node[wlab,above]{$.85$};
-    \draw[con,relw=0.90] (a3) -- (a4) node[wlab,left,pos=0.5]{$.90$};
-    \draw[con,relw=0.85] (a3) -- (a5) node[wlab,right,pos=0.5]{$.85$};
-    \path (-0.5,-2.25) -- (3.6,0.75);
-  \end{tikzpicture}
-
+% #1 zero-axis x (mm); #2 list i/label/value/negative-flag
+\newcommand{\dbars}[2]{%
   \begin{tikzpicture}[x=1mm, y=1mm]
-    \def\zx{34}\def\rh{3.4}
+    \def\zx{#1}\def\rh{3.4}
     \node[font=\scriptsize\bfseries,anchor=west] at (0,2.6) {$\Delta_r$ (change in $\Lambda$)};
-    \foreach \i/\lab/\v in {%
-        1/{$a_1\Rightarrow a_2$}/\vyADRawOne,
-        2/{$a_2\Rightarrow a_3$}/\vyADRawTwo,
-        3/{$a_3\ \con\ a_4$}/\vyADRawThree,
-        4/{$a_3\ \con\ a_5$}/\vyADRawFour}
-    {
-      \pgfmathsetmacro{\y}{-\i*\rh}
-      \pgfmathsetmacro{\w}{\v*\dscale}
-      \node[anchor=west,font=\scriptsize] at (0,\y) {\lab};
-      \fill[blue!35!white,draw=blue!55!black,line width=0.3pt]
-           (\zx,\y-1.1) rectangle (\zx+\w,\y+1.1);
-      \node[anchor=west,font=\tiny] at (\zx+\w+0.8,\y)
-           {$+\pgfmathprintnumber[fixed,fixed zerofill,precision=2]{\v}$};
-    }
-    \draw[black!60,line width=0.4pt] (\zx,-0.8) -- (\zx,-6*\rh-1.6);
-    \path (0,-6*\rh-1.6) -- (60,-6*\rh-1.6);
-  \end{tikzpicture}
-\end{minipage}\hfill
-%% ===== Response B ========================================================
-\begin{minipage}[t]{0.495\textwidth}\centering
-  \colorbox{red!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
-  \textbf{\textcolor{red!60!black}{Response B}}\\[1pt]
-  \scriptsize
-  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and its instruments then
-  measured a sharp rise in plasma density.\,\claimref{2} \emph{That said, the probe cannot
-  really be counted as being in interstellar space.}\,\claimref{3} The plasma wave instrument
-  had in fact failed before the crossing,\,\claimref{4} \emph{and that failure tells us the
-  probe reached interstellar space;} \emph{it also means} Voyager~1 has left the Solar
-  System.\,\claimref{5} \emph{Of course, the crossing rules out any such failure, and the
-  density rise rules out having left.}\strut}}
-
-  \smallskip
-  \begin{tikzpicture}[x=\mtvx, y=\mtvy]
-    \node[atomtrue]  (a1) at (0,0)        {$a_1$};
-    \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
-    \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
-    \node[atomfalse] (a4) at (0.55,-1.5)  {$a_4$};
-    \node[atomfalse] (a5) at (1.75,-1.5)  {$a_5$};
-    \node[prlab,above=0.3mm of a1] {$\xs{=}1$};
-    \node[prlab,above=0.3mm of a2] {$\xs{=}1$};
-    \node[prlab,above=0.3mm of a3] {$\xs{=}1$};
-    \node[prlab,left=0.4mm of a4]  {$\xs{=}0$};
-    \node[prlab,right=0.4mm of a5] {$\xs{=}0$};
-    \draw[ent,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
-    \draw[con,relw=0.90] (a2) -- (a3) node[wlab,above]{$.90$};
-    \draw[ent,relw=0.88] (a4) -- (a3)
-          node[wlab,above left=-0.4mm and -1.0mm,pos=0.30]{$.88$};
-    \draw[con,relw=0.90] (a1) -- (a4) node[wlab,left,pos=0.55]{$.90$};
-    \draw[ent,relw=0.85] (a4) -- (a5) node[wlab,below]{$.85$};
-    \draw[con,relw=0.88] (a2) to[out=-8,in=25]
-          node[wlab,right,pos=0.55,inner sep=1pt]{$.88$} (a5);
-    \node[chgnum] (n1) at (3.0,-0.35) {1};
-    \draw[chglead] (n1) -- (1.85,-0.06);
-    \node[chglab,anchor=west] at (3.12,-0.35) {denies a truth};
-    \begin{scope}[on background layer]
-      \node[chg,circle,minimum size=8.0mm,inner sep=0pt] at (0.55,-1.5) {};
-    \end{scope}
-    \node[chgnum] (n2) at (-0.45,-0.85) {2};
-    \draw[chglead] (n2) -- (0.25,-1.3);
-    \node[chglab,anchor=north,align=center] at (1.15,-2.0)
-         {premise from a falsehood};
-    \path (-0.5,-2.25) -- (3.6,0.75);
-  \end{tikzpicture}
-
-  \begin{tikzpicture}[x=1mm, y=1mm]
-    \def\zx{44}\def\rh{3.4}
-    \node[font=\scriptsize\bfseries,anchor=west] at (0,2.6) {$\Delta_r$ (change in $\Lambda$)};
-    \foreach \i/\lab/\v/\neg in {%
-        1/{$a_1\Rightarrow a_2$}/\vyBDRawOne/0,
-        2/{$a_2\ \con\ a_3$ \textcolor{orange!60!black}{\textbf{1}}}/\vyBDRawTwo/1,
-        3/{$a_4\Rightarrow a_3$ \textcolor{orange!60!black}{\textbf{2}}}/\vyBDRawThree/0,
-        4/{$a_4\Rightarrow a_5$}/\vyBDRawFour/0,
-        5/{$a_1\ \con\ a_4$}/\vyBDRawFive/0,
-        6/{$a_2\ \con\ a_5$}/\vyBDRawSix/0}
+    \foreach \i/\lab/\v/\neg in {#2}
     {
       \pgfmathsetmacro{\y}{-\i*\rh}
       \pgfmathsetmacro{\w}{\v*\dscale}
@@ -144,23 +30,110 @@
              {$+\pgfmathprintnumber[fixed,fixed zerofill,precision=2]{\v}$};
       \fi
     }
-    \draw[black!60,line width=0.4pt] (\zx,-0.8) -- (\zx,-6*\rh-1.6);
+    \draw[black!60,line width=0.4pt] (\zx,-0.8) -- (\zx,-4*\rh-1.6);
+    \path (0,-4*\rh-1.6) -- (62,-4*\rh-1.6);
+  \end{tikzpicture}}
+
+{\scriptsize\textbf{Query}\ \ \emph{Where is Voyager~1 now, and has it left the Solar System?}}
+
+\smallskip
+\noindent
+%% ===== Response A ========================================================
+\begin{minipage}[t]{0.495\textwidth}\centering
+  \colorbox{blue!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
+  \textbf{\textcolor{blue!55!black}{Response A}}\\[1pt]
+  \scriptsize
+  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and \emph{in consequence} its
+  instruments measured a sharp rise in plasma density\,\claimref{2} --- \emph{the measurement that
+  showed} Voyager~1 is in interstellar space.\,\claimref{3} \emph{One misconception is that} the
+  plasma wave instrument had failed before the crossing;\,\claimref{4} \emph{it cannot have, since
+  that instrument returned the density profile.} \emph{Another is that} it has left the Solar
+  System;\,\claimref{5} \emph{being in interstellar space rules that out}: it is still deep inside
+  the Oort cloud.\strut}}
+
+  \smallskip
+  \begin{tikzpicture}[x=\mtvx, y=\mtvy]
+    \node[atomtrue]  (a1) at (0,0)        {$a_1$};
+    \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
+    \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
+    \node[atomfalse] (a4) at (1.15,-1.5)  {$a_4$};
+    \node[atomfalse] (a5) at (2.3,-1.5)   {$a_5$};
+    \node[prlab,above=0.3mm of a1] {$\xs{=}1$};
+    \node[prlab,above=0.3mm of a2] {$\xs{=}1$};
+    \node[prlab,above=0.3mm of a3] {$\xs{=}1$};
+    \node[prlab,below=0.3mm of a4] {$\xs{=}0$};
+    \node[prlab,below=0.3mm of a5] {$\xs{=}0$};
+    \draw[ent,sup,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+    \draw[ent,sup,relw=0.85] (a2) -- (a3) node[wlab,above]{$.85$};
+    \draw[con,sup,relw=0.90] (a2) -- (a4) node[wlab,left]{$.90$};
+    \draw[con,sup,relw=0.85] (a3) -- (a5) node[wlab,right]{$.85$};
+    \path (-0.5,-2.25) -- (3.6,0.75);
   \end{tikzpicture}
+
+  \dbars{40}{%
+      1/{$a_1\Rightarrow a_2$}/\vyADRawOne/0,
+      2/{$a_2\Rightarrow a_3$}/\vyADRawTwo/0,
+      3/{$a_2\ \con\ a_4$}/\vyADRawThree/0,
+      4/{$a_3\ \con\ a_5$}/\vyADRawFour/0}
+\end{minipage}\hfill
+%% ===== Response B ========================================================
+\begin{minipage}[t]{0.495\textwidth}\centering
+  \colorbox{red!4}{\parbox[t][\mtvbox][t]{\dimexpr\linewidth-2\fboxsep\relax}{%
+  \textbf{\textcolor{red!60!black}{Response B}}\\[1pt]
+  \scriptsize
+  Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and \emph{in consequence} its
+  instruments measured a sharp rise in plasma density.\,\claimref{2} Voyager~1 is in interstellar
+  space,\,\claimref{3} \emph{although that density rise cannot be squared with its being there.}
+  \emph{The crossing could only have happened if} the plasma wave instrument had failed before
+  it,\,\claimref{4} a failure that is in fact a misconception. Nor has it left the Solar
+  System;\,\claimref{5} \emph{being in interstellar space rules that out}: it is still deep inside
+  the Oort cloud.\strut}}
+
+  \smallskip
+  \begin{tikzpicture}[x=\mtvx, y=\mtvy]
+    \node[atomtrue]  (a1) at (0,0)        {$a_1$};
+    \node[atomtrue]  (a2) at (1.15,0)     {$a_2$};
+    \node[atomtrue]  (a3) at (2.3,0)      {$a_3$};
+    \node[atomfalse] (a4) at (0,-1.5)     {$a_4$};
+    \node[atomfalse] (a5) at (2.3,-1.5)   {$a_5$};
+    \node[prlab,above=0.3mm of a1] {$\xs{=}1$};
+    \node[prlab,above=0.3mm of a2] {$\xs{=}1$};
+    \node[prlab,above=0.3mm of a3] {$\xs{=}1$};
+    \node[prlab,below=0.3mm of a4] {$\xs{=}0$};
+    \node[prlab,below=0.3mm of a5] {$\xs{=}0$};
+    \draw[ent,sup,relw=0.90] (a1) -- (a2) node[wlab,above]{$.90$};
+    \draw[con,cnf,relw=0.90] (a2) -- (a3) node[wlab,above]{$.90$};
+    \draw[ent,cnf,relw=0.85] (a1) -- (a4) node[wlab,right]{$.85$};
+    \draw[con,sup,relw=0.85] (a3) -- (a5) node[wlab,right]{$.85$};
+    \node[chgnum] (n1) at (1.75,-0.6) {1};
+    \draw[chglead] (n1) -- (1.75,-0.06);
+    \node[chglab,anchor=north,align=center] at (1.3,-0.82) {sets two truths\\against each other};
+    \node[chgnum] (n2) at (-0.4,-0.75) {2};
+    \draw[chglead] (n2) -- (-0.05,-0.75);
+    \node[chglab,anchor=north east,align=center] at (-0.25,-0.92) {derives a falsehood\\from a truth};
+    \path (-1.4,-2.25) -- (3.6,0.75);
+  \end{tikzpicture}
+
+  \dbars{40}{%
+      1/{$a_1\Rightarrow a_2$}/\vyBDRawOne/0,
+      2/{$a_2\ \con\ a_3$ \textcolor{orange!60!black}{\textbf{1}}}/\vyBDRawTwo/1,
+      3/{$a_1\Rightarrow a_4$ \textcolor{orange!60!black}{\textbf{2}}}/\vyBDRawThree/1,
+      4/{$a_3\ \con\ a_5$}/\vyBDRawFour/0}
 \end{minipage}
 
 \smallskip
 \noindent\rule{\textwidth}{0.4pt}\\[1pt]
-{\small\textbf{Logical coherence score} (verdict polarity):\quad
+{\small\textbf{Logical coherence score} (verdict polarity, Def.~\ref{def:score}):\quad
  A:\ $\LCS=\textcolor{blue!55!black}{\mathbf{\vyALCS}}$
- ($\Lambda=\vyALam$)
  \qquad$\longrightarrow$\qquad
- B:\ $\LCS=\textcolor{red!60!black}{\mathbf{\vyBLCS}}$
- ($\Lambda=\vyBLam$)}
+ B:\ $\LCS=\textcolor{red!60!black}{\mathbf{\vyBLCS}}$}
 
-\caption{\textbf{Two responses, the same five claims, different coherence.} Responses are
-  abridged (full text in App.~\ref{app:voyager}); each claim is labelled with its committed value
-  (blue true, red false). Graphs: solid blue \ent{}, dashed red \con{}, width growing with the
-  weight. Bars: each relation's leave-one-out contribution $\Delta_r$ to the log-ratio $\Lambda$ (\S\ref{sec:voyager},
-  \S\ref{sec:score}).}
+\caption{\textbf{Two responses, the same five claims and verdicts, different coherence.} Both
+  responses assert $a_1$--$a_3$ and reject $a_4,a_5$ as misconceptions; they differ only in the
+  relations they draw. Texts are abridged (full text in App.~\ref{app:voyager}). Nodes: committed
+  values (white true, grey false). Edges: solid arrows \ent{}, dashed lines \con{}, width growing
+  with the weight; colour is the sign at $\xs$, blue support and red conflict. Callouts mark B's
+  two conflicts. Bars: each relation's leave-one-out contribution $\Delta_r$ to the log-ratio
+  $\Lambda$ (\S\ref{sec:props}), whose monotone transform is the score $\LCS$ in the bottom line.}
 \label{fig:voyager}
 \end{figure*}
