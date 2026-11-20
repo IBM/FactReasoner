@@ -1,0 +1,47 @@
+<View>
+  <Header value="Read the passage. Judge only the HIGHLIGHTED text." size="4"/>
+  <HyperText name="ctx" value="$context_html" inline="true"/>
+  <View style="background:#f4f4f2;padding:0.5em 0.8em;margin:0.6em 0">
+    <Header value="Claim X" size="6"/>
+    <Text name="x" value="$claim_x"/>
+    <Header value="Claim Y" size="6"/>
+    <Text name="y" value="$claim_y"/>
+  </View>
+  <Header value="1. What connection does the highlighted text draw between X and Y?" size="5"/>
+  <Choices name="link" toName="ctx" choice="single-radio" required="true">
+    <Choice value="X is given as a reason, cause or evidence for Y"/>
+    <Choice value="Y is given as a reason, cause or evidence for X"/>
+    <Choice value="X and Y cannot both be true (one rules out the other)"/>
+    <Choice value="X and Y say the same thing"/>
+    <Choice value="Exactly one of X and Y holds (not both, not neither)"/>
+    <Choice value="At least one of X and Y holds (perhaps both)"/>
+    <Choice value="Only contrasted, conceded, or ordered in time: no dependence"/>
+    <Choice value="No connection is drawn between X and Y"/>
+  </Choices>
+  <Header value="2. How does the highlighted text treat claim X?" size="5"/>
+  <Choices name="stance_x" toName="ctx" choice="single-radio" required="true" showInline="true">
+    <Choice value="asserted"/>
+    <Choice value="denied"/>
+    <Choice value="not stated in this passage"/>
+  </Choices>
+  <Header value="3. How does the highlighted text treat claim Y?" size="5"/>
+  <Choices name="stance_y" toName="ctx" choice="single-radio" required="true" showInline="true">
+    <Choice value="asserted"/>
+    <Choice value="denied"/>
+    <Choice value="not stated in this passage"/>
+  </Choices>
+  <Header value="4. Does the highlighted text also connect X or Y to some OTHER statement?" size="5"/>
+  <Choices name="other" toName="ctx" choice="single-radio" required="true" showInline="true">
+    <Choice value="No"/>
+    <Choice value="Yes"/>
+  </Choices>
+  <View visibleWhen="choice-selected" whenTagName="other" whenChoiceValue="Yes">
+    <TextArea name="other_quote" toName="ctx" rows="2" maxSubmissions="1" placeholder="Quote the words that make that connection"/>
+  </View>
+  <Header value="5. How sure are you?" size="5"/>
+  <Choices name="confidence" toName="ctx" choice="single-radio" required="true" showInline="true">
+    <Choice value="1 (unsure)"/>
+    <Choice value="2"/>
+    <Choice value="3 (sure)"/>
+  </Choices>
+</View>

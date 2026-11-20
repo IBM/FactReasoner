@@ -1,0 +1,170 @@
+{
+  "family_id": "f017",
+  "stage": "template",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "S3",
+      "passed": true,
+      "threshold": null,
+      "observed": {
+        "primary": {
+          "type": "CONFLICT",
+          "lambda": [
+            -1.3071,
+            1.1068,
+            2.2715
+          ],
+          "lcs": [
+            0.213,
+            0.7516,
+            0.9066
+          ],
+          "assertion_lambda": [
+            -6.4877,
+            -4.0738,
+            -2.909
+          ],
+          "assertion_order": [
+            "strict",
+            "strict"
+          ]
+        },
+        "control": {
+          "type": "CONTROL",
+          "lambda": [
+            1.1068,
+            1.1068,
+            1.1068
+          ],
+          "lcs": [
+            0.7516,
+            0.7516,
+            0.7516
+          ],
+          "assertion_lambda": [
+            -4.0738,
+            -4.0738,
+            -4.0738
+          ],
+          "assertion_order": [
+            "equal",
+            "equal"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-5.6-sol": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "claude-opus-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 2
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gemini-3.1-pro': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 2}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-5.6-sol": {
+            "leakage": 2
+          },
+          "gemini-3.1-pro": {},
+          "claude-opus-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 1,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-5.6-sol": {
+            "leakage": 2,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-opus-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {
+          "gpt-5.6-sol": {
+            "leakage": [
+              "described below",
+              "detailed next"
+            ]
+          }
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-5.6-sol": 4,
+          "gemini-3.1-pro": 4,
+          "claude-opus-5-5": 6
+        },
+        "spans": {
+          "gpt-5.6-sol": [
+            "cannot be squared with",
+            "described below",
+            "detailed next",
+            "In other words, the blackout interrupted the electricity supply to roughly 50 million people."
+          ],
+          "gemini-3.1-pro": [
+            "Three FirstEnergy 345-kilovolt transmission lines tripped after contacting trees, a tree-contact outage sequence that ca",
+            "The general operation of protective relays as designed cannot be squared with the conclusion that protective relays gene",
+            "That normal functioning cannot be squared with the control-room software failure detailed next; even with normal alarm p",
+            "Approximately 50 million people lost electrical service in the blackout. In other words, the blackout interrupted the el"
+          ],
+          "claude-opus-5-5": [
+            "Three FirstEnergy 345-kilovolt transmission lines tripped after contacting trees, a tree-contact outage sequence that ca",
+            "The general operation of protective relays as designed cannot be squared with the conclusion that protective relays gene",
+            "FirstEnergy's alarm-processing software functioned normally throughout the developing emergency.",
+            "That normal functioning cannot be squared with the control-room software failure detailed next; even with normal alarm p",
+            "cannot be squared with"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "S4",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "V3.scores: 2/3 auditor(s) scored below the floor: {'gemini-3.1-pro': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 2}}"
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gemini-3.1-pro': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 2}}; S4: V3.scores: 2/3 auditor(s) scored below the floor: {'gemini-3.1-pro': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 2}}"
+}

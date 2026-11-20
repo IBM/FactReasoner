@@ -1,0 +1,158 @@
+{
+  "family_id": "f011",
+  "stage": "template",
+  "passed": false,
+  "gates": [
+    {
+      "gate": "S3",
+      "passed": true,
+      "threshold": null,
+      "observed": {
+        "primary": {
+          "type": "SIGN",
+          "lambda": [
+            -4.6497,
+            -2.4173,
+            -2.2409
+          ],
+          "lcs": [
+            0.0095,
+            0.0819,
+            0.0961
+          ],
+          "assertion_lambda": [
+            -2.0594,
+            -2.4173,
+            -4.8312
+          ],
+          "assertion_order": [
+            "none",
+            "none"
+          ]
+        },
+        "control": {
+          "type": "CONTROL",
+          "lambda": [
+            -2.4173,
+            -2.4173,
+            -2.4173
+          ],
+          "lcs": [
+            0.0819,
+            0.0819,
+            0.0819
+          ],
+          "assertion_lambda": [
+            -2.4173,
+            -2.4173,
+            -2.4173
+          ],
+          "assertion_order": [
+            "equal",
+            "equal"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.scores",
+      "passed": false,
+      "threshold": ">= 4 (majority of 3 auditor(s))",
+      "observed": {
+        "votes": {
+          "gpt-5.6-sol": {
+            "fluency": 3,
+            "formality": 5,
+            "organization": 4
+          },
+          "gemini-3.1-pro": {
+            "fluency": 4,
+            "formality": 5,
+            "organization": 5
+          },
+          "claude-opus-5-5": {
+            "fluency": 3,
+            "formality": 4,
+            "organization": 3
+          }
+        },
+        "n_below_floor": 2,
+        "needed_to_reject": 2
+      },
+      "detail": "2/3 auditor(s) scored below the floor: {'gpt-5.6-sol': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 3}}"
+    },
+    {
+      "gate": "V3.spans",
+      "passed": true,
+      "threshold": "empty (majority of 3 auditor(s), per span kind)",
+      "observed": {
+        "votes": {
+          "gpt-5.6-sol": {},
+          "gemini-3.1-pro": {},
+          "claude-opus-5-5": {}
+        },
+        "n_flagging_per_kind": {
+          "leakage": 0,
+          "hedging": 0
+        },
+        "needed_to_reject": 2,
+        "raw_counts": {
+          "gpt-5.6-sol": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "gemini-3.1-pro": {
+            "leakage": 0,
+            "hedging": 0
+          },
+          "claude-opus-5-5": {
+            "leakage": 0,
+            "hedging": 0
+          }
+        },
+        "spans": {}
+      },
+      "detail": ""
+    },
+    {
+      "gate": "V3.artifacts",
+      "passed": true,
+      "threshold": "recorded, not enforced",
+      "observed": {
+        "counts": {
+          "gpt-5.6-sol": 3,
+          "gemini-3.1-pro": 2,
+          "claude-opus-5-5": 6
+        },
+        "spans": {
+          "gpt-5.6-sol": [
+            "In other words, the transmission demonstrated by Boysen-Jensen was passage across the gelatin interface: either the tip\u2019",
+            "Noncrossing is, in other words, the prevention of transmission described above.",
+            "At least one of the following rate conditions holds, perhaps both: during a given observation interval, the shaded flank"
+          ],
+          "gemini-3.1-pro": [
+            "either the tip\u2019s growth-promoting influence crossed Boysen-Jensen\u2019s intervening gelatin layer, or the tip\u2019s growth-promo",
+            "At least one of the following rate conditions holds, perhaps both: during a given observation interval, the shaded flank"
+          ],
+          "claude-opus-5-5": [
+            "The Darwins located the principal site of light perception in the lower bending region.",
+            "Boysen-Jensen demonstrated transmission of the tip\u2019s influence through an intervening gelatin layer. Boysen-Jensen\u2019s gel",
+            "either the tip\u2019s growth-promoting influence crossed Boysen-Jensen\u2019s intervening gelatin layer, or the tip\u2019s growth-promo",
+            "Noncrossing is, in other words, the prevention of transmission described above.",
+            "At least one of the following rate conditions holds, perhaps both: during a given observation interval, the shaded flank"
+          ]
+        }
+      },
+      "detail": ""
+    },
+    {
+      "gate": "S4",
+      "passed": false,
+      "threshold": null,
+      "observed": null,
+      "detail": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-5.6-sol': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 3}}"
+    }
+  ],
+  "reason": "V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-5.6-sol': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 3}}; S4: V3.scores: 2/3 auditor(s) scored below the floor: {'gpt-5.6-sol': {'fluency': 3}, 'claude-opus-5-5': {'fluency': 3, 'organization': 3}}"
+}
