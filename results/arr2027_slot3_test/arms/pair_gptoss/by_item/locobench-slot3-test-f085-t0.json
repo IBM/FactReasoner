@@ -1,0 +1,662 @@
+{
+  "item_id": "locobench-slot3-test-f085-t0",
+  "item_name": "Cybersecurity -- SIGN r0",
+  "source": "generated:S4/claude-opus-5",
+  "expected": {
+    "design": "slot3",
+    "family_id": "f085",
+    "primary": "SIGN",
+    "assignment": {
+      "S3": "none",
+      "S2": "para1",
+      "S1": "conflict"
+    },
+    "paragraph_order": null,
+    "ladders": [
+      {
+        "ladder_id": "f085-SIGN",
+        "type": "SIGN",
+        "rung_index": 0
+      }
+    ]
+  },
+  "meta": {
+    "canonical_topic": "Cybersecurity",
+    "domain": "Engineering & Technology",
+    "framing": "How do incident responders establish whether a data breach originated from a compromised employee credential or an unpatched external-facing server when the victim organization and its security vendor attribute the intrusion differently?",
+    "split": "test",
+    "word_count": 459,
+    "generator": "claude-opus-5",
+    "taxonomy": "v2",
+    "polarity": "verdict",
+    "priors": "flat"
+  },
+  "notes": null,
+  "num_atoms": 14,
+  "atoms": [
+    {
+      "id": "a0",
+      "pos": 1,
+      "text": "Incident responders reconstructed a unified timeline from authentication logs, firewall logs, and endpoint telemetry.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a1",
+      "pos": 2,
+      "text": "Exploitation of a remote code execution flaw and use of stolen credentials leave distinguishable forensic artifacts.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a2",
+      "pos": 3,
+      "text": "Volatile memory was acquired from the running server and contained the attacker's active process.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a3",
+      "pos": 4,
+      "text": "The contents of volatile memory on the compromised server persisted after the machine was powered off.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a4",
+      "pos": 5,
+      "text": "Forensic disk images were taken of the external-facing server before it was rebuilt.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a5",
+      "pos": 6,
+      "text": "A web shell was recovered from the web root directory of the external-facing server.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a6",
+      "pos": 7,
+      "text": "The creation timestamp of the web shell preceded the earliest suspicious VPN authentication by six days.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a7",
+      "pos": 8,
+      "text": "The security vendor attributed initial access to exploitation of an unpatched external-facing VPN appliance.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a8",
+      "pos": 9,
+      "text": "The victim organization attributed the intrusion to a stolen employee credential obtained by phishing.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a9",
+      "pos": 10,
+      "text": "The external-facing server was running a version of the appliance software missing a published security patch.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a10",
+      "pos": 11,
+      "text": "An employee's network credentials were harvested through a phishing campaign.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a11",
+      "pos": 12,
+      "text": "A log retention window of thirty days limited visibility into the earliest attacker activity.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a12",
+      "pos": 13,
+      "text": "Windows security event ID 4624 records a successful account logon.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a13",
+      "pos": 14,
+      "text": "Windows security event ID 4625 records successful interactive logons.",
+      "factual": false,
+      "stance": "asserted"
+    }
+  ],
+  "gold_relations": [
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r000",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a1",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r001",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r002",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a8",
+      "level2_sense": "Refutation",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r003",
+      "sign_verdict": "conflict",
+      "sign_assertion": "conflict",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r004",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r005",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a6",
+      "level2_sense": "Concession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r006",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 5
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": "S1",
+      "filler": "conflict",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r007",
+      "sign_verdict": "conflict",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a5",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": "S2",
+      "filler": "para1",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r008",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a4",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a6",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a11",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a12",
+      "position_distance": 3
+    }
+  ],
+  "response": "Competing attributions of this kind are resolved by sequencing the available traces rather than by weighing the confidence of the two parties. Incident responders reconstructed a unified timeline from authentication logs, firewall logs, and endpoint telemetry, normalizing every source to a single clock so that server-side activity and account activity sat on one axis. Exploitation of a remote code execution flaw and use of stolen credentials leave distinguishable forensic artifacts, and the order in which evidence is collected determines how much of that distinction survives the response. Volatile memory was acquired from the running server and contained the attacker's active process, which confirms that the contents of volatile memory on that compromised server persisted after the machine was powered off.\n\nOnly after the memory capture was complete did the team turn to the non-volatile media. Forensic disk images were taken of the external-facing server before it was rebuilt, and that preservation led to the recovery of a web shell from the server's web root directory. Imaging ahead of the rebuild is the decisive procedural choice, because a rebuild overwrites the file system that carries perimeter exploitation evidence. The recovery of that file from the server's publicly reachable directory is the evidence for the distinction drawn above between exploitation artifacts and credential-use artifacts. The creation timestamp of the web shell preceded the earliest suspicious VPN authentication by six days.\n\nThat six-day interval is what settles the disagreement between the two parties. It is the evidence for the position of the security vendor, which attributed initial access to exploitation of an unpatched external-facing VPN appliance. The victim organization, by contrast, attributed the intrusion to a stolen employee credential obtained by phishing. The same six-day interval cannot be squared with the organization's account: a web shell resident on the appliance before any anomalous logon rules out the phished credential as the point of entry, whatever later use the attacker made of that credential.\n\nTwo separate exposures were documented in the environment. The external-facing server was running a version of the appliance software missing a published security patch. An employee's network credentials were harvested through a phishing campaign. At least one of these two weaknesses, the unpatched appliance or the harvested credentials, served as the intruder's route into the network, perhaps both. Although a log retention window of thirty days limited visibility into the earliest attacker activity, the six-day precedence of the web shell over the first suspicious VPN authentication stands as the anchor of the reconstructed sequence. Windows security event ID 4624 records a successful account logon. Windows security event ID 4625 records successful interactive logons. Definitional precision of this sort governs which logon records count as corroboration of an interactive session, and responders fix it before the attribution is written up.",
+  "runs": [
+    {
+      "item_id": "locobench-slot3-test-f085-t0",
+      "item_name": "Cybersecurity -- SIGN r0",
+      "arm": "mined:gpt-oss-120b:windowed:slot3",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "windowed",
+      "family_id": "f085",
+      "family": null,
+      "rung_index": null,
+      "rung_name": null,
+      "perturbation": null,
+      "num_atoms": 14,
+      "num_gold_relations": 9,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": "slot3",
+      "sense_menu": "slot3",
+      "reconcile": "strict",
+      "prompt_variant": "v2",
+      "require_evidence": true,
+      "taxonomy": "v2",
+      "num_pairs_scored": 19,
+      "num_dropped_none": 14,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 24,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 5,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 14,
+        "total_ordered_pairs": 182,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 46,
+        "num_callback_pairs": 0,
+        "pairs_selected": 19,
+        "forward_pairs_possible": 91,
+        "pairs_pruned": 72,
+        "discourse_anchored": true,
+        "num_sentences": 21,
+        "num_atoms_aligned": 14,
+        "num_promoted": 0,
+        "num_demoted": 27,
+        "pairs_scored": 19,
+        "dropped_none": 14,
+        "relations_kept": 5,
+        "llm_calls": 24,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "slot3",
+        "taxonomy": "v2",
+        "reconcile": "strict",
+        "prompt_variant": "v2",
+        "require_evidence": true,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.1
+      },
+      "relations": [
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "which confirms that the contents of volatile memory on that compromised server persisted after the machine was powered off"
+        },
+        {
+          "source": "a4",
+          "target": "a5",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "that preservation led to the recovery of a web shell"
+        },
+        {
+          "source": "a6",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "It is the evidence for the position of the security vendor"
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "cannot be squared with the organization's account"
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999981357349543,
+          "strength": 0.999999,
+          "type_confidence": 0.99999913573409,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "At least one of these two weaknesses, the unpatched appliance or the harvested credentials, served as the intruder's route into the network, perhaps both"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7696497142857143,
+        "consistency": 0.9175233326259962,
+        "reified": 0.499996,
+        "log_partition": 0.3480160222629945
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.9,
+          "a10": 0.95,
+          "a11": 0.9,
+          "a12": 0.9,
+          "a13": 0.1,
+          "a2": 0.642859,
+          "a3": 0.678567,
+          "a4": 0.94186,
+          "a5": 0.994186,
+          "a6": 0.920455,
+          "a7": 0.971591,
+          "a8": 0.025578,
+          "a9": 0.95
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.42101248999922286,
+        "log_z": -4.652704,
+        "log_z_max": -2.373117,
+        "log_z_min": -5.869502
+      },
+      "comparison": {
+        "gold_edges_total": 9,
+        "gold_edges_scorable": 6,
+        "mined_edges_total": 5,
+        "pair": {
+          "tp": 4,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8,
+          "recall": 0.6666666666666666,
+          "f1": 0.7272727272727272
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8,
+          "recall": 0.6666666666666666,
+          "f1": 0.7272727272727272
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8,
+          "recall": 0.6666666666666666,
+          "f1": 0.7272727272727272
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 5,
+            "found": 4,
+            "recall": 0.8
+          },
+          "backward": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "True": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          }
+        },
+        "recall_by_window_admission": {
+          "None": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 3,
+            "recall": 0.75
+          }
+        },
+        "recall_by_validity": {
+          "None": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 55.83,
+      "run_config_fingerprint": "0e37387ee119"
+    }
+  ]
+}

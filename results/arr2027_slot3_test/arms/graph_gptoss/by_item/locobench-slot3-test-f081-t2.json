@@ -1,0 +1,771 @@
+{
+  "item_id": "locobench-slot3-test-f081-t2",
+  "item_name": "Computer Science -- SIGN r2",
+  "source": "generated:S4/claude-opus-5",
+  "expected": {
+    "design": "slot3",
+    "family_id": "f081",
+    "primary": "SIGN",
+    "assignment": {
+      "S2": "none",
+      "S3": "para1",
+      "S1": "support"
+    },
+    "paragraph_order": null,
+    "ladders": [
+      {
+        "ladder_id": "f081-SIGN",
+        "type": "SIGN",
+        "rung_index": 2
+      }
+    ]
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do engineers adjudicate between a latent software defect and a hardware fault when a distributed database silently corrupts records, and what evidence ultimately settles the attribution?",
+    "split": "test",
+    "word_count": 488,
+    "generator": "claude-opus-5",
+    "taxonomy": "v2",
+    "polarity": "verdict",
+    "priors": "flat"
+  },
+  "notes": null,
+  "num_atoms": 14,
+  "atoms": [
+    {
+      "id": "a0",
+      "pos": 1,
+      "text": "Background scrub jobs recompute stored checksums to detect silent corruption.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a1",
+      "pos": 2,
+      "text": "Engineers compare the byte content of the same record across each of its replicas.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a2",
+      "pos": 3,
+      "text": "Byte-identical corruption on independent replicas points to a fault in the shared software path.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a3",
+      "pos": 4,
+      "text": "Byte-identical corruption across replicas in separate datacenters proves independent hardware failure.",
+      "factual": false,
+      "stance": "denied"
+    },
+    {
+      "id": "a4",
+      "pos": 5,
+      "text": "Corruption isolated to a single replica on a single node points to a localized hardware fault.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a5",
+      "pos": 6,
+      "text": "ECC memory controllers log correctable single-bit error counts for each memory module.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a6",
+      "pos": 7,
+      "text": "ECC memory corrects all multi-bit errors within a single memory module.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a7",
+      "pos": 8,
+      "text": "Single-bit flips at arbitrary offsets are characteristic of DRAM faults.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a8",
+      "pos": 9,
+      "text": "Corruption aligned to record and page boundaries is characteristic of a serialization defect.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a9",
+      "pos": 10,
+      "text": "The storage engine's compaction code contained a latent defect that mishandled a rare offset case.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a10",
+      "pos": 11,
+      "text": "The memory module in node seven had an uncorrectable hardware fault.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a11",
+      "pos": 12,
+      "text": "The post-incident review board concluded that the root cause was a latent software defect in the compaction path.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a12",
+      "pos": 13,
+      "text": "Every corrupted record was recoverable from backups and replica repair.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a13",
+      "pos": 14,
+      "text": "At least one corrupted record was permanently unrecoverable.",
+      "factual": true,
+      "stance": "asserted"
+    }
+  ],
+  "gold_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r000",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r001",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r002",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r003",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r004",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Concession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r005",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r006",
+      "sign_verdict": "conflict",
+      "sign_assertion": "conflict",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Refutation",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": "S1",
+      "filler": "support",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r007",
+      "sign_verdict": "support",
+      "sign_assertion": "conflict",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": "S3",
+      "filler": "para1",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r008",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a4",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a5",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a7",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a8",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a10",
+      "position_distance": 4
+    }
+  ],
+  "response": "Adjudicating between a latent software defect and a hardware fault in a silently corrupting distributed database is a matter of pattern discrimination, and it begins with detection rather than with diagnosis. Background scrub jobs recompute stored checksums to detect silent corruption; only after such a job flags a mismatch do engineers compare the byte content of the same record across each of its replicas. The outcome of that comparison supplies the evidence that discriminates between the competing hypotheses. Byte-identical corruption on independent replicas points to a fault in the shared software path. Precisely because it does, the claim that byte-identical corruption across replicas in separate datacenters proves independent hardware failure cannot be true. By contrast, corruption isolated to a single replica on a single node points to a localized hardware fault. The question is never settled by the fact of corruption alone, but by its distribution across machines that share code yet share no silicon.\n\nA second line of inquiry runs through the hardware telemetry gathered for the interval in which the scrub reported mismatches. ECC memory controllers log correctable single-bit error counts for each memory module. Vendors document the correction scheme in detail; ECC memory corrects all multi-bit errors within a single memory module. Those per-module records show that single-bit flips at arbitrary offsets are characteristic of DRAM faults. Engineers therefore read the counters alongside device firmware logs, looking for a module or a drive whose error rate rose in step with the first observed mismatch.\n\nThe signature recovered in the incident under review had a different shape entirely: the damaged bytes did not wander across the page but sat at predictable offsets. Corruption aligned to record and page boundaries is characteristic of a serialization defect, and that alignment showed that the storage engine's compaction code contained a latent defect which mishandled a rare offset case. Reproducing that offset case against a synthetic workload then took the argument out of the realm of inference, since the same mangled output appeared on hardware whose counters were clean.\n\nAt least one of two conditions therefore obtained: a latent defect in the compaction path, or an uncorrectable fault in the memory of node seven, and conceivably both at once. The memory module in node seven did have an uncorrectable hardware fault. Even though that module had failed outright, the post-incident review board concluded that the root cause was a latent software defect in the compaction path, because the boundary-aligned damage extended to replicas that shared no memory with node seven.\n\nOn the question of consequences, exactly one of two outcomes holds and the two cannot both be true: either every corrupted record was recoverable from backups and replica repair, or at least one corrupted record was permanently unrecoverable. What ultimately settles the attribution is the conjunction of three findings: the cross-replica byte comparison, the per-module error history, and a deterministic reproduction of the fault on hardware known to be sound.",
+  "runs": [
+    {
+      "item_id": "locobench-slot3-test-f081-t2",
+      "item_name": "Computer Science -- SIGN r2",
+      "arm": "mined:gpt-oss-120b:graph:k5-tv2",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "graph",
+      "family_id": "f081",
+      "family": null,
+      "rung_index": null,
+      "rung_name": null,
+      "perturbation": null,
+      "num_atoms": 14,
+      "num_gold_relations": 9,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "nli_method": "vote_share",
+      "strength_method": "vote_band",
+      "strength_model": null,
+      "strategy": "k5-tv2",
+      "graph_mode": "graph",
+      "graph_k": 5,
+      "candidate_arm": null,
+      "num_pairs_scored": null,
+      "num_llm_calls": 5,
+      "num_call_exceptions": 0,
+      "graph_samples": 5,
+      "graph_fresh_usage": {
+        "prompt_tokens": 7785,
+        "completion_tokens": 11743,
+        "reasoning_tokens": 0
+      },
+      "graph_used_usage": {
+        "prompt_tokens": 7785,
+        "completion_tokens": 11743
+      },
+      "graph_vote": [
+        {
+          "source_id": "a0",
+          "target_id": "a1",
+          "sense": "Cause-Effect",
+          "vote_share": 0.6,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a1",
+          "target_id": "a2",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a2",
+          "target_id": "a3",
+          "sense": "Refutation",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a5",
+          "target_id": "a7",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a8",
+          "target_id": "a9",
+          "sense": "Evidence",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a9",
+          "target_id": "a10",
+          "sense": "Disjunction",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a9",
+          "target_id": "a11",
+          "sense": "Evidence",
+          "vote_share": 0.8,
+          "label_share": 0.75,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a12",
+          "target_id": "a13",
+          "sense": "Alternative",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        }
+      ],
+      "call_error_rate": 0.0,
+      "num_relations": 8,
+      "coverage": {
+        "policy": "graph",
+        "pairs_scored": null,
+        "llm_calls": 5,
+        "llm_call_errors": 0,
+        "graph_samples": 5,
+        "graph_samples_cached": 0,
+        "graph_samples_fresh": 5,
+        "graph_parse_failures": 0,
+        "graph_failed_samples": 0,
+        "graph_fresh_usage": {
+          "prompt_tokens": 7785,
+          "completion_tokens": 11743,
+          "reasoning_tokens": 0
+        },
+        "graph_used_usage": {
+          "prompt_tokens": 7785,
+          "completion_tokens": 11743
+        },
+        "graph_edges_voted": 8,
+        "graph_raw_edges_per_sample": [
+          10,
+          10,
+          10,
+          11,
+          11
+        ],
+        "num_candidates": null,
+        "relations_kept": 8,
+        "gold_weighted_edges": 0
+      },
+      "miner_config": {
+        "relation_source": "graph_miner",
+        "nli_method": "vote_share",
+        "strength_method": "vote_band",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45,
+        "k": 5,
+        "weighting": "vote_band",
+        "strength_model": null,
+        "taxonomy": "v2",
+        "graph_mode": "graph",
+        "pair_policy": "graph"
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.555,
+          "strength": 0.925,
+          "type_confidence": 0.6,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a5",
+          "target": "a7",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a9",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.576,
+          "strength": 0.72,
+          "type_confidence": 0.8,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7657930000000001,
+        "consistency": 0.9240146110056926,
+        "reified": 0.393287,
+        "log_partition": 0.5170439701948707
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.907775,
+          "a1": 0.938305,
+          "a10": 0.928739,
+          "a11": 0.923698,
+          "a12": 0.631579,
+          "a13": 0.631579,
+          "a2": 0.972645,
+          "a3": 0.01142,
+          "a4": 0.9,
+          "a5": 0.924058,
+          "a6": 0.1,
+          "a7": 0.954131,
+          "a8": 0.925688,
+          "a9": 0.971485
+        },
+        "num_below_prior": 3,
+        "avg_norm_entropy": 0.41932334008642436,
+        "log_z": -4.493496,
+        "log_z_max": -2.822302,
+        "log_z_min": -6.282646
+      },
+      "comparison": {
+        "gold_edges_total": 9,
+        "gold_edges_scorable": 5,
+        "mined_edges_total": 8,
+        "pair": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 0,
+          "precision": 0.625,
+          "recall": 1.0,
+          "f1": 0.7692307692307693
+        },
+        "coupling": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 0,
+          "precision": 0.625,
+          "recall": 1.0,
+          "f1": 0.7692307692307693
+        },
+        "sense": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 0,
+          "precision": 0.625,
+          "recall": 1.0,
+          "f1": 0.7692307692307693
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 5,
+            "found": 5,
+            "recall": 1.0
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 3,
+            "found": 3,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          }
+        },
+        "recall_by_window_admission": {
+          "None": {
+            "total": 5,
+            "found": 5,
+            "recall": 1.0
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "None": {
+            "total": 5,
+            "found": 5,
+            "recall": 1.0
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 111.588,
+      "run_config_fingerprint": "d098cb067f54"
+    }
+  ]
+}

@@ -1,0 +1,649 @@
+{
+  "item_id": "locobench-slot3-test-f081-t0",
+  "item_name": "Computer Science -- SIGN r0",
+  "source": "generated:S4/claude-opus-5",
+  "expected": {
+    "design": "slot3",
+    "family_id": "f081",
+    "primary": "SIGN",
+    "assignment": {
+      "S2": "none",
+      "S3": "para1",
+      "S1": "conflict"
+    },
+    "paragraph_order": null,
+    "ladders": [
+      {
+        "ladder_id": "f081-SIGN",
+        "type": "SIGN",
+        "rung_index": 0
+      }
+    ]
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do engineers adjudicate between a latent software defect and a hardware fault when a distributed database silently corrupts records, and what evidence ultimately settles the attribution?",
+    "split": "test",
+    "word_count": 481,
+    "generator": "claude-opus-5",
+    "taxonomy": "v2",
+    "polarity": "verdict",
+    "priors": "flat"
+  },
+  "notes": null,
+  "num_atoms": 14,
+  "atoms": [
+    {
+      "id": "a0",
+      "pos": 1,
+      "text": "Background scrub jobs recompute stored checksums to detect silent corruption.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a1",
+      "pos": 2,
+      "text": "Engineers compare the byte content of the same record across each of its replicas.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a2",
+      "pos": 3,
+      "text": "Byte-identical corruption on independent replicas points to a fault in the shared software path.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a3",
+      "pos": 4,
+      "text": "Byte-identical corruption across replicas in separate datacenters proves independent hardware failure.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a4",
+      "pos": 5,
+      "text": "Corruption isolated to a single replica on a single node points to a localized hardware fault.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a5",
+      "pos": 6,
+      "text": "ECC memory controllers log correctable single-bit error counts for each memory module.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a6",
+      "pos": 7,
+      "text": "ECC memory corrects all multi-bit errors within a single memory module.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a7",
+      "pos": 8,
+      "text": "Single-bit flips at arbitrary offsets are characteristic of DRAM faults.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a8",
+      "pos": 9,
+      "text": "Corruption aligned to record and page boundaries is characteristic of a serialization defect.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a9",
+      "pos": 10,
+      "text": "The storage engine's compaction code contained a latent defect that mishandled a rare offset case.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a10",
+      "pos": 11,
+      "text": "The memory module in node seven had an uncorrectable hardware fault.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a11",
+      "pos": 12,
+      "text": "The post-incident review board concluded that the root cause was a latent software defect in the compaction path.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a12",
+      "pos": 13,
+      "text": "Every corrupted record was recoverable from backups and replica repair.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a13",
+      "pos": 14,
+      "text": "At least one corrupted record was permanently unrecoverable.",
+      "factual": true,
+      "stance": "asserted"
+    }
+  ],
+  "gold_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Precedence",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": true,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r000",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r001",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a7",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "weak",
+      "strength_range": [
+        0.35,
+        0.59
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r002",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a8",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r003",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r004",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a10",
+      "target_id": "a11",
+      "level2_sense": "Concession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r005",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Alternative",
+      "level1_coupling": "exclusive",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r006",
+      "sign_verdict": "conflict",
+      "sign_assertion": "conflict",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": "S1",
+      "filler": "conflict",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r007",
+      "sign_verdict": "conflict",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": "S3",
+      "filler": "para1",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r008",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a4",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a5",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a7",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a8",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a6",
+      "target_id": "a10",
+      "position_distance": 4
+    }
+  ],
+  "response": "Adjudicating between a latent software defect and a hardware fault in a silently corrupting distributed database is a matter of pattern discrimination, and it begins with detection rather than with diagnosis. Background scrub jobs recompute stored checksums to detect silent corruption; only after such a job flags a mismatch do engineers compare the byte content of the same record across each of its replicas. The outcome of that comparison supplies the evidence that discriminates between the competing hypotheses. Byte-identical corruption on independent replicas points to a fault in the shared software path; as a result, byte-identical corruption across replicas in separate datacenters proves independent hardware failure. By contrast, corruption isolated to a single replica on a single node points to a localized hardware fault. The question is never settled by the fact of corruption alone, but by its distribution across machines that share code yet share no silicon.\n\nA second line of inquiry runs through the hardware telemetry gathered for the interval in which the scrub reported mismatches. ECC memory controllers log correctable single-bit error counts for each memory module. Vendors document the correction scheme in detail; ECC memory corrects all multi-bit errors within a single memory module. Those per-module records show that single-bit flips at arbitrary offsets are characteristic of DRAM faults. Engineers therefore read the counters alongside device firmware logs, looking for a module or a drive whose error rate rose in step with the first observed mismatch.\n\nThe signature recovered in the incident under review had a different shape entirely: the damaged bytes did not wander across the page but sat at predictable offsets. Corruption aligned to record and page boundaries is characteristic of a serialization defect, and that alignment showed that the storage engine's compaction code contained a latent defect which mishandled a rare offset case. Reproducing that offset case against a synthetic workload then took the argument out of the realm of inference, since the same mangled output appeared on hardware whose counters were clean.\n\nAt least one of two conditions therefore obtained: a latent defect in the compaction path, or an uncorrectable fault in the memory of node seven, and conceivably both at once. The memory module in node seven did have an uncorrectable hardware fault. Even though that module had failed outright, the post-incident review board concluded that the root cause was a latent software defect in the compaction path, because the boundary-aligned damage extended to replicas that shared no memory with node seven.\n\nOn the question of consequences, exactly one of two outcomes holds and the two cannot both be true: either every corrupted record was recoverable from backups and replica repair, or at least one corrupted record was permanently unrecoverable. What ultimately settles the attribution is the conjunction of three findings: the cross-replica byte comparison, the per-module error history, and a deterministic reproduction of the fault on hardware known to be sound.",
+  "runs": [
+    {
+      "item_id": "locobench-slot3-test-f081-t0",
+      "item_name": "Computer Science -- SIGN r0",
+      "arm": "mined:llama-3.3-70b-instruct:windowed:slot3",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "windowed",
+      "family_id": "f081",
+      "family": null,
+      "rung_index": null,
+      "rung_name": null,
+      "perturbation": null,
+      "num_atoms": 14,
+      "num_gold_relations": 9,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": "slot3",
+      "sense_menu": "slot3",
+      "reconcile": "strict",
+      "prompt_variant": "v2",
+      "require_evidence": true,
+      "taxonomy": "v2",
+      "num_pairs_scored": 19,
+      "num_dropped_none": 15,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 23,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 4,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 14,
+        "total_ordered_pairs": 182,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 46,
+        "num_callback_pairs": 0,
+        "pairs_selected": 19,
+        "forward_pairs_possible": 91,
+        "pairs_pruned": 72,
+        "discourse_anchored": true,
+        "num_sentences": 19,
+        "num_atoms_aligned": 14,
+        "num_promoted": 1,
+        "num_demoted": 28,
+        "pairs_scored": 19,
+        "dropped_none": 15,
+        "relations_kept": 4,
+        "llm_calls": 23,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "slot3",
+        "taxonomy": "v2",
+        "reconcile": "strict",
+        "prompt_variant": "v2",
+        "require_evidence": true,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.1,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9
+      },
+      "relations": [
+        {
+          "source": "a1",
+          "target": "a2",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "The outcome of that comparison supplies the evidence that discriminates between the competing hypotheses"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "and that alignment showed"
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.4378234991142018,
+          "strength": 0.4378234991142018,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "because the boundary-aligned damage extended to replicas that shared no memory with node seven"
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "exclusive",
+          "sense": "Alternative",
+          "probability": 0.005220125632456934,
+          "strength": 0.005220125632456934,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "exactly one of two outcomes holds and the two cannot both be true"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.8153300000000001,
+        "consistency": 0.9553337687452942,
+        "reified": 0.486225,
+        "log_partition": 0.8336659472351162
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.9,
+          "a1": 0.94186,
+          "a10": 0.890166,
+          "a11": 0.877874,
+          "a12": 0.987244,
+          "a13": 0.987244,
+          "a2": 0.994186,
+          "a3": 0.1,
+          "a4": 0.9,
+          "a5": 0.9,
+          "a6": 0.1,
+          "a7": 0.9,
+          "a8": 0.94186,
+          "a9": 0.994186
+        },
+        "num_below_prior": 2,
+        "avg_norm_entropy": 0.3420751249477453,
+        "log_z": -1.291127,
+        "log_z_max": -1.088594,
+        "log_z_min": -2.306222
+      },
+      "comparison": {
+        "gold_edges_total": 9,
+        "gold_edges_scorable": 5,
+        "mined_edges_total": 4,
+        "pair": {
+          "tp": 2,
+          "fp": 2,
+          "fn": 3,
+          "precision": 0.5,
+          "recall": 0.4,
+          "f1": 0.4444444444444445
+        },
+        "coupling": {
+          "tp": 2,
+          "fp": 2,
+          "fn": 3,
+          "precision": 0.5,
+          "recall": 0.4,
+          "f1": 0.4444444444444445
+        },
+        "sense": {
+          "tp": 2,
+          "fp": 2,
+          "fn": 3,
+          "precision": 0.5,
+          "recall": 0.4,
+          "f1": 0.4444444444444445
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          },
+          "backward": {
+            "total": 0,
+            "found": 0,
+            "recall": null
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 2,
+            "found": 1,
+            "recall": 0.5
+          },
+          "True": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          }
+        },
+        "recall_by_window_admission": {
+          "None": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          },
+          "entailment": {
+            "total": 3,
+            "found": 1,
+            "recall": 0.3333333333333333
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "None": {
+            "total": 5,
+            "found": 2,
+            "recall": 0.4
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 5.201,
+      "run_config_fingerprint": "0e37387ee119"
+    }
+  ]
+}

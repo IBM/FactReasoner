@@ -1,0 +1,738 @@
+{
+  "item_id": "locobench-slot3-test-f009-t0",
+  "item_name": "Computer Science -- CONFLICT r0",
+  "source": "generated:S4/claude-opus-5",
+  "expected": {
+    "design": "slot3",
+    "family_id": "f009",
+    "primary": "CONFLICT",
+    "assignment": {
+      "S3": "none",
+      "S4": "para1",
+      "S1": "conflict",
+      "S2": "conflict"
+    },
+    "paragraph_order": null,
+    "ladders": [
+      {
+        "ladder_id": "f009-CONFLICT",
+        "type": "CONFLICT",
+        "rung_index": 0
+      }
+    ]
+  },
+  "meta": {
+    "canonical_topic": "Computer Science",
+    "domain": "Engineering & Technology",
+    "framing": "How do engineers establish whether an intermittent failure in a large distributed system originates in application logic or in the underlying hardware, when the postmortem evidence initially supports two competing accounts?",
+    "split": "test",
+    "word_count": 453,
+    "generator": "claude-opus-5",
+    "taxonomy": "v2",
+    "polarity": "verdict",
+    "priors": "flat"
+  },
+  "notes": null,
+  "num_atoms": 14,
+  "atoms": [
+    {
+      "id": "a0",
+      "pos": 1,
+      "text": "Platform telemetry recorded machine check exceptions on several hosts in the cluster.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a1",
+      "pos": 2,
+      "text": "The failures persisted on hosts whose memory modules had been freshly replaced.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a2",
+      "pos": 3,
+      "text": "The ECC subsystem logged correctable single-bit errors on two hosts during the incident window.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a3",
+      "pos": 4,
+      "text": "Hardware faults typically cluster on individual machines rather than following a single code path.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a4",
+      "pos": 5,
+      "text": "ECC memory silently corrects double-bit errors without recording any event.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a5",
+      "pos": 6,
+      "text": "A subset of the cluster's memory modules produced uncorrectable errors.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a6",
+      "pos": 7,
+      "text": "The application accessed shared state without synchronization.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a7",
+      "pos": 8,
+      "text": "The corrupted responses carried checksums that did not match their payloads.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a8",
+      "pos": 9,
+      "text": "The suspect code path used a lock-free ring buffer shared between worker threads.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a9",
+      "pos": 10,
+      "text": "A thread-sanitizer build reported a data race on the ring buffer's write index.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a10",
+      "pos": 11,
+      "text": "The remediation added a memory barrier around updates to the shared write index.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a11",
+      "pos": 12,
+      "text": "Hardware-induced faults reproduce deterministically on every execution of the same code path.",
+      "factual": false,
+      "stance": "asserted"
+    },
+    {
+      "id": "a12",
+      "pos": 13,
+      "text": "Corrupted responses appeared only on hosts running the new application release.",
+      "factual": true,
+      "stance": "asserted"
+    },
+    {
+      "id": "a13",
+      "pos": 14,
+      "text": "No host running the previous application release produced a corrupted response.",
+      "factual": true,
+      "stance": "asserted"
+    }
+  ],
+  "gold_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a5",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r000",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 5
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a4",
+      "level2_sense": "Concession",
+      "level1_coupling": "none",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r001",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a5",
+      "target_id": "a6",
+      "level2_sense": "Disjunction",
+      "level1_coupling": "co_necessity",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r002",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a5",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r003",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a6",
+      "level2_sense": "Evidence",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r004",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a8",
+      "target_id": "a9",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r005",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a11",
+      "target_id": "a12",
+      "level2_sense": "Contrast",
+      "level1_coupling": "none",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r006",
+      "sign_verdict": "none",
+      "sign_assertion": "none",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a12",
+      "target_id": "a13",
+      "level2_sense": "Restatement",
+      "level1_coupling": "equivalence",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": null,
+      "filler": null,
+      "provenance": {
+        "source": "plan"
+      },
+      "id": "r007",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a0",
+      "target_id": "a1",
+      "level2_sense": "Refutation",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": "S1",
+      "filler": "conflict",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r008",
+      "sign_verdict": "conflict",
+      "sign_assertion": "conflict",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a2",
+      "target_id": "a3",
+      "level2_sense": "Refutation",
+      "level1_coupling": "contradiction",
+      "directed": false,
+      "ordering_only": false,
+      "intended_strength_band": "moderate",
+      "strength_range": [
+        0.6,
+        0.84
+      ],
+      "slot_id": "S2",
+      "filler": "conflict",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r009",
+      "sign_verdict": "conflict",
+      "sign_assertion": "conflict",
+      "position_distance": 1
+    },
+    {
+      "source_id": "a9",
+      "target_id": "a10",
+      "level2_sense": "Cause-Effect",
+      "level1_coupling": "entailment",
+      "directed": true,
+      "ordering_only": false,
+      "intended_strength_band": "strong",
+      "strength_range": [
+        0.85,
+        1.0
+      ],
+      "slot_id": "S4",
+      "filler": "para1",
+      "provenance": {
+        "source": "slot"
+      },
+      "id": "r010",
+      "sign_verdict": "support",
+      "sign_assertion": "support",
+      "position_distance": 1
+    }
+  ],
+  "non_relations": [
+    {
+      "source_id": "a0",
+      "target_id": "a2",
+      "position_distance": 2
+    },
+    {
+      "source_id": "a1",
+      "target_id": "a4",
+      "position_distance": 3
+    },
+    {
+      "source_id": "a3",
+      "target_id": "a7",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a4",
+      "target_id": "a8",
+      "position_distance": 4
+    },
+    {
+      "source_id": "a7",
+      "target_id": "a10",
+      "position_distance": 3
+    }
+  ],
+  "response": "Resolving a dispute of this kind depends less on gathering more evidence than on locating the single observation that only one of the two accounts can accommodate. The standard first move is therefore to audit the platform layer, because a hardware story and a software story predict different distributions of symptoms across machines, releases and code paths. Platform telemetry recorded machine check exceptions on several hosts in the cluster, a record that cannot be squared with the persistence of the failures on hosts whose memory modules had been freshly replaced.\n\nThe ECC subsystem logged correctable single-bit errors on two hosts during the incident window, a signature that cannot be squared with the fact that hardware faults typically cluster on individual machines rather than following a single code path. Although correctable errors were logged during that window, ECC memory silently corrects double-bit errors without recording any event, so a sparse log is not by itself a clean bill of health. The machine check exceptions captured across the cluster nevertheless show that a subset of the cluster's memory modules produced uncorrectable errors; the continued failure of hosts whose memory had just been swapped out, by contrast, tells against reading the incident as a pure component defect. At that stage at least one of two conditions had to obtain, and perhaps both held together: uncorrectable errors in the cluster's memory, or an application that accessed shared state without synchronization.\n\nThe next step is to interrogate the corrupted output itself and the code that produced it. The corrupted responses carried checksums that did not match their payloads. The suspect code path used a lock-free ring buffer shared between worker threads. It was the unsynchronized sharing of that ring buffer across workers that produced the race condition instrumentation went on to detect. A thread-sanitizer build reported a data race on the ring buffer's write index, and that report led directly to a remediation that added a memory barrier around updates to the shared write index. That sanitizer result confirms the second of the two candidate conditions, namely that the application was reaching shared state without the synchronization its correctness required.\n\nThe decisive discrimination comes from the pattern of occurrence rather than from any single log entry. Hardware-induced faults reproduce deterministically on every execution of the same code path; the corrupted responses, by contrast, appeared only on hosts running the new application release. That is, no host running the previous application release produced a corrupted response. The method, in summary, is to treat each account as a prediction about where symptoms should and should not appear, to find the boundary at which one prediction fails, and then to replace inference from telemetry with direct instrumentation of the suspect path.",
+  "runs": [
+    {
+      "item_id": "locobench-slot3-test-f009-t0",
+      "item_name": "Computer Science -- CONFLICT r0",
+      "arm": "mined:gpt-oss-120b:windowed:slot3",
+      "relation_source": "mined",
+      "model": "gpt-oss-120b",
+      "pair_policy": "windowed",
+      "family_id": "f009",
+      "family": null,
+      "rung_index": null,
+      "rung_name": null,
+      "perturbation": null,
+      "num_atoms": 14,
+      "num_gold_relations": 11,
+      "model_id": "openai/gpt-oss-120b-a100",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/gpt-oss-120b-a100",
+      "window": 4,
+      "gate": "none",
+      "nli_method": "logprobs",
+      "strength_method": "surrogate_logprobs",
+      "strength_samples": 8,
+      "max_concurrency": 16,
+      "max_distance": null,
+      "discourse": true,
+      "strategy": "slot3",
+      "sense_menu": "slot3",
+      "reconcile": "strict",
+      "prompt_variant": "v2",
+      "require_evidence": true,
+      "taxonomy": "v2",
+      "num_pairs_scored": 24,
+      "num_dropped_none": 17,
+      "num_inadmissible_sense": 0,
+      "num_unparseable_coupling": 0,
+      "num_evidence_rejected": 0,
+      "num_llm_calls": 31,
+      "num_call_exceptions": 0,
+      "call_exceptions_by_stage": {},
+      "call_exceptions_by_type": {},
+      "call_error_rate": 0.0,
+      "num_relations": 7,
+      "coverage": {
+        "policy": "windowed",
+        "num_atoms": 14,
+        "total_ordered_pairs": 182,
+        "window": 4,
+        "gate": null,
+        "gate_backend": null,
+        "gate_threshold": null,
+        "num_window_pairs": 46,
+        "num_callback_pairs": 0,
+        "pairs_selected": 24,
+        "forward_pairs_possible": 91,
+        "pairs_pruned": 67,
+        "discourse_anchored": true,
+        "num_sentences": 17,
+        "num_atoms_aligned": 14,
+        "num_promoted": 1,
+        "num_demoted": 23,
+        "pairs_scored": 24,
+        "dropped_none": 17,
+        "relations_kept": 7,
+        "llm_calls": 31,
+        "llm_call_errors": 0,
+        "llm_call_errors_by_stage": {},
+        "llm_call_errors_by_type": {},
+        "drops_by_reason": {},
+        "num_inadmissible_sense": 0,
+        "num_unparseable_coupling": 0,
+        "num_evidence_rejected": 0
+      },
+      "miner_config": {
+        "nli_method": "logprobs",
+        "strength_method": "surrogate_logprobs",
+        "strength_samples": 8,
+        "pair_policy": "windowed",
+        "window": 4,
+        "max_distance": null,
+        "gate": "none",
+        "gate_threshold": 0.3,
+        "discourse": true,
+        "discourse_gate_threshold": 0.2,
+        "discourse_sentence_span": 2,
+        "sense_menu": "slot3",
+        "taxonomy": "v2",
+        "reconcile": "strict",
+        "prompt_variant": "v2",
+        "require_evidence": true,
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.9,
+        "a4": 0.1,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.9,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.1,
+        "a12": 0.9,
+        "a13": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a1",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "a record that cannot be squared with the persistence of the failures on hosts whose memory modules had been freshly replaced"
+        },
+        {
+          "source": "a2",
+          "target": "a3",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "cannot be squared with the fact that hardware faults typically cluster on individual machines rather than following a single code path"
+        },
+        {
+          "source": "a5",
+          "target": "a6",
+          "type": "co_necessity",
+          "sense": "Disjunction",
+          "probability": 0.9999955429544738,
+          "strength": 0.999999,
+          "type_confidence": 0.9999965429510168,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "at least one of two conditions had to obtain, and perhaps both held together: uncorrectable errors in the cluster's memory, or an application that accessed shared state without synchronization"
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "produced the race condition"
+        },
+        {
+          "source": "a8",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.9999984039548565,
+          "strength": 0.999999,
+          "type_confidence": 0.9999994039542605,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "that report led directly to a remediation that added a memory barrier"
+        },
+        {
+          "source": "a9",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.999998960263613,
+          "strength": 0.999999,
+          "type_confidence": 0.9999999602635733,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "that report led directly to a remediation that added a memory barrier"
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.999999,
+          "strength": 0.999999,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": "That is, no host running the previous application release produced a corrupted response"
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7052652142857143,
+        "consistency": 0.9910993757289541,
+        "reified": 0.499997,
+        "log_partition": 0.25507509178916754
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.642859,
+          "a1": 0.321433,
+          "a10": 0.999833,
+          "a11": 0.1,
+          "a12": 0.987805,
+          "a13": 0.987805,
+          "a2": 0.642859,
+          "a3": 0.321433,
+          "a4": 0.1,
+          "a5": 0.95,
+          "a6": 0.95,
+          "a7": 0.9,
+          "a8": 0.971352,
+          "a9": 0.998334
+        },
+        "num_below_prior": 4,
+        "avg_norm_entropy": 0.4335662964332568,
+        "log_z": -4.52305,
+        "log_z_max": -0.590835,
+        "log_z_min": -5.869508
+      },
+      "comparison": {
+        "gold_edges_total": 11,
+        "gold_edges_scorable": 8,
+        "mined_edges_total": 7,
+        "pair": {
+          "tp": 6,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8571428571428571,
+          "recall": 0.75,
+          "f1": 0.7999999999999999
+        },
+        "coupling": {
+          "tp": 6,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8571428571428571,
+          "recall": 0.75,
+          "f1": 0.7999999999999999
+        },
+        "sense": {
+          "tp": 6,
+          "fp": 1,
+          "fn": 2,
+          "precision": 0.8571428571428571,
+          "recall": 0.75,
+          "f1": 0.7999999999999999
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 7,
+            "found": 6,
+            "recall": 0.8571428571428571
+          },
+          "backward": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 4,
+            "found": 4,
+            "recall": 1.0
+          },
+          "True": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          }
+        },
+        "recall_by_window_admission": {
+          "None": {
+            "total": 8,
+            "found": 6,
+            "recall": 0.75
+          }
+        },
+        "recall_by_coupling": {
+          "co_necessity": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "contradiction": {
+            "total": 2,
+            "found": 2,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 4,
+            "found": 2,
+            "recall": 0.5
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_validity": {
+          "None": {
+            "total": 8,
+            "found": 6,
+            "recall": 0.75
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 127.495,
+      "run_config_fingerprint": "0e37387ee119"
+    }
+  ]
+}
