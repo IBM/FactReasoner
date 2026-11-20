@@ -103,6 +103,10 @@ class Level2Sense(str, Enum):
     INSTANTIATION = "Instantiation"
     CONTRAST = "Contrast"
     CONCESSION = "Concession"
+    # An asserted incompatibility: the text says the two claims cannot both hold
+    # ("it cannot have, since ...", "cannot be squared with"). Added with taxonomy v2,
+    # which moves Contrast and Concession to no factor (ARR coherence paper, Table 1).
+    REFUTATION = "Refutation"
     # Exhaustive competing alternatives (exactly one holds) -> EXCLUSIVE, and a
     # disjunction / joint prerequisite (at least one holds) -> CO_NECESSITY.
     # Added with the Level-1 3->5 coupling extension (revised deep-dive Table 2).
@@ -171,7 +175,16 @@ class SenseSpec:
 
 
 # Deep-dive Table 2: "Compiling Level-2 discourse senses to Level-1 factors."
-COMPILE = {
+#
+# TWO VERSIONS. v1 is the map every corpus built before 2026-11-18 was labelled with:
+# Contrast and Concession compile to contradiction. v2 is the map the ARR coherence paper
+# states (Table 1): only an asserted incompatibility (Refutation) compiles to
+# contradiction, while Contrast and Concession deny an expectation, not the conjunction,
+# and produce no factor. v2 is the default (`COMPILE`). v1 stays for data and prompts
+# written against it: the v1 LoCoBench generator, its corpora (items without
+# `meta.taxonomy` are v1), and the existing miners, whose prompts teach
+# "Contrast, Concession -> contradiction". Those consumers pin "v1" explicitly.
+COMPILE_V1 = {
     Level2Sense.CAUSE_EFFECT: SenseSpec(LEVEL1_ENTAILMENT, None, directed=True),
     Level2Sense.EFFECT_CAUSE: SenseSpec(LEVEL1_ENTAILMENT, None, directed=True),
     Level2Sense.EVIDENCE: SenseSpec(LEVEL1_ENTAILMENT, None, directed=True),
@@ -192,11 +205,41 @@ COMPILE = {
     Level2Sense.SUCCESSION: SenseSpec(
         LEVEL1_NONE, None, directed=True, ordering_only=True
     ),
+    Level2Sense.REFUTATION: SenseSpec(LEVEL1_CONTRADICTION, None, directed=False),
     Level2Sense.NONE: SenseSpec(LEVEL1_NONE, None, directed=False),
 }
 
+COMPILE_V2 = {
+    **COMPILE_V1,
+    Level2Sense.CONTRAST: SenseSpec(LEVEL1_NONE, None, directed=False),
+    Level2Sense.CONCESSION: SenseSpec(LEVEL1_NONE, None, directed=True),
+    Level2Sense.REFUTATION: SenseSpec(LEVEL1_CONTRADICTION, None, directed=False),
+}
 
-def compile_sense(sense, raw_p: float | None = None):
+TAXONOMIES = {"v1": COMPILE_V1, "v2": COMPILE_V2}
+DEFAULT_TAXONOMY = "v2"
+COMPILE = TAXONOMIES[DEFAULT_TAXONOMY]
+
+
+def compile_map(taxonomy: str = DEFAULT_TAXONOMY) -> dict:
+    """The sense -> coupling map of one taxonomy version.
+
+    Args:
+        taxonomy: ``"v1"`` (Contrast/Concession -> contradiction) or ``"v2"``
+            (Refutation -> contradiction, Contrast/Concession -> none).
+
+    Raises:
+        ValueError: On an unknown version.
+    """
+    try:
+        return TAXONOMIES[taxonomy]
+    except KeyError:
+        raise ValueError(
+            f"Unknown taxonomy {taxonomy!r} (expected one of {sorted(TAXONOMIES)})."
+        ) from None
+
+
+def compile_sense(sense, raw_p: float | None = None, taxonomy: str = DEFAULT_TAXONOMY):
     """Compile a Level-2 sense to a Level-1 coupling and effective strength.
 
     Applies the deterministic map ``COMPILE`` (deep-dive Table 2). The effective
@@ -208,6 +251,7 @@ def compile_sense(sense, raw_p: float | None = None):
         sense: A :class:`Level2Sense` or a sense string (parsed via
             :meth:`Level2Sense.from_string`).
         raw_p: The miner's strength estimate for this relation, if available.
+        taxonomy: The compile-map version (see :func:`compile_map`).
 
     Returns:
         A tuple ``(level1_coupling, effective_strength, spec)`` where
@@ -215,7 +259,7 @@ def compile_sense(sense, raw_p: float | None = None):
     """
     if not isinstance(sense, Level2Sense):
         sense = Level2Sense.from_string(str(sense))
-    spec = COMPILE[sense]
+    spec = compile_map(taxonomy)[sense]
 
     if spec.level1 == LEVEL1_NONE:
         return LEVEL1_NONE, None, spec
@@ -321,12 +365,32 @@ GOLD9_SENSES: tuple[Level2Sense, ...] = (
     Level2Sense.PRECEDENCE,
 )
 
+# Over the v1 map, which is what those corpora were labelled with.
 LEGAL_SENSE_COUPLING: frozenset[tuple[str, str]] = frozenset(
-    (s.value, COMPILE[s].level1) for s in GOLD9_SENSES
+    (s.value, COMPILE_V1[s].level1) for s in GOLD9_SENSES
+)
+
+# The senses the slot3 corpora (taxonomy v2) use: `locobench.slots.PLAN_SENSES`. Effect-
+# Cause, Condition and Instantiation are absent there because their direction is the one
+# readers disagree on; Refutation is the only conflict sense.
+SLOT3_SENSES: tuple[Level2Sense, ...] = (
+    Level2Sense.CAUSE_EFFECT,
+    Level2Sense.EVIDENCE,
+    Level2Sense.RESTATEMENT,
+    Level2Sense.REFUTATION,
+    Level2Sense.CONTRAST,
+    Level2Sense.CONCESSION,
+    Level2Sense.ALTERNATIVE,
+    Level2Sense.DISJUNCTION,
+    Level2Sense.PRECEDENCE,
+    Level2Sense.SUCCESSION,
+)
+LEGAL_SENSE_COUPLING_SLOT3: frozenset[tuple[str, str]] = frozenset(
+    (s.value, COMPILE_V2[s].level1) for s in SLOT3_SENSES
 )
 
 # Sense-menu names accepted by the miner / prompt builder.
-SENSE_MENUS = ("full", "gold9")
+SENSE_MENUS = ("full", "gold9", "slot3")
 
 
 def menu_senses(menu: str = "full") -> tuple[Level2Sense, ...]:
@@ -339,6 +403,8 @@ def menu_senses(menu: str = "full") -> tuple[Level2Sense, ...]:
         return tuple(Level2Sense)
     if menu == "gold9":
         return GOLD9_SENSES
+    if menu == "slot3":
+        return SLOT3_SENSES
     raise ValueError(f"Unknown sense menu {menu!r} (expected one of {list(SENSE_MENUS)}).")
 
 
@@ -352,6 +418,9 @@ def is_admissible(sense, coupling: str, menu: str = "full") -> bool:
     """
     if menu == "full":
         return True
+    if menu == "slot3":
+        name = sense.value if isinstance(sense, Level2Sense) else str(sense)
+        return (name, str(coupling)) in LEGAL_SENSE_COUPLING_SLOT3
     if menu != "gold9":
         raise ValueError(
             f"Unknown sense menu {menu!r} (expected one of {list(SENSE_MENUS)})."

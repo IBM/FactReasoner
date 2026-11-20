@@ -427,11 +427,13 @@ class TestPromptDrift:
     def test_all_ten_prompts_present(self):
         assert set(prompts.PROMPTS) == set(prompts.GENERATION_PROMPTS) | set(
             prompts.VALIDATION_PROMPTS
-        )
+        ) | set(prompts.SLOT3_PROMPTS)
         # Phase 1's nine, minus V2 (removed with the exhaustiveness adjudicator, since
         # COMPILE derives `exclusive`/`co_necessity` from the sense), plus V5 and V5c: the
-        # rung realization gate and its content-only drop-target screen.
-        assert len(prompts.PROMPTS) == 11
+        # rung realization gate and its content-only drop-target screen. The slot3 design
+        # (`locobench.slots`) adds its own five.
+        assert len(prompts.PROMPTS) - len(prompts.SLOT3_PROMPTS) == 11
+        assert len(prompts.SLOT3_PROMPTS) == 5
         assert "V2" not in prompts.PROMPTS
         assert {"V5", "V5c", "V5r"} <= set(prompts.VALIDATION_PROMPTS)
 
@@ -3900,7 +3902,10 @@ class TestPromptTexParity:
     while this test only asserts that prompts the harness SHIPS match it.
     """
 
-    @pytest.mark.parametrize("pid", sorted(prompts.PROMPTS))
+    # The Phase 1 document records the v1 design's prompts; the slot3 prompts postdate it.
+    @pytest.mark.parametrize(
+        "pid", sorted(set(prompts.PROMPTS) - set(prompts.SLOT3_PROMPTS))
+    )
     def test_the_prompt_matches_the_phase_one_document(self, pid):
         tex = open(
             "docs/ideation/coherence/benchmark/locobench_phase1.tex", encoding="utf-8"

@@ -116,6 +116,16 @@ MINING_STRATEGIES: dict[str, dict[str, Any]] = {
         "require_evidence": True,
         "reconcile": "strict",
     },
+    # The v2 strategy under taxonomy v2, for the slot3 corpora: Refutation is the only
+    # conflict sense, Contrast/Concession produce no factor, and the menu is the ten
+    # senses those corpora use.
+    "slot3": {
+        "sense_menu": "slot3",
+        "prompt_variant": "v2",
+        "require_evidence": True,
+        "reconcile": "strict",
+        "taxonomy": "v2",
+    },
 }
 
 
@@ -259,6 +269,7 @@ async def abuild_mined_result(
     prompt_variant: str = "v1",
     require_evidence: bool = False,
     show_progress: bool = False,
+    taxonomy: str = "v1",
 ) -> MiningResult:
     """Mine one item's relations with its atoms and priors held fixed.
 
@@ -333,6 +344,7 @@ async def abuild_mined_result(
         prompt_variant=prompt_variant,
         require_evidence=require_evidence,
         show_progress=show_progress,
+        taxonomy=taxonomy,
         **kwargs,
     )
     result = await miner.amine_from_atoms(atoms, str(response), node_priors=priors)

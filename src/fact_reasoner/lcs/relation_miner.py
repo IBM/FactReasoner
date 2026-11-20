@@ -372,6 +372,7 @@ class RelationMiner:
         require_evidence: bool = False,
         show_progress: bool = False,
         on_progress: Callable[[str, int, int], None] | None = None,
+        taxonomy: str = "v1",
     ):
         """Initialize the relation miner.
 
@@ -557,8 +558,12 @@ class RelationMiner:
         # model asserts only relations the response actually draws (pruning
         # spurious, abstractly-plausible edges that cause over-connection).
         # Grounding is mandatory -- there is no ungrounded path.
+        # Which compile map the prompt teaches and reconciliation uses: v1 (the
+        # default, Contrast/Concession -> contradiction) or v2 (Refutation is the only
+        # conflict sense; ARR coherence paper Table 1), for the slot3 corpora.
+        self.taxonomy = taxonomy
         self._sense_prompt = build_sense_coupling_prompt(
-            variant=prompt_variant, menu=sense_menu
+            variant=prompt_variant, menu=sense_menu, taxonomy=taxonomy
         )
         self._strength_prompt = build_strength_prompt()
         self._surrogate_strength_prompt = build_surrogate_strength_prompt()
@@ -858,6 +863,7 @@ class RelationMiner:
             "discourse_gate_threshold": self.discourse_gate_threshold,
             "discourse_sentence_span": self.discourse_sentence_span,
             "sense_menu": self.sense_menu,
+            "taxonomy": self.taxonomy,
             "reconcile": self.reconcile,
             "prompt_variant": self.prompt_variant,
             "require_evidence": self.require_evidence,
@@ -1248,7 +1254,10 @@ class RelationMiner:
         # taxonomy does not recognise, inventing a coupling nobody supplied. And
         # because `_type_confidence` reads the logprobs of the coupling span, the
         # confidence then attached belongs to the DISCARDED answer.
-        compiled_level1, _, spec = compile_sense(sense, None)
+        # In the taxonomy the prompt taught (v1 by default: its prompts say "Contrast,
+        # Concession -> contradiction", so reconciling against v2 would discard the very
+        # conflicts the prompt asked for).
+        compiled_level1, _, spec = compile_sense(sense, None, taxonomy=self.taxonomy)
         if self.reconcile == "ratchet":
             if level1 == LEVEL1_NONE and compiled_level1 != LEVEL1_NONE:
                 level1 = compiled_level1

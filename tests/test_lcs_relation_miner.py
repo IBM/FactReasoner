@@ -170,8 +170,35 @@ class TestTaxonomy:
         ],
     )
     def test_compile_map_matches_table2(self, sense, expected_level1):
+        # Table 2 is the v1 map, which the existing corpora and miner prompts use.
+        level1, _strength, _spec = compile_sense(sense, 0.7, taxonomy="v1")
+        assert level1 == expected_level1
+
+    @pytest.mark.parametrize(
+        "sense,expected_level1",
+        [
+            (Level2Sense.REFUTATION, LEVEL1_CONTRADICTION),
+            (Level2Sense.CONTRAST, LEVEL1_NONE),
+            (Level2Sense.CONCESSION, LEVEL1_NONE),
+            (Level2Sense.CAUSE_EFFECT, LEVEL1_ENTAILMENT),
+            (Level2Sense.ALTERNATIVE, LEVEL1_EXCLUSIVE),
+        ],
+    )
+    def test_v2_map_matches_paper_table1(self, sense, expected_level1):
+        # v2 (the default) is the ARR coherence paper's Table 1: only an asserted
+        # incompatibility compiles to contradiction.
         level1, _strength, _spec = compile_sense(sense, 0.7)
         assert level1 == expected_level1
+
+    def test_refutation_compiles_to_contradiction_in_both_versions(self):
+        for tax in ("v1", "v2"):
+            level1, _s, spec = compile_sense(Level2Sense.REFUTATION, 0.7, taxonomy=tax)
+            assert level1 == LEVEL1_CONTRADICTION
+            assert spec.directed is False
+
+    def test_unknown_taxonomy_raises(self):
+        with pytest.raises(ValueError):
+            compile_sense(Level2Sense.CONTRAST, 0.7, taxonomy="v9")
 
     def test_restatement_has_strength_prior(self):
         # Restatement starts near 0.90 when no estimate is supplied.
@@ -181,7 +208,8 @@ class TestTaxonomy:
         assert spec.directed is False
 
     def test_concession_is_flagged(self):
-        _l, _s, spec = compile_sense(Level2Sense.CONCESSION, 0.8)
+        # v1 only: under v2 a Concession produces no factor, so there is nothing to discount.
+        _l, _s, spec = compile_sense(Level2Sense.CONCESSION, 0.8, taxonomy="v1")
         assert spec.is_concession is True
 
     def test_ordering_only_senses_produce_no_edge(self):

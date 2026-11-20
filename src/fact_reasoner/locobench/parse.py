@@ -602,6 +602,139 @@ def parse_resolution(text: str) -> tuple[dict[str, Any] | None, str | None]:
     return {"tension_sentence": tension, "resolving_sentence": resolving,
             "resolved": resolved, "model_said": bool(obj.get("resolved"))}, None
 
+# ---- slot3 parsers ------------------------------------------------------------
+#
+# Structural only: the semantic gates live in `locobench.slots` and run as `check=`
+# callbacks, so a parse failure here means "unreadable", never "unacceptable".
+
+
+def _json_block_lenient(text: str) -> tuple[Any, str | None]:
+    """`_json_block`, then once more allowing raw control characters inside strings.
+
+    A 500-word template is a long JSON string, and models often break it with literal
+    newlines rather than ``\n`` escapes; ``strict=False`` reads those as intended.
+    """
+    obj, err = _json_block(text)
+    if err is None:
+        return obj, None
+    block = extract_first_code_block(text, ignore_language=True)
+    cand = (block or text).strip()
+    start, end = cand.find("{"), cand.rfind("}")
+    if start == -1 or end <= start:
+        return None, err
+    try:
+        return json.loads(cand[start: end + 1], strict=False), None
+    except json.JSONDecodeError:
+        return None, err
+
+
+def parse_slot_plan(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """S3: a JSON object with atoms, relations, slots and non_relations lists."""
+    obj, err = _json_block_lenient(text)
+    if err is not None:
+        return None, err
+    if not isinstance(obj, dict):
+        return None, "the plan must be a JSON object"
+    for key in ("atoms", "relations", "slots", "non_relations"):
+        if not isinstance(obj.get(key), list):
+            return None, f"the plan needs a {key!r} list"
+    for a in obj["atoms"]:
+        if not isinstance(a, dict) or not isinstance(a.get("pos"), int) or not a.get("text"):
+            return None, "every atom needs an integer 'pos' and a 'text'"
+    for key in ("relations", "slots", "non_relations"):
+        for r in obj[key]:
+            if not isinstance(r, dict) or not all(
+                isinstance(r.get(f), int) for f in ("source_pos", "target_pos")
+            ):
+                return None, f"every entry of {key!r} needs integer source_pos/target_pos"
+    return obj, None
+
+
+def parse_template(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """S4: {"template": str, "fillers": {slot: {kind: str}}}."""
+    obj, err = _json_block_lenient(text)
+    if err is not None:
+        return None, err
+    if not isinstance(obj, dict) or not isinstance(obj.get("template"), str):
+        return None, "output a JSON object with a string 'template'"
+    fillers = obj.get("fillers")
+    if not isinstance(fillers, dict) or not all(
+        isinstance(v, dict) and all(isinstance(t, str) for t in v.values())
+        for v in fillers.values()
+    ):
+        return None, "'fillers' must map each slot id to an object of kind -> sentence(s)"
+    if "{{" not in obj["template"]:
+        return None, "the template contains no slot marker such as {{S1}}"
+    return obj, None
+
+
+def parse_filler(text: str) -> tuple[str | None, str | None]:
+    """SF: {"filler": str}."""
+    obj, err = _json_block_lenient(text)
+    if err is not None:
+        return None, err
+    if not isinstance(obj, dict) or not isinstance(obj.get("filler"), str) or not obj[
+        "filler"
+    ].strip():
+        return None, 'output a JSON object {"filler": "..."}'
+    return obj["filler"].strip(), None
+
+
+_LINK_LABELS = (
+    "i_supports_j", "j_supports_i", "incompatible", "equivalent", "exactly_one",
+    "at_least_one", "precedes", "follows", "contrast_only", "concedes", "unlinked",
+)
+
+
+def parse_link_list(text: str) -> tuple[list[dict[str, Any]] | None, str | None]:
+    """SV1: a JSON list of {"pair": [i, j], "label": ...}."""
+    obj, err = _json_block(text)
+    if err is not None:
+        return None, err
+    if isinstance(obj, dict):
+        obj = next((v for v in obj.values() if isinstance(v, list)), None)
+    if not isinstance(obj, list):
+        return None, "output a JSON list"
+    out = []
+    for e in obj:
+        if not isinstance(e, dict):
+            continue
+        pair = e.get("pair")
+        lab = str(e.get("label", "")).strip().lower()
+        if (isinstance(pair, list) and len(pair) == 2 and lab in _LINK_LABELS):
+            try:
+                out.append({"pair": [int(pair[0]), int(pair[1])], "label": lab,
+                            "evidence": str(e.get("evidence") or "")})
+            except (TypeError, ValueError):
+                continue
+    if not out and obj:
+        return None, f"no entry has a valid pair and one of the labels {list(_LINK_LABELS)}"
+    return out, None
+
+
+def parse_link_reading(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """SV5: {"x_status", "y_status", "link", "other_links", "evidence"}."""
+    obj, err = _json_block(text)
+    if err is not None:
+        return None, err
+    if not isinstance(obj, dict):
+        return None, "output a JSON object"
+    link = str(obj.get("link", "")).strip().lower()
+    if link not in _LINK_LABELS:
+        return None, f"'link' must be one of {list(_LINK_LABELS)}"
+    st = {}
+    for k in ("x_status", "y_status"):
+        v = str(obj.get(k, "")).strip().lower()
+        if v not in ("asserted", "denied", "absent"):
+            return None, f"{k!r} must be asserted, denied or absent"
+        st[k] = v
+    other = obj.get("other_links") or []
+    if not isinstance(other, list):
+        other = [str(other)]
+    return {**st, "link": link, "other_links": [str(o) for o in other if str(o).strip()],
+            "evidence": str(obj.get("evidence") or "")}, None
+
+
 PARSERS = {
     "P1": parse_question,
     "P2": parse_claims,
@@ -614,6 +747,11 @@ PARSERS = {
     "V5": parse_realization,
     "V5c": parse_compatibility,
     "V5r": parse_resolution,
+    "S3": parse_slot_plan,
+    "S4": parse_template,
+    "SF": parse_filler,
+    "SV1": parse_link_list,
+    "SV5": parse_link_reading,
 }
 
 __all__ = [

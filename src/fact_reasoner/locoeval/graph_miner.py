@@ -97,6 +97,62 @@ MAX_TOKENS = 16000
 # either one would otherwise silently shrink the vote denominator.
 MAX_ATTEMPTS = 4
 
+# The graph-recovery prompt under taxonomy v2 (ARR coherence paper, Table 1): Refutation is
+# the only sense that sets two claims against each other as a logical conflict, Contrast and
+# Concession produce no factor, and every entailment runs from the supporting claim to the
+# supported one. The menu is the ten senses the slot3 corpus uses (`locobench.slots.
+# PLAN_SENSES`), mirroring the v1 miner's gold9 admissibility filter. It is NOT the prompt
+# the slot3 committee admits items with (that is SV1, a blind pair-by-pair verification),
+# so the mined arms are no longer selected by their own prompt.
+PROMPT_GRAPH_V2 = r"""
+Let's define a function named recover_relations(response: str,
+atoms: dict[str, str]).
+Given a RESPONSE and the ATOMS drawn from it, the function returns the list of logical
+relations the response ITSELF draws between those atoms.
+
+ATOMS maps an atom's NUMBER to its text, numbered from 1. Use those numbers, as integers,
+to identify atoms in your output. Never renumber them and never count from zero.
+
+For each pair of atoms that the response actually relates, emit one object:
+  {"source": i, "target": j,
+   "sense": one of ["Cause-Effect","Evidence","Restatement","Refutation","Contrast",
+     "Concession","Alternative","Disjunction","Precedence","Succession"],
+   "coupling": one of ["entailment","contradiction","equivalence","exclusive",
+     "co_necessity","none"],
+   "strength_band": one of ["strong","moderate","weak"]}
+
+Senses:
+- "Cause-Effect": the response presents the source as bringing the target about
+  ("caused", "led to", "resulted in", "because"). The source is always the cause.
+- "Evidence": the response presents the source as evidence or a reason for accepting the
+  target ("shows", "indicates", "confirms", "as shown by"). The source is the support.
+- "Restatement": the two say the same thing ("that is", "in other words").
+- "Refutation": the response asserts that the two CANNOT BOTH be true - one rules the other
+  out ("cannot be squared with", "rules out", "it cannot have, since").
+- "Contrast": the response sets the two side by side as contrasting ("by contrast",
+  "whereas", "but") WITHOUT saying they cannot both be true.
+- "Concession": the response grants one while asserting the other anyway ("although",
+  "despite", "even though").
+- "Alternative": exactly one of the two holds - they cannot both hold and cannot both fail.
+- "Disjunction": at least one of the two holds, perhaps both.
+- "Precedence" / "Succession": only a time ordering, the source before / after the target.
+
+Rules:
+- Emit a relation ONLY if the response itself draws that connection, as written or as a
+  clear step in the author's argument. Do not emit a relation that is merely plausible.
+- Distinguish Refutation from Contrast by whether the response asserts incompatibility.
+- Relate a pair only ONCE; pairs the response leaves unrelated are omitted.
+- "coupling" is fixed by the sense: Cause-Effect and Evidence are "entailment";
+  Restatement is "equivalence"; Refutation is "contradiction"; Alternative is
+  "exclusive"; Disjunction is "co_necessity"; Contrast, Concession, Precedence and
+  Succession are "none".
+
+The function returns a JSON list. Note that your response will be passed to the
+python interpreter, SO NO OTHER WORDS!
+
+recover_relations(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])
+"""
+
 _VERIFY_HINT = """
 A separate, high-recall but LOW-PRECISION extractor proposed the CANDIDATES below,
 using the same atom numbering. Many candidates are wrong: the two atoms are unrelated,
@@ -120,19 +176,30 @@ class GraphRecipe:
     k: int = 5
     weighting: str = "vote_band"  # vote_band | band | gold_band | rits_strength
     strength_model: str | None = None
+    # Compile map of the prompt and the vote: "v1", or "v2" (variant suffix "-tv2"),
+    # which selects PROMPT_GRAPH_V2 for the slot3 corpora.
+    taxonomy: str = "v1"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "k": self.k,
             "weighting": self.weighting,
             "strength_model": self.strength_model,
+            "taxonomy": self.taxonomy,
         }
 
 
 def parse_recipe(variant: str | None) -> GraphRecipe:
-    """Parse a graph arm's variant label (`k5`, `k5-band`, `k5-sgpt-oss-120b`)."""
+    """Parse a graph arm's variant label (`k5`, `k5-band`, `k5-sgpt-oss-120b`).
+
+    A trailing ``-tv2`` selects taxonomy v2 (``k5-tv2``, ``k5-band-tv2``).
+    """
     if not variant:
         return GraphRecipe()
+    if variant.endswith("-tv2"):
+        from dataclasses import replace
+
+        return replace(parse_recipe(variant[: -len("-tv2")]), taxonomy="v2")
     head, _, tail = variant.partition("-")
     if not head.startswith("k") or not head[1:].isdigit() or int(head[1:]) < 1:
         raise GraphMinerError(
@@ -170,9 +237,19 @@ def build_prompt(
     item: Mapping[str, Any],
     mode: str,
     candidates: Sequence[Mapping[str, Any]] | None = None,
+    taxonomy: str = "v1",
 ) -> str:
-    """Render the V1 (graph) or V1+candidates (verify) prompt for one item."""
+    """Render the V1 (graph) or V1+candidates (verify) prompt for one item.
+
+    ``taxonomy="v2"`` renders :data:`PROMPT_GRAPH_V2` instead (graph mode only).
+    """
     atoms_arg, _ = _atoms_arg(item)
+    if taxonomy == "v2":
+        if mode != "graph":
+            raise GraphMinerError("The v2 graph prompt supports mode 'graph' only.")
+        return PROMPT_GRAPH_V2.replace(
+            "[RESPONSE_PLACEHOLDER]", str(item.get("response") or "")
+        ).replace("[ATOMS_PLACEHOLDER]", atoms_arg)
     prompt = lb_prompts.fill(
         "V1", response=str(item.get("response") or ""), atoms=atoms_arg
     )
@@ -481,7 +558,9 @@ def _band_mid(band: str | None) -> float:
 
 
 def vote(
-    samples: Sequence[Mapping[str, Any]], pos_to_id: Mapping[int, str]
+    samples: Sequence[Mapping[str, Any]],
+    pos_to_id: Mapping[int, str],
+    taxonomy: str = "v1",
 ) -> list[dict[str, Any]]:
     """Aggregate K recovered graphs into consensus edges.
 
@@ -502,7 +581,7 @@ def vote(
         seen: set[tuple[int, int]] = set()
         for r in s.get("relations") or []:
             try:
-                coupling = coupling_for_sense(str(r["sense"]))
+                coupling = coupling_for_sense(str(r["sense"]), taxonomy)
             except ValueError:
                 continue
             if coupling == LEVEL1_NONE:
@@ -523,7 +602,7 @@ def vote(
             continue
         def label(r):
             sense = str(r["sense"])
-            if is_directed(sense):
+            if is_directed(sense, taxonomy):
                 return (sense, int(r["source"]), int(r["target"]))
             return (sense, key[0], key[1])
         best, count = Counter(label(r) for r in rs).most_common(1)[0]
@@ -540,8 +619,8 @@ def vote(
                 "source_id": pos_to_id[src],
                 "target_id": pos_to_id[tgt],
                 "sense": sense,
-                "coupling": coupling_for_sense(sense),
-                "directed": bool(is_directed(sense)),
+                "coupling": coupling_for_sense(sense, taxonomy),
+                "directed": bool(is_directed(sense, taxonomy)),
                 "vote_share": share,
                 "label_share": count / len(rs),
                 "band": band,

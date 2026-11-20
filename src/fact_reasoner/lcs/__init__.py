@@ -158,6 +158,11 @@ from fact_reasoner.lcs.strength import (
 )
 from fact_reasoner.lcs.taxonomy import (
     COMPILE,
+    COMPILE_V1,
+    COMPILE_V2,
+    DEFAULT_TAXONOMY,
+    TAXONOMIES,
+    compile_map,
     LEVEL1_CONECESSITY,
     LEVEL1_CONFLICT_COUPLINGS,
     LEVEL1_EDGE_COUPLINGS,
@@ -210,6 +215,11 @@ __all__ = [
     "Level2Sense",
     "SenseSpec",
     "COMPILE",
+    "COMPILE_V1",
+    "COMPILE_V2",
+    "DEFAULT_TAXONOMY",
+    "TAXONOMIES",
+    "compile_map",
     "LEVEL1_EXCLUSIVE",
     "LEVEL1_CONECESSITY",
     "LEVEL1_EDGE_COUPLINGS",

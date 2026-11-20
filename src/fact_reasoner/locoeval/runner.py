@@ -716,6 +716,7 @@ class GoldEvalRunner:
                 prompt_variant=knobs["prompt_variant"],
                 require_evidence=knobs["require_evidence"],
                 show_progress=self.show_progress,
+                taxonomy=knobs.get("taxonomy", "v1"),
             )
         )
 
@@ -742,6 +743,7 @@ class GoldEvalRunner:
                 "reconcile": knobs["reconcile"],
                 "prompt_variant": knobs["prompt_variant"],
                 "require_evidence": knobs["require_evidence"],
+                "taxonomy": knobs.get("taxonomy", "v1"),
                 "num_pairs_scored": cov.get("pairs_scored"),
                 "num_dropped_none": cov.get("dropped_none"),
                 "num_inadmissible_sense": cov.get("num_inadmissible_sense"),
@@ -788,7 +790,7 @@ class GoldEvalRunner:
             if mode == "verify"
             else None
         )
-        prompt = build_prompt(item, mode, candidates)
+        prompt = build_prompt(item, mode, candidates, taxonomy=recipe.taxonomy)
         client = self._chat_client(spec.model)
 
         async def go():
@@ -809,7 +811,7 @@ class GoldEvalRunner:
                 f"succeeded ({stats.get('last_error')})."
             )
         _, pos_to_id = _atoms_arg(item)
-        edges = vote(samples, pos_to_id)
+        edges = vote(samples, pos_to_id, taxonomy=recipe.taxonomy)
 
         strengths = None
         strength_stats: dict[str, Any] = {}

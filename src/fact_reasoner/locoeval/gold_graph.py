@@ -53,7 +53,7 @@ from fact_reasoner.fact_graph import Edge, FactGraph, Node
 from fact_reasoner.factors import build_markov_network
 from fact_reasoner.lcs.relation_miner import MinedRelation, MiningResult, _atom_sort_key
 from fact_reasoner.lcs.taxonomy import LEVEL1_CONFLICT_COUPLINGS, LEVEL1_NONE
-from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense
+from fact_reasoner.locobench.taxonomy_bridge import coupling_for_sense, taxonomy_of
 
 # The unary priors the corpus's factuality labels map to. A `factual` atom is one
 # the generator asserts is true, so it enters the MRF strongly supported; a
@@ -137,7 +137,9 @@ def band_probability(relation: Mapping[str, Any]) -> float:
     return 0.5
 
 
-def _check_sense_coupling(relation: Mapping[str, Any], item_id: str) -> None:
+def _check_sense_coupling(
+    relation: Mapping[str, Any], item_id: str, taxonomy: str = "v1"
+) -> None:
     """Verify a gold relation's coupling is the one its sense compiles to.
 
     Raises:
@@ -146,7 +148,7 @@ def _check_sense_coupling(relation: Mapping[str, Any], item_id: str) -> None:
     sense = relation.get("level2_sense")
     coupling = relation.get("level1_coupling")
     try:
-        expected = coupling_for_sense(str(sense))
+        expected = coupling_for_sense(str(sense), taxonomy)
     except ValueError as e:
         raise GoldGraphError(f"{item_id}: relation {relation.get('id')}: {e}") from e
     if coupling != expected:
@@ -199,14 +201,17 @@ def gold_relations(
     out: list[MinedRelation] = []
     for rel in item.get("relations", []):
         stats["gold_total"] += 1
-        _check_sense_coupling(rel, item_id)
+        # In the version the item was labelled with (`meta.taxonomy`; absent means v1).
+        _check_sense_coupling(rel, item_id, taxonomy_of(item))
 
         coupling = rel.get("level1_coupling")
         if coupling == LEVEL1_NONE:
             # Ordering-only: records order, couples no truth values, no factor.
             stats["dropped_ordering_only"] += 1
             continue
-        if not include_invalid and rel.get("validity") != "valid":
+        # slot3 (taxonomy v2) items carry no validity label: every relation is one the
+        # text draws, and its sign comes from the committed world, so absent means kept.
+        if not include_invalid and rel.get("validity", "valid") != "valid":
             stats["dropped_invalid"] += 1
             continue
 

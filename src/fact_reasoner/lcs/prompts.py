@@ -488,6 +488,42 @@ A: {{atom_a}}
 B: {{atom_b}}
 """
 
+# The slot3 menu (taxonomy v2): `taxonomy.SLOT3_SENSES`.
+_SENSE_MENU_SLOT3 = (
+    "Cause-Effect, Evidence, Restatement, Refutation, Contrast, Concession, "
+    "Alternative, Disjunction, Precedence, Succession, None"
+)
+
+# Taxonomy v2 (ARR coherence paper, Table 1), applied to either Prompt A variant by exact
+# substitution: Refutation is the asserted incompatibility and the only conflict sense;
+# Contrast and Concession deny an expectation and compile to `none`. Each pattern must
+# match exactly once, so a later edit of Prompt A cannot silently drop the v2 rules.
+_V2_REFUTATION = (
+    "   - Refutation: the response asserts that A and B CANNOT BOTH be true -- one rules "
+    "the other out (\"cannot be squared with\", \"rules out\", \"it cannot have, since\").\n"
+)
+_V2_SUBS = {
+    "v1": [
+        ("   - Contrast: A and B are in opposition but NOT exhaustive (they need not cover "
+         "all possibilities; both could conceivably be false).\n",
+         _V2_REFUTATION
+         + "   - Contrast: the response sets A and B side by side as contrasting WITHOUT "
+         "saying they cannot both be true.\n"),
+    ],
+    "v2": [
+        ("   - Contrast: A and B are opposed but NOT exhaustive (both could be false).\n",
+         _V2_REFUTATION
+         + "   - Contrast: the response sets A and B side by side as contrasting WITHOUT "
+         "saying they cannot both be true.\n"),
+        ("   - Precedence, None -> none\n",
+         "   - Precedence, Succession, None -> none\n"),
+    ],
+}
+_V2_MAPPING = ("   - Contrast, Concession -> contradiction\n",
+               "   - Refutation -> contradiction\n"
+               "   - Contrast, Concession -> none (they do not say A and B cannot both hold)\n")
+
+
 # Prompt A variants selectable by the miner. "v1" is byte-identical to the
 # original and is kept permanently so any prompt claim can be A/B'd rather than
 # asserted.
@@ -495,7 +531,7 @@ PROMPT_VARIANTS = ("v1", "v2")
 
 
 def build_sense_coupling_prompt(
-    variant: str = "v1", menu: str = "full"
+    variant: str = "v1", menu: str = "full", taxonomy: str = "v1"
 ) -> str:
     """Return Prompt A (response-grounded) with the sense menu interpolated.
 
@@ -521,11 +557,25 @@ def build_sense_coupling_prompt(
         sense_menu = _SENSE_MENU
     elif menu == "gold9":
         sense_menu = _SENSE_MENU_GOLD9
+    elif menu == "slot3":
+        sense_menu = _SENSE_MENU_SLOT3
     else:
-        raise ValueError(f"Unknown sense menu {menu!r} (expected 'full' or 'gold9').")
+        raise ValueError(
+            f"Unknown sense menu {menu!r} (expected 'full', 'gold9' or 'slot3')."
+        )
     template = (
         PROMPT_SENSE_COUPLING if variant == "v1" else PROMPT_SENSE_COUPLING_V2
     )
+    if taxonomy == "v2":
+        for old, new in _V2_SUBS[variant] + [_V2_MAPPING]:
+            if template.count(old) != 1:
+                raise ValueError(
+                    f"Prompt A {variant} no longer contains {old.strip()!r} exactly once; "
+                    "update the taxonomy-v2 substitutions."
+                )
+            template = template.replace(old, new)
+    elif taxonomy != "v1":
+        raise ValueError(f"Unknown taxonomy {taxonomy!r}.")
     return template.replace("{{sense_menu}}", sense_menu)
 
 

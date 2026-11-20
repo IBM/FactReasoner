@@ -662,6 +662,268 @@ Note that your response will be passed to the python interpreter, SO NO OTHER WO
 find_resolution(text="[TEXT_A_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
 """
 
+# ============================================================================
+# slot3 prompts (`locobench.slots`, `.claude/plans/locobench-slot-ladders.md`).
+#
+# One template per family, written once; rungs are deterministic splices of its slot
+# fillers, so there is no free-rewriting P5. Taxonomy v2: Refutation is the only sense
+# that sets two claims against each other as a logical conflict; Contrast and Concession
+# produce no factor.
+# ============================================================================
+
+# --- S3: slot3 relation plan -----------------------------------------------
+PROMPT_S3 = r"""
+Instructions:
+1. You are given a QUESTION and a tagged list of ATOMIC CLAIMS. Produce a SLOT PLAN for an
+   expert answer: which claims it asserts, in what order, which logical relations it
+   draws between them, and which claim pairs are SLOTS - places where later versions of
+   the answer will vary one link while every other word stays the same.
+2. Select 10-14 claims; aim for 12. Number them with FRESH consecutive positions 1..N in
+   the order the answer will assert them, with no gaps and no repeats. Keep every
+   selected claim's text EXACTLY as given. Select AT LEAST 2 [incorrect] claims: the
+   answer asserts false content alongside the true. Give each atom a "factual" field:
+   false for an [incorrect] claim, true for every other tag.
+3. Plan 6-8 fixed RELATIONS. Each joins two selected claims and has a SENSE:
+   - Cause-Effect: the source brings the target about.
+   - Evidence: the source is evidence that shows the target.
+   - Restatement: source and target say the same thing.
+   - Refutation: the answer asserts that the two CANNOT BOTH be true.
+   - Contrast: the answer sets them side by side as contrasting, without saying they
+     cannot both be true.
+   - Concession: the answer grants the source while asserting the target ("although").
+   - Alternative: EXACTLY ONE of the two holds - not both, not neither. Use your
+     [alt-pair-*] claims.
+   - Disjunction: AT LEAST ONE holds, perhaps both. Use your [disj-pair-*] claims.
+   - Precedence / Succession: the source comes before / after the target in time, with
+     no dependence of truth between them.
+   Every relation must join a DIFFERENT pair of claims, within 5 positions of each other.
+4. Include AT LEAST ONE relation of each of these senses: [SENSES_PLACEHOLDER].
+5. Plan the SLOTS. [SLOTS_PLACEHOLDER]
+   Use ONLY the slot roles named here (the example below shows the format, not
+   your roles). Rules for every slot: it joins two claims at CONSECUTIVE positions (target_pos =
+   source_pos + 1), with the source first; its pair is not used by any relation or
+   non-relation; ids are "S1", "S2", ... in position order. Choose slot pairs on the
+   same subject, where the link a later version draws would be a natural thing for an
+   expert to write.
+6. Give each relation and slot an intended STRENGTH BAND: strong (0.85-1.00), moderate
+   (0.60-0.84) or weak (0.35-0.59).
+7. List 3-5 NON-RELATIONS: pairs of selected claims within 5 positions of each other
+   between which the answer draws no connection. They share no pair with a relation or
+   a slot.
+8. Output a single JSON object in a code block and nothing else, shaped like this example
+   (copy the structure, not the content; your slots follow instruction 5):
+
+```json
+{
+  "atoms": [
+    {"pos": 1, "text": "<claim text>", "factual": true},
+    {"pos": 2, "text": "<claim text>", "factual": true},
+    {"pos": 3, "text": "<claim text>", "factual": false}
+  ],
+  "relations": [
+    {"source_pos": 1, "target_pos": 3, "sense": "Cause-Effect", "strength_band": "moderate"}
+  ],
+  "slots": [
+    {"id": "S1", "role": "conflict_tt", "source_pos": 4, "target_pos": 5,
+     "sense": "Refutation", "strength_band": "strong"},
+    {"id": "S2", "role": "control", "source_pos": 8, "target_pos": 9,
+     "sense": "Evidence", "strength_band": "strong"}
+  ],
+  "non_relations": [
+    {"source_pos": 2, "target_pos": 4}
+  ]
+}
+```
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+ATOMIC CLAIMS: [CLAIMS_PLACEHOLDER]
+SLOT PLAN:
+"""
+
+# --- S4: template and slot fillers -----------------------------------------
+PROMPT_S4 = r"""
+Instructions:
+1. You are given a QUESTION and a PLAN in JSON. Write the TEMPLATE of an expert answer
+   to the QUESTION, and the FILLERS for its slots. Every version of the answer is the
+   template with each slot marker replaced by one of that slot's fillers.
+2. Atoms are claims numbered by "pos" in the order the answer asserts them. An atom whose
+   "slot" field names a slot is NOT written in the template; the marker of that slot,
+   for example {{S1}}, stands alone where those atoms fall in position order, as a
+   sentence position of its own. Assert every other atom EXACTLY ONCE in the template,
+   in position order, keeping its content: quantifiers, numbers, dates, polarity and
+   modals exactly as given. Assert [false] atoms in the same confident register as true
+   ones.
+3. Realize every planned RELATION so a careful reader can recover it from the text alone:
+   Cause-Effect "led to", "caused", "resulted in"; Evidence "shows", "indicates",
+   "confirms"; Restatement "that is", "in
+   other words"; Refutation "cannot both be true", "rules out", "cannot be squared with";
+   Contrast "by contrast", "whereas"; Concession "although", "even though"; Alternative
+   "either ... or", making clear in natural words that one of the two must be true and
+   not both; Disjunction "at least one of ..., perhaps both"; Precedence / Succession
+   "before", "after", "subsequently", purely
+   chronological. For each NON-RELATION, assert both atoms and draw no connection; do
+   not announce that they are unrelated.
+4. FILLERS. For each slot, write one filler per kind listed in its "fillers" object. A
+   filler is one or two complete sentences. It asserts every atom listed in the slot's
+   "owns" (and no other atom), and between the slot's source and target it draws EXACTLY
+   the link its kind describes - no other link, to each other or to any other claim.
+   State every link in terms of the subject matter ("the trench date cannot be squared
+   with the superposition sequence", "if the instrument had failed, the profile could
+   not exist"), never by talking about "these claims", "these propositions" or "these
+   statements", and do not reuse one formula across slots.
+   The fillers of one slot are INTERCHANGEABLE: each must read naturally at the marker's
+   position, with the same grammatical frame and the same reference to the surrounding
+   sentences, so that swapping one filler for another changes only the link. The
+   template must not depend on which filler is used.
+5. A "none" filler states its owned atoms plainly, with no connective, comparison or
+   word implying that one bears on the other; put a short independent clause or a
+   sentence break between them if adjacency alone would suggest a link. Never ANNOUNCE
+   that they are unconnected: no "separately", "independently", "it is also
+   documented", "it is established that", "in a separate matter". The three
+   "para" fillers of a control slot draw the SAME link in the SAME direction in three
+   clearly different wordings: change the connective and the clause order, never the
+   logic.
+6. [LAYOUT_PLACEHOLDER] Write formal, precise expert prose: a continuous answer in which
+   the relations are simply how the argument hangs together, so a reader cannot tell a
+   plan exists. Aim for 420-520 words with every marker replaced by its "base" filler.
+   No headings, lists or annotations; never mention the plan, slots, senses, strength or
+   that any content is false; never hedge with "assume", "might", "possibly",
+   "allegedly", "supposedly", "reportedly" or "it is claimed".
+7. Output one JSON object in a code block and nothing else:
+   {"template": "<paragraphs separated by \n\n, containing each marker once>",
+    "fillers": {"S1": {"<kind>": "<filler>", ...}, ...}}
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+PLAN: [PLAN_PLACEHOLDER]
+OUTPUT:
+"""
+
+# --- SF: regenerate one filler ---------------------------------------------
+PROMPT_SF = r"""
+Instructions:
+1. You are given an expert ANSWER in which one slot is marked [[HERE]], a SLOT
+   description, the FAILED filler that was there, and how independent READERS who were
+   not told the intended link understood it. Write a better filler for that position.
+2. The filler is one or two complete sentences that assert every OWNED atom of the slot,
+   keep each atom's content exactly, and between the slot's source and target draw
+   exactly the LINK described - make it unmistakable to a careful reader, but no
+   stronger than the link, and no link to any other claim.
+3. It must read naturally at [[HERE]] and stay interchangeable with the slot's OTHER
+   FILLERS: the same grammatical frame and the same reference to the surrounding text.
+4. Output one JSON object in a code block and nothing else: {"filler": "..."}
+
+Your Task:
+ANSWER: [CONTEXT_PLACEHOLDER]
+SLOT: [SLOT_PLACEHOLDER]
+OTHER FILLERS: [SIBLINGS_PLACEHOLDER]
+FAILED: [FAILED_PLACEHOLDER]
+READERS: [READINGS_PLACEHOLDER]
+FILLER:
+"""
+
+# --- SV1: verify the planned links, pair by pair (blind to the plan) -------
+PROMPT_SV1 = r"""
+Let's define a function named classify_links(response: str, atoms: dict[str, str],
+pairs: list[list[int]]).
+ATOMS maps an atom's NUMBER to its text. For each listed pair [i, j] of atom numbers,
+the function reports the connection the RESPONSE ITSELF draws between atom i and atom j,
+as written - not whether either is true, and not whether one would follow in general.
+
+Labels:
+  "i_supports_j"  the response presents atom i as a cause of atom j, or as evidence or
+                  a reason for accepting atom j
+  "j_supports_i"  the same, with atom j as the support
+  "incompatible"  the response says the two cannot both be true (one rules out the other)
+  "equivalent"    the response presents them as saying the same thing
+  "exactly_one"   exactly one of them holds: they cannot both hold and cannot both fail
+  "at_least_one"  at least one of them holds, perhaps both
+  "precedes"      only a time ordering, atom i before atom j
+  "follows"       only a time ordering, atom i after atom j
+  "contrast_only" set side by side as contrasting, without saying they cannot both hold
+  "concedes"      one is granted while the other is asserted anyway ("although i, j")
+  "unlinked"      the response draws no connection between them
+
+The function returns a JSON list with one object per listed pair, in order:
+  {"pair": [i, j], "label": <one label>, "evidence": <short verbatim quote, or "">}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+classify_links(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER], pairs=[PAIRS_PLACEHOLDER])
+"""
+
+# --- SV5: read one slot filler in context (blind to the intended link) -----
+PROMPT_SV5 = r"""
+Let's define a function named read_link(text: str, passage: str, x: str, y: str).
+PASSAGE is a verbatim excerpt of TEXT, an expert answer. X and Y are two claims. Read the
+PASSAGE in the context of the TEXT and report only what it SAYS - do not use outside
+knowledge of whether X or Y is true.
+
+The function returns a JSON object:
+  {"x_status": one of "asserted", "denied", "absent" - how the passage treats claim X,
+   "y_status": the same for claim Y,
+   "link": one of
+     "i_supports_j"  the passage presents X as a cause of Y, or as evidence or a reason
+                     for accepting Y
+     "j_supports_i"  the same, with Y as the cause, evidence or reason for X
+     "incompatible"  the passage says X and Y cannot both be true (one rules out the other)
+     "equivalent", "exactly_one", "at_least_one", "contrast_only", "concedes",
+     "precedes", "follows" (X before / after Y in time only)
+     "unlinked"      the passage states X and Y without drawing any connection,
+   "other_links": [short verbatim quotes of any connection the passage draws between X or
+                   Y and a statement OTHER than X and Y; [] if none],
+   "evidence": the shortest verbatim quote carrying the link, or ""}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+read_link(text="[TEXT_PLACEHOLDER]", passage="[PASSAGE_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")
+"""
+
+#: S3's slot requirements per primary ladder type, substituted for [SLOTS_PLACEHOLDER].
+_CONTROL_SLOT = (
+    'Also plan exactly 1 slot of role "control": two [correct] claims joined by an\n'
+    "   entailment link (sense Cause-Effect or Evidence) that genuinely\n"
+    "   holds; later versions word that same link three different ways."
+)
+SLOT_REQUIREMENTS: dict[str, str] = {
+    "CONFLICT": (
+        'Plan exactly 3 slots of role "conflict_tt", each joining two [correct] claims.\n'
+        "   Later versions either state the pair plainly or assert that the two cannot\n"
+        "   both be true, so pick pairs on one subject where an expert could be tempted to\n"
+        "   set them against each other - not two claims that obviously fit together, and\n"
+        '   not a claim and its own restatement. Give them sense "Refutation". '
+        + _CONTROL_SLOT
+    ),
+    "CHAIN": (
+        'Plan exactly 2 slots of role "chain_link" over three consecutive [correct]\n'
+        "   claims p, p+1, p+2 that form a chain of reasoning: the first slot joins p ->\n"
+        "   p+1 and the second p+1 -> p+2, each with an entailment sense (Cause-Effect or\n"
+        "   Evidence) that genuinely holds. Later versions draw both links, one, or\n"
+        "   neither. " + _CONTROL_SLOT
+    ),
+
+    "SIGN": (
+        'Plan exactly 2 slots of role "sign_tf". Each joins a [correct] claim (the\n'
+        "   source) to an [incorrect] claim at the NEXT position (the target), with an\n"
+        "   entailment sense (Cause-Effect or Evidence) under which a careless writer\n"
+        "   could present the false claim as following from the true one. Later\n"
+        "   versions either derive the false target from the true source, leave the two\n"
+        "   unlinked, or use the true source to refute the false target. " + _CONTROL_SLOT
+    ),
+    "ORDER": _CONTROL_SLOT.replace("Also plan", "Plan"),
+}
+
+#: S4's layout rule, substituted for [LAYOUT_PLACEHOLDER].
+LAYOUT_REQUIREMENTS: dict[str, str] = {
+    "ORDER": (
+        "Write 4-5 SELF-CONTAINED paragraphs: the two atoms of every relation, and every\n"
+        "   slot marker, sit inside one paragraph, and no paragraph refers to another (no\n"
+        '   "as noted above", and no "this" or "these findings" pointing across a\n'
+        "   paragraph break), so the paragraphs read correctly in any order."
+    ),
+}
+for _t in ("CONFLICT", "CHAIN", "SIGN"):
+    LAYOUT_REQUIREMENTS[_t] = "Organize the answer into 3-5 paragraphs."
+
 # ----------------------------------------------------------------------------
 # The registry, and the spec the drift test checks against.
 # ----------------------------------------------------------------------------
@@ -678,10 +940,16 @@ PROMPTS: dict[str, str] = {
     "V5": PROMPT_V5,
     "V5c": PROMPT_V5C,
     "V5r": PROMPT_V5R,
+    "S3": PROMPT_S3,
+    "S4": PROMPT_S4,
+    "SF": PROMPT_SF,
+    "SV1": PROMPT_SV1,
+    "SV5": PROMPT_SV5,
 }
 
 GENERATION_PROMPTS = ("P1", "P2", "P3", "P4", "P5")
 VALIDATION_PROMPTS = ("V1", "V3", "V4", "V5", "V5c", "V5r")
+SLOT3_PROMPTS = ("S3", "S4", "SF", "SV1", "SV5")
 
 # Per prompt: (numbered-instruction count, required placeholders). Transcribed from
 # Phase 1 Appendix A; the test asserts the constants above still match. V1-V4 use
@@ -699,6 +967,14 @@ PROMPT_SPEC: dict[str, tuple[int, tuple[str, ...]]] = {
     "V5": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER", "TEXT_A_PLACEHOLDER", "TEXT_B_PLACEHOLDER")),
     "V5c": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER")),
     "V5r": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER", "TEXT_A_PLACEHOLDER")),
+    "S3": (8, ("CLAIMS_PLACEHOLDER", "QUESTION_PLACEHOLDER", "SENSES_PLACEHOLDER",
+               "SLOTS_PLACEHOLDER")),
+    "S4": (7, ("LAYOUT_PLACEHOLDER", "PLAN_PLACEHOLDER", "QUESTION_PLACEHOLDER")),
+    "SF": (4, ("CONTEXT_PLACEHOLDER", "FAILED_PLACEHOLDER", "READINGS_PLACEHOLDER",
+               "SIBLINGS_PLACEHOLDER", "SLOT_PLACEHOLDER")),
+    "SV1": (0, ("ATOMS_PLACEHOLDER", "PAIRS_PLACEHOLDER", "RESPONSE_PLACEHOLDER")),
+    "SV5": (0, ("CLAIM_X_PLACEHOLDER", "CLAIM_Y_PLACEHOLDER", "PASSAGE_PLACEHOLDER",
+                "TEXT_PLACEHOLDER")),
 }
 
 #: P3's ladder-specific structural quota, substituted for ``[LADDER_PLACEHOLDER]``.
@@ -830,6 +1106,9 @@ def fill(prompt_id: str, **values: str) -> str:
 
 __all__ = [
     "GENERATION_PROMPTS",
+    "LAYOUT_REQUIREMENTS",
+    "SLOT3_PROMPTS",
+    "SLOT_REQUIREMENTS",
     "PROMPTS",
     "PROMPT_P1",
     "PROMPT_P2",

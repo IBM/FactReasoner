@@ -281,6 +281,12 @@ class GenConfig:
         sampling_loop_budget: Mellea's rejection-sampling budget *within* one call, where
             the predicate is the prompt's real parser. Kept low because the loop
             multiplies token cost.
+        committees: Optional per-generator committees, keyed by generator ``name``. When a
+            generator has an entry, its families are validated by exactly that list
+            (generator still excluded by ``model_id``); otherwise by ``committee``. Used by
+            multi-generator slot3 runs, where each committee must span three vendors
+            without containing its own generator.
+        split: The split label recorded on every slot3 item (``meta.split``).
     """
 
     n_families: int = 120
@@ -304,6 +310,8 @@ class GenConfig:
         default_factory=lambda: list(DEFAULT_RETRY_TEMPERATURES)
     )
     sampling_loop_budget: int = 2
+    committees: dict[str, list[ModelRef]] = field(default_factory=dict)
+    split: str = "test"
 
     # -- validation ----------------------------------------------------------
 
@@ -312,6 +320,8 @@ class GenConfig:
         pairs: list[tuple[str, ModelRef]] = []
         pairs += [("generator", m) for m in self.generators]
         pairs += [("committee", m) for m in self.committee]
+        for gname, models in self.committees.items():
+            pairs += [(f"committee[{gname}]", m) for m in models]
         if self.auditor is not None:
             pairs.append(("auditor", self.auditor))
         return pairs
@@ -429,7 +439,32 @@ class GenConfig:
                     "committee entry/entries were not enough. Add committee models with "
                     "distinct model_ids that differ from the generator's."
                 )
-        families = {m.family for m in self.committee}
+        if self.committees:
+            gen_names = {g.name for g in self.generators}
+            stray = sorted(set(self.committees) - gen_names)
+            if stray:
+                raise ValueError(
+                    f"committees has entries for unknown generator(s) {stray}; keys must be "
+                    f"generator names ({sorted(gen_names)})."
+                )
+            for gen in self.generators:
+                own = self.committees.get(gen.name)
+                if own is None:
+                    continue
+                if any(m.model_id == gen.model_id for m in own):
+                    raise ValueError(
+                        f"the committee of generator {gen.name!r} lists the generator's own "
+                        f"model ({gen.model_id}); remove it rather than rely on exclusion."
+                    )
+                fams = {m.family for m in self.eligible_auditors(gen)}
+                if len(fams) < 3:
+                    raise ValueError(
+                        f"the committee of generator {gen.name!r} spans {len(fams)} model "
+                        f"family/families ({sorted(fams)}); at least 3 are required."
+                    )
+        families = {m.family for m in self.committee} | {
+            m.family for ms in self.committees.values() for m in ms
+        }
         if len(families) < 3:
             raise ValueError(
                 f"committee spans {len(families)} model family/families ({sorted(families)}). "
@@ -457,6 +492,10 @@ class GenConfig:
         d["generators"] = [m.to_dict() for m in self.generators]
         d["committee"] = [m.to_dict() for m in self.committee]
         d["auditor"] = self.auditor.to_dict() if self.auditor else None
+        d.pop("committees", None)
+        d["committees"] = {
+            g: [m.to_dict() for m in ms] for g, ms in self.committees.items()
+        }
         return d
 
     @classmethod
@@ -485,6 +524,11 @@ class GenConfig:
                 d[key] = [
                     m if isinstance(m, ModelRef) else ModelRef(**m) for m in d[key]
                 ]
+        if d.get("committees"):
+            d["committees"] = {
+                g: [m if isinstance(m, ModelRef) else ModelRef(**m) for m in ms]
+                for g, ms in d["committees"].items()
+            }
         if d.get("auditor") and not isinstance(d["auditor"], ModelRef):
             d["auditor"] = ModelRef(**d["auditor"])
         if d.get("only_topics"):
@@ -545,9 +589,12 @@ class GenConfig:
             if gen_id is not None and self.auditor.model_id == gen_id:
                 return []
             return [self.auditor]
+        pool = self.committee
+        if generator is not None and generator.name in self.committees:
+            pool = self.committees[generator.name]
         out: list[ModelRef] = []
         seen: set[str] = set()
-        for m in self.committee:
+        for m in pool:
             if gen_id is not None and m.model_id == gen_id:
                 continue
             if m.model_id in seen:

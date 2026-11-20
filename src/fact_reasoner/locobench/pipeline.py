@@ -294,6 +294,11 @@ _PROBES: dict[str, str] = {
     "V5": "compare_texts(",
     "V5c": "jointly_assertable(",
     "V5r": "find_resolution(",
+    "S3": "SLOT PLAN for an",
+    "S4": "TEMPLATE of an expert answer",
+    "SF": "one slot is marked [[HERE]]",
+    "SV1": "classify_links(",
+    "SV5": "read_link(",
 }
 
 

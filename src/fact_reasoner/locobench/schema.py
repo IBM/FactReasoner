@@ -41,6 +41,7 @@ from fact_reasoner.locobench.taxonomy_bridge import (
     coupling_for_sense,
     is_directed,
     is_ordering_only,
+    taxonomy_of,
 )
 from fact_reasoner.locobench.topics import DOMAINS, TOPICS
 
@@ -156,8 +157,10 @@ def validate_item(item: dict[str, Any], *, strict_meta: bool = True) -> None:
             f"{item['id']}: unknown coupling {coupling!r}",
         )
 
-        # THE BUILDER ASSERTION. Gold may not contradict taxonomy.py.
-        expected = coupling_for_sense(sense)
+        # THE BUILDER ASSERTION. Gold may not contradict taxonomy.py -- in the version the
+        # item was labelled with (`meta.taxonomy`; absent means v1).
+        tax = taxonomy_of(item)
+        expected = coupling_for_sense(sense, tax)
         _require(
             coupling == expected,
             f"{item['id']}: relation {src}->{trg} has sense {sense!r} with coupling "
@@ -169,13 +172,13 @@ def validate_item(item: dict[str, Any], *, strict_meta: bool = True) -> None:
         # Derived flags must agree with the taxonomy too, for the same reason.
         if "directed" in r:
             _require(
-                bool(r["directed"]) == is_directed(sense),
+                bool(r["directed"]) == is_directed(sense, tax),
                 f"{item['id']}: relation {src}->{trg} directed={r['directed']} "
                 f"disagrees with COMPILE for sense {sense!r}",
             )
         if "ordering_only" in r:
             _require(
-                bool(r["ordering_only"]) == is_ordering_only(sense),
+                bool(r["ordering_only"]) == is_ordering_only(sense, tax),
                 f"{item['id']}: relation {src}->{trg} ordering_only={r['ordering_only']} "
                 f"disagrees with COMPILE for sense {sense!r}",
             )

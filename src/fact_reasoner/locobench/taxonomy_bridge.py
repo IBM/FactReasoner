@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from fact_reasoner.lcs.taxonomy import (
     COMPILE,
+    compile_map,
     LEVEL1_CONFLICT_COUPLINGS,
     LEVEL1_COUPLINGS,
     Level2Sense,
@@ -65,7 +66,18 @@ REQUIRED_SENSES: tuple[str, ...] = (
 REQUIRED_EITHER: tuple[str, ...] = ("Precedence", "Succession")
 
 
-def coupling_for_sense(sense: str) -> str:
+# The v1 LoCoBench generator, its corpora and the graph-level miner were all written
+# against the v1 compile map, so every helper here defaults to it. The slot3 pipeline
+# (`locobench.slots`) labels its corpora with v2 and passes `taxonomy="v2"`.
+BRIDGE_DEFAULT_TAXONOMY = "v1"
+
+
+def taxonomy_of(item: dict) -> str:
+    """The compile-map version an item was labelled with (``meta.taxonomy``, else v1)."""
+    return str((item.get("meta") or {}).get("taxonomy") or "v1")
+
+
+def coupling_for_sense(sense: str, taxonomy: str = BRIDGE_DEFAULT_TAXONOMY) -> str:
     """Return the Level-1 coupling a Level-2 sense compiles to.
 
     Args:
@@ -80,15 +92,16 @@ def coupling_for_sense(sense: str) -> str:
             input, this raises -- a typo'd sense in gold data must not silently become
             a no-factor edge.
     """
+    table = compile_map(taxonomy)
     for s in Level2Sense:
         if s.value == sense:
-            return COMPILE[s].level1
+            return table[s].level1
     raise ValueError(
         f"Unknown sense: {sense!r} (expected one of {list(LEGAL_SENSES)})."
     )
 
 
-def spec_for_sense(sense: str):
+def spec_for_sense(sense: str, taxonomy: str = BRIDGE_DEFAULT_TAXONOMY):
     """Return the full ``SenseSpec`` for a sense (directedness, concession, ordering).
 
     Args:
@@ -100,30 +113,33 @@ def spec_for_sense(sense: str):
     Raises:
         ValueError: If the sense is unknown.
     """
+    table = compile_map(taxonomy)
     for s in Level2Sense:
         if s.value == sense:
-            return COMPILE[s]
+            return table[s]
     raise ValueError(
         f"Unknown sense: {sense!r} (expected one of {list(LEGAL_SENSES)})."
     )
 
 
-def is_directed(sense: str) -> bool:
+def is_directed(sense: str, taxonomy: str = BRIDGE_DEFAULT_TAXONOMY) -> bool:
     """Whether a sense is inherently directed (source -> target matters)."""
-    return bool(spec_for_sense(sense).directed)
+    return bool(spec_for_sense(sense, taxonomy).directed)
 
 
-def is_ordering_only(sense: str) -> bool:
+def is_ordering_only(sense: str, taxonomy: str = BRIDGE_DEFAULT_TAXONOMY) -> bool:
     """Whether a sense carries no truth coupling (Precedence/Succession)."""
-    return bool(spec_for_sense(sense).ordering_only)
+    return bool(spec_for_sense(sense, taxonomy).ordering_only)
 
 
-def is_conflict(sense: str) -> bool:
+def is_conflict(sense: str, taxonomy: str = BRIDGE_DEFAULT_TAXONOMY) -> bool:
     """Whether a sense compiles to a conflict coupling (contradiction or exclusive)."""
-    return coupling_for_sense(sense) in CONFLICT_COUPLINGS
+    return coupling_for_sense(sense, taxonomy) in CONFLICT_COUPLINGS
 
 
 __all__ = [
+    "BRIDGE_DEFAULT_TAXONOMY",
+    "taxonomy_of",
     "CONFLICT_COUPLINGS",
     "LEGAL_COUPLINGS",
     "LEGAL_SENSES",

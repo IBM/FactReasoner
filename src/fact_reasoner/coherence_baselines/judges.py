@@ -379,15 +379,24 @@ def make_backend_generate(backend: Any):
       metadata, not in the flattened per-token list, so they are read from
       ``_meta`` directly. Absent them the judge falls back to the emitted integer.
     """
+    import os
+
     import mellea.stdlib.functional as mfuncs
     from mellea.stdlib.context import SimpleContext
+
+    options: dict[str, Any] = {"logprobs": True, "top_logprobs": 5}
+    if os.getenv("LOCOBENCH_NO_CACHE"):
+        # A LiteLLM gateway caches identical requests, so the repeated runs of
+        # judge_with_variance would all be served the first run's completion and the
+        # judge's spread would read as zero. The bypass is per run, from the environment.
+        options["extra_body"] = {"cache": {"no-cache": True}}
 
     def generate(prompt: str):
         res = mfuncs.instruct(
             prompt,
             context=SimpleContext(),
             backend=backend,
-            model_options={"logprobs": True, "top_logprobs": 5},
+            model_options=dict(options),
         )
         out = res[0] if isinstance(res, tuple) else res
 
