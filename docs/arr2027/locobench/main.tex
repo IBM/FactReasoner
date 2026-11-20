@@ -1,0 +1,723 @@
+\documentclass[11pt]{article}
+
+% "review" for submission; "final" for camera-ready; "preprint" for a non-anonymous version.
+\usepackage[review]{acl}
+\input{preamble}
+
+% Release statistics: scripts/locobench_paper_stats.py. Reference-evaluation numbers: the
+% companion paper's macros (scripts/arr_slot3_eval.py), shared so the two papers cannot disagree.
+\input{numbers_lb}
+\input{../coherence/numbers_slot3}
+% Worked examples: scripts/locobench_paper_examples.py.
+\input{examples/teaser_f009}
+\input{examples/worlds_f003}
+\input{examples/readings_f075}
+
+\title{LoCoBench: Coherence Ladders for Evaluating the Logical Coherence\\ of Long-Form Responses}
+
+\author{Anonymous ACL submission}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A metric of logical coherence should rank a response higher when it argues better and leave it
+unchanged when only its presentation changes. Testing this needs responses that differ in
+argument but not in topic, length, claims or facts, together with gold relation graphs that say
+what each response argues; natural corpora provide neither. We introduce LoCoBench, a benchmark of
+\emph{coherence ladders}: sequences of three expert-style answers to one question, spliced from a
+single template, so that two rungs share every claim, every truth value and every word except the
+one or two sentences that draw, drop or reverse a relation between claims. Five ladder types test
+added and removed conflicts, inference chains, the sign of a relation to a false claim, and
+invariance to paragraph order and to rewording. A generator writes each family from a tagged claim
+pool and a plan whose gold graphs are checked to realize the declared orders before any prose
+exists; a committee of three models from three vendors, never the generator, then reads the
+template and every spliced sentence blind to the plan and to the intended link, and the gold
+graphs follow its reading. The release has \lbFamilies{} families on \lbTopics{} topics,
+\lbLadders{} ladders and \lbItems{} responses with gold relation graphs, factuality labels and
+stances, so every response can be evaluated at its verdict world and at its asserted world. On
+gold graphs a monotone coherence score satisfies all \sThreeNIncPairs{} declared increases and
+\sThreeNInvPairs{} declared invariances, while LLM judges miss about half of the increases. We
+release the data, the pipeline, every prompt and the evaluation harness, and describe a human
+validation study.
+\end{abstract}
+
+%% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+%% ============================================================================
+
+Long-form answers are judged on two axes. \emph{Factuality} asks whether each claim is true, and
+is now measured claim by claim \citep{factscore,safe,veriscore,factreasoner}. \emph{Logical
+coherence} asks whether the claims hang together: whether the answer draws inferences that hold,
+avoids contradicting itself, and argues from its true claims rather than towards its false ones.
+A response can score perfectly on the first axis and fail the second, deriving a true conclusion
+from an irrelevant premise or setting two compatible findings against each other; and the
+converse holds too \citep{lorefact}.
+
+Metrics for the second axis are hard to validate. A coherence metric should satisfy two
+requirements: it should rise when the response's argument improves, and it should not move when
+only the presentation changes. Checking either needs pairs of responses that differ in argument
+and in nothing else. Existing coherence resources do not supply them. Discourse-coherence
+datasets compare original texts with shuffled or human-rated ones \citep{barzilay,gcdc}, so their
+contrasts are about order and readability rather than inference. Summarization-consistency and
+factuality benchmarks \citep{summac,frank,summeval} contrast a text with its source, not two
+arguments over the same claims. LLM-judge evaluations rate whole responses that differ in topic,
+length and content at once \citep{geval,zheng2023judge}. A metric's agreement with any of them
+therefore says little about whether it tracks logical structure: two responses that differ in
+coherence almost always differ in their claims as well.
+
+We build the missing contrasts by construction. LoCoBench is a benchmark of \emph{coherence
+ladders} (Figure~\ref{fig:teaser}). A \emph{family} is one expert-style answer written once, as a
+template with marked \emph{slots}; a slot is a pair of claims with alternative \emph{fillers},
+one or two sentences that assert both claims and draw exactly one link between them or none. A
+rung is the template with one filler per slot, so two rungs of a ladder share every claim, every
+truth value and every sentence outside the slots they edit. Each family carries gold relation
+graphs, the factuality label of every claim and the response's stance on it, which fix the two
+worlds a coherence score may be read at: the \emph{verdict world} of a factuality pipeline, and
+the \emph{asserted world} of the response's own commitments.
+
+\paragraph{Contributions.}
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{A ladder design} (\S\ref{sec:ladders}) with five ladder types that isolate one
+  property each: removing a conflict between true claims, completing an inference chain, the sign
+  of a link to a false claim (the one ladder whose declared order depends on the world), and
+  invariance to paragraph order and to rewording.
+\item \textbf{A generation and validation pipeline} (\S\ref{sec:generation}--\ref{sec:validation};
+  Figure~\ref{fig:pipeline}) in which every ladder's declared order is checked \emph{exactly} on
+  its gold graphs before any prose exists, a three-vendor committee reads every template and every
+  spliced sentence blind to the plan and to the intended link, gold follows the committee's
+  reading, and admission is per ladder.
+\item \textbf{The release} (\S\ref{sec:release}): \lbFamilies{} families, \lbLadders{} ladders,
+  \lbItems{} responses and \lbRelTotal{} gold relations over \lbTopics{} topics in \lbDomains{}
+  domains, with every prompt, the generation records and an evaluation harness.
+\item \textbf{A reference evaluation} (\S\ref{sec:reference}), summarizing the companion paper
+  \citep{anoncoherence}: a coherence score with a monotonicity guarantee, four relation miners and
+  eleven baselines, and \textbf{a human validation study}, specified here (\S\ref{sec:study}).
+\end{itemize}
+
+\input{figures/teaser}
+
+%% ============================================================================
+\section{Related Work}
+\label{sec:related}
+%% ============================================================================
+
+\paragraph{Coherence benchmarks.} Entity-grid and neural coherence models are evaluated on
+sentence-order discrimination, telling an original text from a shuffled one \citep{barzilay,li},
+and on human coherence ratings of naturally occurring text \citep{gcdc}; DiscoScore extends the
+idea to generated text \citep{discoscore}. These resources probe discourse organization. LoCoBench
+holds the order fixed (except on its \cp{order} ladder, where order is the only change) and varies
+the inferential links among the claims, so it probes \emph{logical} coherence, and it declares the
+expected direction of every comparison instead of inferring it from ratings.
+
+\paragraph{Consistency and reasoning benchmarks.} NLI-based detectors and benchmarks target
+inconsistency between a summary and its source \citep{summac,frank}, across sampled generations
+\citep{selfcheckgpt} or within one generation \citep{mundler2024}, and reasoning-chain metrics are
+evaluated on entailment trees and step-annotated chains \citep{entailmentbank,roscoe,receval}.
+LoReFact labels dependencies between the claims of a response as a classification task
+\citep{lorefact}. These resources ask whether a relation holds; LoCoBench asks whether a score
+over the whole response moves correctly when one relation changes, at a fixed claim set.
+
+\paragraph{Minimal pairs and contrast sets.} Our rungs are minimal pairs in the sense of contrast
+sets and counterfactual augmentation \citep{contrastsets,kaushik2020} and of behavioural testing
+\citep{checklist}: a perturbation with a known effect on the label. Unlike edits applied to
+existing text, every rung is spliced from one template, so the unedited text is identical by
+construction rather than by a rewrite that could drift. Because the edits are written to be
+explicit, the ladders measure whether a metric orders responses whose relations differ, not how
+often such differences arise in natural text (\S\ref{sec:limitations}).
+
+\paragraph{LLM-built and LLM-validated data.} Generating data with LLMs and validating it with
+LLM annotators is now common \citep{gilardi2023,chiang2023}, and so are its failure modes:
+annotation artifacts a model can exploit \citep{gururangan2018}, and judges that share the
+generator's biases \citep{zheng2023judge}. We separate the generator from a three-vendor committee,
+keep the committee blind to the plan and to the intended answer, check orders exactly on gold
+graphs rather than by judgement, remove surface cues with deterministic checks, and specify a
+human study that also tests the committee (\S\ref{sec:study}).
+
+\paragraph{An earlier design.} An earlier version of LoCoBench perturbed a whole response to make
+each rung, and lost most families to free-rewrite failures; its gold conflicts were contrast and
+concession senses that compile to no logical constraint. The present design replaces it entirely
+(App.~\ref{app:record}).
+
+%% ============================================================================
+\section{Coherence Ladders}
+\label{sec:ladders}
+%% ============================================================================
+
+\subsection{Claims, Relations and Two Worlds}
+\label{sec:worlds}
+
+A response is decomposed into atomic \emph{claims} $a_1,\dots,a_n$, numbered in the order the
+response asserts them. A \emph{relation} links two claims with a discourse \emph{sense} in the
+style of the PDTB \citep{pdtb}, which compiles to a truth-functional \emph{coupling}
+(Table~\ref{tab:compile}): \sense{Evidence} and \sense{Cause-Effect} to an entailment,
+\sense{Refutation} to a contradiction, \sense{Restatement} to an equivalence, \sense{Disjunction}
+to co-necessity and \sense{Alternative} to exclusion. \sense{Contrast}, \sense{Concession} and the
+temporal senses compile to no coupling: two claims in contrast can both be true, so the contrast
+constrains nothing \citep{anoncoherence}. Each relation has a strength band (weak, moderate,
+strong). A pair of claims the response keeps separate is a declared \emph{non-relation}.
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.75cm}lr@{}}
+\toprule
+Sense & Coupling (violated when) & Rel. \\
+\midrule
+\sense{Evidence}, \sense{Cause-Effect} & entailment ($a=1,b=0$) & \lbCoupEntailment \\
+\sense{Refutation} & contradiction ($a=b=1$) & \lbCoupContradiction \\
+\sense{Restatement} & equivalence ($a\ne b$) & \lbCoupEquivalence \\
+\sense{Disjunction} & co-necessity ($a=b=0$) & \lbCoupConecessity \\
+\sense{Alternative} & exclusion ($a=b$) & \lbCoupExclusive \\
+\sense{Contrast}, \sense{Concession}, \sense{Precedence}, \sense{Succession} & none & \lbCoupNone \\
+\bottomrule
+\end{tabular}
+\caption{The compile map from discourse sense to coupling (taxonomy v2), and the number of gold
+relations of each coupling over all \lbItems{} responses.}
+\label{tab:compile}
+\end{table}
+
+Whether a relation helps or hurts an argument depends on the truth values of its claims. A
+\emph{committed world} $\xs\in\{0,1\}^n$ assigns each claim a truth value, and a relation is a
+\emph{support} at $\xs$ if $\xs$ satisfies its coupling and a \emph{conflict} if $\xs$ violates
+it. Every LoCoBench response carries two committed worlds, both fixed by the data before any prose
+is written:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item The \textbf{verdict world} sets each claim to its \emph{factuality label}. Each response
+  asserts \lbFalseMin--\lbFalseMax{} claims that are plausible but false; they are $0$ in the
+  verdict world although the response asserts them. The labels stand in for the verdicts of an
+  error-free factuality pipeline.
+\item The \textbf{asserted world} sets each claim to the response's \emph{stance}: $1$ if the
+  response asserts it, $0$ if it denies it. Every claim of every response is asserted except on
+  the \lbDenied{} rungs that refute a falsehood, which deny it; on all other responses the asserted
+  world is the all-true world.
+\end{itemize}
+The two worlds differ only on false claims, so they sign a relation differently only when it
+touches one. Over all responses, \lbRelVerdictSup{} relations are supports and \lbRelVerdictCon{}
+conflicts at the verdict world, against \lbRelAssertSup{} and \lbRelAssertCon{} at the asserted
+world. Deriving a falsehood from a truth is a conflict at the verdict world, where the entailment
+is violated, and a support at the asserted world, where it is upheld (Figure~\ref{fig:worlds}).
+A score read at the verdict world evaluates \emph{coherence given the facts}; one read at the
+asserted world evaluates internal consistency.
+
+\subsection{Templates, Slots and Fillers}
+\label{sec:slots}
+
+A family is one answer written once as a \emph{template} with slot markers
+(Figure~\ref{fig:template}). A \emph{slot} joins two consecutive claims and has one filler per
+\emph{kind}: an unlinked filler that asserts both claims and draws no link, and a linked filler
+that asserts both and draws exactly the slot's link, or for the \cp{control} slot three wordings
+of one link. Fillers are short (median \lbFillerWordsMedian{} words, at most \lbFillerWordsMax).
+A \emph{rung} is the template with one filler spliced into every marker, so two rungs differ only
+in the fillers of the slots their ladder edits. Gold relations are the plan's \emph{fixed}
+relations, which every rung shares, plus the link of each spliced filler.
+
+\subsection{Five Ladder Types}
+\label{sec:types}
+
+\input{figures/ladders}
+
+Figure~\ref{fig:ladders} shows the five ladder types. Three are declared \emph{increasing}: each
+rung is strictly more coherent than the one before, at the verdict world.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \cp{conflict} has two slots (plus a spare) that each join two true claims. Its rungs set
+  both pairs against each other (a refutation, violated at any world where both claims hold), then
+  one, then neither.
+\item \cp{chain} has two slots over three consecutive true claims $p\to p{+}1\to p{+}2$, each an
+  entailment that holds. Its rungs draw neither link, the first, then both.
+\item \cp{sign} has one slot (plus a spare) from a true claim to the false claim that follows it.
+  Its rungs derive the falsehood from the truth, leave them unlinked, and refute the falsehood
+  with the truth. At the verdict world this is a conflict, nothing, then a support.
+\end{itemize}
+Two are declared \emph{invariant}: \cp{order} permutes 4--5 self-contained paragraphs, and
+\cp{control} words one entailment between true claims three ways. Every family has one
+\emph{primary} ladder of the first four types and a \cp{control} ladder on one more slot, whose
+$\rho_0$ is the primary ladder's $\rho_1$, so a family has five distinct responses.
+\cp{conflict} and \cp{chain} edit only links between true claims, so their orders hold at either
+world; \cp{sign} is the one ladder whose declared order holds at the verdict world and fails at
+the asserted world.
+
+\subsection{What a Declared Order Means}
+\label{sec:declared}
+
+A ladder's declaration is a statement about its gold graphs. For \cp{conflict}, \cp{chain} and
+\cp{sign}, each rung's gold graph is obtained from the previous one by an \emph{elementary
+improvement} at the verdict world: adding a support or removing a conflict while holding every
+other relation fixed. The companion paper shows that a score satisfying a monotonicity axiom rises
+strictly under every such improvement for any priors and any context \citep{anoncoherence}, so
+the declaration does not depend on a choice of weights. For \cp{order} and \cp{control} the gold
+graph does not change, and any score of the graph must not move. The pipeline checks every
+declaration exactly on the gold graphs, with a minimum step in the score between neighbouring
+rungs, before it writes any prose (\S\ref{sec:generation}); what remains to be validated is that
+the prose realizes the graphs, which is the committee's job (\S\ref{sec:validation}).
+
+%% ============================================================================
+\section{Generation}
+\label{sec:generation}
+%% ============================================================================
+
+\input{figures/pipeline}
+
+One generator (Claude Opus~5) writes every family in five stages (Figure~\ref{fig:pipeline},
+top). Every prompt is reproduced verbatim in App.~\ref{app:prompts}.
+
+\paragraph{P1: question.} Each family is assigned a canonical topic, one of \lbTopics{} in
+\lbDomains{} domains, and a primary ladder type. The generator writes one open question about the
+topic whose answer would naturally contain several kinds of logical relation; the prompt prefers
+questions on which competing explanations are adjudicated (incident investigations, diagnostic
+reasoning, competing scientific hypotheses), and forbids words such as ``cause'' or ``contrast''
+that would prime the relations lexically.
+
+\paragraph{P2: claim pool.} The generator writes 26 atomic claims that an answer to the question
+could assert, each a single declarative sentence with no connective, each tagged: 14 factually
+correct, 4 plausible but false, and three typed pairs that later relations need (two exhaustive
+alternatives, two disjunctive claims, two equivalent claims) plus two holding claims in which an
+authority settles a dispute. Nothing in a false claim's wording gives it away. The tags are the
+factuality labels of the verdict world: only the 4 incorrect claims are false, and the labels are
+set here, before any other stage.
+
+\paragraph{S3: plan.} From the pool, the plan selects 10--14 claims in assertion order (12--14 in
+the release), at least two of them false; 6--8 fixed relations among them, each joining claims at
+most five positions apart, with a sense and a strength band; 3--5 declared non-relations; and the
+slots its ladders need, each joining two consecutive claims and carrying a role. The requirements are
+substituted per ladder type (App.~\ref{app:prompts}). Every plan must also use one or two rare
+senses, allocated across the corpus so that each of \sense{Alternative}, \sense{Disjunction},
+\sense{Restatement}, \sense{Refutation} and \sense{Precedence} appears in \lbRareAlternative{}
+plans, rather than demanded of every plan.
+
+\paragraph{The plan gate.} A deterministic gate checks the plan before any prose is written. Each
+slot's endpoints must have the truth values its role needs (two true claims for \cp{conflict},
+\cp{chain} and \cp{control}; a true claim followed by a false one for \cp{sign}); claims must be
+quoted verbatim from the pool and every claim pair used at most once; and, crucially, each
+ladder's gold graphs, compiled with the map of Table~\ref{tab:compile}, must be ordered exactly as
+declared, at the verdict world, with a step of at least $0.05$ nats in the companion paper's score
+between neighbouring rungs, so that no edit is saturated away. A plan that fails is retried with
+the gate's complaint; \lbGateSThreegate{} plan evaluations passed.
+
+\paragraph{S4: template and fillers.} The generator then writes the answer once, 420--520 words
+in 3--5 paragraphs (4--5 self-contained ones for \cp{order}), with a marker where each slot goes,
+together with every filler of every slot. It asserts every non-slot claim exactly once, false ones
+in the same confident register as true ones, and realizes every fixed relation with an explicit
+connective. The fillers of one slot must be \emph{interchangeable}: the same grammatical frame and
+the same reference to the surrounding text, so that swapping fillers changes only the link. An
+unlinked filler states its claims plainly without announcing that they are unrelated, and no
+filler may talk about ``these claims'' or restate a claim the template already asserts. A deterministic structure check
+enforces the length, the markers and the paragraphs. A filler that later fails validation is
+regenerated on its own (SF) with the committee's readings as feedback.
+
+\paragraph{Splicing.} Each rung is the template with one filler per marker; spacing is normalized
+and nothing else changes. \cp{order} rungs are paragraph permutations of the base splice, each
+re-verified by the committee (\S\ref{sec:validation}); a permutation that loses a relation is
+replaced by the next candidate. Each rung's gold graph is the plan's fixed relations, as corrected
+by the committee, plus the links of its fillers.
+
+%% ============================================================================
+\section{Validation}
+\label{sec:validation}
+%% ============================================================================
+
+A committee of three models from three vendors (GPT-6.1, Gemini~3.1 Pro and Claude Opus~5.5)
+validates every family. No committee member is the generator, and every gate is decided by a
+majority of three. Figure~\ref{fig:gates} gives the pass rate of every gate.
+
+\paragraph{V3: fluency and leakage.} Each rater scores the template's fluency, formality and
+organization on a 1--5 scale and flags hedging and annotation leakage (text that talks about the
+claims rather than asserting them). A template passes if a majority scores every criterion at
+least 4 and no majority flags a span. V3 reads the \emph{base splice} and also a set of
+\emph{coverage splices} that between them contain every filler, so no filler reaches a rung
+unread.
+
+\paragraph{V4: claims asserted.} A majority must find every claim asserted, and every false claim
+asserted \emph{as written}, so that the template does not silently correct its falsehoods.
+
+\paragraph{SV1: fixed relations, blind.} Each rater is shown the template and a list of claim
+pairs, the fixed relations mixed with the declared non-relations, and asked how the text relates
+each pair; it does not see the plan. A template stands only if a majority confirms at least
+$75\%$ of its fixed relations. Where the majority's reading of a fixed relation or non-relation
+departs from the plan, \emph{gold follows the reading}: the relation is dropped, added or
+replaced, and the ladder check of \S\ref{sec:generation} is re-run on the corrected graphs. This
+happened to \lbGoldCorr{} relations in \lbGoldCorrFamilies{} families (\lbGoldCorrDropped{}
+dropped, \lbGoldCorrReplaced{} replaced, \lbGoldCorrAdded{} added; App.~\ref{app:checks}).
+
+\paragraph{SV5: fillers, blind.} Each filler is read in its rung by every rater, who is told
+which two claims the slot joins but not which link was intended, and is told to report what
+the passage says without using outside knowledge of whether the claims are true. It reports the
+link the passage draws between them, each claim's stance (asserted or denied), and any link the filler draws to a
+third statement. A filler is admitted if a majority reads exactly the intended link and stances
+and no majority reads a third-claim link (Table~\ref{tab:readings}). A rejected filler is
+regenerated alone with the readings as feedback, up to twice, and then a spare slot stands in.
+
+\paragraph{Deterministic filler checks.} Before the committee reads a filler, regular expressions
+reject fillers that \emph{announce} that their claims are unconnected (``separately'', ``it is
+also documented that''), which would mark the unlinked rung for any reader, fillers that talk
+\emph{about} the claims (``these two statements cannot both be true''), which read as annotation,
+and fillers that restate a claim already in the template (App.~\ref{app:checks}).
+
+\paragraph{Admission.} Admission is per ladder: a ladder is admitted when every one of its rungs'
+fillers has passed SV5, and a family is released when at least one ladder survives. Templates
+that fail V3, V4 or SV1 are regenerated with the committee's complaint; fillers never cause a
+template to be regenerated.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_gates.pdf}
+\caption{\textbf{How selective validation is.} (a) Pass rate of every gate over every evaluation
+of every attempt (\lbAttempts{} family attempts), retries included. (b) The committee's
+\emph{first} reading of each filler kind, before any regeneration: the refuting filler of
+\cp{sign} is the hardest to write so that blind readers read a denial and nothing more
+(\lbReadSigntfSupport{} on the first try); regeneration repaired almost all of them.}
+\label{fig:gates}
+\end{figure*}
+
+\begin{table*}[t]
+\centering\scriptsize
+\rdTable
+\caption{\textbf{A filler the committee rejected and the one that replaced it} (family
+\rdFamily, \cp{conflict} slot joining $a_{\rdXPos}$: ``\rdX'' and $a_{\rdYPos}$: ``\rdY''). Raters
+see the response with the filler in place and the two claims, not the intended link. The first
+filler draws the intended incompatibility, but two raters also read a link to a third statement
+(the ``since \ldots'' clause), so it is rejected and regenerated; the second is read as intended
+by a majority. Readings are the committee's verbatim outputs.}
+\label{tab:readings}
+\end{table*}
+
+\paragraph{What validation establishes, and what it does not.} The committee confirms relations
+by blind pair-by-pair reading, not by the open recovery prompts that relation miners use, so
+admission does not select for what a miner recovers. Two dependencies remain. Gold relations are
+what the committee read, so a mined graph's agreement with gold is agreement with that reading;
+and the committee and the reference miners share vendors, although no model is both. The
+factuality labels are the generator's and are not re-verified. Fluency and blind readings are
+model judgements; the human study of \S\ref{sec:study} tests them.
+
+%% ============================================================================
+\section{The Release}
+\label{sec:release}
+%% ============================================================================
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\multicolumn{2}{@{}l}{\emph{Composition}} \\
+families, topics, domains & \lbFamilies, \lbTopics, \lbDomains \\
+primary ladders, each type & \lbNConflict \\
+\cp{control} ladders & \lbNControl \\
+responses & \lbItems \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Per response}} \\
+words & \lbWordsMin--\lbWordsMax{} (median \lbWordsMedian) \\
+claims (false) & \lbClaimsMin--\lbClaimsMax{} (\lbFalseMin--\lbFalseMax) \\
+relations (with coupling) & \lbRelsMin--\lbRelsMax{} (\lbFactorRelsMin--\lbFactorRelsMax) \\
+declared non-relations & \lbNonRelsMin--\lbNonRelsMax \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Gold relations, all responses}} \\
+total (with a coupling) & \lbRelTotal{} (\lbRelFactor) \\
+fixed / from fillers & \lbRelPlan{} / \lbRelSlot \\
+strong / moderate / weak & \lbBandStrong{} / \lbBandModerate{} / \lbBandWeak \\
+sup.\ / conf., verdict world & \lbRelVerdictSup{} / \lbRelVerdictCon \\
+sup.\ / conf., asserted world & \lbRelAssertSup{} / \lbRelAssertCon \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{Generation}} \\
+attempts (admitted first try) & \lbAttempts{} (\lbFirstTry) \\
+LLM calls (per ladder) & \lbCalls{} (\lbCallsPerLadder) \\
+gateway spend & \$\lbSpend \\
+\bottomrule
+\end{tabular}
+\caption{The released test split.}
+\label{tab:release}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_composition.pdf}
+\caption{\textbf{What is in the release.} (a) Families per domain and primary ladder type
+(\cp{control} ladders ride on every family). (b) Gold relations by discourse sense over all
+responses, coloured by the coupling they compile to; the five rare senses are allocated across
+plans. (c) Response length, every rung of every family.}
+\label{fig:composition}
+\end{figure*}
+
+\paragraph{Composition.} The test split has \lbFamilies{} families, 6--7 on each of
+\lbTopics{} topics in \lbDomains{} domains, with every topic carrying all four primary types
+(Table~\ref{tab:release}, Figure~\ref{fig:composition}). Family $i$ takes topic $i \bmod 36$ and a
+primary type from a shifted rotation, so every type has exactly \lbNConflict{} ladders. A family
+has five responses: three on its primary ladder, of which the middle one is also the first rung of
+its \cp{control} ladder, and two more on the \cp{control} ladder.
+
+\paragraph{Generation record.} The split took \lbAttempts{} family attempts for \lbFamilies{}
+families; \lbFirstTry{} were admitted on the first attempt. Of the \lbAttemptsRejected{} rejected
+attempts, \lbRejStageTemplate{} failed at the template (V3 hedging or leakage \lbRejVThreeSpans,
+V3 scores \lbRejVThreeScores, V4 false claims corrected \lbRejVFour, structure \lbRejSFour),
+\lbRejContentFilter{} were one question that a content filter blocked, and \lbRejSVFive{} had a slot
+with no admissible filler. \lbCalls{} LLM calls were made, most of
+them committee readings (\lbCallsSVFive{} SV5 and \lbCallsVThree{} V3 calls), about \$\lbSpend{}
+at gateway rates. Three events are documented in full in App.~\ref{app:record}. A first attempt
+rotated three generators (Claude Opus~5, GPT-6.1, Gemini~3.1 Pro); the prompts, developed on
+Claude, so rarely produced admissible templates from the other two that the split was generated
+with Claude Opus~5 alone. One family's question was blocked by a provider's content filter and
+replaced. Ten families that lost their primary ladder were regenerated from new questions so that
+every type has \lbNConflict{} ladders; \lbMissingControl{} \cp{control} ladders failed and are
+absent. The gateway caches identical requests, so every run bypasses its cache.
+
+\paragraph{Splits.} A 16-family \emph{development split} (\lbDevLadders{} ladders, \lbDevItems{}
+responses), built first and used to develop the prompts, is released separately and is not test
+data (App.~\ref{app:dev}).
+
+\paragraph{Format and use.} Each response is one JSON item with its text, claims (with factuality
+label and stance), gold relations (with sense, coupling, band, provenance and sign at both
+worlds), non-relations and its ladder memberships; a family file lists each ladder's responses in
+rung order with its declared order (App.~\ref{app:schema}). A metric is evaluated on \emph{rung
+pairs}: each ladder contributes its three pairs, \sThreeNIncPairs{} \emph{Increase} pairs from the
+increasing ladders and \sThreeNInvPairs{} \emph{Invariance} pairs from \cp{order} and
+\cp{control}. An Increase pair is satisfied by a strict rise, an Invariance pair by equality,
+optionally within a tolerance on the metric's own scale; results are reported per ladder type with
+family-level bootstrap intervals, since the rungs of a family share a template. The harness
+computes all of this from a file of scores per response, and also reports \cp{sign} at both
+worlds.
+
+%% ============================================================================
+\section{One Family, End to End}
+\label{sec:family}
+%% ============================================================================
+
+\input{figures/template}
+
+Figure~\ref{fig:template} shows the template of family f009 and the fillers of its four slots.
+Its \cp{conflict} ladder (Figure~\ref{fig:teaser}) splices the refuting fillers into S1 and S2,
+then into S1 only, then into neither; its \cp{control} ladder splices the three wordings into S4
+while S1 carries its conflict and S2 its unlinked filler, which is the conflict ladder's middle
+rung. App.~\ref{app:families} gives this family and one family of every other primary type in
+full: the claim list with labels, the template, the fillers, the five responses with their
+assignments and gold scores at both worlds, one response in full and its gold relations.
+
+\input{figures/worlds}
+
+Figure~\ref{fig:worlds} follows one \cp{sign} slot through its ladder at both worlds. The slot
+joins a true claim to a false one, and its rungs derive the falsehood, draw no link and refute it.
+At the verdict world the derivation is a violated entailment and the refutation an upheld
+contradiction, so the gold score rises along the ladder; at the asserted world the derivation is
+upheld, and the score rates deriving and refuting the falsehood alike. A metric that reads the
+response's commitments without the facts cannot tell the two apart, which is what the \cp{sign}
+ladder is for.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_gold_lcs.pdf}
+\caption{\textbf{The gold graphs realize the declared orders.} Gold $\LCS$ \citep{anoncoherence}
+per rung for every ladder (gray) and their mean (bold). Every increasing ladder rises strictly at
+every step and every invariant ladder is flat, as the plan gate requires; how far a ladder rises
+depends on the rest of its graph, which is why \cp{chain} ladders that start near the top of the
+scale rise least.}
+\label{fig:gold-lcs}
+\end{figure*}
+
+Figure~\ref{fig:gold-lcs} shows gold $\LCS$ per rung for every ladder. Every increasing ladder
+rises at every step and every invariant ladder is flat, which the plan gate guarantees; the size
+of a step depends on the rest of the graph. A \cp{conflict} ladder removes two violated
+contradictions and rises most, while a \cp{chain} ladder whose other relations already support its
+claims strongly starts near the top of the scale and rises least.
+
+%% ============================================================================
+\section{Reference Evaluation}
+\label{sec:reference}
+%% ============================================================================
+
+The companion paper \citep{anoncoherence} evaluates a coherence score on this split; we summarize
+the setup and the results, which also serve as a check of the benchmark.
+
+\paragraph{The score.} The logical coherence score (LCS) reads a Markov random field over the
+claims' truth values, with one soft constraint per relation weighted by its strength, at a
+committed world $\xs$: $\LCS=\sigma(\operatorname{logit}\PR(\xs)-\operatorname{logit}\pi(\xs))$,
+where $\pi$ is the prior and $\PR$ the posterior given the relations. It is the weight of evidence
+the relations lend to $\xs$, read on a $[0,1]$ scale, and it is strictly monotone in every
+elementary improvement at $\xs$ for any priors and any relation graph. Read at the verdict world,
+refuting a falsehood counts as support and deriving one as conflict.
+
+\paragraph{Arms and baselines.} An \emph{arm} fixes where the relation graph comes from: the gold
+graphs, or graphs mined from the text by a graph-level miner (GPT-6, and gpt-oss-120b) or a
+pairwise miner (gpt-oss-120b and Llama-3.3-70B). Each arm is read at the verdict world (the
+paper's score), at the asserted world, and by the mean posterior marginal, a natural but
+non-monotone readout. The baselines are ladder-blind controls (claim count, length), DiscoScore and
+an entity graph \citep{discoscore}, NLI contradiction and ROSCOE self-consistency over the claims
+\citep{roscoe}, and G-Eval and 1--5 rating judges with GPT-6 and gpt-oss-120b, each averaged over
+five independent runs \citep{geval}.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{../coherence/figures/fig_ladders.pdf}
+\caption{\textbf{Reference results on the test split} (from the companion paper). For every
+score: the share of the \sThreeNIncPairs{} declared increases on which it rises (left) and falls
+(middle), and of the \sThreeNInvPairs{} declared invariances it keeps within $0.01$ on its own
+scale (right), with 95\% family-bootstrap intervals. Blue: LCS at the verdict world, on gold and
+on mined graphs. A score that ignores the edits sits at $0\%$, $0\%$ and $100\%$; a random one at
+about $50\%$, $50\%$ and below $100\%$. Hollow markers: invariance kept for a reason other than the
+score (saturation, or a score that never changes within a family).}
+\label{fig:reference}
+\end{figure*}
+
+\paragraph{What the benchmark shows.} Figure~\ref{fig:reference} summarizes the results.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{The gold graphs and the score agree.} LCS on gold graphs satisfies
+  \sThreeGoldLamInc{} Increase and \sThreeGoldLamInv{} Invariance pairs, as the theory and the
+  plan gate predict. This checks the data and the scorer, not new evidence.
+\item \textbf{\cp{sign} separates the worlds.} At the asserted world the same score satisfies
+  only \sThreeGoldLamASign{} gold \cp{sign} pairs, and the mean marginal \sThreeGoldMMSign: the
+  ladder detects whether a metric uses the facts.
+\item \textbf{The ladders locate errors in extraction.} With graphs mined by GPT-6, LCS rises on
+  \sThreeGraphGptLamIncPct\% of the increases; on every pair whose two mined graphs are ordered as
+  declared (\sThreeGraphGptDomForward{} of \sThreeNIncPairs) it rises, so every miss is on a pair
+  whose mined graphs the coherence order cannot rank. With pairwise miners it rises on
+  \sThreePairOssLamIncPct\% and \sThreePairLlamaLamIncPct\% of the increases, but their
+  near-certain weights saturate the score near $0$.
+\item \textbf{Surface baselines and judges do not track the edits.} Length passes
+  \sThreeBCtlLengthChain{} \cp{chain} pairs because each added link adds words, and fails
+  \cp{conflict}. LLM judges rise on \sThreeBGevalGptIncPct\% (G-Eval) and
+  \sThreeBDirectGptIncPct\% (rating) of the increases with GPT-6: they read an explicit
+  contradiction (\sThreeBGevalGptConflict{} \cp{conflict} pairs for G-Eval) but are close to
+  chance on an added inference (\sThreeBGevalGptChain{} rise, \sThreeBGevalGptChainFalls{} fall),
+  and keep only \sThreeBGevalGptInvTolUPct\% of the invariances.
+\end{itemize}
+The benchmark thus discriminates between metrics that respond to the relation an edit changes,
+metrics that respond to its surface, and metrics that do not respond at all, and it separates
+relation extraction from scoring. Full per-type tables are in App.~\ref{app:reference}.
+
+%% ============================================================================
+\section{A Human Validation Study (Planned)}
+\label{sec:study}
+%% ============================================================================
+
+Every label and every admission decision in LoCoBench is model output. We specify a study that
+tests what the construction leaves open; it is pre-registered and has not been run, so its results
+are placeholders. The study is scaled to five annotators, the authors, at no more than five hours
+each, and all its materials are released (App.~\ref{app:study}).
+
+\paragraph{What the study validates, and why these three.} A declared order is a statement about
+gold graphs, which the plan gate checks exactly (\S\ref{sec:declared}). What remains open is
+whether the text realizes the graphs, whether people see the orders, and whether the committee
+that admitted the data can be trusted.
+\begin{description}[leftmargin=1.1em,itemsep=1pt,topsep=2pt,font=\normalfont\bfseries]
+\item[1. Filler fidelity.] Rungs differ only in their fillers, and by the monotonicity theorem a
+  declared order depends only on the links the fillers draw, whatever the fixed relations are.
+  The labels that must be right are therefore the fillers' links: does a filler draw exactly its
+  intended link between the slot's claims, with the intended stances, and nothing else?
+\item[2. Ordering validity.] Do readers prefer the higher rung of every declared increase, and
+  judge the \cp{control} rewordings equal?
+\item[3. Committee validity.] Does the committee's blind filler verdict (SV5) agree with people's
+  on both sides of the gate? The pipeline kept every filler it rejected, with its readings, so the
+  gate can be tested on what it turned away.
+\end{description}
+Fixed relations are not tested, because they cannot change a declared order; nor are factuality
+labels, because the benchmark is defined given the verdicts (annotators are told which claims are
+false); nor is \cp{order}, which asks whether paragraph order is part of coherence, a question
+about the construct rather than the labels.
+
+\paragraph{Tasks.} \emph{Task 1 (aspects 1 and 3)} shows a filler highlighted in its paragraph,
+with the slot's two claims X and Y, and asks what connection the highlighted text draws between
+them (eight plain-language options that map onto the committee's labels), whether it asserts,
+denies or does not state each claim, and whether it links either claim to any other statement;
+this is the committee's SV5 question, put to people. \emph{Task 2 (aspect 2)} shows two complete
+responses of one family side by side, with the sentences in which they differ highlighted and the
+family's false claims listed as given, and asks which is more logically coherent, or whether they
+are about equal. Both are Label Studio projects that each annotator runs locally
+(Figure~\ref{fig:study-ui}).
+
+\paragraph{Sample and assignment.} Task 1 has 120 fillers from the test split: 80 that the
+committee admitted, 8 for each of the 10 combinations of slot role and filler kind, and 40 that
+it rejected, 4 per combination; at most one per family, and none from a Task 2 family. Task 2 has
+30 families, 10 each of \cp{conflict}, \cp{chain} and \cp{sign}, round-robin over domains; every
+rung pair of their primary and \cp{control} ladders gives 90 Increase and 90 Invariance pairs.
+Each item is judged by exactly three annotators, dealt over the ten possible triples so that every
+pair of annotators overlaps equally, so each annotator judges 72 fillers and 108 pairs. With a
+20-minute practice on the development split and a calibration discussion of the practice items
+only, the projected load is 3.5--4 hours per annotator; a pre-registered fallback shrinks Task 1
+to 100 fillers if the timed practice projects more than five hours.
+
+\paragraph{Annotators who are the authors.} The annotators know the design, which is the main
+threat to validity. Task screens carry no gold, ladder, rung, slot or committee information, and
+a build-time check asserts this on every exported task; annotators work alone and do not open the
+data. Two features guard against answering from knowledge of the design: Task 1 mixes rejected
+with admitted fillers, so ``read as intended'' is not always right, and half of Task 2's pairs
+are \cp{control} pairs, whose right answer is ``about equal'', with sides balanced. Each
+annotator's screens include six attention checks from the development split; failing two excludes
+the annotator. The gold key is committed by its hash in the pre-registration before annotation,
+and the analysis refuses a key that does not match. No annotator adjudicates their own
+disagreements, and the analysis is scripted.
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}p{2.35cm}p{2.8cm}p{1.75cm}@{}}
+\toprule
+Hypothesis & Test & Result \\
+\midrule
+H1. Admitted fillers read as intended & exact binomial, rate $>0.80$, $n=80$ & \tbd{} \\
+H2. Readers agree with declared increases & sign test, agree vs.\ disagree, $n=90$ (per type, Holm) & \tbd{} \\
+H3. \cp{control} pairs read as equal & majority-equal share; side sign test & \tbd{} \\
+H4. People agree with the committee & agreement, $\kappa$, reweighted pass and fail rates, $n=120$ & \tbd{} \\
+\bottomrule
+\end{tabular}
+\caption{Pre-registered hypotheses ($\alpha=0.05$). H1 and pooled H2 are confirmatory; per-type
+H2, H3 and H4 are reported with 95\% intervals.}
+\label{tab:study}
+\end{table}
+
+\paragraph{Scoring and analysis.} A person's reading of a filler is scored by the committee's
+own rule: the connection must match the intended link (exactly, including direction, for links
+that constrain truth; any no-dependence answer for an unlinked filler), every claim the filler
+asserts must have the intended stance, and a filler passes when a majority of its readers are
+correct and no majority reports a link to another statement. In Task 2 each reader scores a pair
+$+1$, $0$ or $-1$ for preferring the declared-higher rung, equal, or the lower one, and the sum
+over readers decides agree, tie or disagree. Table~\ref{tab:study} lists the hypotheses. H1
+has power $0.90$ at a true rate of $0.92$, and the pooled H2 has power near $1$ if pairs agree
+$70\%$ and disagree $15\%$ of the time. Reliability is reported as Krippendorff's $\alpha$
+\citep{krippendorff}, nominal for the connection and ordinal for the preference. As secondary
+analyses, ladder strengths are fitted with a Bradley--Terry model \citep{bradleyterry}, and every
+metric of \S\ref{sec:reference} is rescored against the human majority. Consequences are fixed in
+advance: a filler that fails with people is flagged in a release update and every result is
+re-run without its family, and a ladder type that fails H2 is reported as not validated by
+readers. \tbd{Results.}
+
+%% ============================================================================
+\section{Limitations}
+\label{sec:limitations}
+%% ============================================================================
+
+\textbf{Realism.} The ladders are diagnostic, not a sample of natural responses. Rungs differ in
+one or two short sentences, fillers draw their links with explicit markers, and claims are given
+rather than extracted, so the benchmark tests whether a metric orders responses whose relations
+differ, not how often such differences arise or how well a metric handles implicit links; mined
+results on it are best read as upper bounds. \textbf{One generator.} Every family was written by
+Claude Opus~5; the prompts were developed on it and did not transfer to two other generators, so
+the release reflects one model's style. \textbf{Model-made labels.} The factuality labels are the
+generator's and were not verified; gold relations are what the committee read; the human study
+that tests both has not been run. \textbf{Coverage.} The relation inventory has ten senses, six
+couplings and pairwise relations only, and \cp{sign} covers derivations from a truth to a
+falsehood but not the reverse. \textbf{English, expert register.} All families are English
+answers in an academic register on \lbTopics{} topics.
+
+\section*{Ethics Statement}
+
+The data are synthetic expert-style answers on academic topics and contain no personal
+information. Each response asserts some claims that are false by design; the release labels every
+one of them, and the responses should not be used as sources of fact or to train models without
+those labels. Generation used commercial models under their terms of use. The planned human study
+will be reviewed before data collection and annotators paid at or above the local minimum wage.
+
+\section{Conclusion}
+
+LoCoBench provides what a coherence metric's two requirements need: responses that differ in
+argument and in nothing else, with gold graphs and two committed worlds that say what each
+response argues and what is true. Its construction checks each declared order exactly before any
+prose exists, and validates the prose blind. On it, a monotone score on gold graphs satisfies
+every declaration, the \cp{sign} ladder shows whether a metric uses the facts, and errors on mined
+graphs are located in extraction; LLM judges miss about half of the declared increases. We release
+the data, the pipeline and every prompt, and invite metrics to be evaluated on it.
+
+\bibliography{ref}
+
+\appendix
+\input{appendix}
+
+\end{document}

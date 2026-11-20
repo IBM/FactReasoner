@@ -1,0 +1,73 @@
+% Copied from docs/arr2027/coherence/main.tex (same macros).
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{3.4pt}
+\begin{tabular}{@{}ll ccc c cc@{}}
+\toprule
+& & \multicolumn{4}{c}{Increase} & \multicolumn{2}{c}{Invariance, exact} \\
+\cmidrule(lr){3-6}\cmidrule(l){7-8}
+Arm & Readout & \cp{conflict} & \cp{chain} & \cp{sign} & resolved & \cp{order} & \cp{control} \\
+\midrule
+\multirow{3}{*}{\cp{gold}}
+ & mean marginal & \sThreeGoldMMConflict & \sThreeGoldMMChain & \sThreeGoldMMSign & \sThreeGoldMMIncTol & \sThreeGoldMMOrder & \sThreeGoldMMControl \\
+ & $\LCS$, assertion & \sThreeGoldLamAConflict & \sThreeGoldLamAChain & \sThreeGoldLamASign & \sThreeGoldLamAIncTol & \sThreeGoldLamAOrder & \sThreeGoldLamAControl \\
+ & $\LCS$, verdict (ours) & \sThreeGoldLamConflict & \sThreeGoldLamChain & \sThreeGoldLamSign & \sThreeGoldLamIncTol & \sThreeGoldLamOrder & \sThreeGoldLamControl \\
+\midrule
+\multirow{3}{*}{graph, GPT-6}
+ & mean marginal & \sThreeGraphGptMMConflict & \sThreeGraphGptMMChain & \sThreeGraphGptMMSign & \sThreeGraphGptMMIncTol & \sThreeGraphGptMMOrder & \sThreeGraphGptMMControl \\
+ & $\LCS$, assertion & \sThreeGraphGptLamAConflict & \sThreeGraphGptLamAChain & \sThreeGraphGptLamASign & \sThreeGraphGptLamAIncTol & \sThreeGraphGptLamAOrder & \sThreeGraphGptLamAControl \\
+ & $\LCS$, verdict (ours) & \sThreeGraphGptLamConflict & \sThreeGraphGptLamChain & \sThreeGraphGptLamSign & \sThreeGraphGptLamIncTol & \sThreeGraphGptLamOrder & \sThreeGraphGptLamControl \\
+\midrule
+\multirow{3}{*}{graph, gpt-oss}
+ & mean marginal & \sThreeGraphOssMMConflict & \sThreeGraphOssMMChain & \sThreeGraphOssMMSign & \sThreeGraphOssMMIncTol & \sThreeGraphOssMMOrder & \sThreeGraphOssMMControl \\
+ & $\LCS$, assertion & \sThreeGraphOssLamAConflict & \sThreeGraphOssLamAChain & \sThreeGraphOssLamASign & \sThreeGraphOssLamAIncTol & \sThreeGraphOssLamAOrder & \sThreeGraphOssLamAControl \\
+ & $\LCS$, verdict (ours) & \sThreeGraphOssLamConflict & \sThreeGraphOssLamChain & \sThreeGraphOssLamSign & \sThreeGraphOssLamIncTol & \sThreeGraphOssLamOrder & \sThreeGraphOssLamControl \\
+\midrule
+\multirow{3}{*}{pairwise, gpt-oss}
+ & mean marginal & \sThreePairOssMMConflict & \sThreePairOssMMChain & \sThreePairOssMMSign & \sThreePairOssMMIncTol & \sThreePairOssMMOrder & \sThreePairOssMMControl \\
+ & $\LCS$, assertion & \sThreePairOssLamAConflict & \sThreePairOssLamAChain & \sThreePairOssLamASign & \sThreePairOssLamAIncTol & \sThreePairOssLamAOrder & \sThreePairOssLamAControl \\
+ & $\LCS$, verdict (ours) & \sThreePairOssLamConflict & \sThreePairOssLamChain & \sThreePairOssLamSign & \sThreePairOssLamIncTol & \sThreePairOssLamOrder & \sThreePairOssLamControl \\
+\midrule
+\multirow{3}{*}{pairwise, Llama}
+ & mean marginal & \sThreePairLlamaMMConflict & \sThreePairLlamaMMChain & \sThreePairLlamaMMSign & \sThreePairLlamaMMIncTol & \sThreePairLlamaMMOrder & \sThreePairLlamaMMControl \\
+ & $\LCS$, assertion & \sThreePairLlamaLamAConflict & \sThreePairLlamaLamAChain & \sThreePairLlamaLamASign & \sThreePairLlamaLamAIncTol & \sThreePairLlamaLamAOrder & \sThreePairLlamaLamAControl \\
+ & $\LCS$, verdict (ours) & \sThreePairLlamaLamConflict & \sThreePairLlamaLamChain & \sThreePairLlamaLamSign & \sThreePairLlamaLamIncTol & \sThreePairLlamaLamOrder & \sThreePairLlamaLamControl \\
+\bottomrule
+\end{tabular}
+\caption{Ladder assertions on the test split by type (pairs satisfied / pairs). ``Resolved'':
+Increase pairs whose $[0,1]$-scale score rises by more than
+$\tau=\sThreeTol$, out of \sThreeNIncPairs.}
+\label{tab:ref-bytype}
+\end{table*}
+
+\begin{table}[h]
+\centering\small
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+& \multicolumn{4}{c}{Increase satisfied (\%)} & Inv.$_\tau$ \\
+\cmidrule(lr){2-5}
+Score & all & \cp{conf.} & \cp{chain} & \cp{sign} & (\%) \\
+\midrule
+claim count & \sThreeBCtlClaimsIncPct & \sThreeBCtlClaimsConflictPct & \sThreeBCtlClaimsChainPct & \sThreeBCtlClaimsSignPct & \sThreeBCtlClaimsInvTolUPct \\
+length & \sThreeBCtlLengthIncPct & \sThreeBCtlLengthConflictPct & \sThreeBCtlLengthChainPct & \sThreeBCtlLengthSignPct & \sThreeBCtlLengthInvTolUPct \\
+DiscoScore RC & \sThreeBDiscRCIncPct & \sThreeBDiscRCConflictPct & \sThreeBDiscRCChainPct & \sThreeBDiscRCSignPct & \sThreeBDiscRCInvTolUPct \\
+DiscoScore LC & \sThreeBDiscLCIncPct & \sThreeBDiscLCConflictPct & \sThreeBDiscLCChainPct & \sThreeBDiscLCSignPct & \sThreeBDiscLCInvTolUPct \\
+entity graph & \sThreeBDiscEGIncPct & \sThreeBDiscEGConflictPct & \sThreeBDiscEGChainPct & \sThreeBDiscEGSignPct & \sThreeBDiscEGInvTolUPct \\
+NLI contradiction & \sThreeBNliContraIncPct & \sThreeBNliContraConflictPct & \sThreeBNliContraChainPct & \sThreeBNliContraSignPct & \sThreeBNliContraInvTolUPct \\
+ROSCOE SC & \sThreeBRoscoeMaxIncPct & \sThreeBRoscoeMaxConflictPct & \sThreeBRoscoeMaxChainPct & \sThreeBRoscoeMaxSignPct & \sThreeBRoscoeMaxInvTolUPct \\
+G-Eval, GPT-6 & \sThreeBGevalGptIncPct & \sThreeBGevalGptConflictPct & \sThreeBGevalGptChainPct & \sThreeBGevalGptSignPct & \sThreeBGevalGptInvTolUPct \\
+G-Eval, gpt-oss & \sThreeBGevalOssIncPct & \sThreeBGevalOssConflictPct & \sThreeBGevalOssChainPct & \sThreeBGevalOssSignPct & \sThreeBGevalOssInvTolUPct \\
+rating, GPT-6 & \sThreeBDirectGptIncPct & \sThreeBDirectGptConflictPct & \sThreeBDirectGptChainPct & \sThreeBDirectGptSignPct & \sThreeBDirectGptInvTolUPct \\
+rating, gpt-oss & \sThreeBDirectOssIncPct & \sThreeBDirectOssConflictPct & \sThreeBDirectOssChainPct & \sThreeBDirectOssSignPct & \sThreeBDirectOssInvTolUPct \\
+\midrule
+$\LCS$, gold & \sThreeGoldLamIncPct & \sThreeGoldLamConflictPct & \sThreeGoldLamChainPct & \sThreeGoldLamSignPct & \sThreeGoldLamInvTolPct \\
+$\LCS$, graph GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptLamConflictPct & \sThreeGraphGptLamChainPct & \sThreeGraphGptLamSignPct & \sThreeGraphGptLamInvTolPct \\
+\bottomrule
+\end{tabular}
+\caption{Baselines on the test split: Increase pairs satisfied, in \% of \sThreeNIncPairs{}
+(\sThreeNConflict{} ladders, 180 pairs, per type), and Invariance pairs within $\tau=\sThreeTol$ on
+each score's $[0,1]$ scale, in \% of \sThreeNInvPairs. Judges are averaged over five independent
+runs.}
+\label{tab:ref-baselines}
+\end{table}

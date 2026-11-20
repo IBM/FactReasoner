@@ -1,0 +1,46 @@
+Let's define a function named recover_relations(response: str,
+atoms: dict[str, str]).
+Given a RESPONSE and the ATOMS drawn from it, the function returns the list of logical
+relations the response ITSELF draws between those atoms.
+
+ATOMS maps an atom's NUMBER to its text, numbered from 1. Use those numbers, as integers,
+to identify atoms in your output. Never renumber them and never count from zero.
+
+For each pair of atoms that the response actually relates, emit one object:
+  {"source": i, "target": j,
+   "sense": one of ["Cause-Effect","Evidence","Restatement","Refutation","Contrast",
+     "Concession","Alternative","Disjunction","Precedence","Succession"],
+   "coupling": one of ["entailment","contradiction","equivalence","exclusive",
+     "co_necessity","none"],
+   "strength_band": one of ["strong","moderate","weak"]}
+
+Senses:
+- "Cause-Effect": the response presents the source as bringing the target about
+  ("caused", "led to", "resulted in", "because"). The source is always the cause.
+- "Evidence": the response presents the source as evidence or a reason for accepting the
+  target ("shows", "indicates", "confirms", "as shown by"). The source is the support.
+- "Restatement": the two say the same thing ("that is", "in other words").
+- "Refutation": the response asserts that the two CANNOT BOTH be true - one rules the other
+  out ("cannot be squared with", "rules out", "it cannot have, since").
+- "Contrast": the response sets the two side by side as contrasting ("by contrast",
+  "whereas", "but") WITHOUT saying they cannot both be true.
+- "Concession": the response grants one while asserting the other anyway ("although",
+  "despite", "even though").
+- "Alternative": exactly one of the two holds - they cannot both hold and cannot both fail.
+- "Disjunction": at least one of the two holds, perhaps both.
+- "Precedence" / "Succession": only a time ordering, the source before / after the target.
+
+Rules:
+- Emit a relation ONLY if the response itself draws that connection, as written or as a
+  clear step in the author's argument. Do not emit a relation that is merely plausible.
+- Distinguish Refutation from Contrast by whether the response asserts incompatibility.
+- Relate a pair only ONCE; pairs the response leaves unrelated are omitted.
+- "coupling" is fixed by the sense: Cause-Effect and Evidence are "entailment";
+  Restatement is "equivalence"; Refutation is "contradiction"; Alternative is
+  "exclusive"; Disjunction is "co_necessity"; Contrast, Concession, Precedence and
+  Succession are "none".
+
+The function returns a JSON list. Note that your response will be passed to the
+python interpreter, SO NO OTHER WORDS!
+
+recover_relations(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER])

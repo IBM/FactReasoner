@@ -1,0 +1,65 @@
+% Figure 2: the generation and validation pipeline. Pass rates from numbers_lb.tex.
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\scriptsize,
+  box/.style={rounded corners=1mm,text width=2.05cm,align=center,inner sep=1.3mm,
+              anchor=north},
+  gen/.style={box,draw=lbline,fill=lbgen,minimum height=1.32cm},
+  det/.style={box,draw=lbconflict!70,fill=lbdet,minimum height=1.32cm},
+  com/.style={box,draw=lbsupport!70,fill=lbcom,minimum height=1.62cm},
+  flow/.style={-{Stealth[length=1.6mm]},black!70,line width=0.6pt},
+  back/.style={-{Stealth[length=1.4mm]},lbconflict!80!black,line width=0.55pt,
+               dash pattern=on 2pt off 1.2pt},
+  lane/.style={font=\scriptsize\bfseries,text=lbink,rotate=90,anchor=south,align=center},
+  rate/.style={font=\tiny,text=lbink,inner sep=0.6pt,anchor=north},
+]
+\def\gy{0} \def\dy{-1.95} \def\cy{-3.9}
+% columns
+\foreach \n/\x in {c1/0,c2/2.55,c3/5.1,c4/7.65,c5/10.2,c6/12.75} \coordinate (\n) at (\x,0);
+% ---- generator lane ----
+\node[gen] (p1) at (c1|-0,\gy) {\textbf{P1} question on one of \lbTopics{} topics};
+\node[gen] (p2) at (c2|-0,\gy) {\textbf{P2} 26 tagged claims: 14 true, 4 plausible but false, typed pairs};
+\node[gen] (s3) at (c3|-0,\gy) {\textbf{S3} plan: 10--14 claims in order, fixed relations, non-relations, slots};
+\node[gen] (s4) at (c4|-0,\gy) {\textbf{S4} template: the answer written once, slot markers in place};
+\node[gen] (sf) at (c5|-0,\gy) {fillers: per slot, its link drawn or not (or three wordings)};
+\node[gen] (sp) at (c6|-0,\gy) {\textbf{splice}: a rung is the template with one filler per slot};
+\foreach \a/\b in {p1/p2,p2/s3,s3/s4,s4/sf,sf/sp} \draw[flow] (\a) -- (\b);
+% ---- deterministic lane ----
+\node[det] (g3) at (c3|-0,\dy) {\textbf{plan gate}: roles, truth values; \emph{exact ladder check on the gold graphs}};
+\node[det] (g4) at (c4|-0,\dy) {\textbf{structure}: 420--520 words, every marker, paragraphs};
+\node[det] (gf) at (c5|-0,\dy) {\textbf{filler checks}: no announcing, no meta talk, no restated claim};
+\draw[flow] (s3) -- (g3); \draw[flow] (s4) -- (g4); \draw[flow] (sf) -- (gf);
+% ---- committee lane ----
+\node[com] (tg) at (c4|-0,\cy) {\textbf{V3} fluency, no leakage; \textbf{V4} claims asserted; \textbf{SV1} blind check of each fixed relation (gold follows it)};
+\node[com] (sv5) at (c5|-0,\cy) {\textbf{SV5} blind filler reading: the link, each claim's stance, no third-claim link};
+\node[com] (adm) at (c6|-0,\cy) {\textbf{admit per ladder} when all its rungs' fillers pass; spare slots stand in};
+\draw[flow] (g4) -- (tg); \draw[flow] (gf) -- (sv5); \draw[flow] (sv5) -- (adm);
+\draw[flow] (sp) -- (adm);
+% ---- retry loops (dashed) ----
+\draw[back] (g3.west) -- ++(-0.22,0) |- ([yshift=-3mm]s3.west);
+\node[rate,anchor=east,align=right] at ([xshift=-0.3cm,yshift=-0.2cm]g3.west) {retry S3 with\\the gate's complaint};
+\draw[back] (tg.west) -- ++(-0.22,0) |- ([yshift=-3mm]s4.west);
+\node[rate,anchor=east,align=right] at ([xshift=-0.3cm,yshift=-0.2cm]tg.west) {retry S4 with\\the committee's\\complaint};
+\draw[back] (sv5.east) -- ++(0.2,0) |- ([yshift=-3mm]sf.east);
+\node[rate,anchor=west,align=left] at ([xshift=0.25cm,yshift=1.15cm]sv5.east) {regenerate\\the filler\\alone ($\le$2)};
+% ---- pass rates ----
+\node[rate,anchor=north east] at (g3.south east) {passed \lbGateSThreegatePct\%};
+\node[rate,anchor=north east] at (g4.south east) {passed \lbGateSFourstructurePct\%};
+\node[rate,align=right,anchor=north east] at (tg.south east) {V3 \lbGateVThreescoresPct/\lbGateVThreespansPct\%, V4 \lbGateVFourPct\%, SV1 \lbGateSVOnePct\%};
+\node[rate,anchor=north east] at (sv5.south east) {first reading \lbGateSVFivePct\%};
+\node[rate,anchor=north east] at (adm.south east) {\lbLadders{} ladders, \lbFamilies{} families};
+% ---- lane labels ----
+\node[lane] at (-1.15,\gy-0.66) {generator\\[-1pt](Claude Opus~5)};
+\node[lane] at (-1.15,\dy-0.66) {deterministic\\[-1pt]checks};
+\node[lane] at (-1.15,\cy-0.81) {committee\\[-1pt](3 vendors)};
+\end{tikzpicture}
+\caption{\textbf{The generation and validation pipeline.} Top: the generator writes a question,
+a tagged claim pool, a plan and a template with slot markers, then the fillers of every slot;
+every rung is a splice. Middle: deterministic checks, the first of which verifies, before any
+prose exists, that each ladder's gold graphs are ordered exactly as declared. Bottom: a committee
+of three models from three vendors, never the generator, reads the template and every filler
+\emph{blind} to the plan and to the intended link. Dashed: what happens on a failure.
+Percentages are pass rates over every evaluation of every attempt (\S\ref{sec:validation}).}
+\label{fig:pipeline}
+\end{figure*}

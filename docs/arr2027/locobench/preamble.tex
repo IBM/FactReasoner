@@ -1,0 +1,52 @@
+% Preamble of the LoCoBench dataset paper.
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyvrb}
+\usepackage{fvextra}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+
+% ---- colours (the companion paper's palette) --------------------------------
+\definecolor{lbsupport}{HTML}{2A78D6}   % support (blue)
+\definecolor{lbconflict}{HTML}{EB6834}  % conflict (orange)
+\definecolor{lbaqua}{HTML}{1BAF7A}
+\definecolor{lbline}{HTML}{898781}      % de-emphasis gray
+\definecolor{lbink}{HTML}{52514E}
+\definecolor{lbslot}{HTML}{1F5FA8}      % slot text
+\definecolor{lbslotbg}{HTML}{E6EFFA}
+\definecolor{lbgen}{HTML}{F1F0EC}       % generator boxes
+\definecolor{lbcom}{HTML}{E6EFFA}       % committee boxes
+\definecolor{lbdet}{HTML}{FFF3E8}       % deterministic checks
+
+% ---- notation ---------------------------------------------------------------
+\newcommand{\LCS}{\mathrm{LCS}}
+\newcommand{\xs}{x^{\ast}}
+\newcommand{\PR}{P_{\mathcal{R}}}
+\newcommand{\cp}[1]{\textsc{#1}}
+\newcommand{\sense}[1]{\textsf{#1}}
+\newcommand{\tbd}[1]{\textcolor{red}{[TBD: #1]}}
+
+% Slot markers and spliced slot text in examples.
+\newcommand{\slotmarker}[1]{\fcolorbox{lbslot}{lbslotbg}{\tiny\sffamily\bfseries #1}}
+\newcommand{\slotfill}[2]{\textsuperscript{\tiny\sffamily\bfseries\textcolor{lbslot}{#1}}%
+  \textcolor{lbslot}{#2}}
+\newcommand{\slotclaim}[1]{\fcolorbox{lbslot}{lbslotbg}{#1}}
+\newcommand{\sgn}[1]{%
+  \ifx#1+\textcolor{lbsupport}{\textbf{support}}\fi
+  \ifx#1-\textcolor{lbconflict}{\textbf{conflict}}\fi}
+
+\newcommand{\promptfile}[1]{%
+  \VerbatimInput[fontsize=\scriptsize,frame=single,framesep=3pt,numbers=left,
+                 numbersep=3pt,breaklines=true,breakanywhere=true]{#1}}

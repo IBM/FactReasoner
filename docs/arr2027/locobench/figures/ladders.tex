@@ -1,0 +1,71 @@
+% Figure: the five ladder types as relation glyphs, rung by rung.
+\tikzset{
+  gT/.style={circle,draw=black!60,fill=white,inner sep=0pt,minimum size=3.6mm,font=\tiny},
+  gF/.style={circle,draw=black!60,fill=black!22,inner sep=0pt,minimum size=3.6mm,font=\tiny},
+  gsup/.style={draw=lbsupport,line width=0.85pt,-{Stealth[length=1.3mm]}},
+  gsupu/.style={draw=lbsupport,line width=0.85pt},
+  gcnf/.style={draw=lbconflict,line width=0.85pt,dash pattern=on 2pt off 1.2pt},
+  gcnfa/.style={draw=lbconflict,line width=0.85pt,-{Stealth[length=1.3mm]},
+                dash pattern=on 2pt off 1.2pt},
+  glab/.style={font=\tiny,inner sep=0.5pt},
+  para/.style={draw=black!50,fill=black!6,minimum width=2.6mm,minimum height=3.4mm,
+               inner sep=0pt,font=\tiny},
+}
+% #1, #2: edge styles of the two conflict pairs
+\newcommand{\gConflict}[2]{\tikz[baseline=-0.6ex]{
+  \node[gT] (a) at (0,0) {}; \node[gT] (b) at (0.72,0) {};
+  \node[gT] (c) at (1.22,0) {}; \node[gT] (d) at (1.94,0) {};
+  \draw[#1] (a) -- (b); \draw[#2] (c) -- (d);}}
+\newcommand{\gChain}[2]{\tikz[baseline=-0.6ex]{
+  \node[gT] (a) at (0,0) {}; \node[gT] (b) at (0.85,0) {}; \node[gT] (c) at (1.7,0) {};
+  \draw[#1] (a) -- (b); \draw[#2] (b) -- (c);}}
+% #1 edge style, #2 label
+\newcommand{\gSign}[2]{\tikz[baseline=-0.6ex]{
+  \node[gT] (a) at (0,0) {}; \node[gF] (b) at (1.5,0) {};
+  \draw[#1] (a) -- node[glab,above=0.6mm] {#2} (b);}}
+\newcommand{\gOrder}[4]{\tikz[baseline=-0.6ex]{
+  \node[para] at (0,0) {#1}; \node[para] at (0.33,0) {#2};
+  \node[para] at (0.66,0) {#3}; \node[para] at (0.99,0) {#4};}}
+\newcommand{\gControl}[1]{\tikz[baseline=-0.6ex]{
+  \node[gT] (a) at (0,0) {}; \node[gT] (b) at (1.5,0) {};
+  \draw[gsup] (a) -- node[glab,above=0.6mm] {#1} (b);}}
+
+\begin{figure*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.55}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{2.45cm} c c c c c@{}}
+\toprule
+& & & & & \multicolumn{2}{c}{Declared order} \\
+\cmidrule(l){6-7}
+Ladder & What its slots join & $\rho_0$ & $\rho_1$ & $\rho_2$ & verdict world & asserted world \\
+\midrule
+\cp{conflict} & two pairs of true claims
+  & \gConflict{gcnf}{gcnf} & \gConflict{gcnf}{draw=none} & \gConflict{draw=none}{draw=none}
+  & increasing & increasing \\
+\cp{chain} & three true claims in a chain $p\to p{+}1\to p{+}2$
+  & \gChain{draw=none}{draw=none} & \gChain{gsup}{draw=none} & \gChain{gsup}{gsup}
+  & increasing & increasing \\
+\cp{sign} & a true claim and a false one
+  & \gSign{gcnfa}{derives} & \gSign{draw=none}{} & \gSign{gsupu}{refutes}
+  & increasing & \emph{not} increasing \\
+\cp{order} & no slot; 4--5 self-contained paragraphs
+  & \gOrder{4}{3}{2}{1} & \gOrder{1}{2}{3}{4} & \gOrder{2}{3}{4}{1}
+  & invariant & invariant \\
+\cp{control} & two true claims joined by an entailment
+  & \gControl{wording 1} & \gControl{wording 2} & \gControl{wording 3}
+  & invariant & invariant \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{The five ladder types}, as the relation each rung draws between the claims its
+slots join (white: true claim, gray: false claim). Edge colour is the relation's sign at the
+\emph{verdict world}, where each claim takes its factuality label: \textcolor{lbsupport}{blue}
+supports it, \textcolor{lbconflict}{orange (dashed)} conflicts with it. Deriving a falsehood from a
+truth is a conflict at the verdict world, because the entailment is violated there; refuting it
+is a support. At the \emph{asserted world}, where every asserted claim is true, the derivation is
+an upheld entailment instead, so only \cp{sign}'s order changes with the world
+(\S\ref{sec:worlds}). Every family has one primary ladder and a \cp{control} ladder on one extra
+slot, whose $\rho_0$ is the primary ladder's $\rho_1$; \cp{order}'s permutations shown are those of
+family f055.}
+\label{fig:ladders}
+\end{figure*}

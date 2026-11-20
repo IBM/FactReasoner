@@ -1,0 +1,22 @@
+Let's define a function named read_link(text: str, passage: str, x: str, y: str).
+PASSAGE is a verbatim excerpt of TEXT, an expert answer. X and Y are two claims. Read the
+PASSAGE in the context of the TEXT and report only what it SAYS - do not use outside
+knowledge of whether X or Y is true.
+
+The function returns a JSON object:
+  {"x_status": one of "asserted", "denied", "absent" - how the passage treats claim X,
+   "y_status": the same for claim Y,
+   "link": one of
+     "i_supports_j"  the passage presents X as a cause of Y, or as evidence or a reason
+                     for accepting Y
+     "j_supports_i"  the same, with Y as the cause, evidence or reason for X
+     "incompatible"  the passage says X and Y cannot both be true (one rules out the other)
+     "equivalent", "exactly_one", "at_least_one", "contrast_only", "concedes",
+     "precedes", "follows" (X before / after Y in time only)
+     "unlinked"      the passage states X and Y without drawing any connection,
+   "other_links": [short verbatim quotes of any connection the passage draws between X or
+                   Y and a statement OTHER than X and Y; [] if none],
+   "evidence": the shortest verbatim quote carrying the link, or ""}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+read_link(text="[TEXT_PLACEHOLDER]", passage="[PASSAGE_PLACEHOLDER]", x="[CLAIM_X_PLACEHOLDER]", y="[CLAIM_Y_PLACEHOLDER]")

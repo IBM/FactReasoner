@@ -1,0 +1,371 @@
+% Appendix of the LoCoBench dataset paper.
+
+%% ============================================================================
+\section{The Pipeline's Prompts, Verbatim}
+\label{app:prompts}
+%% ============================================================================
+
+Every prompt below is exported from the pipeline's code by
+\texttt{scripts/locobench\_export\_prompts.py}, so it is the text that was sent.
+\texttt{[\ldots\_PLACEHOLDER]} marks where the pipeline substitutes a value. Prompts in the
+function-call idiom (V3, V4, SV1, SV5) follow the committee format of LoReFact \citep{lorefact}:
+the model is asked to evaluate a Python call and return JSON.
+
+\subsection{Generation}
+
+\paragraph{P1: topic to question.}
+\promptfile{prompts/PROMPT_P1.txt}
+
+\paragraph{P2: question to tagged claim pool.}
+\promptfile{prompts/PROMPT_P2.txt}
+
+\paragraph{S3: claims to slot plan.} \texttt{[SENSES\_PLACEHOLDER]} receives the family's one or
+two rare senses; \texttt{[SLOTS\_PLACEHOLDER]} receives the slot requirement of its primary ladder
+type, given after the prompt.
+\promptfile{prompts/PROMPT_S3.txt}
+
+\noindent Slot requirement, \cp{conflict}:
+\promptfile{prompts/INSERT_S3_SLOTS_CONFLICT.txt}
+\noindent Slot requirement, \cp{chain}:
+\promptfile{prompts/INSERT_S3_SLOTS_CHAIN.txt}
+\noindent Slot requirement, \cp{sign}:
+\promptfile{prompts/INSERT_S3_SLOTS_SIGN.txt}
+\noindent Slot requirement, \cp{order}:
+\promptfile{prompts/INSERT_S3_SLOTS_ORDER.txt}
+
+\paragraph{S4: plan to template and fillers.} \texttt{[LAYOUT\_PLACEHOLDER]} receives
+``Organize the answer into 3-5 paragraphs.'' for \cp{conflict}, \cp{chain} and \cp{sign}, and for
+\cp{order}:
+\promptfile{prompts/INSERT_S4_LAYOUT_ORDER.txt}
+\promptfile{prompts/PROMPT_S4.txt}
+
+\paragraph{SF: regenerating one filler.}
+\promptfile{prompts/PROMPT_SF.txt}
+
+\paragraph{Retry notes.} Appended to a prompt whose output failed to parse, or failed a
+deterministic check, together with the reason:
+\promptfile{prompts/RETRY_PARSE.txt}
+\promptfile{prompts/RETRY_SEMANTIC.txt}
+
+\subsection{Committee}
+
+\paragraph{V3: fluency, leakage, hedging, artifacts.}
+\promptfile{prompts/PROMPT_V3.txt}
+
+\paragraph{V4: claim coverage.}
+\promptfile{prompts/PROMPT_V4.txt}
+
+\paragraph{SV1: blind pair-by-pair relation reading.}
+\promptfile{prompts/PROMPT_SV1.txt}
+
+\paragraph{SV5: blind filler reading.}
+\promptfile{prompts/PROMPT_SV5.txt}
+
+\subsection{Reference Evaluation}
+
+The prompts of the companion paper's relation miners and LLM judges (\S\ref{sec:reference}).
+
+\paragraph{Graph-level miner.}
+\promptfile{prompts/EVAL_GRAPH_MINER.txt}
+
+\paragraph{Pairwise miner, Prompt A (sense and coupling).}
+\promptfile{prompts/EVAL_PAIR_A.txt}
+
+\paragraph{Pairwise miner, Prompt B (strength).}
+\promptfile{prompts/EVAL_PAIR_B.txt}
+
+\paragraph{G-Eval coherence judge.}
+\promptfile{prompts/EVAL_JUDGE_GEVAL.txt}
+
+\paragraph{Direct 1--5 coherence rating.}
+\promptfile{prompts/EVAL_JUDGE_DIRECT.txt}
+
+%% ============================================================================
+\section{Worked Families}
+\label{app:families}
+%% ============================================================================
+
+One family of each primary ladder type, extracted from the release by
+\texttt{scripts/locobench\_paper\_examples.py}. Each lists the question, the plan's claims with
+their labels, the template with its slot markers, every slot's fillers, the five responses with
+the filler each carries in the edited slots and its gold $\LCS$ at both worlds, one response in
+full with its slot sentences highlighted, and that response's gold relations. The other responses
+are the template with the listed fillers spliced in.
+
+\subsection{A \cp{conflict} family (f009)}
+\input{examples/family_f009}
+
+\subsection{A \cp{chain} family (f224)}
+\input{examples/family_f224}
+
+\subsection{A \cp{sign} family (f003)}
+\input{examples/family_f003}
+
+\subsection{An \cp{order} family (f055)}
+\input{examples/family_f055}
+
+%% ============================================================================
+\section{Checks, Thresholds and Gold Corrections}
+\label{app:checks}
+%% ============================================================================
+
+\paragraph{The plan gate} (\texttt{slots.check\_plan}). A plan is rejected, with a specific
+complaint fed back to S3, if: a claim is not quoted verbatim from the pool or is not at a fresh
+consecutive position; a relation or non-relation joins claims more than five positions apart, or
+two of them share a pair; the plan has the wrong number of slots of a role for its ladder type; a
+slot's endpoints are not consecutive, or do not have the truth values its role needs; a required
+rare sense is missing; or a ladder's gold graphs, compiled with taxonomy v2 at the verdict world
+and weighted at their band midpoints, are not ordered exactly as declared, with a step of at least
+$0.05$ nats in $\Lambda=\log\PR(\xs)/\pi(\xs)$ between neighbouring rungs. The factuality of each
+planned claim is read from the pool's tags, not from the planner's output.
+
+\paragraph{Structure.} The base splice must have every slot marker, 3--5 paragraphs (4--5 for
+\cp{order}) and 380--650 words (the prompt asks for 420--520 with the base fillers).
+
+\paragraph{Deterministic filler checks.} A filler is rejected before the committee reads it if it
+matches the \emph{announcing} pattern (``separately'', ``independently'', ``in a separate'',
+``unrelated'', ``on a different note'', ``it is (also) documented / established / recorded / noted
+that''), which would mark an unlinked filler for any reader; the \emph{meta} pattern, which
+catches fillers that talk about ``these claims'', ``these propositions'' or ``these statements'';
+or if it restates a claim the template already asserts.
+
+\paragraph{Committee thresholds.} V3: a template is rejected if a majority scores any of fluency,
+formality and organization below 4, or a majority flags the same kind of span (leakage, hedging,
+artifacts); it is applied to the base splice and to coverage splices that together contain every
+filler. V4: a majority must find each claim asserted, and each false claim asserted as written.
+SV1: a majority must confirm at least $75\%$ of the fixed relations. SV5: a majority must read the
+intended link and stances and no majority a third-claim link. A failed filler is regenerated at
+most twice before a spare slot is tried; an \cp{order} rung tries up to four permutations.
+
+\paragraph{Gold corrections.} Where SV1's majority reading of a planned fixed relation or declared
+non-relation departs from the plan, gold follows the reading: a relation read as unlinked is
+dropped, one read with a different link is replaced by it, and a declared non-relation read as
+linked becomes a relation. Over the release this changed \lbGoldCorr{} relations in
+\lbGoldCorrFamilies{} families: \lbGoldCorrDropped{} dropped, \lbGoldCorrReplaced{} replaced and
+\lbGoldCorrAdded{} added. Each correction is recorded in the family file with the three raters'
+labels, and the ladder check is re-run on the corrected graphs.
+
+%% ============================================================================
+\section{Generation Record}
+\label{app:record}
+%% ============================================================================
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Stage & Calls \\
+\midrule
+P1 question & \lbCallsPOne \\
+P2 claim pool & \lbCallsPTwo \\
+S3 plan & \lbCallsSThree \\
+S4 template and fillers & \lbCallsSFour \\
+SF filler regeneration & \lbCallsSF \\
+V3 (committee) & \lbCallsVThree \\
+V4 (committee) & \lbCallsVFour \\
+SV1 (committee) & \lbCallsSVOne \\
+SV5 (committee) & \lbCallsSVFive \\
+\midrule
+total & \lbCalls \\
+\bottomrule
+\end{tabular}
+\caption{LLM calls over all \lbAttempts{} family attempts.}
+\label{tab:calls}
+\end{table}
+
+\paragraph{Run.} The test split was generated on 2026-11-19 by Claude Opus~5 with the committee of
+\S\ref{sec:validation}, through one gateway, with 12 families in parallel, in about four hours and
+forty minutes plus half an hour of retries; key spend was about \$\lbSpend. Of the \lbAttempts{}
+attempts, \lbFirstTry{} families were admitted on the first attempt. A rejected family is retried
+from its stored question and claims.
+
+\paragraph{Response cache.} The gateway caches identical requests. Without a bypass, a
+whole-family retry replays the cached plan and template of the failed attempt, and the repeated
+runs of an LLM judge are one run; every generation and evaluation run therefore sends a no-cache
+directive.
+
+\paragraph{Three generators, then one.} The split was first set up with three rotating generators
+(Claude Opus~5, GPT-6.1 and Gemini~3.1 Pro), each with a committee that excluded it. In the first
+16 minutes Claude Opus~5 had 5 of 5 families admitted, GPT-6.1 0 of 10 attempts and Gemini~3.1 Pro
+1 of 7, all failing at the template stage: the prompts had been developed on Claude, GPT-6.1 walked
+through the plan relation by relation (fluency 3 from all three raters, restated claims), and
+Gemini wrote templates too short or unparseable. The split was generated with Claude Opus~5
+alone; the aborted run is kept.
+
+\paragraph{Regenerated families.} One family's question was blocked by a provider's content filter
+four times (empty output); it was replaced by a new question. Ten admitted families had lost their
+primary ladder (a designated slot and its spare, or a \cp{chain} link, failed its filler reading)
+and kept only \cp{control}; they were archived and regenerated from new questions, and all ten were
+admitted with both ladders. \lbMissingControl{} \cp{control} ladders failed the same way and are
+absent; their families keep their primary ladder.
+
+\paragraph{A correction.} The released files were corrected once after generation: the sign of a
+gold relation at the asserted world (\texttt{sign\_assertion}) had been computed at the all-true
+world, ignoring stance, which mis-signed relations touching the denied claim on the \lbDenied{}
+refuting \cp{sign} rungs. The correction re-signed 67 relations in 60 items; nothing else changed,
+and no reported score depends on the field. The original files are archived with the release.
+
+\paragraph{The earlier design.} An earlier LoCoBench generated a base response and derived each
+rung by an LLM rewrite of it. Rewrites changed more than the intended relation, so most families
+were lost to validation of the rewritten text, and the gold conflicts were \sense{Contrast} and
+\sense{Concession} relations, which compile to no coupling. The slot design removes both problems:
+rungs are splices, so the unedited text is identical by construction, and conflicts are
+refutations between true claims.
+
+%% ============================================================================
+\section{Data Format}
+\label{app:schema}
+%% ============================================================================
+
+The release has, per split, \texttt{items.jsonl} (one response per line), \texttt{families.json}
+(one record per family), the generator's stored state (\texttt{state.json}: question, claim pool,
+plan, template, every filler and every committee reading, including rejected fillers), the attempt
+log and the run configuration.
+
+{\raggedright
+\paragraph{Items.} \texttt{id}; \texttt{response}; \texttt{atoms}: \texttt{id}, \texttt{pos},
+\texttt{text}, \texttt{factual} (the factuality label), \texttt{stance} (\texttt{asserted} or
+\texttt{denied}); \texttt{relations}: \texttt{source\_id}, \texttt{target\_id},
+\texttt{level2\_sense}, \texttt{level1\_coupling}, \texttt{intended\_strength\_band} and
+\texttt{strength\_range}, \texttt{slot\_id} and \texttt{filler} (for relations drawn by a filler),
+\texttt{provenance} (\texttt{plan} or \texttt{slot}), \texttt{sign\_verdict} and
+\texttt{sign\_assertion} (\texttt{support}, \texttt{conflict} or \texttt{none} at each world);
+\texttt{non\_relations}; \texttt{expected}: \texttt{family\_id}, \texttt{primary},
+\texttt{assignment} (the filler kind in each slot), \texttt{paragraph\_order} (\cp{order}),
+\texttt{ladders} (ladder ids and rung indices); \texttt{meta}: topic, domain, question, split,
+word count, generator, taxonomy.
+
+\paragraph{Families.} \texttt{family\_id}, topic, domain, question, generator, \texttt{primary},
+\texttt{rare\_senses}; \texttt{ladders}: \texttt{ladder\_id}, \texttt{type}, \texttt{declared}
+(\texttt{increase} or \texttt{invariant}), \texttt{item\_ids} in rung order, and the gold $\Lambda$
+and $\LCS$ per rung at the verdict world as the plan gate computed them; \texttt{gold\_corrections}.
+\par}
+
+\paragraph{An item} (trimmed; \texttt{...} marks omissions):
+\VerbatimInput[fontsize=\scriptsize,frame=single,framesep=3pt,breaklines=true,
+breakanywhere=true]{examples/schema_item.json}
+
+\paragraph{A family record} (trimmed):
+\VerbatimInput[fontsize=\scriptsize,frame=single,framesep=3pt,breaklines=true,
+breakanywhere=true]{examples/schema_family.json}
+
+%% ============================================================================
+\section{Dataset Statistics}
+\label{app:stats}
+%% ============================================================================
+
+\begin{table}[h]
+\centering\scriptsize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{\input{examples/topics}}
+\caption{Families per topic and primary ladder type. Every family also has a \cp{control} ladder,
+except \lbMissingControl.}
+\label{tab:topics}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Sense & Gold relations \\
+\midrule
+\sense{Evidence} & \lbSenseEvidence \\
+\sense{Cause-Effect} & \lbSenseCauseEffect \\
+\sense{Refutation} & \lbSenseRefutation \\
+\sense{Contrast} & \lbSenseContrast \\
+\sense{Precedence} & \lbSensePrecedence \\
+\sense{Disjunction} & \lbSenseDisjunction \\
+\sense{Restatement} & \lbSenseRestatement \\
+\sense{Alternative} & \lbSenseAlternative \\
+\sense{Concession} & \lbSenseConcession \\
+\sense{Succession} & \lbSenseSuccession \\
+\midrule
+all & \lbRelTotal \\
+\bottomrule
+\end{tabular}
+\caption{Gold relations by discourse sense over all \lbItems{} responses (a relation shared by the
+five responses of a family is counted five times).}
+\label{tab:senses}
+\end{table}
+
+Responses have \lbClaimsMin--\lbClaimsMax{} claims (mean \lbClaimsMean), of which
+\lbFalseMin--\lbFalseMax{} are false (mean \lbFalseMean); \lbWordsMin--\lbWordsMax{} words
+(median \lbWordsMedian); \lbRelsMin--\lbRelsMax{} gold relations (mean \lbRelsMean), of which
+\lbFactorRelsMin--\lbFactorRelsMax{} carry a coupling (mean \lbFactorRelsMean); and
+\lbNonRelsMin--\lbNonRelsMax{} declared non-relations. \lbFillersAdmitted{} fillers are in the
+released families, with a median of \lbFillerWordsMedian{} words. Each of the five rare senses
+appears in the plans of \lbRareAlternative{} families.
+
+%% ============================================================================
+\section{The Development Split}
+\label{app:dev}
+%% ============================================================================
+
+The development split was generated first, by the same generator, committee and pipeline, and
+used to develop the prompts and the deterministic checks; it is therefore not held out. It has
+\lbDevFamilies{} families, \lbDevLadders{} ladders (4 of each primary type and 16 \cp{control})
+and \lbDevItems{} responses, and it reached 16 of 16 families, 15 on the first attempt. The
+companion paper reports its results separately \citep{anoncoherence}; they show the same pattern
+as the test split.
+
+%% ============================================================================
+\section{Reference Evaluation in Detail}
+\label{app:reference}
+%% ============================================================================
+
+The tables below are the companion paper's \citep{anoncoherence}, generated from the same
+evaluation.
+
+\input{examples/ref_tables}
+
+%% ============================================================================
+\section{User Study Materials}
+\label{app:study}
+%% ============================================================================
+
+\begin{figure*}[t]
+\centering
+\fbox{\includegraphics[width=0.9\textwidth,trim=0 755 325 45,clip]{figures/study_task1.png}}
+\caption{\textbf{Task 1 in Label Studio}, as each annotator sees it locally: a filler
+highlighted in its paragraph, the slot's two claims, and the five questions. Nothing on the screen
+says which link was intended or whether the committee admitted the filler.}
+\label{fig:study-ui}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\fbox{\includegraphics[width=0.9\textwidth,trim=0 520 325 45,clip]{figures/study_task2.png}}
+\caption{\textbf{Task 2 in Label Studio} (top of the screen; the responses continue below, followed
+by the preference, confidence and reason questions): the question, the family's false claims
+given as facts, and two responses that differ only in the highlighted sentences.}
+\label{fig:study-ui2}
+\end{figure*}
+
+Everything the study needs is generated by \texttt{scripts/locobench\_study\_build.py} from the
+release and a fixed seed, and released with the paper:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item one bundle per annotator, with its Task 1 and Task 2 files, the practice files from the
+  development split, the two Label Studio labeling configurations, the annotator brief, setup
+  instructions, the practice answers for the calibration discussion, and a script that creates
+  the annotator's four projects in a local Label Studio;
+\item the gold key, committed by hash in the pre-registration and never imported into Label
+  Studio, which holds the sample, the intended answers, the committee's verdicts, the declared
+  orders and the attention-check answers;
+\item the pre-registration (hypotheses, sample, exclusions, scoring, power, consequences);
+\item \texttt{scripts/locobench\_study\_analyze.py}, which checks the key against its hash,
+  scores the Label Studio exports, and writes the report and the paper's macros. It was tested
+  end to end on simulated exports, and on a real Label Studio instance (configuration validation,
+  task import, annotation and JSON export), before annotation.
+\end{itemize}
+
+\paragraph{Task 1 options and their mapping.} The eight connection options map onto the
+committee's SV5 labels: \emph{X is given as a reason, cause or evidence for Y} (and the reverse)
+to the two directions of entailment; \emph{X and Y cannot both be true} to incompatibility;
+\emph{say the same thing}, \emph{exactly one holds} and \emph{at least one holds} to equivalence,
+exclusion and co-necessity; \emph{only contrasted, conceded, or ordered in time} and \emph{no
+connection} to the no-factor readings, which score alike.
+
+\paragraph{Budget.} Practice and calibration about 25 minutes, Task 1 about 75 minutes (72
+fillers and 4 checks), Task 2 about two hours (18 families, 108 pairs and 2 checks), in sessions
+of at most 90 minutes: 3.5--4 hours per annotator against a five-hour cap. \tbd{Measured times
+and results.}
