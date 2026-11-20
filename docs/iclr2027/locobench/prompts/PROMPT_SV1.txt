@@ -1,0 +1,25 @@
+Let's define a function named classify_links(response: str, atoms: dict[str, str],
+pairs: list[list[int]]).
+ATOMS maps an atom's NUMBER to its text. For each listed pair [i, j] of atom numbers,
+the function reports the connection the RESPONSE ITSELF draws between atom i and atom j,
+as written - not whether either is true, and not whether one would follow in general.
+
+Labels:
+  "i_supports_j"  the response presents atom i as a cause of atom j, or as evidence or
+                  a reason for accepting atom j
+  "j_supports_i"  the same, with atom j as the support
+  "incompatible"  the response says the two cannot both be true (one rules out the other)
+  "equivalent"    the response presents them as saying the same thing
+  "exactly_one"   exactly one of them holds: they cannot both hold and cannot both fail
+  "at_least_one"  at least one of them holds, perhaps both
+  "precedes"      only a time ordering, atom i before atom j
+  "follows"       only a time ordering, atom i after atom j
+  "contrast_only" set side by side as contrasting, without saying they cannot both hold
+  "concedes"      one is granted while the other is asserted anyway ("although i, j")
+  "unlinked"      the response draws no connection between them
+
+The function returns a JSON list with one object per listed pair, in order:
+  {"pair": [i, j], "label": <one label>, "evidence": <short verbatim quote, or "">}
+Note that your response will be passed to the python interpreter, SO NO OTHER WORDS!
+
+classify_links(response="[RESPONSE_PLACEHOLDER]", atoms=[ATOMS_PLACEHOLDER], pairs=[PAIRS_PLACEHOLDER])

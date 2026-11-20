@@ -1,0 +1,55 @@
+Instructions:
+1. You are given a QUESTION and a PLAN in JSON. Write the TEMPLATE of an expert answer
+   to the QUESTION, and the FILLERS for its slots. Every version of the answer is the
+   template with each slot marker replaced by one of that slot's fillers.
+2. Atoms are claims numbered by "pos" in the order the answer asserts them. An atom whose
+   "slot" field names a slot is NOT written in the template; the marker of that slot,
+   for example {{S1}}, stands alone where those atoms fall in position order, as a
+   sentence position of its own. Assert every other atom EXACTLY ONCE in the template,
+   in position order, keeping its content: quantifiers, numbers, dates, polarity and
+   modals exactly as given. Assert [false] atoms in the same confident register as true
+   ones.
+3. Realize every planned RELATION so a careful reader can recover it from the text alone:
+   Cause-Effect "led to", "caused", "resulted in"; Evidence "shows", "indicates",
+   "confirms"; Restatement "that is", "in
+   other words"; Refutation "cannot both be true", "rules out", "cannot be squared with";
+   Contrast "by contrast", "whereas"; Concession "although", "even though"; Alternative
+   "either ... or", making clear in natural words that one of the two must be true and
+   not both; Disjunction "at least one of ..., perhaps both"; Precedence / Succession
+   "before", "after", "subsequently", purely
+   chronological. For each NON-RELATION, assert both atoms and draw no connection; do
+   not announce that they are unrelated.
+4. FILLERS. For each slot, write one filler per kind listed in its "fillers" object. A
+   filler is one or two complete sentences. It asserts every atom listed in the slot's
+   "owns" (and no other atom), and between the slot's source and target it draws EXACTLY
+   the link its kind describes - no other link, to each other or to any other claim.
+   State every link in terms of the subject matter ("the trench date cannot be squared
+   with the superposition sequence", "if the instrument had failed, the profile could
+   not exist"), never by talking about "these claims", "these propositions" or "these
+   statements", and do not reuse one formula across slots.
+   The fillers of one slot are INTERCHANGEABLE: each must read naturally at the marker's
+   position, with the same grammatical frame and the same reference to the surrounding
+   sentences, so that swapping one filler for another changes only the link. The
+   template must not depend on which filler is used.
+5. A "none" filler states its owned atoms plainly, with no connective, comparison or
+   word implying that one bears on the other; put a short independent clause or a
+   sentence break between them if adjacency alone would suggest a link. Never ANNOUNCE
+   that they are unconnected: no "separately", "independently", "it is also
+   documented", "it is established that", "in a separate matter". The three
+   "para" fillers of a control slot draw the SAME link in the SAME direction in three
+   clearly different wordings: change the connective and the clause order, never the
+   logic.
+6. [LAYOUT_PLACEHOLDER] Write formal, precise expert prose: a continuous answer in which
+   the relations are simply how the argument hangs together, so a reader cannot tell a
+   plan exists. Aim for 420-520 words with every marker replaced by its "base" filler.
+   No headings, lists or annotations; never mention the plan, slots, senses, strength or
+   that any content is false; never hedge with "assume", "might", "possibly",
+   "allegedly", "supposedly", "reportedly" or "it is claimed".
+7. Output one JSON object in a code block and nothing else:
+   {"template": "<paragraphs separated by \n\n, containing each marker once>",
+    "fillers": {"S1": {"<kind>": "<filler>", ...}, ...}}
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+PLAN: [PLAN_PLACEHOLDER]
+OUTPUT:

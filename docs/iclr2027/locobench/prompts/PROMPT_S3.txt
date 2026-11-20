@@ -1,0 +1,66 @@
+Instructions:
+1. You are given a QUESTION and a tagged list of ATOMIC CLAIMS. Produce a SLOT PLAN for an
+   expert answer: which claims it asserts, in what order, which logical relations it
+   draws between them, and which claim pairs are SLOTS - places where later versions of
+   the answer will vary one link while every other word stays the same.
+2. Select 10-14 claims; aim for 12. Number them with FRESH consecutive positions 1..N in
+   the order the answer will assert them, with no gaps and no repeats. Keep every
+   selected claim's text EXACTLY as given. Select AT LEAST 2 [incorrect] claims: the
+   answer asserts false content alongside the true. Give each atom a "factual" field:
+   false for an [incorrect] claim, true for every other tag.
+3. Plan 6-8 fixed RELATIONS. Each joins two selected claims and has a SENSE:
+   - Cause-Effect: the source brings the target about.
+   - Evidence: the source is evidence that shows the target.
+   - Restatement: source and target say the same thing.
+   - Refutation: the answer asserts that the two CANNOT BOTH be true.
+   - Contrast: the answer sets them side by side as contrasting, without saying they
+     cannot both be true.
+   - Concession: the answer grants the source while asserting the target ("although").
+   - Alternative: EXACTLY ONE of the two holds - not both, not neither. Use your
+     [alt-pair-*] claims.
+   - Disjunction: AT LEAST ONE holds, perhaps both. Use your [disj-pair-*] claims.
+   - Precedence / Succession: the source comes before / after the target in time, with
+     no dependence of truth between them.
+   Every relation must join a DIFFERENT pair of claims, within 5 positions of each other.
+4. Include AT LEAST ONE relation of each of these senses: [SENSES_PLACEHOLDER].
+5. Plan the SLOTS. [SLOTS_PLACEHOLDER]
+   Use ONLY the slot roles named here (the example below shows the format, not
+   your roles). Rules for every slot: it joins two claims at CONSECUTIVE positions (target_pos =
+   source_pos + 1), with the source first; its pair is not used by any relation or
+   non-relation; ids are "S1", "S2", ... in position order. Choose slot pairs on the
+   same subject, where the link a later version draws would be a natural thing for an
+   expert to write.
+6. Give each relation and slot an intended STRENGTH BAND: strong (0.85-1.00), moderate
+   (0.60-0.84) or weak (0.35-0.59).
+7. List 3-5 NON-RELATIONS: pairs of selected claims within 5 positions of each other
+   between which the answer draws no connection. They share no pair with a relation or
+   a slot.
+8. Output a single JSON object in a code block and nothing else, shaped like this example
+   (copy the structure, not the content; your slots follow instruction 5):
+
+```json
+{
+  "atoms": [
+    {"pos": 1, "text": "<claim text>", "factual": true},
+    {"pos": 2, "text": "<claim text>", "factual": true},
+    {"pos": 3, "text": "<claim text>", "factual": false}
+  ],
+  "relations": [
+    {"source_pos": 1, "target_pos": 3, "sense": "Cause-Effect", "strength_band": "moderate"}
+  ],
+  "slots": [
+    {"id": "S1", "role": "conflict_tt", "source_pos": 4, "target_pos": 5,
+     "sense": "Refutation", "strength_band": "strong"},
+    {"id": "S2", "role": "control", "source_pos": 8, "target_pos": 9,
+     "sense": "Evidence", "strength_band": "strong"}
+  ],
+  "non_relations": [
+    {"source_pos": 2, "target_pos": 4}
+  ]
+}
+```
+
+Your Task:
+QUESTION: [QUESTION_PLACEHOLDER]
+ATOMIC CLAIMS: [CLAIMS_PLACEHOLDER]
+SLOT PLAN:
