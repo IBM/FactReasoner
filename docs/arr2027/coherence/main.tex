@@ -106,7 +106,9 @@
 \begin{abstract}
 Long-form factuality metrics verify claims one at a time, so they cannot tell whether a response's
 claims hold together as an argument. We study logical coherence as a property of the relations a
-response draws between its own claims, and require one property of a score for it: over a fixed
+response draws between its own claims; unlike discourse coherence, it is read against the claims'
+truth values and does not depend on how the text is ordered or worded. We require one property of
+a score for it: over a fixed
 set of claims, any edit that makes the relations agree better with the facts, such as adding a
 relation the facts uphold or deleting one they break, must raise the score, wherever in the
 argument the edit occurs. Natural readouts of a Markov random field over claim truth values, such
@@ -140,6 +142,18 @@ every claim it states still receives the right verdict; \citet{lorefact} show th
 factuality pipelines miss such errors on samples built to contain them. Two responses with the
 same claims and the same verdicts can differ only in how they relate those claims, and no
 per-claim check separates them.
+
+This is not what ``coherence'' usually means in NLP. Discourse coherence is a property of the
+text: how its sentences connect and how it is organized, independent of whether its claims are
+true, and lost by definition when the text is shuffled \citep{grosz1995,barzilay}. Logical
+coherence, in our sense, is a property of the argument: the truth-functional relations a response
+draws among a fixed set of claims, read against which of those claims are true. The two notions
+disagree in predictable places. Reordering paragraphs harms discourse coherence and leaves logical
+coherence unchanged; a contrast or a concession helps a text read well but rules out no
+assignment of truth values; deriving a false claim from a true one is a well-formed causal link as
+discourse and a conflict as logic; and an added inference raises logical coherence where a
+consistency check, which looks only for contradictions, sees nothing to change.
+\S\ref{sec:notions} states these differences as properties of the score.
 
 A score for that difference must guarantee one thing. Over a fixed set of claims with fixed truth
 values, any change that makes the relations agree better with those values --- a new or stronger
@@ -206,8 +220,9 @@ After a motivating example (\S\ref{sec:voyager}), we fix the claims and their tr
 into logical couplings (\S\ref{sec:taxonomy}), estimate those relations from the text
 (\S\ref{sec:mining}), and turn them into a probability model (\S\ref{sec:mrf}). We then state what
 a coherence score must guarantee and define one that does (\S\ref{sec:score}), show which of
-the choices the guarantee forces (\S\ref{sec:why}), and list the remaining properties
-(\S\ref{sec:props}).
+the choices the guarantee forces (\S\ref{sec:why}), list the remaining properties
+(\S\ref{sec:props}), and set logical coherence apart from other notions of coherence
+(\S\ref{sec:notions}).
 Proofs are in Appendix~\ref{app:proofs}.
 
 \subsection{A Motivating Example}
@@ -779,6 +794,50 @@ $n\le20$, and by variable elimination when the relation graph has low treewidth;
 approximated by weighted mini-bucket elimination \citep{wmb}, where the guarantees hold only up to
 the approximation.
 
+\subsection{Logical Coherence and Other Notions of Coherence}
+\label{sec:notions}
+
+The definitions above fix what the score responds to, and they separate logical coherence from the
+other properties called coherence on five points. \citet{anonlocobench} tabulate the comparison;
+here we state each point as a property of $\LCS$.
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+\item \textbf{The text enters only through its relation graph.} $\LCS$ is a function of the
+  relation graph, the priors and the committed world (Def.~\ref{def:score}), so two texts with the
+  same claims, verdicts and relations receive the same score, whatever their order and wording.
+  Discourse coherence is a property of a text's organization: cohesion and local coherence track
+  lexical and entity links between neighbouring sentences \citep{hallidayhasan1976,grosz1995}, and
+  the standard test of a coherence model is that a shuffled text scores lower \citep{barzilay}. A
+  permutation of paragraphs, or a rewording that keeps the links, is a change the score must ignore
+  and a discourse metric is expected to register.
+\item \textbf{Only constraints on truth values count.} Relational theories of discourse coherence
+  count any relation a reader can infer \citep{hobbs1979,mann}. The compile map
+  (Table~\ref{tab:couplings}) sends \sense{Contrast}, \sense{Concession} and the temporal senses to
+  \emph{none}, whose factor is constant, so they leave $\PR$ and the score unchanged. Conversely, a
+  \sense{Refutation} between two true claims is well formed as discourse and a violated
+  contradiction at $\xs$.
+\item \textbf{Signs come from the committed world.} Discourse coherence, consistency and the
+  coherence measures of Bayesian epistemology \citep{shogenji1999,olsson2002} do not depend on
+  which claims are true. A relation's sign is fixed by $\xs$ (\S\ref{sec:taxonomy}), so the same
+  link is a support or a conflict depending on the verdicts: deriving a falsehood from a truth is a
+  conflict, and refuting it is a support. Assertion polarity, which sets the verdicts aside, is the
+  score's closest analogue to a truth-independent notion (\S\ref{sec:setup}).
+\item \textbf{Supports count, not only conflicts.} Consistency is the absence of contradiction
+  \citep{summac,selfcheckgpt,mundler2024}, so it cannot rise when an inference is added. By
+  Theorem~\ref{thm:mono} every added support raises $\LCS$, with diminishing returns
+  (Prop.~\ref{prop:sat}).
+\item \textbf{The claims are held fixed, and their truth is not scored.} Probabilistic coherence
+  measures compare different sets of propositions, and holistic ratings \citep{summeval,geval}
+  compare whole texts that differ in content. The score's guarantee holds over one claim set and
+  committed world, and the score does not charge a response for asserting a false claim, which is
+  the factuality score's job; a false claim affects it only through the relations the claim takes
+  part in.
+\end{enumerate}
+Each point is tested by a ladder type of \S\ref{sec-locobench}: the first by \cp{order} and
+\cp{control}, the second by \cp{conflict}, the third by \cp{sign}, the fourth by \cp{chain}, and the
+fifth by every ladder, since all of them hold the claims and verdicts fixed. These are choices of
+construct, not claims that organization or style do not matter: logical coherence is meant to be
+reported beside discourse coherence and factuality (\S\ref{sec:discussion}).
+
 %% ================================================================
 \section{Evaluation Data}
 \label{sec-locobench}
@@ -1184,10 +1243,10 @@ polarities disagree exactly where a relation's truth differs from its assertion,
 \cp{sign} ladders (\S\ref{sec:exp-polarity}).
 
 \paragraph{What the score leaves out.} The score measures \emph{logical} coherence, the fit between
-a response's claims and the truth-functional relations it draws between them. It is blind to
-discourse coherence: in a human study of earlier LoCoBench ladders \citep{anonlocobench}, readers
-preferred unshuffled \cp{order} rungs that the score, correctly by its own definition, rates as
-equal. It also
+a response's claims and the truth-functional relations it draws between them, and by design
+nothing else (\S\ref{sec:notions}). It is blind to discourse coherence: it rates a permutation of
+self-contained paragraphs as equal to the original, as the \cp{order} ladders require, even where a
+reader would prefer the original order. It also
 compares responses only over a fixed claim set and committed world, which is the setting of the
 requirement but not of every evaluation; ranking responses with different claims requires a
 choice of normalization that the theory does not make. The Limitations section lists the
@@ -1214,12 +1273,16 @@ entailment trees \citep{entailmentbank}. These methods detect conflicts or score
 how a response's supports and conflicts should combine, and none has a notion of a committed world
 under which refuting a falsehood counts as support.
 
-\paragraph{Discourse coherence.} Entity grids \citep{barzilay}, neural coherence models \citep{li},
-DiscoScore \citep{discoscore} and entity--discourse graphs \citep{liustrube} score coherence from
-surface statistics, learned representations or discourse relations \citep{pdtb,mann}, and LLM
-judges are the practical incumbent \citep{geval,zheng2023judge}. These methods measure cohesion and
-organization rather than truth-functional constraints between claims, and none guarantees how its
-score responds to a change in those constraints.
+\paragraph{Discourse coherence.} Theories of discourse coherence explain it by cohesive ties
+\citep{hallidayhasan1976}, by the continuity of entities between utterances \citep{grosz1995} or by
+the relations a reader infers between segments \citep{hobbs1979,mann,pdtb}. Entity grids
+\citep{barzilay}, neural coherence models \citep{li}, DiscoScore \citep{discoscore} and
+entity--discourse graphs \citep{liustrube} score it from surface statistics, learned
+representations or discourse relations, and LLM judges are the practical incumbent
+\citep{geval,zheng2023judge}. These methods measure cohesion and organization, which do not depend
+on whether the claims are true and change when a text is reordered; logical coherence is the
+reverse on both counts (\S\ref{sec:notions}), and none of these methods guarantees how its score
+responds to a change in the truth-functional constraints between claims.
 
 \paragraph{Argumentation.} Argument mining recovers support and attack relations from text
 \citep{stab2017}, and argument-quality frameworks rate dimensions such as cogency
