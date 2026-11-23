@@ -1,0 +1,337 @@
+\documentclass[10pt]{article}
+% Companion report to the coherence paper (../main.tex): a survey of external datasets for
+% evaluating the logical coherence score and its pipeline. Build from this directory with
+%   latexmk -pdf -outdir=<tmp> dataset_survey.tex && cp <tmp>/dataset_survey.pdf .
+% (build outside the directory; something auto-builds the paper directory and cleans aux files).
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage{microtype}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,longtable,array,tabularx}
+\usepackage{enumitem}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage[round]{natbib}
+
+\newcommand{\LCS}{\mathrm{LCS}}
+\newcommand{\cp}[1]{\textsc{#1}}
+\newcommand{\sense}[1]{\textsf{#1}}
+\newcommand{\Y}{\textcolor{ForestGreen}{\ensuremath{\checkmark}}}
+\newcommand{\Pa}{\textcolor{Dandelion!85!black}{\ensuremath{\sim}}}
+\newcommand{\N}{\textcolor{BrickRed}{\ensuremath{\times}}}
+\newcommand{\ok}{\textsuperscript{\textcolor{ForestGreen}{\ensuremath{\checkmark}}}}
+\newcommand{\unv}{\textsuperscript{\textsc{u}}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}{>{\centering\arraybackslash}p{0.47cm}}
+\setlist{leftmargin=1.3em,itemsep=1pt,topsep=3pt}
+
+\title{External Datasets for Evaluating the Logical Coherence Score\\
+\large A survey and evaluation plan, companion to the coherence paper}
+\author{Internal report}
+\date{23 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We surveyed about seventy datasets in four areas: argumentation, reasoning chains,
+contradiction and long-form factuality, and discourse coherence. The question was whether any of
+them could evaluate the logical coherence score (LCS) and its pipeline, as a complement to the
+synthetic LoCoBench ladders. None can replace LoCoBench. No released dataset combines multi-claim
+text, gold relations between claims that include \emph{both} supports and conflicts, and a truth
+label for each claim. Each candidate has at most two of the three. The closest prior work, LoReFact
+\citep{lorefact}, labels relations only within single sentences and has not released its data. Each
+part of the pipeline can still be tested on existing data: correlation with human judgements,
+relation mining, pairs whose expected effect on the score is known, and the dependence of a
+relation's sign on truth. Discourse-coherence data serve as negative controls. We recommend running
+these checks on released data first, and then annotating relations on a small set of natural LLM
+responses that already carry human truth labels for each claim, which would fill the gap the survey
+found.
+\end{abstract}
+
+%% ============================================================================
+\section{What a Dataset Would Need}
+%% ============================================================================
+
+The score is computed in four steps:
+\begin{enumerate}
+\item A response is decomposed into atomic claims.
+\item A miner extracts the relations between claims, each with a discourse sense.
+\item Each sense is compiled to a truth-functional coupling: entailment, contradiction,
+  equivalence, exclusion, co-necessity, or none. \sense{Contrast}, \sense{Concession} and the
+  temporal senses compile to none.
+\item $\LCS$ reads a Markov random field over the claims' truth values at the committed world fixed
+  by a factuality pipeline.
+\end{enumerate}
+Several properties follow from this construction. $\LCS$ rises when a support is added or a
+conflict removed. A relation's sign depends on the truth values. The score does not change when the
+text is reordered or reworded.
+
+Every candidate was scored on six requirements:
+\begin{description}[font=\normalfont\bfseries,leftmargin=2.2em,style=sameline]
+\item[R1] multi-claim text, LLM-generated if possible;
+\item[R2] claims, propositions or steps already segmented;
+\item[R3] gold relations between units whose types map to couplings;
+\item[R4] a truth or factuality label for each unit;
+\item[R5] controlled pairs whose effect is declared, or human judgements of logical quality at the
+  level of the whole text;
+\item[R6] public availability, with licence, size and language.
+\end{description}
+Candidates were also classified by the uses they support:
+\begin{description}[font=\normalfont\bfseries,leftmargin=2.2em,style=sameline]
+\item[U1] correlating the score with human judgements;
+\item[U2] evaluating the relation miner against gold relations;
+\item[U3] tests on pairs with a declared effect;
+\item[U4] tests of the sign of a relation, which depends on truth;
+\item[NC] negative controls, contrasts the score should \emph{not} respond to.
+\end{description}
+LoCoBench meets R1--R5 by construction but is synthetic. An external dataset is useful if it meets
+R3 or R4 together with R5 on natural text.
+
+%% ============================================================================
+\section{Coverage}
+%% ============================================================================
+
+Table~\ref{tab:coverage} scores the main candidates. Marks: \Y{} yes, \Pa{} partial, \N{} no.
+\ok{} marks availability we checked directly on 23 November 2026; \unv{} marks details we could not
+verify.
+
+{\small
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}L{3.25cm}CCCCCCL{1.35cm}L{5.85cm}@{}}
+\caption{Coverage of the six requirements. Uses: U1 human judgements, U2 relation miner, U3
+declared-effect pairs, U4 sign depends on truth, NC negative control.}\label{tab:coverage}\\
+\toprule
+Dataset & R1 & R2 & R3 & R4 & R5 & R6 & Uses & What it has, and what it lacks \\
+\midrule
+\endfirsthead
+\toprule
+Dataset & R1 & R2 & R3 & R4 & R5 & R6 & Uses & What it has, and what it lacks \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{9}{@{}l}{\emph{Contradiction and long-form factuality}}\\
+LoReFact \citep{lorefact} & \Y & \Pa & \Pa & \Y & \N & \N\ok & (U2, U4) & 1{,}080 GPT-4o responses, 5{,}706 statements labelled causal, conditional, temporal or concessive, with a binary ``logic holds'' label and a truth label per claim; relations only within a sentence; repository empty\ok \\
+ChatProtect \citep{mundler2024} & \Y & \Pa & \Pa & \Y & \Pa & \Y\ok & U2, U3, U4 & LLM descriptions; human contradiction labels between a sentence and a resampled alternative ($\kappa$ 0.83--0.89); in the release, which side is false is recorded only for the \texttt{verifiable\_sc} subset\ok; Apache-2.0\ok \\
+ContraDoc \citep{contradoc} & \Pa & \Pa & \Pa & \N & \Y & \Y\ok & U2, U3 & 449 documents with GPT-4-inserted, human-checked contradictions and 442 clean ones; evidence sentence, type and scope labels; the two sets are not paired, but the 178 Insert cases give pairs by deleting the inserted sentence\ok; Apache-2.0\ok \\
+Scarecrow \citep{scarecrow} & \Y & \N & \Pa & \Pa & \Pa & \Y & U1, U2 & 1.3k GPT-2/GPT-3 paragraphs; Self-Contradiction spans linked to the span they contradict \\
+FELM \citep{felm} & \Y & \Pa & \N & \Y & \N & \Y & U4 & 847 ChatGPT responses with a truth label per segment; a ``reasoning error'' type \\
+Factcheck-Bench \citep{factcheckbench} & \Y & \Y & \N & \Y & \Pa & \Y & U4, U3 & 94 ChatGPT responses, 678 human-checked claims, plus revised responses; short (median 67 words, 7 claims)\ok \\
+ExpertQA \citep{expertqa} & \Y & \Y & \N & \Y & \Pa & \Y\ok & U4; base for new gold & 2{,}177 expert-validated answers from 6 systems, 32 fields; median 129 words (p90 272); human 5-point correctness label per sentence-level claim; MIT\ok \\
+Xu et al.\ LFQA \citep{xu2023lfqa} & \Y & \N & \N & \N & \Y & \Y\ok & U1 & 854 pairwise coherence preferences with rationales; their coherence includes organization; no licence file\ok \\
+HelpSteer2 \citep{helpsteer2} & \Y & \N & \N & \Pa & \Pa & \Y & U1 (weak) & 21k responses rated for coherence on a 0--4 scale, near ceiling \\
+SummEdits \citep{summedits} & \N & \N & \N & \Pa & \Y & \Y & U3 (weak) & edit pairs, but they measure consistency with the source, not within the text \\
+WikiContradict \citep{wikicontradict} & \Pa & \N & \Pa & \N & \N & \Y & U2 & 253 pairs of Wikipedia passages that contradict each other; contradiction between sources \\
+DECODE \citep{decode} & \Pa & \Pa & \Pa & \N & \N & \Y & U2 & self-contradiction in dialogue between personas \\
+\midrule
+\multicolumn{9}{@{}l}{\emph{Reasoning chains and consistency of model beliefs}}\\
+REVEAL \citep{reveal} & \Y & \Y & \Pa & \Y & \Y & \Pa\ok & U1, U4 & LLM chains of thought, labelled per step for attribution (incl.\ \emph{contradictory}) and logical correctness, plus chain labels; CC-BY-ND-4.0, gated, test only\ok; no edges; $\alpha\approx0.46$--$0.49$ \\
+ExplaGraphs \citep{explagraphs} & \Pa & \Pa & \Y & \N & \Pa & \Y\ok & U2, U3 & 3{,}166 arguments labelled support (1{,}734) or counter (1{,}432), with relations in plain and negated forms; MIT\ok \\
+BeliefBank \citep{beliefbank,concord} & \N & \Y & \Y & \Y & \N & \Pa & U4, U2 & 12.5k facts with gold true/false labels, plus weighted implication and exclusion constraints; not running text; licence\unv \\
+EntailmentBank \citep{entailmentbank} & \Pa & \Y & \Pa & \Pa & \Pa & \Y & U2, U3 & 1{,}840 expert entailment trees; every fact true, entailment relations only \\
+ROSCOE / ReCEval \citep{roscoe,receval} & \Y & \Y & \Pa & \N & \Y & \Pa & U1, U3 & perturbations of reasoning chains with declared effects (negate, remove, hallucinate, shuffle, swap); human error labels on 965 GPT-3 chains; ROSCOE's perturbed data must be regenerated \\
+ProofWriter / RobustLR \citep{proofwriter,robustlr} & \Pa & \Y & \Y & \Y & \Y & \Y & U2, U3, U4 & exact proofs, negation, open-world T/F/Unknown labels; RobustLR adds logical contrast and equivalence sets; templated language \\
+FOLIO \citep{folio} & \Y & \Y & \Pa & \Pa & \N & \Y & U2, U4 & human-written premises in first-order logic; T/F/Unknown labels on conclusions \\
+PARC \citep{parc} & \Y & \Y & \Pa & \Y & \N & \Y & U2, U4 & graphs linking each math step to its premises (support only); ``accumulation'' errors; labels mostly from an LLM \\
+PRM800K, ProcessBench, BIG-Bench Mistake \citep{prm800k,processbench,bbmistake} & \Y & \Y & \N & \Y & \N & \Y & U4 (weak) & step correctness or first error; no relations \\
+\midrule
+\multicolumn{9}{@{}l}{\emph{Argumentation}}\\
+QT30 \citep{qt30}, US2016 \citep{us2016} & \Pa & \Y & \Y & \N & \N & \Y & U2 & debate dialogue; 10{,}818 relations between propositions: Inference 48\%, Rephrase 42.6\%, Conflict 9.4\%, which map to entailment, equivalence and contradiction; licence\unv \\
+Arg-Microtexts \citep{microtexts,microtexts2} & \Y & \Y & \Y & \N & \N & \Y & U2 & 283 short arguments with support, rebut and undercut; a multilayer version aligns RST and SDRT relations; CC BY-NC-SA \\
+Arg.\ Annotated Essays \citep{stab2017} & \Y & \Y & \Pa & \N & \Pa & \Y & U2, U1 (weak) & 402 essays with Support and Attack relations; no equivalence or exclusion \\
+AbstRCT \citep{abstrct}, CDCP \citep{cdcp} & \Y & \Y & \Pa & \N & \N & \Y & U2 & support and attack in clinical-trial abstracts (AbstRCT); support only in user comments (CDCP) \\
+Dagstuhl-15512 \citep{wachsmuth2017} & \Y & \N & \N & \Pa & \Y & \Y & U1 & 320 arguments rated by 3 experts on 15 dimensions, incl.\ cogency and local sufficiency; $\alpha$ 0.26--0.51 \\
+UKPConvArg \citep{ukpconvarg} & \Y & \N & \N & \N & \Pa & \Y & U1 & 16k pairwise convincingness judgements; not minimal pairs \\
+ARCT \citep{arct} & \Pa & \Y & \Pa & \Pa & \Y & \Y & U3, U4 & pairs of a correct and an opposite warrant for the same reason and claim; 3 claims each \\
+LIARArg & \Y & \Y & \Y & \Pa & \N & \Pa\unv & U4, U2 & support and attack in fact-checkers' justifications, with veracity of the claim; release\unv \\
+Fallacy sets \citep{fallacy} & \Pa & \N & \N & \N & \Pa & \Y & U1 (weak) & text-level fallacy labels; most fallacies are not truth-functional \\
+\midrule
+\multicolumn{9}{@{}l}{\emph{Discourse coherence and discourse relations}}\\
+CoheSentia \citep{cohesentia} & \Y & \Y & \N & \N & \Y & \Y & U1 & 500 GPT-3 stories; a reason for each incoherent sentence, one of which is ``Consistency''; fiction, so no external truth \\
+GDTB, PDTB 3.0, RST-DT, GUM \citep{pdtb,rstdt,gum} & \N & \Y & \Y & \N & \N & \Pa & U2 & gold discourse senses, which map to couplings; almost no contradiction; PDTB and RST-DT require an LDC licence \\
+GCDC \citep{gcdc}, SummEval \citep{summeval}, HANNA \citep{hanna} & \Pa & \N & \N & \N & \Pa & \Pa & NC & coherence judged as organization and readability \\
+Shuffle suites \citep{barzilay} & \Pa & \Y & \N & \N & \Y & \Y & NC & reordering, to which LCS is invariant by design \\
+DEAM \citep{deam}, CoUDA \citep{couda}, SNaC \citep{snac} & \Pa & \Pa & \N & \N & \Pa & \Y & U3 / NC & perturbations of dialogue or summaries; mostly discourse-level \\
+\end{longtable}
+}
+
+%% ============================================================================
+\section{Closest Prior Work: LoReFact}
+%% ============================================================================
+
+LoReFact \citep{lorefact} has 1{,}080 GPT-4o responses of about 819 words each, with 5{,}706
+``logical statements''. Each statement carries three labels:
+\begin{itemize}
+\item a relation type: causal 3{,}358, conditional 1{,}551, temporal 473 or concessive 324;
+\item a binary label for whether the dependency holds;
+\item a truth label for each claim it contains.
+\end{itemize}
+It is the only prior work that judges logic and factuality together. It differs from ours in four
+ways:
+\begin{enumerate}
+\item Its relations stay within a single sentence, and it builds no graph; the authors note that it
+  does not guarantee global consistency across multi-step chains.
+\item It has no contradiction, equivalence or exclusion.
+\item 78\% of its statements are deliberately flawed. The generation also often produces cases where
+  $A$ and $B$ are both true but ``because'' is false. That is a question of whether the relation is
+  valid, not a constraint on truth values.
+\item It labels concessive statements, which our compile map sends to \emph{none}.
+\end{enumerate}
+Its GitHub repository is empty\ok{} (size 0, last push 1 October 2025), so we would have to obtain
+the data from the authors. It is the work to contrast with in both papers.
+
+%% ============================================================================
+\section{Candidates by Use}
+%% ============================================================================
+
+\paragraph{U1: human judgements.}
+\begin{itemize}
+\item \textbf{Xu et al.} \citep{xu2023lfqa}: 854 pairwise coherence preferences, with rationales, on
+  long-form answers. This is the best target on long-form text. Their notion of coherence includes
+  organization, so expect a modest correlation.
+\item \textbf{Dagstuhl-15512} \citep{wachsmuth2017}: expert ratings of cogency and local
+  sufficiency, the closest human dimensions to what $\LCS$ measures. Agreement is low.
+\item \textbf{REVEAL} \citep{reveal}: logic labels for each step and for the whole chain, on LLM
+  chains of thought.
+\item \textbf{CoheSentia} \citep{cohesentia}: per-sentence ``Consistency'' reasons. Read it at the
+  asserted world, since fiction has no external facts. Its Cohesion and Relevance reasons give a
+  discriminant check.
+\end{itemize}
+
+\paragraph{U2: relation miner.}
+\begin{itemize}
+\item \textbf{QT30 / IAT} \citep{qt30,us2016}: Inference, Rephrase and Conflict map onto entailment,
+  equivalence and contradiction. This is the cleanest external gold data for all three main
+  couplings. Caveats: it is dialogue, many Rephrase relations link a question to its answer, and it
+  has no truth labels.
+\item \textbf{Arg-Microtexts, multilayer version} \citep{microtexts,microtexts2}: RST and SDRT senses
+  (including \sense{Concession} and \sense{Contrast}) sit on the same segments as support and attack
+  relations. This tests the compile map directly. Undercut attacks an inference rather than a claim,
+  so it should receive no claim-level coupling.
+\item \textbf{Discourse treebanks} \citep{pdtb,rstdt,gum}: score the miner at the coupling level
+  after mapping senses to couplings. GDTB is the open option; from DISRPT 2025, keep the original
+  labels. These texts hardly contain any contradiction.
+\item \textbf{Contradiction only:} Mündler et al.\ \citep{mundler2024} and ContraDoc
+  \citep{contradoc}.
+\end{itemize}
+
+\paragraph{U3: pairs with a declared effect.}
+\begin{itemize}
+\item \textbf{ContraDoc}: its clean and contradicted documents are not paired, but each of the
+  178 Insert cases gives a pair once the inserted sentence, which appears verbatim, is deleted.
+  At the asserted world, the contradiction should lower $\LCS$. At the verdict world, a true
+  sentence set against a false inserted one is a support, so $\LCS$ may rise. The effect can be
+  stratified by scope (global, local, within one sentence).
+\item \textbf{Mündler et al.}: splicing the resampled alternative sentence into the response gives a
+  natural minimal pair.
+\item \textbf{ROSCOE and ReCEval perturbations of EntailmentBank} \citep{roscoe,receval}:
+  \begin{itemize}
+  \item negating a step should lower $\LCS$;
+  \item an unrelated hallucinated step should not move it;
+  \item shuffle and swap should leave it \emph{unchanged}.
+  \end{itemize}
+  ROSCOE counts shuffle and swap as coherence errors. That disagreement is worth reporting.
+\item \textbf{RobustLR} \citep{robustlr}: its contrast sets flip a label and its equivalence sets
+  preserve one.
+\item \textbf{ARCT} \citep{arct}: pairs of opposite warrants.
+\end{itemize}
+
+\paragraph{U4: the sign of a relation follows the truth values.}
+\begin{itemize}
+\item \textbf{BeliefBank} \citep{beliefbank,concord} is the cleanest test.
+  \begin{enumerate}
+  \item Verbalize about ten facts per entity as a response.
+  \item Flip one fact's truth value.
+  \item Read off from the gold implication and exclusion constraints which relations change sign.
+  \end{enumerate}
+  The expected sign of the change in $\LCS$ is then known in advance.
+\item \textbf{Mündler et al.:} in 63\% of ChatGPT's self-contradictions both sentences are false.
+  There, $\LCS$ should differ from simply counting contradictions.
+\item \textbf{LIARArg:} support and attack relations around a claim whose veracity is known. Its
+  release is unverified.
+\item \textbf{REVEAL}'s contradictory steps and \textbf{PARC}'s accumulation errors \citep{parc}
+  are analogues of deriving a falsehood.
+\end{itemize}
+
+\paragraph{Negative controls.} Under sentence and paragraph shuffles \citep{barzilay}, $\LCS$ should
+not move. It should also be close to uncorrelated with the coherence ratings of GCDC \citep{gcdc},
+SummEval \citep{summeval} and HANNA \citep{hanna}, which rate organization and readability.
+SummEval's \emph{Consistency} dimension is faithfulness to the source document. $\LCS$ deliberately
+does not measure that, so it is not a positive target either.
+
+%% ============================================================================
+\section{Recommendations}
+%% ============================================================================
+
+\begin{enumerate}
+\item \textbf{Cheap checks on released data.} Each check tests one property:
+  \begin{itemize}
+  \item \emph{Negative controls:} shuffled LoCoBench and ContraDoc documents, plus the
+    discourse-coherence ratings above.
+  \item \emph{ContraDoc pairs:} U3, and contradiction recall of the miner for U2.
+  \item \emph{Mündler et al.\ pairs:} U4.
+  \item \emph{Relation-miner evaluation on QT30:} U2, with GDTB for the senses that compile to
+    \emph{none}.
+  \end{itemize}
+\item \textbf{Fill the gap.} Annotate claim-to-claim relations on 40--60 natural LLM answers
+  from ExpertQA \citep{expertqa}, which already carry expert truth labels for each claim. The pool
+  is 165 answers of at least 150 words and 6 claims with at least one incorrect claim, across 25
+  fields. Factcheck-Bench \citep{factcheckbench} and FELM \citep{felm} were considered and set
+  aside: their responses are short, and FELM labels segments rather than claims. This would be the
+  first natural dataset with gold relation graphs and gold truth values. It would also show how
+  often these relations occur in real output, which LoCoBench cannot.
+\item \textbf{Moderate effort, later.} Correlate with the preferences of Xu et al.\ and with
+  REVEAL's labels. Run sign-flip tests on verbalized BeliefBank. Run the EntailmentBank
+  perturbations.
+\item \textbf{Ask the LoReFact authors for their data.}
+\end{enumerate}
+
+%% ============================================================================
+\section{Implications for the Two Papers}
+%% ============================================================================
+
+The survey supports the claim in the LoCoBench paper that natural corpora provide neither minimal
+pairs nor gold graphs: no released corpus has gold relation graphs that include conflicts together
+with truth labels for each claim. Related Work in both papers should add three things:
+\begin{itemize}
+\item LoReFact, the closest framing of the task;
+\item QT30 and its argumentation scheme, the closest to our couplings;
+\item ROSCOE's convention that shuffling is an error, as a point of explicit disagreement.
+\end{itemize}
+
+%% ============================================================================
+\section{Verification Status}
+%% ============================================================================
+
+The following were checked directly on 23 November 2026 (\ok):
+\begin{itemize}
+\item the LoReFact repository is empty;
+\item the ChatProtect annotation folders (\texttt{glm/reconciled}, \texttt{popqa},
+  \texttt{verifiable\_sc}) are present, under Apache-2.0; \texttt{glm} holds contradiction labels
+  only, and \texttt{verifiable\_sc} also records which side is false;
+\item ContraDoc's contradicted and clean sets share only 21 source documents; all 178 inserted
+  sentences appear verbatim;
+\item ExpertQA is MIT; the statistics above were computed from \texttt{r2\_compiled\_anon.jsonl};
+\item ExplaGraphs is licensed MIT, and ContraDoc Apache-2.0;
+\item \texttt{carriex/lfqa\_eval} has no licence file;
+\item REVEAL is CC-BY-ND-4.0, gated and test only.
+\end{itemize}
+All other sizes, counts and licences come from the papers, repositories and dataset cards, and
+those we could not confirm are marked \unv. Confirm licences before redistributing anything derived
+from these datasets. URLs: ContraDoc \url{https://github.com/ddhruvkr/contradoc}; ChatProtect
+\url{https://github.com/eth-sri/ChatProtect}; QT30 \url{https://aclanthology.org/2022.lrec-1.352};
+REVEAL \url{https://huggingface.co/datasets/google/reveal}; ExplaGraphs
+\url{https://github.com/swarnaHub/ExplaGraphs}; BeliefBank/ConCoRD
+\url{https://github.com/eric-mitchell/concord}; Xu et al.\ \url{https://github.com/carriex/lfqa_eval};
+Factcheck-Bench \url{https://github.com/yuxiaw/Factcheck-GPT}; FELM
+\url{https://github.com/hkust-nlp/felm}; LoReFact \url{https://aclanthology.org/2026.findings-acl.346};
+LIARArg \url{https://liararg.nakala.fr}.
+
+\bibliographystyle{plainnat}
+\bibliography{ref,survey}
+
+\end{document}
