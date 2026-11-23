@@ -24,7 +24,9 @@
 A metric of logical coherence should rank a response higher when it argues better and leave it
 unchanged when only its presentation changes. Testing this needs responses that differ in
 argument but not in topic, length, claims or facts, together with gold relation graphs that say
-what each response argues; natural corpora provide neither. We introduce LoCoBench, a benchmark of
+what each response argues; natural corpora provide neither. Unlike discourse coherence, logical
+coherence is a property of the truth-functional relations among a response's claims, read against
+which claims are true, and it does not depend on how the text is ordered or worded. We introduce LoCoBench, a benchmark of
 \emph{coherence ladders}: sequences of three expert-style answers to one question, spliced from a
 single template, so that two rungs share every claim, every truth value and every word except the
 one or two sentences that draw, drop or reverse a relation between claims. Five ladder types test
@@ -67,6 +69,18 @@ length and content at once \citep{geval,zheng2023judge}. A metric's agreement wi
 therefore says little about whether it tracks logical structure: two responses that differ in
 coherence almost always differ in their claims as well.
 
+The difficulty is partly one of construct. ``Coherence'' in NLP usually means \emph{discourse}
+coherence: how well a text's sentences connect and how well it is organized, a property of the
+text that is independent of whether its claims are true and that a shuffled text loses by
+definition \citep{grosz1995,barzilay}. Logical coherence, as we use it, is a property of the
+\emph{argument}: the truth-functional relations a response draws among a fixed set of claims,
+evaluated against which of those claims are true. The two notions disagree in predictable places.
+Reordering paragraphs harms discourse coherence and leaves logical coherence unchanged; a
+\sense{Contrast} or \sense{Concession} makes a text read well but constrains nothing; and
+deriving a false claim from a true one is a well-formed causal link to a discourse model and a
+failure of the argument to ours. Each ladder type of LoCoBench is built on one of these
+disagreements (\S\ref{sec:notions}).
+
 We build the missing contrasts by construction. LoCoBench is a benchmark of \emph{coherence
 ladders} (Figure~\ref{fig:teaser}). A \emph{family} is one expert-style answer written once, as a
 template with marked \emph{slots}; a slot is a pair of claims with alternative \emph{fillers},
@@ -90,7 +104,7 @@ the \emph{asserted world} of the response's own commitments.
   reading, and admission is per ladder.
 \item \textbf{The release} (\S\ref{sec:release}): \lbFamilies{} families, \lbLadders{} ladders,
   \lbItems{} responses and \lbRelTotal{} gold relations over \lbTopics{} topics in \lbDomains{}
-  domains, with every prompt, the generation records and an evaluation harness.
+  domains, with every prompt and an evaluation harness.
 \item \textbf{A reference evaluation} (\S\ref{sec:reference}), summarizing the companion paper
   \citep{anoncoherence}: a coherence score with a monotonicity guarantee, four relation miners and
   eleven baselines, and \textbf{a human validation study}, specified here (\S\ref{sec:study}).
@@ -109,7 +123,8 @@ and on human coherence ratings of naturally occurring text \citep{gcdc}; DiscoSc
 idea to generated text \citep{discoscore}. These resources probe discourse organization. LoCoBench
 holds the order fixed (except on its \cp{order} ladder, where order is the only change) and varies
 the inferential links among the claims, so it probes \emph{logical} coherence, and it declares the
-expected direction of every comparison instead of inferring it from ratings.
+expected direction of every comparison instead of inferring it from ratings. \S\ref{sec:notions}
+sets the two notions side by side.
 
 \paragraph{Consistency and reasoning benchmarks.} NLI-based detectors and benchmarks target
 inconsistency between a summary and its source \citep{summac,frank}, across sampled generations
@@ -134,11 +149,6 @@ generator's biases \citep{zheng2023judge}. We separate the generator from a thre
 keep the committee blind to the plan and to the intended answer, check orders exactly on gold
 graphs rather than by judgement, remove surface cues with deterministic checks, and specify a
 human study that also tests the committee (\S\ref{sec:study}).
-
-\paragraph{An earlier design.} An earlier version of LoCoBench perturbed a whole response to make
-each rung, and lost most families to free-rewrite failures; its gold conflicts were contrast and
-concession senses that compile to no logical constraint. The present design replaces it entirely
-(App.~\ref{app:record}).
 
 %% ============================================================================
 \section{Coherence Ladders}
@@ -201,6 +211,83 @@ is violated, and a support at the asserted world, where it is upheld (Figure~\re
 A score read at the verdict world evaluates \emph{coherence given the facts}; one read at the
 asserted world evaluates internal consistency.
 
+\subsection{How Logical Coherence Differs from Other Notions}
+\label{sec:notions}
+
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+Notion & What is rated & Truth of the claims & Order of the text & What makes a text more coherent \\
+\midrule
+Cohesion and local coherence \citep{hallidayhasan1976,grosz1995,barzilay} & lexical and entity
+  links between neighbouring sentences & not used & matters & continuing entities and cohesive
+  ties \\ \addlinespace
+Relational discourse coherence \citep{hobbs1979,mann,pdtb} & whether text segments are joined by
+  discourse relations & not used & matters & any recognizable relation, \sense{Contrast} and
+  \sense{Concession} included \\ \addlinespace
+Holistic coherence \citep{gcdc,summeval,geval} & how well a text is organized and reads, as
+  rated by people or LLMs & not used & matters & structure and flow, as judged \\ \addlinespace
+Consistency \citep{summac,selfcheckgpt,mundler2024} & contradictions within a text, against a
+  source or across samples & not used & not used & removing contradictions; nothing is credited \\ \addlinespace
+Probabilistic and explanatory coherence \citep{shogenji1999,olsson2002,thagard1989} & mutual
+  support among a set of propositions & not used, by design & not used & more mutual support,
+  over a set that may change \\
+\midrule
+\textbf{Logical coherence} (this work, \citealp{anoncoherence}) & truth-functional relations
+  among a \emph{fixed} set of claims & read at the committed world & invariant & adding a
+  support or removing a conflict at that world \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Notions of coherence.} Logical coherence is the only one of these that rates the
+relations among a fixed set of claims against their truth values and is, by definition, invariant
+to the order and wording of the text. Each difference is tested by a ladder type
+(\S\ref{sec:notions}).}
+\label{tab:notions}
+\end{table*}
+
+The word ``coherence'' covers several properties, and a metric built for one is not wrong when it
+fails a test built for another. Table~\ref{tab:notions} sets ours beside the others. Five
+differences are critical for evaluation, and each is tested by a ladder type (\S\ref{sec:types}).
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+\item \textbf{The argument, not the text.} Discourse coherence is a property of a text's
+  organization, and the standard test of it is that a shuffled text should score lower
+  \citep{barzilay}. Logical coherence is a property of the relations among the claims, which
+  survive any reordering that keeps them readable and any rewording that keeps the links. The
+  \cp{order} and \cp{control} ladders declare these changes \emph{invariant}, where a
+  discourse-coherence metric is expected to move.
+\item \textbf{Only relations that constrain truth count.} A discourse relation is coherent if a
+  reader can infer it, whatever its sense \citep{hobbs1979,mann}. A relation counts for logical
+  coherence only if it compiles to a coupling (Table~\ref{tab:compile}): \sense{Contrast},
+  \sense{Concession} and the temporal senses help a text read well but rule out no assignment of
+  truth values, so they neither help nor hurt. \cp{conflict} rungs set true claims against each
+  other with \sense{Refutation}, a relation that is perfectly well formed as discourse and is a
+  violated constraint as logic.
+\item \textbf{Relative to the truth.} Discourse coherence, consistency and the coherence measures
+  of Bayesian epistemology are all independent of which claims are true; for the last this is
+  deliberate \citep{shogenji1999,olsson2002}. Logical coherence is read at a committed world,
+  so the same link can be a support or a conflict: deriving a false claim from a true one breaks
+  an entailment at the verdict world, and refuting it upholds a contradiction. The \cp{sign}
+  ladder is the one whose declared order depends on the world (\S\ref{sec:worlds}); read at the
+  asserted world, logical coherence reduces to internal consistency, the closest analogue of the
+  truth-independent notions.
+\item \textbf{Graded, with supports as well as conflicts.} Consistency is the absence of
+  contradiction, so a consistency checker sees no difference between rungs that differ only in an
+  added inference. Logical coherence credits supports as well as charging conflicts, and the
+  \cp{chain} ladder, none of whose rungs contradicts anything, rises only because links are added.
+\item \textbf{A fixed claim set, separate from factuality.} Coherence measures over propositions
+  compare different sets of propositions, and holistic ratings compare whole texts that differ in
+  content. Logical coherence compares responses over the \emph{same} claims and truth values, and it
+  does not charge a response for asserting a false claim, which is the factuality score's job;
+  a false claim affects the score only through the relations it takes part in. Every LoCoBench ladder holds the claims
+  and their labels fixed, so a metric cannot pass it by tracking length, content or factuality.
+\end{enumerate}
+These choices define the construct; they do not claim that order or style are irrelevant to how
+good a response is. A complete evaluation reports logical coherence beside discourse coherence and
+factuality, and the \cp{order} ladder is where logical and discourse coherence are expected to
+disagree.
+
 \subsection{Templates, Slots and Fillers}
 \label{sec:slots}
 
@@ -233,7 +320,8 @@ rung is strictly more coherent than the one before, at the verdict world.
 Two are declared \emph{invariant}: \cp{order} permutes 4--5 self-contained paragraphs, and
 \cp{control} words one entailment between true claims three ways. Every family has one
 \emph{primary} ladder of the first four types and a \cp{control} ladder on one more slot, whose
-$\rho_0$ is the primary ladder's $\rho_1$, so a family has five distinct responses.
+$\rho_0$ is the primary ladder's $\rho_1$, so a family has five distinct responses
+(\S\ref{sec:release}).
 \cp{conflict} and \cp{chain} edit only links between true claims, so their orders hold at either
 world; \cp{sign} is the one ladder whose declared order holds at the verdict world and fails at
 the asserted world.
@@ -293,7 +381,7 @@ quoted verbatim from the pool and every claim pair used at most once; and, cruci
 ladder's gold graphs, compiled with the map of Table~\ref{tab:compile}, must be ordered exactly as
 declared, at the verdict world, with a step of at least $0.05$ nats in the companion paper's score
 between neighbouring rungs, so that no edit is saturated away. A plan that fails is retried with
-the gate's complaint; \lbGateSThreegate{} plan evaluations passed.
+the gate's complaint.
 
 \paragraph{S4: template and fillers.} The generator then writes the answer once, 420--520 words
 in 3--5 paragraphs (4--5 self-contained ones for \cp{order}), with a marker where each slot goes,
@@ -362,8 +450,8 @@ template to be regenerated.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_gates.pdf}
-\caption{\textbf{How selective validation is.} (a) Pass rate of every gate over every evaluation
-of every attempt (\lbAttempts{} family attempts), retries included. (b) The committee's
+\caption{\textbf{How selective validation is.} (a) Pass rate of every gate over all its
+evaluations, retries included. (b) The committee's
 \emph{first} reading of each filler kind, before any regeneration: the refuting filler of
 \cp{sign} is the hardest to write so that blind readers read a denial and nothing more
 (\lbReadSigntfSupport{} on the first try); regeneration repaired almost all of them.}
@@ -404,7 +492,8 @@ model judgements; the human study of \S\ref{sec:study} tests them.
 families, topics, domains & \lbFamilies, \lbTopics, \lbDomains \\
 primary ladders, each type & \lbNConflict \\
 \cp{control} ladders & \lbNControl \\
-responses & \lbItems \\
+ladders (3 rungs each) & \lbLadders{} (\lbRungSlots{} rungs) \\
+responses (shared rungs once) & \lbItems \\
 \midrule
 \multicolumn{2}{@{}l}{\emph{Per response}} \\
 words & \lbWordsMin--\lbWordsMax{} (median \lbWordsMedian) \\
@@ -418,14 +507,9 @@ fixed / from fillers & \lbRelPlan{} / \lbRelSlot \\
 strong / moderate / weak & \lbBandStrong{} / \lbBandModerate{} / \lbBandWeak \\
 sup.\ / conf., verdict world & \lbRelVerdictSup{} / \lbRelVerdictCon \\
 sup.\ / conf., asserted world & \lbRelAssertSup{} / \lbRelAssertCon \\
-\midrule
-\multicolumn{2}{@{}l}{\emph{Generation}} \\
-attempts (admitted first try) & \lbAttempts{} (\lbFirstTry) \\
-LLM calls (per ladder) & \lbCalls{} (\lbCallsPerLadder) \\
-gateway spend & \$\lbSpend \\
 \bottomrule
 \end{tabular}
-\caption{The released test split.}
+\caption{The release.}
 \label{tab:release}
 \end{table}
 
@@ -439,31 +523,26 @@ plans. (c) Response length, every rung of every family.}
 \label{fig:composition}
 \end{figure*}
 
-\paragraph{Composition.} The test split has \lbFamilies{} families, 6--7 on each of
-\lbTopics{} topics in \lbDomains{} domains, with every topic carrying all four primary types
+\paragraph{Composition.} LoCoBench has \lbFamilies{} families, 6--7 on each of \lbTopics{}
+topics in \lbDomains{} domains, with every topic carrying all four primary types
 (Table~\ref{tab:release}, Figure~\ref{fig:composition}). Family $i$ takes topic $i \bmod 36$ and a
-primary type from a shifted rotation, so every type has exactly \lbNConflict{} ladders. A family
-has five responses: three on its primary ladder, of which the middle one is also the first rung of
-its \cp{control} ladder, and two more on the \cp{control} ladder.
+primary type from a shifted rotation, so every type has exactly \lbNConflict{} ladders. Every
+family has its primary ladder, and all but \lbMissingControl{} also have a \cp{control} ladder
+(whose \cp{control} slot got no filler that passed SV5), giving $4\times\lbNConflict+\lbNControl=\lbLadders$
+ladders.
 
-\paragraph{Generation record.} The split took \lbAttempts{} family attempts for \lbFamilies{}
-families; \lbFirstTry{} were admitted on the first attempt. Of the \lbAttemptsRejected{} rejected
-attempts, \lbRejStageTemplate{} failed at the template (V3 hedging or leakage \lbRejVThreeSpans,
-V3 scores \lbRejVThreeScores, V4 false claims corrected \lbRejVFour, structure \lbRejSFour),
-\lbRejContentFilter{} were one question that a content filter blocked, and \lbRejSVFive{} had a slot
-with no admissible filler. \lbCalls{} LLM calls were made, most of
-them committee readings (\lbCallsSVFive{} SV5 and \lbCallsVThree{} V3 calls), about \$\lbSpend{}
-at gateway rates. Three events are documented in full in App.~\ref{app:record}. A first attempt
-rotated three generators (Claude Opus~5, GPT-6.1, Gemini~3.1 Pro); the prompts, developed on
-Claude, so rarely produced admissible templates from the other two that the split was generated
-with Claude Opus~5 alone. One family's question was blocked by a provider's content filter and
-replaced. Ten families that lost their primary ladder were regenerated from new questions so that
-every type has \lbNConflict{} ladders; \lbMissingControl{} \cp{control} ladders failed and are
-absent. The gateway caches identical requests, so every run bypasses its cache.
-
-\paragraph{Splits.} A 16-family \emph{development split} (\lbDevLadders{} ladders, \lbDevItems{}
-responses), built first and used to develop the prompts, is released separately and is not test
-data (App.~\ref{app:dev}).
+\paragraph{Counting responses.} The \lbLadders{} ladders have three rungs each, \lbRungSlots{} in
+all, but they do not have \lbRungSlots{} distinct responses, because the two ladders of a family
+share one: the primary ladder's middle rung is also the first rung of its \cp{control} ladder. A
+family with both ladders therefore has $3+3-1=5$ responses, and a family with its primary ladder
+only has $3$, so the release has
+\[
+  5\times\lbFullFamilies + 3\times\lbMissingControl
+  = 3\times\lbLadders - \lbSharedRungs = \lbItems
+\]
+distinct responses. Every response is an item of its own, and an item records each ladder and rung
+it belongs to (App.~\ref{app:schema}); counting ladder memberships instead of items gives the
+\lbRungSlots{} rungs.
 
 \paragraph{Format and use.} Each response is one JSON item with its text, claims (with factuality
 label and stance), gold relations (with sense, coupling, band, provenance and sign at both
@@ -524,7 +603,7 @@ claims strongly starts near the top of the scale and rises least.
 \label{sec:reference}
 %% ============================================================================
 
-The companion paper \citep{anoncoherence} evaluates a coherence score on this split; we summarize
+The companion paper \citep{anoncoherence} evaluates a coherence score on LoCoBench; we summarize
 the setup and the results, which also serve as a check of the benchmark.
 
 \paragraph{The score.} The logical coherence score (LCS) reads a Markov random field over the
@@ -547,7 +626,7 @@ five independent runs \citep{geval}.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{../coherence/figures/fig_ladders.pdf}
-\caption{\textbf{Reference results on the test split} (from the companion paper). For every
+\caption{\textbf{Reference results on LoCoBench} (from the companion paper). For every
 score: the share of the \sThreeNIncPairs{} declared increases on which it rises (left) and falls
 (middle), and of the \sThreeNInvPairs{} declared invariances it keeps within $0.01$ on its own
 scale (right), with 95\% family-bootstrap intervals. Blue: LCS at the verdict world, on gold and
@@ -623,14 +702,14 @@ family's false claims listed as given, and asks which is more logically coherent
 are about equal. Both are Label Studio projects that each annotator runs locally
 (Figure~\ref{fig:study-ui}).
 
-\paragraph{Sample and assignment.} Task 1 has 120 fillers from the test split: 80 that the
+\paragraph{Sample and assignment.} Task 1 has 120 fillers from the release: 80 that the
 committee admitted, 8 for each of the 10 combinations of slot role and filler kind, and 40 that
 it rejected, 4 per combination; at most one per family, and none from a Task 2 family. Task 2 has
 30 families, 10 each of \cp{conflict}, \cp{chain} and \cp{sign}, round-robin over domains; every
 rung pair of their primary and \cp{control} ladders gives 90 Increase and 90 Invariance pairs.
 Each item is judged by exactly three annotators, dealt over the ten possible triples so that every
 pair of annotators overlaps equally, so each annotator judges 72 fillers and 108 pairs. With a
-20-minute practice on the development split and a calibration discussion of the practice items
+20-minute practice on families outside the release and a calibration discussion of the practice items
 only, the projected load is 3.5--4 hours per annotator; a pre-registered fallback shrinks Task 1
 to 100 fillers if the timed practice projects more than five hours.
 
@@ -640,7 +719,7 @@ a build-time check asserts this on every exported task; annotators work alone an
 data. Two features guard against answering from knowledge of the design: Task 1 mixes rejected
 with admitted fillers, so ``read as intended'' is not always right, and half of Task 2's pairs
 are \cp{control} pairs, whose right answer is ``about equal'', with sides balanced. Each
-annotator's screens include six attention checks from the development split; failing two excludes
+annotator's screens include six attention checks from the same practice families; failing two excludes
 the annotator. The gold key is committed by its hash in the pre-registration before annotation,
 and the analysis refuses a key that does not match. No annotator adjudicates their own
 disagreements, and the analysis is scripted.
@@ -689,8 +768,7 @@ one or two short sentences, fillers draw their links with explicit markers, and 
 rather than extracted, so the benchmark tests whether a metric orders responses whose relations
 differ, not how often such differences arise or how well a metric handles implicit links; mined
 results on it are best read as upper bounds. \textbf{One generator.} Every family was written by
-Claude Opus~5; the prompts were developed on it and did not transfer to two other generators, so
-the release reflects one model's style. \textbf{Model-made labels.} The factuality labels are the
+Claude Opus~5, on which the prompts were developed, so the release reflects one model's style. \textbf{Model-made labels.} The factuality labels are the
 generator's and were not verified; gold relations are what the committee read; the human study
 that tests both has not been run. \textbf{Coverage.} The relation inventory has ten senses, six
 couplings and pairwise relations only, and \cp{sign} covers derivations from a truth to a

@@ -119,6 +119,14 @@ def release(fams, items):
                                "families": sum(bool(f.get("gold_corrections")) for f in fams)}
     out["missing_control"] = sum(not any(l["type"] == "CONTROL" for l in f["ladders"])
                                  for f in fams)
+    # Response count: 3 rungs per ladder, minus the rung a family's two ladders share
+    # (the primary's rung 1 is the CONTROL ladder's rung 0).
+    slots = sum(len(l["item_ids"]) for l in lad)
+    member = collections.Counter(i for l in lad for i in l["item_ids"])
+    shared = sum(n == 2 for n in member.values())
+    assert set(member.values()) <= {1, 2} and len(member) == len(items) == slots - shared
+    assert shared == out["n_families"] - out["missing_control"]
+    out["rung_slots"], out["shared_rungs"] = slots, shared
     # Gold LCS per rung, per ladder (stored by the generator's exact ladder check).
     out["gold_lcs"] = {t: [l["gold"]["lcs"] for l in lad if l["type"] == t] for t in TYPES}
     out["gold_lambda"] = {t: [l["gold"]["lambda"] for l in lad if l["type"] == t] for t in TYPES}
@@ -193,6 +201,11 @@ def write_macros(path, R, G, Dv, spent, F=None):
     for a, n in R["gold_corrections"]["by_action"].items():
         m("GoldCorr" + a.title(), n)
     m("MissingControl", R["missing_control"])
+    m("FullFamilies", R["n_families"] - R["missing_control"])
+    m("FullFamilyItems", num(5 * (R["n_families"] - R["missing_control"])))
+    m("PrimaryOnlyItems", 3 * R["missing_control"])
+    m("RungSlots", num(R["rung_slots"]))
+    m("SharedRungs", R["shared_rungs"])
     for sense, n in R["rare_senses"].items():
         m("Rare" + sense.replace("-", ""), n)
     # Generation record.

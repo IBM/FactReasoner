@@ -146,81 +146,14 @@ linked becomes a relation. Over the release this changed \lbGoldCorr{} relations
 labels, and the ladder check is re-run on the corrected graphs.
 
 %% ============================================================================
-\section{Generation Record}
-\label{app:record}
-%% ============================================================================
-
-\begin{table}[h]
-\centering\small
-\begin{tabular}{@{}lr@{}}
-\toprule
-Stage & Calls \\
-\midrule
-P1 question & \lbCallsPOne \\
-P2 claim pool & \lbCallsPTwo \\
-S3 plan & \lbCallsSThree \\
-S4 template and fillers & \lbCallsSFour \\
-SF filler regeneration & \lbCallsSF \\
-V3 (committee) & \lbCallsVThree \\
-V4 (committee) & \lbCallsVFour \\
-SV1 (committee) & \lbCallsSVOne \\
-SV5 (committee) & \lbCallsSVFive \\
-\midrule
-total & \lbCalls \\
-\bottomrule
-\end{tabular}
-\caption{LLM calls over all \lbAttempts{} family attempts.}
-\label{tab:calls}
-\end{table}
-
-\paragraph{Run.} The test split was generated on 2026-11-19 by Claude Opus~5 with the committee of
-\S\ref{sec:validation}, through one gateway, with 12 families in parallel, in about four hours and
-forty minutes plus half an hour of retries; key spend was about \$\lbSpend. Of the \lbAttempts{}
-attempts, \lbFirstTry{} families were admitted on the first attempt. A rejected family is retried
-from its stored question and claims.
-
-\paragraph{Response cache.} The gateway caches identical requests. Without a bypass, a
-whole-family retry replays the cached plan and template of the failed attempt, and the repeated
-runs of an LLM judge are one run; every generation and evaluation run therefore sends a no-cache
-directive.
-
-\paragraph{Three generators, then one.} The split was first set up with three rotating generators
-(Claude Opus~5, GPT-6.1 and Gemini~3.1 Pro), each with a committee that excluded it. In the first
-16 minutes Claude Opus~5 had 5 of 5 families admitted, GPT-6.1 0 of 10 attempts and Gemini~3.1 Pro
-1 of 7, all failing at the template stage: the prompts had been developed on Claude, GPT-6.1 walked
-through the plan relation by relation (fluency 3 from all three raters, restated claims), and
-Gemini wrote templates too short or unparseable. The split was generated with Claude Opus~5
-alone; the aborted run is kept.
-
-\paragraph{Regenerated families.} One family's question was blocked by a provider's content filter
-four times (empty output); it was replaced by a new question. Ten admitted families had lost their
-primary ladder (a designated slot and its spare, or a \cp{chain} link, failed its filler reading)
-and kept only \cp{control}; they were archived and regenerated from new questions, and all ten were
-admitted with both ladders. \lbMissingControl{} \cp{control} ladders failed the same way and are
-absent; their families keep their primary ladder.
-
-\paragraph{A correction.} The released files were corrected once after generation: the sign of a
-gold relation at the asserted world (\texttt{sign\_assertion}) had been computed at the all-true
-world, ignoring stance, which mis-signed relations touching the denied claim on the \lbDenied{}
-refuting \cp{sign} rungs. The correction re-signed 67 relations in 60 items; nothing else changed,
-and no reported score depends on the field. The original files are archived with the release.
-
-\paragraph{The earlier design.} An earlier LoCoBench generated a base response and derived each
-rung by an LLM rewrite of it. Rewrites changed more than the intended relation, so most families
-were lost to validation of the rewritten text, and the gold conflicts were \sense{Contrast} and
-\sense{Concession} relations, which compile to no coupling. The slot design removes both problems:
-rungs are splices, so the unedited text is identical by construction, and conflicts are
-refutations between true claims.
-
-%% ============================================================================
 \section{Data Format}
 \label{app:schema}
 %% ============================================================================
 
-The release has, per split, \texttt{items.jsonl} (one response per line), \texttt{families.json}
-(one record per family), the generator's stored state (\texttt{state.json}: question, claim pool,
-plan, template, every filler and every committee reading, including rejected fillers), the attempt
-log and the run configuration.
+The release has \texttt{items.jsonl} (one response per line), \texttt{families.json} (one record
+per family), the generator's stored state (\texttt{state.json}: question, claim pool, plan,
+template, every filler and every committee reading, including rejected fillers) and the run
+configuration.
 
 {\raggedright
 \paragraph{Items.} \texttt{id}; \texttt{response}; \texttt{atoms}: \texttt{id}, \texttt{pos},
@@ -297,18 +230,6 @@ released families, with a median of \lbFillerWordsMedian{} words. Each of the fi
 appears in the plans of \lbRareAlternative{} families.
 
 %% ============================================================================
-\section{The Development Split}
-\label{app:dev}
-%% ============================================================================
-
-The development split was generated first, by the same generator, committee and pipeline, and
-used to develop the prompts and the deterministic checks; it is therefore not held out. It has
-\lbDevFamilies{} families, \lbDevLadders{} ladders (4 of each primary type and 16 \cp{control})
-and \lbDevItems{} responses, and it reached 16 of 16 families, 15 on the first attempt. The
-companion paper reports its results separately \citep{anoncoherence}; they show the same pattern
-as the test split.
-
-%% ============================================================================
 \section{Reference Evaluation in Detail}
 \label{app:reference}
 %% ============================================================================
@@ -344,8 +265,7 @@ given as facts, and two responses that differ only in the highlighted sentences.
 Everything the study needs is generated by \texttt{scripts/locobench\_study\_build.py} from the
 release and a fixed seed, and released with the paper:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item one bundle per annotator, with its Task 1 and Task 2 files, the practice files from the
-  development split, the two Label Studio labeling configurations, the annotator brief, setup
+\item one bundle per annotator, with its Task 1 and Task 2 files, the practice files, the two Label Studio labeling configurations, the annotator brief, setup
   instructions, the practice answers for the calibration discussion, and a script that creates
   the annotator's four projects in a local Label Studio;
 \item the gold key, committed by hash in the pre-registration and never imported into Label
