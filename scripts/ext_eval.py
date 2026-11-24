@@ -166,6 +166,8 @@ def invariance_block(rows, metric_names):
         G = [[r for r in g if r in R] for g in groups]
         G = [g for g in G if g]
         out[m] = {"n": len(R), "invariant": inv(R), "invariant_ci": boot(inv, G),
+                  "down_tol": sum(r[m] < r[m + "_orig"] - TOL for r in R),
+                  "up_tol": sum(r[m] > r[m + "_orig"] + TOL for r in R),
                   "decrease": dec(R), "decrease_ci": boot(dec, G),
                   "mean_abs": st.mean(abs(r[m] - r[m + "_orig"]) for r in R)}
     return out
@@ -346,11 +348,15 @@ def check2(args):
             rb, ra = rels_of(recs[b["id"]]), rels_of(recs[a["id"]])
             xb = [0 if k in evi else 1 for k in range(b["num_atoms"])]
             on_ev = [r for r in rb if r[2] in CONFLICTISH and (r[0] in evi or r[1] in evi)]
+            touch = [r for r in rb if r[0] in evi or r[1] in evi]
             row = {"group": fam, "scope": b["expected"]["scope"], "doc_type": b["expected"]["doc_type"],
                    "asserted_a": lcs_at(a["num_atoms"], ra)[0], "asserted_b": lcs_at(b["num_atoms"], rb)[0],
                    "verdict_a": lcs_at(a["num_atoms"], ra)[0],  # a has no evidence claim: x* = 1
                    "verdict_b": lcs_at(b["num_atoms"], rb, xb)[0], "edge_on_evidence": bool(on_ev),
-                   "spot": (spot.get(a["id"]) or {}).get("majority")}
+                   "spot": (spot.get(a["id"]) or {}).get("majority"),
+                   # Exploratory: sign, at the verdict world, of every relation on the evidence.
+                   "ev_supports": sum((xb[r[0]], xb[r[1]]) not in VIOLATED[r[2]] for r in touch),
+                   "ev_conflicts": sum((xb[r[0]], xb[r[1]]) in VIOLATED[r[2]] for r in touch)}
             for bl in BASELINES:
                 if a["id"] in base.get(bl, {}) and b["id"] in base.get(bl, {}):
                     row[bl + "_a"], row[bl + "_b"] = base[bl][a["id"]], base[bl][b["id"]]
@@ -363,7 +369,14 @@ def check2(args):
                     "p_sign": sign_test(dec, inc)}
 
         edge = [r for r in pairs if r["edge_on_evidence"]]
+        ev_sup = sum(r["ev_supports"] for r in edge)
+        ev_con = sum(r["ev_conflicts"] for r in edge)
+        falls = [r for r in edge if r["verdict_b"] < r["verdict_a"] - TIE]
         out = {"errors": err, "pairs": len(pairs),
+               "exploratory_evidence_relations": {
+                   "supports": ev_sup, "conflicts": ev_con,
+                   "verdict_falls": len(falls),
+                   "verdict_falls_without_evidence_conflict": sum(r["ev_conflicts"] == 0 for r in falls)},
                "asserted": counts(pairs, "asserted"), "verdict_all": counts(pairs, "verdict"),
                "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted")}
         out["H2a_asserted_pass"] = out["asserted"]["decrease"] > out["asserted"]["increase"] and \
@@ -476,6 +489,12 @@ def check3(args):
         S = [r for r in strong if "d0" in r]
         dec = sum(r["d1"] < r["d0"] - TIE for r in S)
         inc = sum(r["d1"] > r["d0"] + TIE for r in S)
+        # Exploratory: the asserted-world change split by whether the contradiction was found.
+        out["asserted_by_found"] = {
+            "found_fall": sum(r["conflict"] and r["d1"] < r["d0"] - TIE for r in S),
+            "found_rise": sum(r["conflict"] and r["d1"] > r["d0"] + TIE for r in S),
+            "notfound_fall": sum(not r["conflict"] and r["d1"] < r["d0"] - TIE for r in S),
+            "notfound_rise": sum(not r["conflict"] and r["d1"] > r["d0"] + TIE for r in S)}
         out["asserted"] = {"n": len(S), "decrease": dec, "increase": inc, "p_sign": sign_test(dec, inc)}
         out["H3c_pass"] = dec > inc and out["asserted"]["p_sign"] < 0.05
         res[f"3:{arm}"] = out
@@ -603,6 +622,10 @@ def write_macros(ev, path):
             P = a["perm"]
             m(f"LocoPermInv{tag}", pct(P["lcs"]["invariant"]))
             m(f"LocoPermDec{tag}", pct(P["lcs"]["decrease"]))
+            m(f"LocoPermDownTol{tag}", P["lcs"]["down_tol"])
+            m(f"LocoPermUpTol{tag}", P["lcs"]["up_tol"])
+            m(f"LocoPermN{tag}", P["lcs"]["n"])
+            m(f"LocoPermMean{tag}", f"{P['lcs']['mean_abs']:.3f}")
             m(f"LocoNoiseInv{tag}", pct(a["noise_floor"]["lcs"]["invariant"]))
             m(f"LocoSentInv{tag}", pct(a["sent"]["lcs"]["invariant"]))
             m(f"HOneA{tag}", held(a["H_pass"]))
@@ -647,7 +670,13 @@ def write_macros(ev, path):
         if x:
             if tag == "Gpt":
                 m("CdPairs", x["pairs"])
-            for w, wt in (("asserted", "Assert"), ("verdict_all", "VerdAll"), ("verdict_edge", "VerdEdge")):
+            ex_ = x.get("exploratory_evidence_relations", {})
+            for k_, kt in (("supports", "EvSup"), ("conflicts", "EvCon"), ("verdict_falls", "VerdFalls"),
+                           ("verdict_falls_without_evidence_conflict", "VerdFallsNoCon")):
+                if k_ in ex_:
+                    m(f"Cd{kt}{tag}", ex_[k_])
+            for w, wt in (("asserted", "Assert"), ("verdict_all", "VerdAll"), ("verdict_edge", "VerdEdge"),
+                          ("asserted_edge", "AssertEdge")):
                 m(f"Cd{wt}Dec{tag}", x[w]["decrease"])
                 m(f"Cd{wt}Inc{tag}", x[w]["increase"])
                 m(f"Cd{wt}N{tag}", x[w]["n"])
@@ -683,6 +712,9 @@ def write_macros(ev, path):
             m(f"CpAssertInc{tag}", y["asserted"]["increase"])
             m(f"CpAssertN{tag}", y["asserted"]["n"])
             m(f"CpAssertP{tag}", pval(y["asserted"]["p_sign"]))
+            for k_, kt in (("found_fall", "FoundFall"), ("found_rise", "FoundRise"),
+                           ("notfound_fall", "NotFoundFall"), ("notfound_rise", "NotFoundRise")):
+                m(f"Cp{kt}{tag}", y.get("asserted_by_found", {}).get(k_, "--"))
             m(f"CpRealSupport{tag}", y["real_verdict_signs"].get("support", 0))
             m(f"CpRealConflict{tag}", y["real_verdict_signs"].get("conflict", 0))
             for h, ht in (("H3a_pass", "HThreeA"), ("H3_miner_pass", "HThreeMiner"), ("H3c_pass", "HThreeC")):
