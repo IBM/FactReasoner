@@ -237,7 +237,17 @@ def check1(args):
                     if x["id"] in base.get(b, {}) and o["id"] in base.get(b, {}):
                         row[b], row[b + "_orig"] = base[b][x["id"]], base[b][o["id"]]
                 rows.append(row)
-        res[f"1c:{arm}"] = {"errors": err, "perm": invariance_block(rows, ["lcs"] + list(BASELINES))}
+        # D2 (exploratory): noise floor from re-mining the 150 orig documents.
+        rr, _ = records("contradoc-rerun", arm)
+        noise = []
+        for fam, V in by.items():
+            o = V.get("orig")
+            if o and o.get("expected", {}).get("shuffled") and o["id"] in recs and o["id"] in rr:
+                noise.append({"group": fam,
+                              "lcs": lcs_at(o["num_atoms"], rels_of(rr[o["id"]]))[0],
+                              "lcs_orig": lcs_at(o["num_atoms"], rels_of(recs[o["id"]]))[0]})
+        res[f"1c:{arm}"] = {"errors": err, "perm": invariance_block(rows, ["lcs"] + list(BASELINES)),
+                            "noise_floor": invariance_block(noise, ["lcs"])}
     # 1d: SummEval
     it = items("summeval")
     base = baselines("summeval")
@@ -269,6 +279,10 @@ def check1(args):
             others = [b for b in BASELINES if b in P]
             res[key]["H_pass"] = all(P["lcs"]["invariant"] > P[b]["invariant"] for b in others) \
                 if others else None
+            # D1: RC and LC are order-invariant by definition (bag-of-sentences noun counts).
+            dyn = [b for b in others if b not in ("discourse_rc", "discourse_lc")]
+            res[key]["H_pass_excl_order_free"] = all(
+                P["lcs"]["invariant"] > P[b]["invariant"] for b in dyn) if dyn else None
     return res
 
 

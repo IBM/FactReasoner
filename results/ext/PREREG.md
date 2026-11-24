@@ -149,4 +149,17 @@ Substitution, Negative-condition, SpeechAct and Hypophora.
 
 ## Deviations
 
-(none yet)
+Logged after the gpt-6-sol results were first read on 2026-11-24. The pre-registered results
+are still reported as pre-registered; each deviation only adds an analysis.
+
+- **D1. DiscoScore RC and LC are order-invariant by definition.** They count noun repetitions
+  across sentences regardless of order, so, like the length and claim-count controls, they
+  cannot change under a permutation and should have been excluded from the H1a/H1c
+  comparison. H1a and H1c are reported as pre-registered and, additionally, with RC and LC
+  excluded (`H_pass_excl_order_free`). The entity graph, whose edges depend on sentence
+  distance, stays in.
+- **D2. Mining noise floor for 1c (exploratory).** LoCoBench has a noise floor, from re-mining
+  orig against the test-split records; ContraDoc did not. The 150 clean documents of 1c were
+  re-mined with fresh samples (`data/ext/contradoc-rerun`, gpt-6-sol and gpt-oss-120b), and the
+  share with |LCS(orig) − LCS(orig, re-mined)| ≤ 0.01 is reported next to the permutation
+  invariance.
