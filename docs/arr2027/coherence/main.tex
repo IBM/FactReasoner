@@ -112,8 +112,8 @@ truth values and does not depend on how the text is ordered or worded. We requir
 a score for it: over a fixed
 set of claims, any edit that makes the relations agree better with the facts, such as adding a
 relation the facts uphold or deleting one they break, must raise the score, wherever in the
-argument the edit occurs. Natural readouts of a Markov random field over claim truth values, such
-as the mean posterior marginal, violate this requirement. We derive a score that satisfies it. Any
+argument the edit occurs. Natural readouts of a Markov random field over claim truth values violate this
+requirement. We derive a score that satisfies it. Any
 factuality pipeline, whether it returns labels or probabilities, fixes each claim's truth value,
 and the logical coherence score (LCS) measures the weight of evidence that the response's relations
 lend to that assignment: refuting a falsehood counts as support, and deriving a falsehood from a
@@ -123,8 +123,8 @@ monotone, show that the score must be read at the world that defines the order, 
 with one partition-function query. On a benchmark of \sThreeLadders{} coherence ladders
 (\sThreeItems{} responses), each spliced from one template, the score satisfies every declared
 ordering and invariance on gold relation graphs,
-while the mean marginal and the score read at the asserted world misrank the ladders that derive or
-refute a falsehood. On graphs mined by four extractors its errors fall only on pairs whose
+while the score read at the asserted world misranks the ladders that derive or refute a
+falsehood. On graphs mined by four extractors its errors fall only on pairs whose
 extracted graphs no sequence of improving edits connects, which locates them in relation
 extraction, while LLM judges miss about half of the declared increases.
 \end{abstract}
@@ -160,12 +160,11 @@ A score for that difference must guarantee one thing. Over a fixed set of claims
 values, any change that makes the relations agree better with those values --- a new or stronger
 relation that they uphold, a weaker or deleted one that they break --- must raise the score,
 wherever in the argument the change occurs. The natural model is a Markov random field (MRF) over
-claim truth values with one factor per relation \citep{factreasoner}, but its natural readout, the
-mean posterior marginal, does not deliver this. It can fall when a contradiction is deleted,
-because the claims that contradiction held in check are released against others
-(\S\ref{sec:failures}), and it falls on \fallsPctMmSigndef\% of random coherence-improving edits
-(with every claim taken as true; App.~\ref{app:verify}). The question is which quantity of the
-model to read.
+claim truth values with one factor per relation \citep{factreasoner}, but its natural readouts do
+not deliver this (\S\ref{sec:why}, App.~\ref{app:earlier}), and neither does a classical coherence
+measure: Shogenji's \citep{shogenji1999} falls on \fallsPctShogenjiSigndef\% of random
+coherence-improving edits (with every claim taken as true; App.~\ref{app:verify}). The question is
+which quantity of the model to read.
 
 We answer it from what a factuality pipeline already provides. Its verdicts fix a
 \emph{committed world}, the truth value of each claim, and we score a response by how much its
@@ -193,8 +192,7 @@ responses that state the same five claims with the same stance.
   magnitude depends on the rest of the argument but whose sign never does. Adding or deleting a
   pairwise relation moves the score in a fixed direction in every context exactly when the
   relation's table is sign-definite, which tables normalized in the premise are not at low weights
-  or false premises; the score must be read at the world that defines the order; and the mean
-  posterior marginal is not monotone.
+  or false premises; and the score must be read at the world that defines the order.
 \item \textbf{A coherence score with a guarantee} (\S\ref{sec:setup}--\ref{sec:props}). $\LCS$ is
   strictly monotone in every coherence-improving edit, for any priors and relation graph. It takes
   labels or posteriors from any factuality pipeline, does not depend on whether a claim enters as
@@ -202,8 +200,8 @@ responses that state the same five claims with the same stance.
   sub-arguments and saturating under redundant support.
 \item \textbf{A diagnostic evaluation} (\S\ref{sec-locobench}--\ref{sec:experiments}). On
   \sThreeLadders{} three-rung ladders built for the purpose (\sThreeFamilies{} families,
-  \sThreeItems{} responses), every declared ordering and invariance holds on gold graphs, a check of the theory and its implementation, while the mean marginal and
-  the score read at the asserted world misrank the ladders that derive or refute a falsehood. On
+  \sThreeItems{} responses), every declared ordering and invariance holds on gold graphs, a check of the theory and its implementation, while the score read at
+  the asserted world misranks the ladders that derive or refute a falsehood. On
   graphs from four miners every error falls on a pair whose extracted graphs are incomparable in
   the coherence order, which separates extraction errors from scoring errors; LLM judges, a
   frontier one included, recognize explicit contradictions but miss about half of the
@@ -683,7 +681,7 @@ to rule out.
 
 Theorem~\ref{thm:mono} rests on two choices, the potentials and the world at which the posterior is
 read. We show that sign-definite tables are the only pairwise tables with the property, that the
-readout world must be the world that defines the order, that a natural alternative readout fails,
+readout world must be the world that defines the order, that a classical coherence measure fails,
 and that the obvious simpler score fails too. The results are elementary; their value is in what
 they rule out. First, is sign-definiteness merely sufficient, or is it needed?
 
@@ -715,21 +713,15 @@ The proposition does not say that $\xs$ is the right world; choosing it is the f
 pipeline's job. It says that the order and the readout must use the same world, so a score
 monotone in agreement with the verdicts has to be read at the verdicts.
 
-Third, could an average of beliefs replace a single world? The natural candidate is the mean
-posterior marginal.
-
-\begin{proposition}[The mean marginal is not monotone]
-\label{prop:mm}
-There are graphs in which deleting a contradiction strictly lowers the mean marginal
-$\frac1n\sum_i\PR(a_i{=}1)$, under Eq.~\ref{eq:mrf} and row-stochastic tables alike.
-\end{proposition}
-
-\label{sec:failures}
-In the witness, a contradiction holds down a hub claim that itself contradicts five others;
-deleting it releases the hub, and the mean marginal falls from $\starFiveMMa$ to $\starFiveMMb$
-while $\Lambda$ rises. The failure is not rare. Over \thmSteps{} random improving edits at
-$\xs=\one$, the mean marginal falls on \fallsPctMmSigndef\% and Shogenji's coherence measure \citep{shogenji1999} on
-\fallsPctShogenjiSigndef\%, while $\Lambda$ never does (App.~\ref{app:verify}).
+Third, classical coherence measures, which ignore the committed world, are not monotone either:
+over \thmSteps{} random improving edits at $\xs=\one$, Shogenji's coherence measure
+\citep{shogenji1999} falls on \fallsPctShogenjiSigndef\%, while $\Lambda$ never does
+(App.~\ref{app:verify}).\footnote{Nor is a natural readout that averages beliefs instead of reading
+one world, the mean posterior marginal $\frac1n\sum_i\PR(a_i{=}1)$. On a star in which a
+contradiction holds down a hub claim that itself contradicts five others, deleting that
+contradiction releases the hub and lowers the mean marginal from $\starFiveMMa$ to
+$\starFiveMMb$, while $\Lambda$ rises; over the same \thmSteps{} random improving edits it falls on
+\fallsPctMmSigndef\%.}
 
 These results fix the class of tables and the readout world; they do not make $\Lambda$ the unique
 score satisfying A1--A4. Any score that is strictly increasing in $\Lambda$ for a fixed prior and
@@ -932,11 +924,9 @@ claims, verdicts and scorer identical. \cp{gold} uses the items' relations at th
 their strength bands. Four mined arms estimate the graph from the text
 (\S\ref{sec:mining}): the graph-level miner ($k=5$) with GPT-6, a frontier model that is neither
 the generator nor on the committee, and with gpt-oss-120b; and the pairwise miner (window $w=4$,
-evidence span required) with gpt-oss-120b and Llama-3.3-70B. Each arm's graph is read three ways:
-$\LCS$ at \emph{verdict polarity}, our score, with $\xs$ the verdict world below and flat priors;
-$\LCS$ at \emph{assertion polarity}, the same formula with $\xs$ the asserted world; and, as the
-non-monotone reference (Prop.~\ref{prop:mm}), the mean posterior marginal under the row-stochastic
-tables of App.~\ref{app:earlier} with priors $0.9$ and $0.1$ from the factuality labels. All
+evidence span required) with gpt-oss-120b and Llama-3.3-70B. Each arm's graph is read two ways:
+$\LCS$ at \emph{verdict polarity}, our score, with $\xs$ the verdict world below and flat priors,
+and $\LCS$ at \emph{assertion polarity}, the same formula with $\xs$ the asserted world. All
 scores are computed exactly, and every number and figure is regenerated from the data by one
 script.
 
@@ -1010,26 +1000,26 @@ and~\ref{tab:baselines}.}
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4.2pt}
-\begin{tabular}{@{}lc ccc ccc ccc@{}}
+\begin{tabular}{@{}lc ccc ccc@{}}
 \toprule
-& & \multicolumn{3}{c}{Mean marginal} & \multicolumn{3}{c}{$\LCS$, assertion polarity}
+& & \multicolumn{3}{c}{$\LCS$, assertion polarity}
 & \multicolumn{3}{c}{$\LCS$, verdict polarity (ours)} \\
-\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(l){9-11}
-Arm & F1 & Incr. & Inv. & Inv.$_\tau$ & Incr. & Inv. & Inv.$_\tau$ & Incr. & Inv. & Inv.$_\tau$ \\
+\cmidrule(lr){3-5}\cmidrule(l){6-8}
+Arm & F1 & Incr. & Inv. & Inv.$_\tau$ & Incr. & Inv. & Inv.$_\tau$ \\
 \midrule
-\cp{gold} & --- & \sThreeGoldMMIncPct & \sThreeGoldMMInvPct & \sThreeGoldMMInvTolPct
+\cp{gold} & ---
   & \sThreeGoldLamAIncPct & \sThreeGoldLamAInvPct & \sThreeGoldLamAInvTolPct
   & \textbf{\sThreeGoldLamIncPct} & \textbf{\sThreeGoldLamInvPct} & \textbf{\sThreeGoldLamInvTolPct} \\
-graph, GPT-6 & \sThreeGraphGptCoupF & \sThreeGraphGptMMIncPct & \sThreeGraphGptMMInvPct & \sThreeGraphGptMMInvTolPct
+graph, GPT-6 & \sThreeGraphGptCoupF
   & \sThreeGraphGptLamAIncPct & \sThreeGraphGptLamAInvPct & \sThreeGraphGptLamAInvTolPct
   & \sThreeGraphGptLamIncPct & \sThreeGraphGptLamInvPct & \sThreeGraphGptLamInvTolPct \\
-graph, gpt-oss-120b & \sThreeGraphOssCoupF & \sThreeGraphOssMMIncPct & \sThreeGraphOssMMInvPct & \sThreeGraphOssMMInvTolPct
+graph, gpt-oss-120b & \sThreeGraphOssCoupF
   & \sThreeGraphOssLamAIncPct & \sThreeGraphOssLamAInvPct & \sThreeGraphOssLamAInvTolPct
   & \sThreeGraphOssLamIncPct & \sThreeGraphOssLamInvPct & \sThreeGraphOssLamInvTolPct \\
-pairwise, gpt-oss-120b & \sThreePairOssCoupF & \sThreePairOssMMIncPct & \sThreePairOssMMInvPct & \sThreePairOssMMInvTolPct
+pairwise, gpt-oss-120b & \sThreePairOssCoupF
   & \sThreePairOssLamAIncPct & \sThreePairOssLamAInvPct & \sThreePairOssLamAInvTolPct
   & \sThreePairOssLamIncPct & \sThreePairOssLamInvPct & \sThreePairOssLamInvTolPct \\
-pairwise, Llama-3.3-70B & \sThreePairLlamaCoupF & \sThreePairLlamaMMIncPct & \sThreePairLlamaMMInvPct & \sThreePairLlamaMMInvTolPct
+pairwise, Llama-3.3-70B & \sThreePairLlamaCoupF
   & \sThreePairLlamaLamAIncPct & \sThreePairLlamaLamAInvPct & \sThreePairLlamaLamAInvTolPct
   & \sThreePairLlamaLamIncPct & \sThreePairLlamaLamInvPct & \sThreePairLlamaLamInvTolPct \\
 \bottomrule
@@ -1037,8 +1027,7 @@ pairwise, Llama-3.3-70B & \sThreePairLlamaCoupF & \sThreePairLlamaMMIncPct & \sT
 \caption{Ladder assertions satisfied on the test split, in \% of the \sThreeNIncPairs{} Increase
 and \sThreeNInvPairs{} Invariance pairs, per arm and readout. Inv.: equality within $10^{-9}$;
 Inv.$_\tau$: within $\tau=\sThreeTol$ on the readout's $[0,1]$ scale. F1:
-coupling-level extraction F1 against gold. The mean marginal over row-stochastic tables is the
-non-monotone reference. Counts per ladder type are in Table~\ref{tab:bytype}.}
+coupling-level extraction F1 against gold. Counts per ladder type are in Table~\ref{tab:bytype}.}
 \label{tab:ladders}
 \end{table*}
 
@@ -1053,12 +1042,10 @@ It also resolves \sThreeGoldLamIncTol{} of the increases. The 17 it does not res
 $\LCS$ is below $0.06$ or above $0.9$, where the logistic compresses a step of $0.07$--$0.53$
 nats in $\Lambda$ below $\tau$.
 
-The two other readouts fail exactly where the theory says they should, on \cp{sign}
-(\S\ref{sec:exp-polarity}): the mean marginal satisfies \sThreeGoldMMSign{} \cp{sign} pairs and
-$\LCS$ at the asserted world \sThreeGoldLamASign. Both are right on every \cp{chain} pair and,
-but for one mean-marginal pair, on every \cp{conflict} pair. The mean marginal also barely moves
-when one relation changes, since it averages over 12--14 claims: only \sThreeGoldMMIncTol{} of its
-gold increases exceed $\tau$, against \sThreeGoldLamIncTol{} for $\LCS$.
+The other readout, $\LCS$ at the asserted world, fails exactly where the theory says it should,
+on \cp{sign} (\S\ref{sec:exp-polarity}): it satisfies \sThreeGoldLamASign{} \cp{sign} pairs, while it
+is right on every \cp{conflict} pair (\sThreeGoldLamAConflict) and every \cp{chain} pair
+(\sThreeGoldLamAChain).
 
 \subsection{Mined Graphs: Separating Estimation from Scoring}
 \label{sec:exp-mined}
@@ -1111,10 +1098,7 @@ sampled at temperature $0.7$, rarely returns the same graph (\sThreeGraphOssLamI
 $10^{-8}$ when any sentence of the response changes, almost never does (\sThreePairOssLamInv{} and
 \sThreePairLlamaLamInv). Within $\tau$, GPT-6 keeps \sThreeGraphGptLamInvTol{} invariances. The pairwise arms reach
 \sThreePairOssLamInvTol{} and \sThreePairLlamaLamInvTol{}, but that figure is inflated by
-saturation: two responses pinned near $\LCS=0$ are trivially within $\tau$ of each other. A
-readout that hardly moves looks better still: on GPT-6's graphs the mean marginal stays within
-$\tau$ on \sThreeGraphGptMMInvTol{} invariance pairs but resolves only \sThreeGraphGptMMIncTol{}
-increases. Tolerant invariance is informative only next to the resolved increases.
+saturation: two responses pinned near $\LCS=0$ are trivially within $\tau$ of each other. Tolerant invariance is informative only next to the resolved increases.
 
 \subsection{What Polarity Changes}
 \label{sec:exp-polarity}
@@ -1125,8 +1109,7 @@ increases. Tolerant invariance is informative only next to the resolved increase
 \caption{\textbf{Only the verdict-polarity score orders \cp{sign} as declared.} The
 \sThreeNSign{} gold \cp{sign} ladders, rung by rung: each readout's change from the rung that draws
 no link, averaged over ladders, with 95\% bootstrap intervals. The declared order is
-$\rho_0<\rho_1<\rho_2$, a line rising left to right. Each panel has its own vertical scale: the
-mean marginal moves about a hundred times less than $\LCS$.}
+$\rho_0<\rho_1<\rho_2$, a line rising left to right. Each panel has its own vertical scale.}
 \label{fig:sign}
 \end{figure*}
 
@@ -1135,9 +1118,7 @@ derived from a truth is a conflict and a falsehood refuted by a truth is a suppo
 below the unlinked rung when the falsehood is derived and rises above it when it is refuted: all
 \sThreeGoldLamSign{} gold \cp{sign} pairs are satisfied, and \sThreeGraphGptLamSign{} on the GPT-6
 graphs. Read at the response's own stance, the derivation is an upheld entailment, and the score
-prefers it to drawing no link: \sThreeGoldLamASign{} gold \cp{sign} pairs. The mean marginal
-reverses the declared order: deriving the falsehood pulls its marginal up and refuting it pulls
-the marginal down, so it satisfies only \sThreeGoldMMSign. On \cp{conflict} and \cp{chain}, which
+prefers it to drawing no link: \sThreeGoldLamASign{} gold \cp{sign} pairs. On \cp{conflict} and \cp{chain}, which
 edit only links between true claims, the two polarities agree on every gold pair. The polarity
 thus changes the order exactly where a relation's truth and its assertion come apart.
 Table~\ref{tab:example} in App.~\ref{app:results} shows one \cp{sign} ladder with every score.
@@ -1513,13 +1494,6 @@ relative to $\xs$, so adding it is an elementary improvement. It multiplies $\PR
 $\psi_r(x)/\E_{\PR}[\psi_r]=(1-p)/(1-pq)$ with $q=\PR(x_e\in V)<1$, which is less than $1$.
 $\square$
 
-\paragraph{Proposition~\ref{prop:mm}.} The witness is the star of \S\ref{sec:why}: claim $a_2$
-contradicts $a_3,\dots,a_7$ and claim $a_1$ contradicts $a_2$, all weights $0.99$, all priors
-$\frac12$, so $\xs=\one$ and every relation is a conflict. Deleting $a_1\ \con\ a_2$ lowers the mean
-marginal from $\starFiveMMa$ to $\starFiveMMb$ while $\Lambda$ rises from $\starFiveLama$ to
-$\starFiveLamb$, exactly, by $2^7$-world enumeration. A hand-checkable instance under row-stochastic
-tables, with three spokes, is given in App.~\ref{app:earlier}. $\square$
-
 \subsection{Further Properties (\S\ref{sec:props})}
 \label{app:proof-props}
 
@@ -1567,8 +1541,7 @@ $a_1\Rightarrow a_4$ is \sense{Condition}, and $a_2\con a_3$ and $a_3\con a_5$ a
 same committed world and the same scores as verdict polarity. Reading the denied claims as asserted
 ($\xs=\one$) keeps the order, A $\vyALamAs$ against B $\vyBLamAs$, but charges A for its
 refutations ($\vyADAsThree$, $\vyADAsFour$) as if they were self-contradictions, which is why
-assertion polarity takes the response's stance. The mean marginal over row-stochastic tables gives $\vyAMM$ and
-$\vyBMM$, and its per-claim view shows B dragging the true $a_3$ to $\vyBMargThree$.
+assertion polarity takes the response's stance.
 
 \smallskip\noindent\textbf{Response A.}
 Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and \emph{in consequence}, in the
@@ -1608,27 +1581,25 @@ $\wpWeakEntGain$. When the source is false at $\xs$ (for \ent{} and \con{}), or 
 is false (for \cnc{}), the committed cell holds $\pi_0$, which is neither the maximum nor the minimum
 for any $p\neq\frac12$, so these tables fail at every weight.
 
-\paragraph{Alternative readouts.} Besides $\Lambda$ we consider six readouts, (a)--(d) over the
-row-stochastic tables and (e)--(f) over Eq.~\ref{eq:mrf}:
-(a) the mean marginal $\frac1n\sum_i\PR(a_i{=}1)$;
-(b) a two-term consistency probability, averaging $P(\text{no contradiction active})$ with a
+\paragraph{Alternative readouts.} Besides $\Lambda$ we consider five readouts, (a)--(c) over the
+row-stochastic tables and (d)--(e) over Eq.~\ref{eq:mrf}:
+(a) a two-term consistency probability, averaging $P(\text{no contradiction active})$ with a
 weight-averaged probability that supports are actively upheld;
-(c) the posterior of a reified coherence node with noisy-AND votes;
-(d) $(\log Z-\log Z_{\min})/(\log Z_{\max}-\log Z_{\min})$ with the conflict-free network as
+(b) the posterior of a reified coherence node with noisy-AND votes;
+(c) $(\log Z-\log Z_{\min})/(\log Z_{\max}-\log Z_{\min})$ with the conflict-free network as
 ceiling and the most probable world's mass as floor;
-(e) \emph{conflict escape}, $\E_{P_0}[\prod_{r\in\Rcon}\psi_r(x_{e_r})]$, with $P_0$ the
+(d) \emph{conflict escape}, $\E_{P_0}[\prod_{r\in\Rcon}\psi_r(x_{e_r})]$, with $P_0$ the
 network without conflicts;
-(f) \emph{prior expectation}, $\sigma\bigl(\frac2n\log\E_\pi[\prod_{\Rcon}(1-p_rV_r)
+(e) \emph{prior expectation}, $\sigma\bigl(\frac2n\log\E_\pi[\prod_{\Rcon}(1-p_rV_r)
 \prod_{\Rsup}(1+p_rC_r)]\bigr)$, where $V_r$ indicates that a conflict is violated and $C_r$ that a
 support is credited, i.e.\ its endpoints are both true (\ent{}, \eqv{}) or exactly one is true
 (\cnc{}).
-(a), (b), (c) and (d) fail A1: (a) on the star of Prop.~\ref{prop:mm}, (b) and (c) when weakening a
-contradiction \emph{raises} the probability that it is active, and (d) because its floor
-moves with the edit. (e) is monotone in conflict edits but not support edits, since supports shape
-$P_0$. (f) is monotone in every edit, but it scores relations against the priors rather than the
+(a), (b) and (c) fail A1: (a) and (b) when weakening a contradiction \emph{raises} the
+probability that it is active, and (c) because its floor moves with the edit. (d) is monotone in
+conflict edits but not support edits, since supports shape $P_0$. (e) is monotone in every edit, but it scores relations against the priors rather than the
 coherence MRF, so it violates A2: an exclusion and an equivalence of equal weight $p$ on one pair
-have tables whose product is the constant $1-p$, so $\PR=P_\varnothing$ and $\Lambda=0$, while (f)
-moves away from $\frac12$ ($0.364$ at $p=0.9$ and uniform priors). (f) also does not saturate: $k$
+have tables whose product is the constant $1-p$, so $\PR=P_\varnothing$ and $\Lambda=0$, while (e)
+moves away from $\frac12$ ($0.364$ at $p=0.9$ and uniform priors). (e) also does not saturate: $k$
 copies of one equivalence at $0.9$ on two fair claims give
 $\padBalOne,\padBalTwo,\padBalThree,\padBalFour,\padBalFive,\padBalSix$ for $k=1,\dots,6$, against
 $\padLCSOne,\padLCSTwo,\padLCSThree,\padLCSFour,\padLCSFive,\padLCSSix$ for $\LCS$.
@@ -1638,12 +1609,6 @@ $\xs=\one$, adding a weak entailment under the row-stochastic tables moves the c
 gain by $\wpWeakEntailment$ and a weak contradiction by $\wpWeakContradiction$, both in the wrong
 direction. Under Eq.~\ref{eq:mrf} the same relations move it by $\sdWeakEntailment$ and
 $\sdWeakContradiction$.
-
-\paragraph{The star under row-stochastic tables.} With three spokes, all spoke weights $p=0.95$ and
-blocker weight $b=0.95$ under the row-stochastic tables, deleting the blocker lowers (a) from
-$\starMMa$ to $\starMMb$, which can be checked by hand by reading the network as a Bayesian network.
-On the same graph $\Lambda$, computed under Eq.~\ref{eq:mrf}, rises from $\starLama$ to
-$\starLamb$.
 
 %% ============================================================================
 \section{Relation Mining and Gold Weights}
@@ -1710,9 +1675,7 @@ prompt follows verbatim.
 \paragraph{Gold arm.} Each gold relation's weight is the midpoint of its labelled strength band
 (strong $[0.85,1]$, moderate $[0.60,0.84]$, weak $[0.35,0.59]$). The corpus' factuality labels give
 the committed world ($\xs_i=1$ for claims labelled factual, $0$ otherwise), and each response's
-stance on each claim gives the world of assertion polarity. The score's MRF uses flat priors; the
-mean-marginal reference uses priors $0.9$ and $0.1$ from the same labels, as the row-stochastic
-tables were designed for informative priors. No miner is a member of the committee that admitted
+stance on each claim gives the world of assertion polarity. The score's MRF uses flat priors. No miner is a member of the committee that admitted
 the corpus' items.
 
 %% ============================================================================
@@ -1916,8 +1879,7 @@ generated with Claude Opus~5 alone.
 
 \paragraph{One ladder, end to end.} Table~\ref{tab:example} shows a \cp{sign} ladder with every
 score. On the gold graph $\LCS$ rises at each rung; on the GPT-6 miner's graphs it rises too. The
-score read at the asserted world rates deriving the falsehood and refuting it alike, and the mean
-marginal falls slightly at each rung, the reverse of the declared order. The G-Eval judge also
+score read at the asserted world rates deriving the falsehood and refuting it alike. The G-Eval judge also
 prefers the rung that derives the falsehood, and the 1--5 rating does not move.
 
 \begin{table*}[t]
@@ -1929,28 +1891,23 @@ prefers the rung that derives the falsehood, and the 1--5 rating does not move.
 \cmidrule(lr){3-6}\cmidrule(l){7-8}
 Arm & Readout & \cp{conflict} & \cp{chain} & \cp{sign} & resolved & \cp{order} & \cp{control} \\
 \midrule
-\multirow{3}{*}{\cp{gold}}
- & mean marginal & \sThreeGoldMMConflict & \sThreeGoldMMChain & \sThreeGoldMMSign & \sThreeGoldMMIncTol & \sThreeGoldMMOrder & \sThreeGoldMMControl \\
+\multirow{2}{*}{\cp{gold}}
  & $\LCS$, assertion & \sThreeGoldLamAConflict & \sThreeGoldLamAChain & \sThreeGoldLamASign & \sThreeGoldLamAIncTol & \sThreeGoldLamAOrder & \sThreeGoldLamAControl \\
  & $\LCS$, verdict (ours) & \sThreeGoldLamConflict & \sThreeGoldLamChain & \sThreeGoldLamSign & \sThreeGoldLamIncTol & \sThreeGoldLamOrder & \sThreeGoldLamControl \\
 \midrule
-\multirow{3}{*}{graph, GPT-6}
- & mean marginal & \sThreeGraphGptMMConflict & \sThreeGraphGptMMChain & \sThreeGraphGptMMSign & \sThreeGraphGptMMIncTol & \sThreeGraphGptMMOrder & \sThreeGraphGptMMControl \\
+\multirow{2}{*}{graph, GPT-6}
  & $\LCS$, assertion & \sThreeGraphGptLamAConflict & \sThreeGraphGptLamAChain & \sThreeGraphGptLamASign & \sThreeGraphGptLamAIncTol & \sThreeGraphGptLamAOrder & \sThreeGraphGptLamAControl \\
  & $\LCS$, verdict (ours) & \sThreeGraphGptLamConflict & \sThreeGraphGptLamChain & \sThreeGraphGptLamSign & \sThreeGraphGptLamIncTol & \sThreeGraphGptLamOrder & \sThreeGraphGptLamControl \\
 \midrule
-\multirow{3}{*}{graph, gpt-oss}
- & mean marginal & \sThreeGraphOssMMConflict & \sThreeGraphOssMMChain & \sThreeGraphOssMMSign & \sThreeGraphOssMMIncTol & \sThreeGraphOssMMOrder & \sThreeGraphOssMMControl \\
+\multirow{2}{*}{graph, gpt-oss}
  & $\LCS$, assertion & \sThreeGraphOssLamAConflict & \sThreeGraphOssLamAChain & \sThreeGraphOssLamASign & \sThreeGraphOssLamAIncTol & \sThreeGraphOssLamAOrder & \sThreeGraphOssLamAControl \\
  & $\LCS$, verdict (ours) & \sThreeGraphOssLamConflict & \sThreeGraphOssLamChain & \sThreeGraphOssLamSign & \sThreeGraphOssLamIncTol & \sThreeGraphOssLamOrder & \sThreeGraphOssLamControl \\
 \midrule
-\multirow{3}{*}{pairwise, gpt-oss}
- & mean marginal & \sThreePairOssMMConflict & \sThreePairOssMMChain & \sThreePairOssMMSign & \sThreePairOssMMIncTol & \sThreePairOssMMOrder & \sThreePairOssMMControl \\
+\multirow{2}{*}{pairwise, gpt-oss}
  & $\LCS$, assertion & \sThreePairOssLamAConflict & \sThreePairOssLamAChain & \sThreePairOssLamASign & \sThreePairOssLamAIncTol & \sThreePairOssLamAOrder & \sThreePairOssLamAControl \\
  & $\LCS$, verdict (ours) & \sThreePairOssLamConflict & \sThreePairOssLamChain & \sThreePairOssLamSign & \sThreePairOssLamIncTol & \sThreePairOssLamOrder & \sThreePairOssLamControl \\
 \midrule
-\multirow{3}{*}{pairwise, Llama}
- & mean marginal & \sThreePairLlamaMMConflict & \sThreePairLlamaMMChain & \sThreePairLlamaMMSign & \sThreePairLlamaMMIncTol & \sThreePairLlamaMMOrder & \sThreePairLlamaMMControl \\
+\multirow{2}{*}{pairwise, Llama}
  & $\LCS$, assertion & \sThreePairLlamaLamAConflict & \sThreePairLlamaLamAChain & \sThreePairLlamaLamASign & \sThreePairLlamaLamAIncTol & \sThreePairLlamaLamAOrder & \sThreePairLlamaLamAControl \\
  & $\LCS$, verdict (ours) & \sThreePairLlamaLamConflict & \sThreePairLlamaLamChain & \sThreePairLlamaLamSign & \sThreePairLlamaLamIncTol & \sThreePairLlamaLamOrder & \sThreePairLlamaLamControl \\
 \bottomrule
@@ -2037,27 +1994,22 @@ Invariance pairs) and its prompts are not held out.
 \begin{table}[h]
 \centering\small
 \setlength{\tabcolsep}{2.8pt}
-\begin{tabular}{@{}l ccc ccc@{}}
+\begin{tabular}{@{}l ccc@{}}
 \toprule
-& \multicolumn{3}{c}{$\LCS$, verdict (ours)} & \multicolumn{3}{c}{mean marginal} \\
-\cmidrule(lr){2-4}\cmidrule(l){5-7}
-Arm & Incr. & Inv. & Inv.$_\tau$ & Incr. & Inv. & Inv.$_\tau$ \\
+& \multicolumn{3}{c}{$\LCS$, verdict (ours)} \\
+\cmidrule(l){2-4}
+Arm & Incr. & Inv. & Inv.$_\tau$ \\
 \midrule
-\cp{gold} & \sPilotGoldLamInc & \sPilotGoldLamInv & \sPilotGoldLamInvTol
-  & \sPilotGoldMMInc & \sPilotGoldMMInv & \sPilotGoldMMInvTol \\
-graph, GPT-6 & \sPilotGraphGptLamInc & \sPilotGraphGptLamInv & \sPilotGraphGptLamInvTol
-  & \sPilotGraphGptMMInc & \sPilotGraphGptMMInv & \sPilotGraphGptMMInvTol \\
-graph, gpt-oss & \sPilotGraphOssLamInc & \sPilotGraphOssLamInv & \sPilotGraphOssLamInvTol
-  & \sPilotGraphOssMMInc & \sPilotGraphOssMMInv & \sPilotGraphOssMMInvTol \\
-pair., gpt-oss & \sPilotPairOssLamInc & \sPilotPairOssLamInv & \sPilotPairOssLamInvTol
-  & \sPilotPairOssMMInc & \sPilotPairOssMMInv & \sPilotPairOssMMInvTol \\
-pair., Llama & \sPilotPairLlamaLamInc & \sPilotPairLlamaLamInv & \sPilotPairLlamaLamInvTol
-  & \sPilotPairLlamaMMInc & \sPilotPairLlamaMMInv & \sPilotPairLlamaMMInvTol \\
+\cp{gold} & \sPilotGoldLamInc & \sPilotGoldLamInv & \sPilotGoldLamInvTol \\
+graph, GPT-6 & \sPilotGraphGptLamInc & \sPilotGraphGptLamInv & \sPilotGraphGptLamInvTol \\
+graph, gpt-oss & \sPilotGraphOssLamInc & \sPilotGraphOssLamInv & \sPilotGraphOssLamInvTol \\
+pair., gpt-oss & \sPilotPairOssLamInc & \sPilotPairOssLamInv & \sPilotPairOssLamInvTol \\
+pair., Llama & \sPilotPairLlamaLamInc & \sPilotPairLlamaLamInv & \sPilotPairLlamaLamInvTol \\
 \midrule
-G-Eval, GPT-6 & \sPilotBGevalGptInc & \sPilotBGevalGptInv & \sPilotBGevalGptInvTolU & & & \\
-rating, GPT-6 & \sPilotBDirectGptInc & \sPilotBDirectGptInv & \sPilotBDirectGptInvTolU & & & \\
-G-Eval, gpt-oss & \sPilotBGevalOssInc & \sPilotBGevalOssInv & \sPilotBGevalOssInvTolU & & & \\
-rating, gpt-oss & \sPilotBDirectOssInc & \sPilotBDirectOssInv & \sPilotBDirectOssInvTolU & & & \\
+G-Eval, GPT-6 & \sPilotBGevalGptInc & \sPilotBGevalGptInv & \sPilotBGevalGptInvTolU \\
+rating, GPT-6 & \sPilotBDirectGptInc & \sPilotBDirectGptInv & \sPilotBDirectGptInvTolU \\
+G-Eval, gpt-oss & \sPilotBGevalOssInc & \sPilotBGevalOssInv & \sPilotBGevalOssInvTolU \\
+rating, gpt-oss & \sPilotBDirectOssInc & \sPilotBDirectOssInv & \sPilotBDirectOssInvTolU \\
 \bottomrule
 \end{tabular}
 \caption{Development split: ladder assertions satisfied (counts as in
@@ -2066,9 +2018,8 @@ Table~\ref{tab:ladders}). Judge rows give the judge's own score.}
 \end{table}
 
 The development split shows every pattern of the test split. On gold graphs $\LCS$ satisfies
-all \sPilotGoldLamInc{} Increase and \sPilotGoldLamInv{} Invariance pairs, the mean marginal
-satisfies \sPilotGoldMMSign{} \cp{sign} pairs and $\LCS$ at the asserted world
-\sPilotGoldLamASign. On mined graphs every pair whose extracted graphs are ordered is scored
+all \sPilotGoldLamInc{} Increase and \sPilotGoldLamInv{} Invariance pairs, and $\LCS$ at the
+asserted world satisfies \sPilotGoldLamASign{} \cp{sign} pairs. On mined graphs every pair whose extracted graphs are ordered is scored
 correctly (GPT-6: \sPilotGraphGptDomForwardOk{} of \sPilotGraphGptDomForward{} ordered,
 \sPilotGraphGptDomIncomparableOk{} of \sPilotGraphGptDomIncomparable{} incomparable; pairwise
 gpt-oss: \sPilotPairOssDomForwardOk/\sPilotPairOssDomForward{} ordered,
@@ -2091,8 +2042,6 @@ increases with GPT-6, and \sPilotBGevalOssInc{} and \sPilotBDirectOssInc{} with 
 \toprule
 Score (random improving edits) & lowered \\
 \midrule
-mean marginal, row-stochastic tables & \fallsPctMmWithpriors\% \\
-mean marginal, Eq.~\ref{eq:mrf} & \fallsPctMmSigndef\% \\
 committed world, row-stochastic tables & \fallsPctAssertedWithpriors\% \\
 Shogenji measure, Eq.~\ref{eq:mrf} & \fallsPctShogenjiSigndef\% \\
 prior-expectation score (App.~\ref{app:earlier}) & \fallsPctBalanced\% \\
