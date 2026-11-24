@@ -373,6 +373,9 @@ def build(seed, out, reduced=False):
     rng.shuffle(dev_t2)
     pq, pfacts, ppairs = family_pairs(dev_t2[0], ditems, dstate)
     cq, cfacts, cpairs = family_pairs(dev_t2[1], ditems, dstate)
+    # Development families already shown to annotators (practice, attention checks): the brief's
+    # real walk-through must come from another one. Computed here, never read from the key.
+    dev_shown = {f for f, _ in used_dev} | {dev_t2[0]["family_id"], dev_t2[1]["family_id"]}
 
     allc = filler_candidates(fams, items, state, exclude=set())
     population = {f"{r}/{k}": {"admitted": len(allc[(r, k)]["admitted"]),
@@ -454,6 +457,10 @@ def build(seed, out, reduced=False):
         prac2.append({"data": {"task_id": t, "question": pq, "facts_html": pfacts,
                                "a_html": p["html"][0], "b_html": p["html"][1]}})
     practice_md = practice_answers(key, prac1, prac2)
+    # The brief: the master text with its real Task 1 walk-through filled in. No rng is used, so
+    # the key is the same with or without the walk-through.
+    brief = render_brief(clear, dev_shown)
+    open(os.path.join(STUDY_DOCS, "brief_rendered.md"), "w").write(brief)
     # ---- write --------------------------------------------------------------------------------
     if os.path.isdir(os.path.join(out, "bundles")):
         shutil.rmtree(os.path.join(out, "bundles"))
@@ -466,10 +473,11 @@ def build(seed, out, reduced=False):
         json.dump(prac1, open(os.path.join(d, "practice_task1.json"), "w"), indent=1)
         json.dump(prac2, open(os.path.join(d, "practice_task2.json"), "w"), indent=1)
         open(os.path.join(d, "practice_answers.md"), "w").write(practice_md)
-        for f in ("filler_reading.xml", "rung_comparison.xml", "brief.md", "setup.md"):
+        for f in ("filler_reading.xml", "rung_comparison.xml", "setup.md"):
             src = os.path.join(STUDY_DOCS, "labelstudio" if f.endswith(".xml") else "", f)
             if os.path.exists(src):
                 shutil.copy2(src, d)
+        open(os.path.join(d, "brief.md"), "w").write(brief)
         shutil.copy2(os.path.join(os.path.dirname(__file__), "locobench_study_projects.py"), d)
         check_no_leak(d)
     kp = os.path.join(out, "key", "key.json")
@@ -512,6 +520,64 @@ def practice_answers(key, prac1, prac2):
             ans = "B is more logically coherent" if k["rungs"][1] == hi else "A is more logically coherent"
         L += [f"{i}. `{t['data']['task_id']}` -- **{ans}**"]
     return "\n".join(L) + "\n"
+
+
+EXAMPLE_MARKER = "<!-- EXAMPLE:TASK1-REAL -->"
+
+
+def _md(html_text):
+    """Task HTML -> Markdown: <mark> becomes bold, paragraphs become blank-line separated."""
+    t = re.sub(r"<style>.*?</style>", "", html_text, flags=re.S)
+    t = re.sub(r"</p>\s*<p>", "\n\n", t)
+    t = re.sub(r"<mark>(.*?)</mark>", r"**\1**", t, flags=re.S)
+    t = re.sub(r"<[^>]+>", "", t)
+    return html.unescape(t).strip()
+
+
+WHY = {"i_supports_j": "The highlighted text gives X as the reason for, or evidence of, Y.",
+       "j_supports_i": "The highlighted text gives Y as the reason for, or evidence of, X.",
+       "incompatible": "The highlighted text says that the two claims cannot both hold.",
+       "unlinked": "Both claims are stated, but nothing in the highlighted text links them."}
+
+
+def render_brief(clear, dev_shown, combo=("chain_link", "support")):
+    """The master brief with one real development-split screen and its intended answer.
+
+    The filler is an admitted, unanimous, first-attempt reading of ``combo`` from the first
+    development family (in id order) that the practice items and attention checks do not use.
+    """
+    master = open(os.path.join(STUDY_DOCS, "brief.md")).read()
+    if EXAMPLE_MARKER not in master:
+        return master
+    pool = sorted((r for r in clear[combo] if r["family_id"] not in dev_shown),
+                  key=lambda r: (r["family_id"], r["slot"]))
+    r = pool[0]
+    inv = {v: k for k, v in LINK_OPTIONS}
+    stance = {v: k for k, v in STANCE_OPTIONS}
+    st = {int(p): v for p, v in r["expected_stance"].items()}
+    sx, sy = stance[st[r["x_pos"]]], stance[st[r["y_pos"]]]
+    quote = "\n".join("> " + line if line else ">" for line in _md(r["data"]["context_html"]).split("\n"))
+    block = "\n".join([
+        "### Task 1: one real screen",
+        "",
+        "This passage comes from the development split, from an answer that is not used anywhere",
+        "in the study or the practice. It shows what a screen looks like.",
+        "",
+        quote,
+        "",
+        f"X: *{r['data']['claim_x']}*",
+        f"Y: *{r['data']['claim_y']}*",
+        "",
+        f"- Connection: **{inv[r['expected_link']]}**. {WHY[r['expected_link']]}",
+        f"- X: {sx}. Y: {sy}.",
+        "- Other statement: No. The highlighted text links only X and Y.",
+    ])
+    out = master.replace(EXAMPLE_MARKER, block)
+    for bad in (r"\bf\d{3}\b", r"locobench-slot3", r"conflict_tt|chain_link|sign_tf",
+                r"\bpara[123]\b", r"i_supports_j|j_supports_i|contrast_only|exactly_one",
+                r"\{\{S\d+\}\}"):
+        assert not re.search(bad, out), ("brief", bad)
+    return out
 
 
 def check_no_leak(d):

@@ -147,4 +147,24 @@ before annotation; results go to `data/locobench-study/results/`.
 
 ## Deviations
 
-(none yet)
+- **D1 (2026-11-24, before any annotation): worked examples added to the annotator brief.**
+  - **What changed.** `brief.md` gained a "Worked examples" section:
+    - nine constructed Task 1 examples, one per answer option, on a topic that occurs nowhere in
+      the study;
+    - one real Task 1 screen from a development-split family that no practice item, attention
+      check or study item uses (rendered by `render_brief` in
+      `scripts/locobench_study_build.py`);
+    - for Task 2, the screen layout and two worked "about equal" cases (a rewording, and a
+      difference of style only).
+  - **What it does not state.** No preference is given for the edited Task 2 differences
+    (conflict, added inference, deriving or refuting a false claim), so the brief does not answer
+    H2. The practice answers state them after the practice, as before.
+  - **What did not change.** The key, the sample, every task file and both Label Studio configs.
+    A rebuild with seed 20261120 reproduced the key hash above, and only `brief.md` differs.
+  - **Cost.** Reading time grows by about 5 minutes; the projected load stays within 3.5–4 hours.
+- **D2 (2026-11-24): the gold key was opened before annotation.** While preparing D1, the
+  coordinator's AI coding assistant opened `key/key.json` to list which development-split families
+  the practice items and attention checks use. It printed those family identifiers only. No
+  test-split item, intended answer, committee verdict or assignment was read, and no annotator saw
+  the key. The exclusion is now computed from the build's own seeded selection, so the key is not
+  needed for it.

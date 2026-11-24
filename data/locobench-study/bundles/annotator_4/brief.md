@@ -21,6 +21,103 @@ projects (about 20 minutes) and join the 15-minute calibration discussion.
 - If a screen is genuinely unclear, give your best answer, set confidence to 1, and write a
   note in the reason box (Task 2) or the quote box (Task 1).
 
+## Worked examples
+
+The examples below are made up, on a topic that does not occur in the study, so that each shows
+one point clearly. **Bold** marks the highlighted text. Read them before the practice projects;
+the calibration discussion comes after the practice.
+
+### Task 1: one example per answer
+
+1. **Reason.** "The fuse tripped at seven. **Because the kettle cable was damaged, the fuse
+   tripped as soon as the kettle was switched on.**"
+   X: *The kettle cable was damaged.* Y: *The fuse tripped.*
+   - Connection: **X is given as a reason, cause or evidence for Y** ("because X, Y").
+   - X: asserted. Y: asserted. Other statement: No.
+2. **The other direction.** "**The fuse tripped, which shows that the kettle cable was damaged.**"
+   X: *The kettle cable was damaged.* Y: *The fuse tripped.*
+   - Connection: **Y is given as a reason, cause or evidence for X**: the tripping is offered as
+     evidence for the damage. Direction matters; read who supports whom.
+   - X: asserted. Y: asserted. Other statement: No.
+3. **Cannot both be true.** "**The electrician found the cable intact, yet the fault log records
+   the cable as damaged; both cannot be right.**"
+   X: *The cable was intact.* Y: *The cable was damaged.*
+   - Connection: **X and Y cannot both be true**.
+   - X: asserted. Y: asserted. The text states both and says they clash.
+   - Other statement: No.
+4. **Denying a claim.** "**The cable was intact, which rules out the claim that the cable caused
+   the fault.**"
+   X: *The cable was intact.* Y: *The cable caused the fault.*
+   - Connection: **X and Y cannot both be true**.
+   - X: asserted. Y: **denied**: the text uses X to say Y is false. Other statement: No.
+5. **At least one, exactly one, the same thing.** "**Either the cable or the socket was faulty,
+   and possibly both.**"
+   X: *The cable was faulty.* Y: *The socket was faulty.*
+   - Connection: **at least one of X and Y holds**.
+   - X and Y: **not stated**: the text commits to neither on its own.
+   - "…the cable or the socket, but not both" would be **exactly one**. "…the fuse tripped, that
+     is, the circuit was cut" would be **say the same thing**.
+6. **Only contrasted.** "**The kettle is new, whereas the toaster is ten years old.**"
+   X: *The kettle is new.* Y: *The toaster is ten years old.*
+   - Connection: **only contrasted, conceded, or ordered in time**: the two are set side by side,
+     but neither depends on the other. "Although", "but" and "before" often signal this.
+   - X: asserted. Y: asserted. Other statement: No.
+7. **No connection.** "**The kettle is new. The fuse box was replaced in 2019.**"
+   X: *The kettle is new.* Y: *The fuse box was replaced in 2019.*
+   - Connection: **no connection**: both are stated and nothing links them.
+   - X: asserted. Y: asserted. Other statement: No.
+8. **A link to another statement.** "**The fuse tripped because the cable was damaged, since the
+   dog had chewed it.**"
+   X: *The cable was damaged.* Y: *The fuse tripped.*
+   - Connection: **X is given as a reason for Y**. X: asserted. Y: asserted.
+   - Other statement: **Yes**. Quote "since the dog had chewed it": it ties X to a third
+     statement, the dog chewing the cable.
+9. **A trap: your knowledge does not count.** "**The kettle cable was damaged. The fuse tripped.**"
+   X: *The kettle cable was damaged.* Y: *The fuse tripped.*
+   - You may well think the damage caused the tripping, but the text does not say so.
+   - Connection: **no connection**. X: asserted. Y: asserted. Other statement: No.
+
+### Task 1: one real screen
+
+This passage comes from the development split, from an answer that is not used anywhere
+in the study or the practice. It shows what a screen looks like.
+
+> **Forensic engineers mapped the debris field before any wreckage was removed, and that mapping led to the recovery of fractured gusset plate sections from the collapsed span.** Metallurgical testing compared the steel's measured yield strength with the specified grade. Such comparison of measured properties with specified ones distinguishes steel that never met its grade from steel loaded beyond anything it was meant to carry. Investigators compared the as-built drawings against the original design drawings. That comparison shows that the installed gusset plates were thinner than the design specified. The design underestimated the dead load added by a later deck resurfacing, and at least one of these two deficiencies — the undersized plates or the unaccounted resurfacing weight, and perhaps both at once — must account for the capacity lost at the failed connection. Dead load is permanent, so an error in estimating it bears on the connection continuously from the day the overlay is laid.
+
+X: *Forensic engineers mapped the debris field before any wreckage was removed.*
+Y: *Fractured gusset plate sections were recovered from the collapsed span.*
+
+- Connection: **X is given as a reason, cause or evidence for Y**. The highlighted text gives X as the reason for, or evidence of, Y.
+- X: asserted. Y: asserted.
+- Other statement: No. The highlighted text links only X and Y.
+
+### Task 2: how to read a screen
+
+At the top of a screen is the question, then a grey box listing the claims that are **false**.
+Below it are answers A and B, identical except for the highlighted sentences. Read the whole of
+an answer on its first screen. On later screens with the same question, read the highlighted
+sentences and whatever they refer to.
+
+Two worked examples of **About equal**:
+
+- **Same link, different words.** A: "… **The cable was damaged, so the fuse tripped.** …"
+  B: "… **The fuse tripped as a result of the damaged cable.** …"
+  - Answer: **About equal**. Both draw the same connection between the same claims.
+- **Style is not the target.** A: "… **The cable was damaged, so the fuse tripped.** …"
+  B: "… **It was, unsurprisingly, the damaged cable that made the fuse trip.** …"
+  - Answer: **About equal**. B is livelier, but it connects the same claims in the same way.
+
+The other kinds of difference look like this. The answers are left to you, because judging them
+is what the study asks:
+
+- A sets two claims that the box does not list as false against each other ("the cable was
+  intact, yet the log records it as damaged"); B states the same two claims without the clash.
+- A states two claims side by side; B draws an inference between them ("…, so …").
+- The box lists Y as false. A derives Y from a true claim X ("X, and therefore Y"); B states X
+  and Y unconnected, or uses X to argue that Y is false ("X, which rules out Y").
+
+For each screen, ask which answer's claims fit together better, given the facts in the box.
+
 ## Task 1: filler reading
 
 Each screen shows one paragraph of an expert-style answer with **one or two sentences
