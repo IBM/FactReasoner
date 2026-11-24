@@ -10,8 +10,8 @@ order, without the logistic's compression near 0 and 1), so ``rows["dl"]`` is a 
 
 * ``fig_dominance.pdf`` -- per mined arm, its Increase pairs split by how the two extracted
   graphs compare in the coherence order: no error falls on a correctly ordered pair.
-* ``fig_sign.pdf``     -- the SIGN ladder rung by rung on gold graphs, under the three
-  readouts: only the verdict-polarity score rises from "derives the falsehood" to "refutes it".
+* ``fig_sign.pdf``     -- the SIGN ladder rung by rung on gold graphs, under the two
+  polarities: only the verdict-polarity score rises from "derives the falsehood" to "refutes it".
 
 Palette: the dataviz skill's reference palette (validated: blue/aqua/orange pass every gate;
 aqua sits below 3:1 contrast, so its segments carry direct labels).
@@ -59,7 +59,6 @@ ROWS = [
     ("arm:pair_llama:lambda", "pairwise miner, Llama-3.3-70B", "ours"),
     ("header", "Other readouts of the same model (gold graphs)", None),
     ("arm:gold:lambda_assert", "LCS at the asserted world", "other"),
-    ("arm:gold:mean_marginal", "mean posterior marginal", "other"),
     ("header", "Baselines (read the text)", None),
     ("base:judge_geval@gpt-6-sol", "LLM judge, G-Eval, GPT-6", "other"),
     ("base:judge_direct@gpt-6-sol", "LLM judge, 1–5 rating, GPT-6", "other"),
@@ -248,11 +247,10 @@ def fig_dominance(d, out):
 def fig_sign(d, out):
     """Each SIGN ladder's change from its unlinked rung, averaged, with 95% intervals."""
     panels = [("lcs", "Our score: LCS at verdict polarity", BLUE),
-              ("lcs_assert", "LCS at the asserted world", GRAY),
-              ("mean_marginal", "Mean posterior marginal", GRAY)]
+              ("lcs_assert", "LCS at the asserted world", GRAY)]
     xs = [0, 1, 2]
     names = ["derives\nthe falsehood", "no link", "refutes\nthe falsehood"]
-    fig, axes = plt.subplots(1, 3, figsize=(7.0, 1.6), gridspec_kw={"wspace": 0.45})
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 1.6), gridspec_kw={"wspace": 0.35})
     for ax, (ro, title, col) in zip(axes, panels):
         lad = d["sign_rungs"][ro]
         stats = [boot_mean([l[k] - l[1] for l in lad], seed=k) for k in xs]

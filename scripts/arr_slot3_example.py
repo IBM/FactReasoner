@@ -2,7 +2,7 @@
 
 Prints, for candidate SIGN ladders of the test split, the sentences that differ between the
 three rungs, the two slot claims with their factuality labels, and every score per rung:
-LCS (verdict and asserted world) and the mean marginal on gold graphs, LCS on the GPT-6
+LCS (verdict and asserted world) on gold graphs, LCS on the GPT-6
 graph-level miner's graphs, the two GPT-6 judges and length. ``--ladder f123-SIGN`` prints one
 ladder only; ``--tex PATH`` writes that ladder's table for the paper.
 
@@ -88,7 +88,6 @@ def write_tex(path, lad, sents, rows, framing, claims, words):
         name = {"LCS, gold": "$\\LCS$, gold graph (ours)",
                 "LCS, GPT-6 graphs": "$\\LCS$, GPT-6 graph-level miner (ours)",
                 "LCS asserted, gold": "$\\LCS$ at the asserted world, gold graph",
-                "mean marginal, gold": "mean posterior marginal, gold graph",
                 "G-Eval": "G-Eval judge, GPT-6", "rating": "1--5 rating judge, GPT-6",
                 "length": "response length"}[k]
         L.append(f"{name} & {cells} & {_order(v)} \\\\")
@@ -126,7 +125,6 @@ def main() -> int:
         rows = {
             "LCS, gold": [x["lcs"] for x in g],
             "LCS asserted, gold": [x["lcs_assert"] for x in g],
-            "mean marginal, gold": [x["mean_marginal"] for x in g],
             "LCS, GPT-6 graphs": [x["lcs"] if x else None for x in m],
             **{BASE[n]: v for n, v in b.items()},
         }
