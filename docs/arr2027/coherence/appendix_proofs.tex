@@ -1,0 +1,139 @@
+%% ============================================================================
+\section{Proofs}
+\label{app:proofs}
+%% ============================================================================
+
+Throughout, $\xs$ is a fixed committed world, priors lie in $(0,1)$ and weights in $[0,1)$, so
+every world has positive mass under every $\PR$. For a scope $e$ write $V\subseteq\{0,1\}^{|e|}$
+for a violated set with $\varnothing\ne V\ne\{0,1\}^{|e|}$; a relation with $V=\varnothing$ or
+$V=\{0,1\}^{|e|}$ contributes a constant factor and leaves $\PR$ unchanged.
+
+\subsection{The Score (\S\ref{sec:score})}
+\label{app:proof-score}
+
+\paragraph{Lemma~\ref{lem:edit}.} Let $\tilde P(x)=\pi(x)\prod_{r'\in\R}\psi_{r'}(x)$, so
+$\PR=\tilde P/Z_\R$. After adding $r$, the unnormalized mass is $\tilde P\psi_r$, with normalizer
+$Z_{\R\uplus\{r\}}=\sum_x\tilde P(x)\psi_r(x)=Z_\R\,\E_{\PR}[\psi_r]$. Hence
+$P_{\R\uplus\{r\}}(\xs)=\PR(\xs)\psi_r(\xs)/\E_{\PR}[\psi_r]$; taking logarithms and subtracting
+the constant $\log\pi(\xs)$ gives the identity. For $\psi_r$ of Eq.~\ref{eq:psi},
+$\E_{\PR}[\psi_r]=1-p_rq_r$ with $q_r=\PR(x_{e_r}\in V(\kappa_r))\in(0,1)$, and $\psi_r(\xs)$ is $1$ for a
+support and $1-p_r$ for a conflict, which gives the two closed forms and their signs. $\square$
+
+\paragraph{Theorem~\ref{thm:mono}.} By transitivity it suffices to show that each elementary
+improvement does not decrease $\Lambda$, and strictly increases it when it changes a weight by a
+non-zero amount. Fix the improvement and let $\R_0$ be the graph without the edited relation $r$
+(for an addition, the graph before; for a deletion, the graph after). Write
+$q=P_{\R_0}(x_e\in V)$; by positivity and the non-triviality of $V$, $0<q<1$. Define
+$g(p)=\Lambda(\R_0\uplus\{(e,\kappa,p)\})-\Lambda(\R_0)$. By Lemma~\ref{lem:edit},
+$g^+(p)=-\log(1-pq)$ for a support and $g^-(p)=\log(1-p)-\log(1-pq)$ for a conflict, with
+$g^\pm(0)=0$, and
+\begin{gather*}
+\tfrac{d}{dp}g^+=\tfrac{q}{1-pq}>0,\\
+\tfrac{d}{dp}g^-=-\tfrac{1-q}{(1-p)(1-pq)}<0\quad\text{on }[0,1).
+\end{gather*}
+(i) Adding a support of weight $p>0$ changes $\Lambda$ by $g^+(p)>0$. (ii) Raising a support's
+weight from $p$ to $p'>p$ changes it by $g^+(p')-g^+(p)>0$. (iii) Deleting a conflict of weight
+$p>0$ changes it by $-g^-(p)>0$. (iv) Lowering a conflict's weight from $p$ to $p'<p$ changes it
+by $g^-(p')-g^-(p)>0$. A zero-weight addition or deletion leaves $\Lambda$ unchanged. Parallel
+copies of the edited relation are part of $\R_0$, so multisets are handled. $\LCS$ is a strictly
+increasing function of $\Lambda$ for a fixed claim set and prior, which gives the statement for
+$\LCS$. Nothing in the argument uses $|e|=2$, and $\xs$
+enters only through which relations are supports, that is, through $\psi_r(\xs)\in\{1,1-p_r\}$.
+$\square$
+
+\paragraph{A three-claim example by hand.} Take three claims, all verified true, at $\pi_i=\frac12$ (so $\xs=\one$
+under either polarity), with $a_1\Rightarrow a_2$ and $a_2\Rightarrow a_3$ at weight $0.9$ and a
+contradiction between $a_1$ and $a_3$ at $0.8$ (Table~\ref{tab:worked}). With only the chain, the
+violating worlds are those with $(a_1,a_2)=(1,0)$ or $(a_2,a_3)=(1,0)$; no world violates both,
+since that would need $a_2=0$ and $a_2=1$. The unnormalized masses ($\times8$) are
+$1,1,0.1,1,0.1,0.1,0.1,1$ for $x=000,\dots,111$, summing to $4.4$, so
+$\PR(\one)=1/4.4=\wkChainP$, $\Lambda=\log(8/4.4)=\wkChainLam$, and
+$\PR(a_1{=}a_3{=}1)=1.1/4.4=\wkPOneThree$. Adding the contradiction therefore costs exactly
+$\log\frac{0.2}{1-0.8\cdot\wkPOneThree}=\wkConflictGain$, as Lemma~\ref{lem:edit} predicts.
+Weakening it to $0.44$ recovers most of the loss. The posterior marginals under the chain
+are $(0.295,0.500,0.705)$: sign-definite entailments lower the premise's marginal.
+
+\begin{table}[h]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Relations & $\PR(\one)$ & $\Lambda$ & $\LCS$ \\
+\midrule
+none (bag of claims)          & \wkBagP & \wkBagLam & \wkBagLCS \\
+contradiction only           & \wkConflictP & \wkConflictLam & \wkConflictLCS \\
+chain                        & \wkChainP & \wkChainLam & \wkChainLCS \\
+chain + contradiction         & \wkChainConflictP & \wkChainConflictLam & \wkChainConflictLCS \\
+chain + weakened contradiction & \wkChainResolvedP & \wkChainResolvedLam & \wkChainResolvedLCS \\
+\bottomrule
+\end{tabular}
+\caption{Three claims, uniform priors, exact values.}
+\label{tab:worked}
+\end{table}
+
+\subsection{Why This Score (\S\ref{sec:why})}
+\label{app:proof-why}
+
+\paragraph{Theorem~\ref{thm:necessity}.} Let $c^\ast=\xs_e$. By Lemma~\ref{lem:edit}, adding
+$\psi$ changes $\Lambda$ by $\log\psi(c^\ast)-\log\E_{\PR}[\psi]$, and $\E_{\PR}[\psi]$ is a
+convex combination of the values of $\psi$ with weights $\PR(x_e=c)$.
+\emph{(If.)} If $\psi(c^\ast)=\max\psi$ the expectation is at most $\psi(c^\ast)$ and the change is
+$\ge0$; symmetrically for the minimum.
+\emph{(Only if.)} Suppose $\psi(c)>\psi(c^\ast)$ for some cell $c$; we build a relation graph,
+with the priors untouched, under which adding $\psi$ lowers $\Lambda$. For every cell $d\ne c$ of
+the scope $e=(s,t)$, some coupling has violated set exactly $\{d\}$: $\{(1,0)\}$ is
+$a_s\Rightarrow a_t$, $\{(0,1)\}$ is $a_t\Rightarrow a_s$, $\{(1,1)\}$ is \con{} and $\{(0,0)\}$ is
+\cnc{}. Let $\R_w$ contain one such relation for each $d\ne c$, all of weight $w$. Every world with
+$x_e\ne c$ is multiplied by $1-w$, so $\PR(x_e=c)\to1$ as $w\to1$, whatever the priors. Hence
+$\E_{P_{\R_w}}[\psi]\to\psi(c)>\psi(c^\ast)$, and for $w$ close enough to $1$ the change is
+negative. The monotone-down case is symmetric. The argument needs a singleton-violation relation for
+every cell of the scope, which the pairwise couplings provide; for scopes of higher arity the
+theorem holds under the same assumption. \emph{Weight changes.} For a parametric family
+$\psi_p$ added to a graph $\R_0$, the change in $\Lambda$ is exactly
+$-\log\E_{P_{\R_0}}[\psi_p/\psi_p(c^\ast)]$, so it is monotone in $p$ in every context if each likelihood ratio $\psi_p(c)/\psi_p(c^\ast)$ is
+non-increasing in $p$ for supports and non-decreasing for conflicts. This condition is sufficient;
+we do not claim it is necessary. The potentials of Eq.~\ref{eq:psi} satisfy it, since the ratios
+are $1$, $1-p$ or $1/(1-p)$. $\square$
+
+\paragraph{Proposition~\ref{prop:unique}.} Let $x\ne\xs$, pick $i$ with $x_i\ne\xs_i$ and any
+$j\ne i$. As above, every singleton $\{(x_i,x_j)\}$ is the violated set of some coupling on
+$(a_i,a_j)$; let $r$ be that relation. Since $(\xs_i,\xs_j)\ne(x_i,x_j)$, $r$ is a support
+relative to $\xs$, so adding it with weight $p>0$ is an elementary improvement. It multiplies
+$\PR(x)$ by $\psi_r(x)/\E_{\PR}[\psi_r]=(1-p)/(1-pq)$ with $q=\PR(x_e\in V)<1$, which is less
+than $1$.
+$\square$
+
+\subsection{Further Properties (\S\ref{sec:props})}
+\label{app:proof-props}
+
+\paragraph{Proposition~\ref{prop:props}, (i)--(iii).} (i) $P_\varnothing=\pi$. (ii) Build $\R$ by adding its
+relations one at a time to $\varnothing$. Each addition of a support raises $\Lambda$ and each
+addition of a conflict lowers it (Lemma~\ref{lem:edit}). (iii) With disjoint scopes the
+unnormalized measure factorizes as
+$\bigl[\pi^{(1)}\prod_{\R_1}\psi\bigr]\bigl[\pi^{(2)}\prod_{\R_2}\psi\bigr]\pi^{(0)}$ over the
+claims touched by $\R_1$, those touched by $\R_2$ and the rest. Hence $Z_\R=Z_{\R_1}Z_{\R_2}$, and
+the conflict sum in Eq.~\ref{eq:lambda} splits. $\square$
+
+\paragraph{Proposition~\ref{prop:props}(iv).} The map $x\mapsto x'$ that flips coordinate $i$ is a
+bijection of $\{0,1\}^n$. It sends $\xs$ to the new committed world, $\pi(x)$ to the new prior of
+$x'$, since $\pi_i^{x_i}(1-\pi_i)^{1-x_i}=(1-\pi_i)^{x'_i}\pi_i^{1-x'_i}$, and each $\psi_r(x)$ to
+the rewritten relation's $\psi_{r'}(x')$, since negating an endpoint maps the violated set
+cell-wise. Hence $Z_\R$, $\PR(\xs)$ and $\pi(\xs)$ are preserved, and so are $\Lambda$ and $\LCS$;
+$\xs_{e_r}\in V(\kappa_r)$ iff ${\xs}'_{e_{r'}}\in V(\kappa_{r'})$, so signs are preserved. The rewritten
+violated set is again a coupling of Def.~\ref{def:coupling} (App.~\ref{app:framework}). $\square$
+
+\paragraph{Proposition~\ref{prop:props}, (v)--(vii).} (v) The upper bound is $\PR(\xs)\le1$. The lower bound
+follows from $Z_\R=\E_\pi[\prod\psi]\le1$, since every potential is at most $1$. (vi) For a
+support, $V\not\ni\xs_e$, so $q_r=\PR(x_e\in V)\le1-\PR(\xs)$, and $-\log(1-p_rq_r)$ is
+increasing in $q_r$. (vii) After adding a support $r$ with violation probability $q$, the new
+violation probability is $q'=q(1-p)/(1-pq)<q$ for $p>0$ and $q<1$, so a second copy gains
+$-\log(1-pq')<-\log(1-pq)$. $\square$
+
+\paragraph{Saturation in numbers.} Successive copies of one equivalence ($p=0.9$) on two fair
+claims gain $\satGainOne$, $\satGainTwo$, $\satGainThree$, $\satGainFour$, \dots{} nats; after five
+copies $\Lambda=\satLamFive$, and it converges to $\log2$ rather than to the bound $\satBound$: an
+equivalence cannot distinguish ``both hold'' from ``both fail''. Under the prior-expectation score
+of App.~\ref{app:earlier}, one to six copies drive the score from $\padBalOne$ to $\padBalSix$,
+while $\LCS$ goes from $\padLCSOne$ to $\padLCSSix$ and does not move, to three decimals, after the
+third copy.
+

@@ -1,0 +1,259 @@
+%% ============================================================================
+\section{The Framework in Detail}
+\label{app:framework}
+%% ============================================================================
+
+This section expands \S\ref{sec:framework} step by step. Nothing in it is needed to check the
+results, whose proofs are in App.~\ref{app:proofs}.
+
+\subsection{The Committed World (\S\ref{sec:setup})}
+
+Verdict polarity is our default for two reasons. It depends on the claims and the evidence, not on
+the response, so all responses over the same claims are judged against the same world. And it does
+not depend on how a response presents a claim, which a decomposition may not record. The verdict is
+binary: a pipeline that separates refuted from unverifiable claims must map both to $0$, so a claim
+the evidence fails to support is treated as false, and a refutation of it is credited as a
+refutation of a falsehood. Assertion polarity needs the decomposition to record stance.
+
+Verdict polarity makes the score a measure of how well an argument holds up \emph{given} the
+verdicts, and four consequences follow.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item A response that sets a true claim against a false one is credited for refuting the
+  falsehood, even if it asserts both. Asserting the falsehood is penalized by the factuality score,
+  not by this one; assertion polarity is the reading that treats such a pair as a
+  self-contradiction.
+\item An entailment from a false claim cannot be broken in the committed world, so reasoning from
+  or among falsehoods is not penalized. It is even credited as a support, because it rules out a
+  world other than $\xs$.
+\item Relations are read as material constraints, so the score does not ask whether a premise is
+  relevant to its conclusion (the miners emit only relations the response itself draws), and the
+  soundness of premises is again the factuality score's concern.
+\item The score inherits the verdicts' errors. A wrong verdict on a claim can flip the sign of the
+  relations at that claim: always for equivalences and exclusions, and for the other couplings
+  depending on the value of the other endpoint.
+\end{itemize}
+The score is therefore not the truth-independent coherence of a set of propositions studied in
+Bayesian epistemology \citep{shogenji1999,olsson2002}. It asks how well the response's relations
+agree with a given assignment of truth values, and assertion polarity is its closest analogue to
+the truth-independent notion.
+
+\subsection{Couplings, Senses and Signs (\S\ref{sec:taxonomy})}
+
+\paragraph{Couplings and natural logic.} The couplings are the constraints that the basic semantic
+relations of natural logic \citep{maccartney2009} impose on truth values: \ent{} is forward
+entailment (reverse entailment is \ent{} with the scope reversed), \eqv{} equivalence, \con{}
+alternation, \cnc{} cover, \exc{} negation, and \emph{none} independence. A coupling only rules
+cells out. Unlike the natural-logic relations, it does not also require the remaining cells to be
+possible, so \con{}, for instance, does not exclude that the two claims are also exhaustive. The set
+of couplings is closed under negating an endpoint: negating the target of \ent{} gives \con{},
+negating its source gives \cnc{}, negating both reverses it, and negating one end of \eqv{} gives
+\exc{}.
+
+\paragraph{The compile map.} It makes three deliberate commitments.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item Five senses collapse onto \ent{}, because a pairwise potential over truth values cannot tell
+  causation from evidence. The sense is kept for interpretation only, and every entailment is
+  oriented from the supporting claim to the supported one, which for both causal senses means from
+  cause to effect.
+\item Only \sense{Refutation}, where the response asserts that two claims cannot both hold (``it
+  cannot have, since\dots'', ``cannot be squared with''), compiles to \con{}. \sense{Contrast} and
+  \sense{Concession} do not: in PDTB and RST both of their arguments are typically true (``sales
+  rose, but profits fell''; ``although the airline blamed pilot error, the tribunal found a
+  defect''), and what they deny is an expectation, not the conjunction.
+\item Temporal senses produce no factor, since ordering two events says nothing about either
+  one's truth, so reordering such claims cannot change the score.
+\end{itemize}
+
+\paragraph{Signs.} $\Rsup$ collects the relations that the committed world upholds and $\Rcon$
+those it breaks. The split is a property of the relation graph \emph{together with} $\xs$: the
+relation alone says which joint values it rules out, and the verdicts say whether the response's
+own world is among them. It is a partition, since every relation that produces a factor is exactly
+one of the two. The verdicts decide only a relation's sign; how much it earns depends on the rest
+of the model (Lemma~\ref{lem:edit}).
+
+\paragraph{The Voyager pair at the asserted world.} Both responses deny exactly the claims the
+verdicts reject, so assertion polarity gives the same split as verdict polarity. The split would
+change if the denied claims were read as asserted, at $\xs=\one$: every contradiction would become a
+conflict, including A's two refutations, and every entailment a support, including B's
+$a_1\Rightarrow a_4$ (App.~\ref{app:voyager}).
+
+\paragraph{Claims and their negations.} A decomposition may record a denied claim as itself, as in
+Figure~\ref{fig:voyager}, or as its asserted negation, ``the instrument had not failed''. The choice
+does not matter (a posterior of exactly $\frac12$, which thresholding sends to $1$ either way,
+aside). Replacing $a_i$ by $\neg a_i$ flips $\xs_i$, replaces $\pi_i$ by $1-\pi_i$, and rewrites
+every coupling at $a_i$ by the closure above, so $a_2\con a_4$ becomes $a_2\Rightarrow\neg a_4$.
+Each relation keeps its sign, and the score is unchanged (Prop.~\ref{prop:props}(iv)). What matters
+is only that the verdict or stance and the coupling refer to the same form of each claim.
+
+\subsection{Estimating Relations (\S\ref{sec:mining})}
+
+The product of Eq.~\ref{eq:decomp} keeps a confidently identified weak link apart from a doubtfully
+identified strong one. It is a modelling choice. A relation whose type is uncertain could instead
+enter as a mixture of tables, but when the mixed couplings disagree in sign at $\xs$, the mixture
+can place the committed cell strictly between its extremes (an entailment--contradiction mixture
+whose support is the likelier reading does). That loses the guarantee of
+Theorem~\ref{thm:necessity}, whereas the product keeps every factor two-valued.
+App.~\ref{app:estimation} details both miners.
+
+\subsection{The Coherence MRF (\S\ref{sec:mrf})}
+
+\input{figures/mrf-response-a}
+
+Read directly, Eq.~\ref{eq:mrf} keeps each world's prior weight and multiplies it by $1-p_r$ for
+every relation the world violates. A world that violates no relation keeps its prior weight, one
+that violates an entailment of weight $0.9$ keeps a tenth of it, and with no relations $\PR=\pi$.
+
+\paragraph{The check reading.} Picture a candidate world drawn at random from the prior. Each
+relation acts as an independent \emph{check} on it. If the world breaks the relation, for example
+by making the premise of an entailment true and its conclusion false, the check raises an alarm
+with probability $p_r$; if the world respects the relation, it never does. A world therefore passes
+the check of $r$ with probability $\psi_r(x_{e_r})$, and all checks with probability
+$\prod_r\psi_r(x_{e_r})$. By Bayes' rule, the distribution of the surviving worlds is the prior
+times this product, renormalized, which is exactly $\PR$. The normalizer $Z_\R$ is the probability
+that a world drawn from the prior passes all checks.
+
+For example, take two claims with flat priors, so each of the four worlds has probability $\frac14$,
+and one entailment $a_1\Rightarrow a_2$ with $p_r=0.9$. Only the world $(1,0)$ breaks it, and it
+survives the check with probability $0.1$. Hence $Z_\R=\frac34+\frac14\cdot0.1=0.775$, the world
+$(1,0)$ falls to $0.025/0.775\approx0.03$, and each of the other three rises to
+$0.25/0.775\approx0.32$. As $p_r\to1$ the check never misses, $(1,0)$ is eliminated, and the
+relation becomes a hard constraint.
+
+Figure~\ref{fig:mrf-a} shows the MRF of Response~A: five claims with flat priors, two entailment
+factors that penalize a premise holding while its conclusion fails, and two contradiction factors
+that penalize worlds in which a true claim and the falsehood it refutes both hold. A world drawn
+from the priors passes all four checks with probability $Z_A=\vyAZ$. The committed world violates
+none of them, and its probability rises from $\pi(\xs)=2^{-5}\approx\vyAPiX$ to $P_A(\xs)=\vyAPX$.
+Under B's relations the same world falls to $P_B(\xs)=\vyBPX$, because it violates both of B's
+conflicts.
+
+\subsection{The Order and the Score (\S\ref{sec:score})}
+
+\paragraph{The order.} Given the committed world, the order is deliberately minimal. It ranks only
+edits that add or strengthen relations $\xs$ satisfies or remove or weaken relations $\xs$
+violates, and it leaves edits that improve one part of an argument and degrade another unordered.
+Arbitrary rewiring is covered whenever each step improves, and retyping a conflict as a support is
+an improvement. The order is canonical relative to $\xs$, not independent of it: under verdict
+polarity, adding an entailment between two false claims is an improvement, because it holds in the
+committed world.
+
+\paragraph{The axioms.} A2 makes a score invariant to presentation, such as reversing a symmetric
+relation or swapping \sense{Precedence} for \sense{Succession}. It has a consequence worth stating:
+relations on one pair that contradict each other, such as an exclusion and an equivalence of equal
+weight, multiply to a constant and leave $\PR$ unchanged, so a score satisfying A2 rates them as
+uninformative rather than as incoherent; we list this as a limitation.
+
+\paragraph{The range of the score.} $\LCS$ lies in $(0,1)$, with three reference points
+(Figure~\ref{fig:lcs-range}). A \emph{completely incoherent} response, whose relations rule out the
+committed world, has $\LCS\to0$: $\PR(\xs)\to0$, as when $\xs$ violates conflicts of weight
+approaching $1$ that a single other world satisfies all of. A response whose relations neither
+confirm nor disconfirm $\xs$, including one with no relations, has $\PR(\xs)=\pi(\xs)$ and
+$\LCS=\frac12$. A \emph{completely coherent} response, whose relations force the committed world,
+has $\LCS\to1$, which requires relations that rule out every other world. Entailments, equivalences
+and contradictions never rule out the world in which every claim is false, so forcing $\xs$ also
+needs co-necessity or exclusion relations. Without them, and when $\xs$ is not that world, $n$
+claims with flat priors stay below $\LCS=1-2^{-n}$, which is $31/32\approx0.97$ for five.
+
+\input{figures/lcs-range}
+
+\paragraph{Two measures of confirmation.} The weight of evidence is also known as the
+log-likelihood-ratio measure of confirmation \citep{fitelson1999}. In the check model, $\Lambda$ is
+the log-ratio measure $\log P(\xs\mid E)/P(\xs)$ \citep{milne1996}, a different measure in general
+\citep{fitelson1999}. Since $\PR(\xs)=\pi(\xs)e^{\Lambda}$, however, $\LCS$ is a strictly
+increasing function of $\Lambda$ for a fixed claim set and prior (App.~\ref{app:lcs-lambda}). The
+two differ in one respect. $\LCS$ depends on $\pi(\xs)$ and so on the whole claim set: adding a
+claim that no relation touches leaves $\Lambda$ unchanged but moves $\LCS$ slightly towards
+$\sigma(\Lambda)$. The additivity and bounds of Prop.~\ref{prop:props} are therefore properties of
+$\Lambda$, not of $\LCS$. We nonetheless report $\LCS$: it is bounded, it reads as a probability,
+with $\frac12$ as the uninformative point, and it stays informative when a pipeline's posteriors
+are confident, where $\Lambda$ tends to $0$ for every graph (App.~\ref{app:twostage}).
+
+\subsection{Why This Score (\S\ref{sec:why})}
+
+\paragraph{Row-stochastic tables.} A natural alternative to Eq.~\ref{eq:psi} uses tables that are
+row-stochastic in the source, so that a false premise leaves its conclusion at the prior
+(App.~\ref{app:earlier}). Such tables fail Theorem~\ref{thm:necessity}'s test. At $\xs=\one$ they
+are sign-definite with the intended sign only for $p\ge\frac12$. Below it the committed cell of an
+entailment is the table's minimum, so a weak entailment lowers the score and a weak contradiction
+raises it. When the source is false at $\xs$, the committed cell holds the prior's value
+$\frac12$, which is neither the maximum nor the minimum, so they fail at every weight except
+$p=\frac12$, where the table is constant and has no effect. For weight changes,
+App.~\ref{app:proof-why} gives the analogue of Theorem~\ref{thm:necessity} as a sufficient
+condition.
+
+\paragraph{The readout world.} Proposition~\ref{prop:unique} does not say that $\xs$ is the right
+world; choosing it is the factuality pipeline's job. It says that the order and the readout must
+use the same world. It also does not exclude readouts that combine several worlds; of the five
+App.~\ref{app:earlier} examines, four are not monotone and the fifth violates A2.
+
+\paragraph{What is not forced.} These results fix the class of tables and the readout world; they
+do not make $\Lambda$ the unique score satisfying A1--A4. Any score that is strictly increasing in
+$\Lambda$ for a fixed prior and takes a prior-independent value at $\Lambda=0$ satisfies them too,
+which is how $\LCS$ does. And any reweighting $p\mapsto1-(1-p)^\beta$ with $\beta>0$ gives another
+monotone score of the same form, where different $\beta$ can rank incomparable graphs differently.
+We take $\beta=1$ because it makes $p_r$ the probability that a check catches a violation, so the
+check reading holds with the weights as estimated.
+
+\paragraph{Why not count relations?} Monotonicity alone admits trivial scores: the signed weight sum
+$\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is monotone by construction. But a count credits every relation in
+full, whether or not it rules out anything plausible, so it depends on how an argument is presented
+rather than on what it rules out. Two entailments $a\Rightarrow b$ and $b\Rightarrow a$ of weight
+$p$ multiply to exactly the table of one equivalence of weight $p$, so they induce the same $\PR$
+and the same $\Lambda$, but they count $2p$ against $p$, which violates A2. Repeating a support
+likewise adds its weight each time, where $\Lambda$ saturates (Prop.~\ref{prop:props}(vii)).
+Averaging removes the dependence on the number of relations but breaks monotonicity, since a weak
+support lowers an average.
+
+\paragraph{Properties.} Additivity makes $\Lambda$ an amount of evidence, in \emph{nats}
+(natural-log units: a change of $\Delta$ nats multiplies $\PR(\xs)$ by $e^{\Delta}$), that adds
+across independent parts of an argument; $\LCS$ is not additive. A support earns credit only for
+the probability it removes from worlds other than $\xs$, so once the relations force $\xs$, further
+support earns almost nothing, and repeated copies of one relation converge rather than accumulate
+(App.~\ref{app:proof-props}). The leave-one-out contributions $\Delta_r$ are not additive and need
+not sum to $\Lambda$. Weighted mini-bucket elimination \citep{wmb}, for graphs beyond exact
+inference, preserves the guarantees only up to the approximation.
+
+\subsection{Logical Coherence and Other Notions of Coherence}
+\label{sec:notions}
+
+The definitions fix what the score responds to, and they separate logical coherence from the other
+properties called coherence on five points. \citet{anonlocobench} tabulate the comparison; here we
+state each point as a property of $\LCS$.
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+\item \textbf{The text enters only through its relation graph.} $\LCS$ is a function of the
+  relation graph, the priors and the committed world, so two texts with the same claims, verdicts
+  and relations receive the same score, whatever their order and wording. Discourse coherence is a
+  property of a text's organization: cohesion and local coherence track lexical and entity links
+  between neighbouring sentences \citep{hallidayhasan1976,grosz1995}, and the standard test of a
+  coherence model is that a shuffled text scores lower \citep{barzilay}.
+\item \textbf{Only constraints on truth values count.} Relational theories of discourse coherence
+  count any relation a reader can infer \citep{hobbs1979,mann}. The compile map sends
+  \sense{Contrast}, \sense{Concession} and the temporal senses to \emph{none}, whose factor is
+  constant. Conversely, a \sense{Refutation} between two true claims is well formed as discourse
+  and a violated contradiction at $\xs$.
+\item \textbf{Signs come from the committed world.} Discourse coherence, consistency and the
+  coherence measures of Bayesian epistemology \citep{shogenji1999,olsson2002} do not depend on
+  which claims are true. A relation's sign is fixed by $\xs$, so deriving a falsehood from a truth
+  is a conflict, and refuting it is a support.
+\item \textbf{Supports count, not only conflicts.} Consistency is the absence of contradiction
+  \citep{summac,selfcheckgpt,mundler2024}, so it cannot rise when an inference is added. By
+  Theorem~\ref{thm:mono} every added support of positive weight raises $\LCS$, and each further
+  copy of the same support earns less (Prop.~\ref{prop:props}(vii)).
+\item \textbf{The claims are held fixed, and their truth is not scored.} Probabilistic coherence
+  measures compare different sets of propositions, and holistic ratings \citep{summeval,geval}
+  compare whole texts that differ in content. The score's guarantee holds over one claim set and
+  committed world, and a false claim affects it only through the relations it takes part in.
+\end{enumerate}
+Each point is tested by a ladder type of LoCoBench (\S\ref{sec-locobench}): the first by
+\cp{order} and \cp{control}, the second by \cp{conflict}, the third by \cp{sign}, the fourth by
+\cp{chain}, and the fifth by every ladder. These are choices of construct, not claims that
+organization or style do not matter: logical coherence is meant to be reported beside discourse
+coherence and factuality.
+
+\paragraph{Relation to argumentation.} Gradual semantics for weighted bipolar argumentation
+\citep{cayrol2005,amgoud2016,amgoud2018,baroni2019} also grade under axioms such as neutrality and
+monotony, and probabilistic argumentation \citep{thimm2012,hunter2013} constrains a distribution by
+attacks. Our setting differs in three ways. Relations are truth-functional couplings between claims
+rather than attacks between arguments. A relation's sign is fixed by the factuality verdicts rather
+than by its type. And monotonicity is asked of a readout of one probability model, so what must be
+justified is the choice of potentials and of the world the readout uses.

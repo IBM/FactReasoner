@@ -1,0 +1,183 @@
+%% ============================================================================
+\section{Relation Mining and Gold Weights}
+\label{app:estimation}
+%% ============================================================================
+
+\paragraph{Pairwise miner.} Prompt~A receives the full response and one claim pair and returns a
+discourse sense and coupling, with reasoning \emph{before} the label so that the label's token
+log-probabilities measure a decision already made; the type confidence is the per-token geometric
+mean probability of the label span, or a self-consistency estimate
+\citep{simbauq} on backends without log-probabilities. Prompt~B asks whether, given the coupling,
+the source makes the target at least plausible; the answer must begin with \texttt{Yes} or
+\texttt{No}, and the strength is the renormalized $P(\texttt{Yes})$ \citep{kadavath}, or the
+affirmative fraction over samples. A verbalized \texttt{[p=0.NN]} variant is kept only as a
+comparison, since verbalized confidence is weakly calibrated \citep{xiong}. Two precision
+mechanisms are added to grounding. An \emph{admissibility filter} restricts answers to the
+(sense, coupling) combinations of Table~\ref{tab:couplings} that the corpus uses: the ten senses
+of App.~\ref{sec-full-locobench}, excluding \sense{Effect-Cause}, \sense{Condition} and
+\sense{Instantiation}, whose direction readers dispute or which fit almost any topical pair. An
+\emph{evidence-span requirement} obliges the model to quote, verbatim from the response, the words
+that draw the link, and the parser drops the relation if the quotation is not a substring of the
+response.
+
+\paragraph{Candidate pairs.} Querying all $n(n-1)$ ordered pairs is quadratic in calls and, without
+grounding, yields over-connected graphs. Four policies are available: \textsc{all\_pairs};
+\textsc{windowed}, forward pairs with $0<j-i\le w$ ($w=4$); \textsc{gated}, the window plus
+long-range forward pairs above an embedding or entity similarity threshold; and
+\textsc{bidirectional}, both directions within $|j-i|\le w$. The last exists because a forward-only
+policy cannot emit a relation that is both directed and backward in claim order. Every policy is
+refined against the response: a pair is \emph{discourse-adjacent} if the two claims share content
+above a Jaccard threshold, if their sentences are close, or if the target's sentence opens with a
+connective. Out-of-window adjacent pairs are promoted into the candidate set, and in-window
+non-adjacent pairs are demoted out of it.
+
+\paragraph{Prompt revisions and failure accounting.} A first-generation Prompt~A over-asserted,
+answering ``related'' on most candidate pairs. The revision rebalances the few-shot exemplars
+towards unrelated pairs, uses silence rather than explicit disavowal as the negative signal, asks
+the discriminating question (does the text draw the link, or are the claims merely near each
+other?) first, and names transitivity, closing a chain the text laid out pairwise, as a
+non-relation. Mining issues one Prompt~A call per candidate pair and one Prompt~B call per
+resulting edge. A failed call returns no parse, and a parser that read ``no parse'' as ``no
+relation'' would turn an infrastructure failure into a sparser, and therefore more coherent-looking,
+graph; call errors are therefore counted separately from genuine \emph{none} answers.
+
+Both prompts teach the compile map of Table~\ref{tab:couplings}: \sense{Refutation} is the only
+sense that compiles to \con{}, and \sense{Contrast} and \sense{Concession} compile to \emph{none}.
+In the experiments the pairwise miner uses the response-grounded Prompt~A with the evidence-span
+requirement and the admissibility filter, type confidences from the label tokens'
+log-probabilities and strengths from the \texttt{Yes}/\texttt{No} surrogate, over the window
+policy with $w=4$.
+
+\paragraph{Graph-level miner.} The prompt hands the model the response and the claims numbered from
+$1$, and asks for a JSON list of every pair the response relates, each with a sense from the ten of
+the corpus, its coupling and a strength band (strong, moderate, weak). Its rules: emit a relation
+only if the response itself draws it; orient every entailment from the supporting claim to the
+supported one; separate \sense{Refutation} from \sense{Contrast} by whether the response asserts
+incompatibility; and relate a pair only once. Each response is sampled five times (gpt-oss-120b at
+temperature $0.7$, GPT-6 at the provider default), and relations are aggregated by strict-majority
+vote as in \S\ref{sec:mining}. The committee that admitted the corpus never saw this prompt: it
+confirmed relations pair by pair with a classification prompt (App.~\ref{sec-full-locobench}). The
+prompt follows verbatim.
+\promptfile{prompts/PROMPT_GRAPH_V2.txt}
+
+\paragraph{Gold arm.} Each gold relation's weight is the midpoint of its labelled strength band
+(strong $[0.85,1]$, moderate $[0.60,0.84]$, weak $[0.35,0.59]$). The corpus's factuality labels give
+the committed world ($\xs_i=1$ for claims labelled factual, $0$ otherwise), and each response's
+stance on each claim gives the world of assertion polarity. The score's MRF uses flat priors. No miner is a member of the committee that admitted
+the corpus's items.
+
+%% ============================================================================
+\section{Discourse Senses, by Example}
+\label{app:senses}
+%% ============================================================================
+
+Table~\ref{tab:senseex} gives one response excerpt per sense of Table~\ref{tab:couplings}, grouped
+by the coupling each compiles to. Every excerpt contains both claims (\uline{$A$ underlined},
+\textbf{$B$ bold}); the \emph{italic} words draw the link, and they are what an annotator, human or
+model, must recognize. The \sense{Refutation}, \sense{Alternative} and \sense{Disjunction} rows
+describe one two-part weld failure three ways, which differ only in exhaustiveness, that is, in
+which same-value worlds the response leaves available; the \sense{Contrast} row shows the same
+material without an asserted incompatibility. Table~\ref{tab:sensemap} gives the closest PDTB~3.0
+and RST label for each sense. The corpus of \S\ref{sec:experiments} uses every sense except
+\sense{Effect-Cause}, \sense{Condition} and \sense{Instantiation}: the first and last run in a
+direction that readers dispute, and \sense{Condition} fits almost any pair of claims on one
+topic.
+
+\begin{table*}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+Sense & Coupling & Response excerpt, and why this sense rather than a neighbour \\
+\midrule
+\sense{Cause-Effect} & \ent
+  & ``\uline{The company shipped a batch it knew to be out of tolerance}, and \emph{as a direct
+    result} \textbf{its share price fell $15\%$ that quarter}.'' The response presents $A$ as
+    bringing $B$ about. \\
+\sense{Effect-Cause} & \ent
+  & ``\uline{The entire fleet was grounded on 14 March}. The order came \emph{because}
+    \textbf{inspectors had found a cracked wing spar on two airframes}.'' The direction of
+    explanation is reversed; the direction of inferential support is not. \\
+\sense{Evidence} & \ent
+  & ``\uline{The maintenance log records no inspection between January and June}, \emph{which
+    shows that} \textbf{the mandatory 500-hour check was skipped}.'' $A$ supports $B$ without
+    causing it: a record is evidence, not a mechanism. \\
+\sense{Condition} & \ent
+  & ``\textbf{A part is cleared for airframe use} \emph{only if} \uline{its alloy meets the
+    reference specification}.'' $B$ is asserted contingent on $A$; nearly any dependence can be
+    reread as a condition. \\
+\sense{Instantiation} & \ent
+  & ``\uline{Several suppliers failed the 2023 audit} --- \emph{for instance}, \textbf{the Tucson
+    plant failed on two counts}.'' $B$ is one case of $A$'s generalization. \\
+\midrule
+\sense{Restatement} & \eqv
+  & ``\uline{The shipment was certified to specification} --- \emph{in other words},
+    \textbf{every requirement in the contract had been met}.'' A marked paraphrase asserts
+    identity of content. \\
+\midrule
+\sense{Refutation} & \con
+  & ``\uline{The weld passed the tensile test}, \emph{which rules out} \textbf{the same joint
+    being porous along its full length}.'' Asserted incompatibility, \emph{not} exhaustive: if the
+    wrong joint was tested, both are false, so the both-false world stays available. \\
+\midrule
+\sense{Alternative} & \exc
+  & ``The two accounts cannot be reconciled: \emph{either} \uline{no one aboard was harmed},
+    \emph{or} \textbf{three passengers died}, and \emph{exactly one of them is true}.''
+    Exhaustive: the pair can neither both hold nor both fail. \\
+\midrule
+\sense{Disjunction} & \cnc
+  & ``The fracture began at the joint, so \emph{at least one of} \uline{the weld} \emph{and}
+    \textbf{the fastener} \emph{must have failed} --- possibly both.'' The dual of
+    \sense{Alternative}: only the both-false world is ruled out. \\
+\midrule
+\sense{Contrast} & none
+  & ``\uline{The weld passed the tensile test}, \emph{but} \textbf{the adjacent rivets showed
+    corrosion}.'' Both can hold; the \emph{but} marks a contrast of expectations, not an
+    incompatibility, so the sense induces no factor. \\
+\sense{Concession} & none
+  & ``\emph{Although} \uline{the airline argued throughout that pilot error was to blame},
+    \textbf{the final report identified a metallurgical defect}.'' Both claims hold (the airline
+    did argue it); the tension is between the airline's position and the finding, so no factor. \\
+\sense{Precedence} & none
+  & ``\uline{The replacement units were installed in March}, \emph{some three months before}
+    \textbf{the first in-flight failures were reported in June}.'' The text relates the claims
+    and says nothing about either one's truth, so the sense induces no factor. \\
+\sense{Succession} & none
+  & ``\textbf{The first in-flight failures were reported in June}, \emph{fully three months
+    after} \uline{the replacement units had been installed}.'' The mirror of
+    \sense{Precedence}. \\
+\bottomrule
+\end{tabularx}
+\caption{One response excerpt per discourse sense of Table~\ref{tab:couplings}.}
+\label{tab:senseex}
+\end{table*}
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Sense & PDTB~3.0 & RST \\
+\midrule
+\sense{Cause-Effect} & Contingency.Cause.Result & Result \\
+\sense{Effect-Cause} & Contingency.Cause.Reason & Cause \\
+\sense{Evidence} & Contingency.Cause+Belief & Evidence \\
+\sense{Condition} & Contingency.Condition & Condition \\
+\sense{Instantiation} & Expansion.Instantiation & Elaboration \\
+\sense{Restatement} & Expansion.Equivalence & Restatement \\
+\sense{Disjunction} & Expansion.Disjunction & Disjunction \\
+\sense{Alternative} & Expansion.Disjunction & Disjunction \\
+\sense{Refutation} & --- & Antithesis \\
+\sense{Contrast} & Comparison.Contrast & Contrast \\
+\sense{Concession} & Comparison.Concession & Concession \\
+\sense{Precedence} & Temporal.Asynch.Precedence & Sequence \\
+\sense{Succession} & Temporal.Asynch.Succession & Sequence \\
+\bottomrule
+\end{tabular}
+\caption{Closest PDTB~3.0 and RST labels for each sense; \sense{Alternative} is the exclusive
+reading of Expansion.Disjunction. PDTB~3.0 has no sense for an asserted incompatibility; \sense{Refutation} is closest to RST's \emph{Antithesis}. The mapping is
+many-to-one in places, so senses are annotated directly rather than converted.}
+\label{tab:sensemap}
+\end{table}
+

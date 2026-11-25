@@ -1,0 +1,56 @@
+%% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+\label{sec:voyager}
+%% ============================================================================
+
+The dominant way to assess long-form generation is decompose-then-verify: split a response into
+atomic claims, check each against evidence, and aggregate
+\citep{factscore,safe,veriscore,factreasoner}. Treating claims independently discards what makes a
+response an argument. Figure~\ref{fig:voyager} shows two answers about Voyager~1 that state the
+same five claims with the same stance, so they receive the same verdicts. A derives its conclusion
+from its evidence and uses both to refute two misconceptions. B sets two of its own truths against
+each other and derives a falsehood from a truth. No per-claim check separates them, and
+\citet{lorefact} show that factuality pipelines miss such errors.
+
+The difference is not discourse coherence, which concerns how a text is organized, ignores whether
+its claims are true, and is lost when the text is shuffled \citep{grosz1995,barzilay}.
+\emph{Logical} coherence is a property of the argument: the truth-functional relations a response
+draws among a fixed set of claims, read against which claims are true. Reordering paragraphs leaves
+it unchanged, a contrast constrains no truth value, deriving a falsehood from a truth is well-formed
+discourse but a logical conflict, and an added inference raises it where a consistency check sees
+nothing (App.~\ref{sec:notions}).
+
+A score for it must guarantee one thing: over a fixed set of claims with fixed truth values, any
+change that makes the relations agree better with those values (a new or stronger relation they
+uphold, a weaker or deleted one they break) must raise the score, wherever it occurs. The natural
+model is a Markov random field (MRF) over claim truth values with one factor per relation
+\citep{factreasoner}, but its natural readouts violate this requirement (App.~\ref{app:earlier}),
+and Shogenji's coherence measure \citep{shogenji1999} falls on \fallsPctShogenjiSigndef\% of random
+coherence-improving edits.
+
+We read the score off what a factuality pipeline already provides. Its verdicts fix a
+\emph{committed world}, the truth value of each claim, and we score a response by the weight of
+evidence \citep{good1950} that its relations lend to that world. Whether a relation helps or hurts
+then follows from that world: refuting a falsehood counts as support, deriving a falsehood from a
+truth as conflict. The score measures how well the relations agree with the facts, not whether the
+claims are true, so it complements a factuality score. Its guarantee concerns responses over one
+claim set, as when candidate answers to one query are compared.
+
+\input{figures/voyager-pair}
+
+\noindent Our contributions are:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{A coherence score with a guarantee} (\S\ref{sec:framework}). $\LCS$ is strictly
+  monotone in every coherence-improving edit, for any priors and relation graph, and works with any
+  factuality pipeline. A pairwise relation's addition is monotone in every context exactly when its
+  table is sign-definite, and no readout at another single world is monotone in the same order.
+\item \textbf{An evaluation on LoCoBench} (\S\ref{sec:experiments}). On \sThreeLadders{} coherence
+  ladders, every declared ordering and invariance holds on gold graphs, and on mined graphs the
+  score follows the extracted graphs wherever the order ranks them, which separates extraction
+  errors from scoring errors. LLM judges are near chance on added inferences.
+\item \textbf{An external evaluation} (\S\ref{sec:exp-external}). On five datasets with
+  pre-registered analyses and on rated student essays, the mined score is unrelated to discourse
+  coherence, falls under self-contradiction, signs every tested relation as predicted, and tracks
+  essay quality beyond length. Relation recall is the binding constraint.
+\end{itemize}

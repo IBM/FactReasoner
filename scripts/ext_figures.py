@@ -1,13 +1,13 @@
 """Figure for the coherence paper's External Checks (GPT-6 graph miner).
 
     uv run --with matplotlib python scripts/ext_figures.py \\
-        --eval results/ext/eval_interim.json --out docs/arr2027/coherence/figures/fig_external.pdf
+        --eval results/ext/eval.json --out docs/arr2027/coherence/figures/fig_external.pdf
 
 (a) Order: share of cases a score keeps within tau when paragraphs are permuted, next to the
     share an unchanged text keeps when mined again (the miner's noise floor).
 (b) ContraDoc: recall of the inserted or replaced contradiction, by scope and by edit.
-(c) GDTB: share of relations that receive a coupling, by category; for the first group that is
-    the right answer, for the second (senses that compile to none) it is an error.
+(c) ASAP 2.0 essays: LCS (every claim true) with length removed, by human score level; the
+    GDTB breakdown is a table in the appendix.
 Palette: the validated categorical slots 1-4 (blue, orange, aqua, yellow); every bar carries a
 value label (two slots are below 3:1 against the surface).
 """
@@ -26,19 +26,20 @@ def main() -> int:
     ap.add_argument("--eval", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--arm", default="graph_gpt6")
+    ap.add_argument("--asap", default="results/ext/asap_120/eval.json")
     args = ap.parse_args()
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     ev = json.load(open(args.eval))
-    c1, c2, c4 = ev["check1"], ev["check2"][f"2:{args.arm}"], ev["check4"][f"4b:{args.arm}"]
+    c1, c2 = ev["check1"], ev["check2"][f"2:{args.arm}"]
     plt.rcParams.update({"font.family": "serif", "font.size": 7.5, "axes.edgecolor": MUTED,
                          "axes.labelcolor": INK, "xtick.color": INK, "ytick.color": INK,
                          "axes.spines.top": False, "axes.spines.right": False,
                          "axes.linewidth": 0.6})
-    fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.35), constrained_layout=True,
-                             gridspec_kw={"width_ratios": [1.15, 1.0, 1.25]})
+    fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.0), constrained_layout=True,
+                             gridspec_kw={"width_ratios": [1.15, 1.0, 1.05]})
 
     def label(ax, bars, horizontal=False):
         for b in bars:
@@ -94,28 +95,32 @@ def main() -> int:
     ax.text(5.0, 70, "edit", ha="center", fontsize=6.5, color=MUTED)
     ax.set_title("(b) ContraDoc recall", fontsize=7.5, color=INK, loc="left")
 
-    # (c) GDTB
+    # (c) ASAP 2.0 essays: LCS with every claim true, length removed (rank residual on word
+    # count, as a share of the sample), one dot per essay and a median bar per score level.
     ax = axes[2]
-    by = c4["by_category"]
-    coup = ["Cause-Effect", "Condition", "Instantiation", "Restatement", "Disjunction"]
-    none = ["Contrast", "Concession", "Temporal", "EntRel/NoRel"]
-    names = coup + none
-    ys = list(range(len(names)))[::-1]
-    # coupling senses: the correct coupling; senses that compile to none: any coupling (an error)
-    vals = [100 * by[c]["correct"] for c in coup] + [100 * by[c]["any"] for c in none]
-    colors = [BLUE] * len(coup) + [ORANGE] * len(none)
-    bars = ax.barh(ys, vals, height=0.7, color=colors, zorder=2)
-    label(ax, bars, horizontal=True)
-    ax.set_yticks(ys, [n.replace("EntRel/NoRel", "EntRel, NoRel") for n in names])
-    ax.set_xlim(0, 100)
-    ax.set_xlabel("relations coupled (%)")
-    ax.xaxis.grid(True, color=GRID, lw=0.5, zorder=0)
-    from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=BLUE, label="has a coupling: the correct one"),
-                       Patch(color=ORANGE, label="compiles to none: any coupling")],
-              fontsize=5.6, frameon=False, loc="center right", bbox_to_anchor=(1.0, 0.36),
-              handlelength=1.0)
-    ax.set_title("(c) GDTB", fontsize=7.5, color=INK, loc="left")
+    import os, random, statistics as st, sys
+    import numpy as np
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from asap_lcs import SEED, _rank
+    rows = json.load(open(args.asap))["arms"]["graph_gpt6"]["rows"]
+    wr = np.array(_rank([r["words"] for r in rows]), float)
+    yr = np.array(_rank([r["asserted"]["lcs"] for r in rows]), float)
+    A = np.vstack([wr, np.ones_like(wr)]).T
+    resid = (yr - A @ np.linalg.lstsq(A, yr, rcond=None)[0]) / len(rows)
+    rng = random.Random(SEED)
+    for lvl in range(1, 7):
+        v = [x for x, r in zip(resid, rows) if r["score"] == lvl]
+        ax.scatter([lvl + rng.uniform(-0.2, 0.2) for _ in v], v, s=6, color=BLUE, alpha=0.65,
+                   lw=0, zorder=2)
+        ax.plot([lvl - 0.32, lvl + 0.32], [st.median(v)] * 2, color=INK, lw=1.4, zorder=3,
+                solid_capstyle="round")
+    ax.axhline(0, color=MUTED, lw=0.6, zorder=1)
+    ax.set_xticks(range(1, 7))
+    ax.set_xlabel("human essay score")
+    ax.set_ylabel("LCS rank, length removed")
+    ax.yaxis.grid(True, color=GRID, lw=0.5, zorder=0)
+    ax.set_axisbelow(True)
+    ax.set_title("(c) ASAP essays", fontsize=7.5, color=INK, loc="left")
     fig.savefig(args.out)
     print(f"wrote {args.out}")
     return 0

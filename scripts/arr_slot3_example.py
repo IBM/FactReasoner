@@ -92,7 +92,7 @@ def write_tex(path, lad, sents, rows, framing, claims, words):
                 "length": "response length"}[k]
         L.append(f"{name} & {cells} & {_order(v)} \\\\")
     L += ["\\bottomrule", "\\end{tabular}",
-          "\\caption{One \\cp{sign} ladder of the test split (" + lad["ladder_id"].split("-")[0]
+          "\\caption{One \\cp{sign} ladder of LoCoBench (" + lad["ladder_id"].split("-")[0]
           + "), end to end. The slot joins a true claim (``" + _tex(claims[0]) + "'') and a false "
           "one (``" + _tex(claims[1]) + "''). The three rungs share every other sentence of the "
           f"{words}-word answer, every claim and every verdict; only the link between the two "

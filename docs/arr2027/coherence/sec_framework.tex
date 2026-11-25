@@ -1,0 +1,258 @@
+%% ============================================================================
+\section{Probabilistic Logical Coherence}
+\label{sec:framework}
+%% ============================================================================
+
+Proofs are in App.~\ref{app:proofs}, and App.~\ref{app:framework} expands every step of this
+section.
+
+\subsection{Claims and the Committed World}
+\label{sec:setup}
+
+A response is decomposed into atomic claims $\A=(a_1,\dots,a_n)$, binary variables with $a_i=1$
+read as ``the claim holds''; a \emph{world} is an assignment $x\in\{0,1\}^n$. A claim is a
+proposition the response mentions, whether it asserts it or denies it: both responses of
+Figure~\ref{fig:voyager} mention $a_4$ in order to reject it.
+
+\begin{definition}[Committed world]
+\label{def:committed}
+The \emph{committed world} $\xs\in\{0,1\}^n$ assigns each claim the truth value under which the
+argument is evaluated. Under \emph{verdict polarity} (our default), $\xs_i$ is a factuality
+pipeline's verdict on claim $i$: $1$ if supported, $0$ if not. Under \emph{assertion polarity},
+$\xs_i$ is the response's own stance: $1$ if it asserts claim $i$, $0$ if it denies it. We call the
+two the \emph{verdict world} and the \emph{asserted world}.
+\end{definition}
+
+Any decompose-then-verify pipeline can supply verdict polarity: the labels of FActScore
+\citep{factscore}, SAFE \citep{safe} or VeriScore \citep{veriscore}, or FactReasoner's posteriors
+\citep{factreasoner} thresholded at $\frac12$. All responses over the same claims are then judged
+against one world. The two polarities coincide when a response asserts exactly the supported claims
+and denies the rest, as both Voyager responses do: $\xs=(1,1,1,0,0)$.
+
+The MRF below also needs a prior $\pi_i\in(0,1)$ per claim, with
+$\pi(x)=\prod_i\pi_i^{x_i}(1-\pi_i)^{1-x_i}$. Label-only pipelines give flat priors,
+$\pi_i=\frac12$, which we use throughout. A probabilistic pipeline's posteriors can serve as priors,
+provided they are computed without the response's own relations. Every result below holds for any
+priors (App.~\ref{app:twostage}).
+
+\subsection{Relations and Their Sign}
+\label{sec:taxonomy}
+
+A reader recognizes a \emph{discourse} relation in text. A probability model needs a
+\emph{logical} one: the joint truth assignments the relation rules out.
+
+\begin{definition}[Coupling and relation]
+\label{def:coupling}
+\label{def:relation}
+A \emph{coupling} $\kappa$ is identified with the set $V(\kappa)\subseteq\{0,1\}^2$ of joint
+assignments of its endpoints $(a_s,a_t)$ that \emph{violate} it: entailment \ent{}
+($a_s\Rightarrow a_t$, $V=\{(1,0)\}$), equivalence \eqv{} ($\{(0,1),(1,0)\}$), co-necessity \cnc{}
+(at least one holds, $\{(0,0)\}$), contradiction \con{} (not both, $\{(1,1)\}$), exclusion \exc{}
+(exactly one, $\{(0,0),(1,1)\}$), and \emph{none} ($\varnothing$). A \emph{relation}
+$r=(e_r,\kappa_r,p_r)$ has a scope $e_r=(s_r,t_r)$ of two distinct claims, a coupling, and a weight
+$p_r\in[0,1)$. A \emph{relation graph} $\R$ is a finite multiset of relations. We write
+$x_e=(x_s,x_t)$ for the values of a world on a scope.
+\end{definition}
+
+Relations are annotated with a discourse \emph{sense} from PDTB~3.0 and RST \citep{pdtb,mann},
+which a deterministic \emph{compile map} sends to a coupling (Table~\ref{tab:couplings}). Only
+\sense{Refutation}, an asserted incompatibility, compiles to \con{}. \sense{Contrast} and
+\sense{Concession}, whose arguments are typically both true (``sales rose, but profits fell''),
+compile to \emph{none}, as do the temporal senses.
+
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}p{62mm}llcccc@{}}
+\toprule
+& & & \multicolumn{4}{c}{Sign at $(\xs_s,\xs_t)$} \\
+\cmidrule(l){4-7}
+Discourse senses & Coupling & $V(\kappa)$ & $(0,0)$ & $(0,1)$ & $(1,0)$ & $(1,1)$ \\
+\midrule
+\sense{Cause-Effect}, \sense{Effect-Cause}, \sense{Evidence}, \sense{Condition}, \sense{Instantiation}
+  & \ent{} ($a_s\Rightarrow a_t$) & $\{(1,0)\}$ & $+$ & $+$ & $-$ & $+$ \\
+\sense{Restatement} & \eqv{} ($a_s\Leftrightarrow a_t$) & $\{(0,1),(1,0)\}$ & $+$ & $-$ & $-$ & $+$ \\
+\sense{Disjunction} & \cnc{} (at least one) & $\{(0,0)\}$ & $-$ & $+$ & $+$ & $+$ \\
+\sense{Refutation} & \con{} (not both) & $\{(1,1)\}$ & $+$ & $+$ & $+$ & $-$ \\
+\sense{Alternative} (exhaustive) & \exc{} (exactly one) & $\{(0,0),(1,1)\}$ & $-$ & $+$ & $+$ & $-$ \\
+\sense{Contrast}, \sense{Concession}, \sense{Precedence}, \sense{Succession} & none & $\varnothing$ & \multicolumn{4}{c}{no factor} \\
+\bottomrule
+\end{tabular}
+\caption{The two-level relation taxonomy. Discourse senses compile to couplings, each defined by
+the joint assignments $V(\kappa)$ it rules out; only \ent{} is directed. The right block gives the
+sign a relation takes from the committed values of its endpoints (Def.~\ref{def:sign}; $+$ support,
+$-$ conflict). App.~\ref{app:senses} gives a prose example of every sense and its closest
+PDTB~3.0 and RST labels.}
+\label{tab:couplings}
+\end{table*}
+
+\begin{definition}[Support and conflict]
+\label{def:sign}
+A relation $r$ with $V(\kappa_r)\neq\varnothing$ is a \emph{support} if the committed world
+satisfies it, $\xs_{e_r}\notin V(\kappa_r)$, and a \emph{conflict} if it violates it. They form the
+multisets $\Rsup$ and $\Rcon$, with $\R=\Rsup\uplus\Rcon$. Relations with $V=\varnothing$ produce no
+factor and are dropped.
+\end{definition}
+
+Table~\ref{tab:couplings} reads the sign off. A contradiction between two truths is a conflict,
+but between a truth and a falsehood it is a support, since it refutes the falsehood. An entailment
+from a truth to a falsehood is a conflict. Response~B has $\Rsup=\{a_1\Rightarrow a_2,\
+a_3\con a_5\}$ and $\Rcon=\{a_2\con a_3,\ a_1\Rightarrow a_4\}$, the two callouts of
+Figure~\ref{fig:voyager}; all of A's relations are supports.
+
+\subsection{Estimating Relations}
+\label{sec:mining}
+
+In use, the graph is read off the response. A relation's weight is the product of a
+\emph{confidence} $c_r$ that the response draws it and the \emph{strength} $g_r$ with which it does,
+\begin{equation}
+p_r=c_r\cdot g_r,\qquad c_r,g_r\in[0,1],
+\label{eq:decomp}
+\end{equation}
+clipped below $1$. The \emph{pairwise} miner asks about each candidate pair in a window over
+claim order, reading $c_r$ from label-token probabilities and $g_r$ from a \texttt{Yes}/\texttt{No}
+answer \citep{kadavath}. The \emph{graph-level} miner asks in one call for every relation the
+response draws, with sense, direction and strength band. It is sampled $k=5$ times and keeps pairs
+that a strict majority relates, with $c_r$ the share of samples and $g_r$ the band midpoint
+($0.925$, $0.72$, $0.47$). Both miners emit only relations the response itself draws
+(App.~\ref{app:estimation}).
+
+\subsection{The Coherence MRF}
+\label{sec:mrf}
+
+The model has one binary variable per claim, a prior factor
+$\phi_i(x_i)=\pi_i^{x_i}(1-\pi_i)^{1-x_i}$ per claim, and one factor per relation that
+down-weights exactly the joint values the relation rules out:
+\begin{equation}
+\psi_r(u,v)=
+\begin{cases}
+1-p_r & \text{if } (u,v)\in V(\kappa_r),\\
+1 & \text{otherwise},
+\end{cases}
+\label{eq:psi}
+\end{equation}
+\begin{equation}
+\PR(x)=\frac{\pi(x)\prod_{r\in\R}\psi_r(x_{e_r})}{Z_\R},
+\label{eq:mrf}
+\end{equation}
+where $Z_\R$ sums the numerator over all worlds. In a simple reading, each relation is an
+independent check on a world drawn from the prior: it raises an alarm with probability $p_r$ if the
+world violates it, and never otherwise. $\PR$ is the distribution of the worlds that raise no
+alarm (App.~\ref{app:framework}). Since $\psi_r$ takes only the values $1$ and $1-p_r$, it is
+\emph{sign-definite} at every $\xs$: its value at $\xs_{e_r}$ is its maximum or its minimum, which
+is what monotonicity requires (\S\ref{sec:why}).
+
+\subsection{The Coherence Order and the Score}
+\label{sec:order}
+\label{sec:score}
+
+\begin{definition}[Coherence order]
+\label{def:order}
+An \emph{elementary improvement} of $\R$ adds a support, raises a support's weight, deletes a
+conflict, or lowers a conflict's weight. $\R'\coh\R$ if $\R'$ is reached from $\R$ by finitely many
+elementary improvements, and $\R'\scoh\R$ if at least one of them changes a weight by a non-zero
+amount, counting an addition or a deletion as a change from or to weight $0$.
+\end{definition}
+
+\noindent Edits that improve one part of an argument and degrade another stay
+unranked. For a fixed $\xs$, a score $S(\R;\pi)$ should be \textbf{(A1) monotone},
+$\R'\scoh\R\Rightarrow S(\R')>S(\R)$ for every $\pi$; \textbf{(A2) MRF-grounded}, a functional of
+$\PR$ and $\pi$; \textbf{(A3) neutral}, with $S(\varnothing;\pi)$ independent of $\pi$; and
+\textbf{(A4) tractable}. A1 is demanding because the edited relation can sit anywhere in an
+arbitrary graph. It suggests reading the MRF at the world the argument is about, before and after
+the relations.
+
+\begin{definition}[Logical coherence score]
+\label{def:score}
+\begin{equation}
+\LCS(\R)=\sigma\bigl(\operatorname{logit}\PR(\xs)-\operatorname{logit}\pi(\xs)\bigr),
+\label{eq:lcs}
+\end{equation}
+with $\sigma$ the logistic function and $\operatorname{logit}u=\log\frac{u}{1-u}$.
+\end{definition}
+
+The difference of log-odds is Good's \emph{weight of evidence} \citep{good1950} that the relations
+give $\xs$, so $\LCS$ is the probability of $\xs$ after the relations for a reader who started from
+even odds: $\frac12$ when they neither confirm nor disconfirm it (as with no relations), tending to
+$0$ when they rule it out and to $1$ when they force it. The results are easiest to state for
+\begin{equation}
+\Lambda=\log\frac{\PR(\xs)}{\pi(\xs)}=\sum_{r\in\Rcon}\log(1-p_r)-\log Z_\R,
+\label{eq:lambda}
+\end{equation}
+where the second form holds because $\psi_r(\xs)$ is $1$ for a support and $1-p_r$ for a
+conflict. For a fixed claim set and prior, $\LCS$ is strictly increasing in $\Lambda$
+(App.~\ref{app:lcs-lambda}), so ordering statements transfer. Either costs one query for $Z_\R$.
+
+\begin{lemma}[Edit identity]
+\label{lem:edit}
+For any $\R$, relation $r$ and priors,
+$\Lambda(\R\uplus\{r\})-\Lambda(\R)=\log\psi_r(\xs)-\log\E_{\PR}[\psi_r]$. With
+$q_r=\PR(x_{e_r}\in V(\kappa_r))\in(0,1)$, this is $-\log(1-p_rq_r)>0$ for a support and
+$\log\frac{1-p_r}{1-p_rq_r}<0$ for a conflict, strictly when $p_r>0$.
+\end{lemma}
+
+A relation's effect depends on the context in magnitude, through $q_r$, but not in sign. Every
+elementary improvement is one addition, deletion or weight change, so the main result follows.
+
+\begin{theorem}[Monotonicity]
+\label{thm:mono}
+Fix $\xs$. For all priors $\pi\in(0,1)^n$ and all relation graphs $\R,\R'$ with weights in $[0,1)$:
+if $\R'\coh\R$ then $\LCS(\R')\ge\LCS(\R)$, and if $\R'\scoh\R$ then $\LCS(\R')>\LCS(\R)$. The
+same holds for $\Lambda$.
+\end{theorem}
+
+The proof does not use the fact that scopes are pairs. The theorem ranks the Voyager pair: A is
+reached from B by deleting B's two conflicts and adding the supports $a_2\Rightarrow a_3$ and
+$a_2\con a_4$, and it scores $\LCS=\vyALCS$ against $\vyBLCS$. The shared refutation $a_3\con a_5$
+adds $\vyADFour$ nats (natural-log units) to $\Lambda$ in A but only $\vyBDFour$ in B, where $a_2\con a_3$ has already made $a_3$
+less probable.
+
+\subsection{Why This Score}
+\label{sec:why}
+\label{sec:props}
+
+Theorem~\ref{thm:mono} rests on two choices, and neither can be changed.
+
+\begin{theorem}[Sign-definiteness is necessary and sufficient]
+\label{thm:necessity}
+Fix the priors and $\xs$. Adding a positive table $\psi$ over a pair of claims $e$ never decreases
+(resp.\ increases) $\Lambda$, for every relation graph, if and only if $\psi(\xs_e)=\max\psi$
+(resp.\ $\min\psi$).
+\end{theorem}
+
+Row-stochastic tables, normalized in the premise, fail this test at low weights, and at every weight when the
+premise is false (App.~\ref{app:framework}).
+
+\begin{proposition}[No other readout world]
+\label{prop:unique}
+For $n\ge2$ and any world $x\neq\xs$, some elementary improvement strictly lowers
+$\log\PR(x)-\log\pi(x)$, for any priors and any $\R$.
+\end{proposition}
+
+The order and the readout must use the same world. Over \thmSteps{} random improving edits,
+Shogenji's measure, which ignores $\xs$, falls on \fallsPctShogenjiSigndef\% and $\Lambda$ on none
+(App.~\ref{app:verify}).\footnote{So does the mean posterior marginal
+$\frac1n\sum_i\PR(a_i{=}1)$: deleting a contradiction that holds down a hub claim, which itself
+contradicts five others, lowers it from $\starFiveMMa$ to $\starFiveMMb$, and it falls on
+\fallsPctMmSigndef\% of the random edits.} A weighted count of relations is monotone but violates
+A2: $a\Rightarrow b$ and $b\Rightarrow a$ induce the same $\PR$ as one equivalence yet count twice.
+$\Lambda$ weighs each relation by what it rules out under the rest of the model.
+
+\begin{proposition}[Further properties]
+\label{prop:props}
+\label{prop:basic}
+\label{prop:neg}
+\label{prop:sat}
+(i) $\Lambda(\varnothing)=0$ for every $\pi$. (ii) $\Lambda\ge0$ if $\R$ has only supports and
+$\Lambda\le0$ if only conflicts. (iii) If $\R_1$ and $\R_2$ have scopes in disjoint sets of claims,
+$\Lambda(\R_1\uplus\R_2)=\Lambda(\R_1)+\Lambda(\R_2)$. (iv) Replacing a claim by its negation,
+together with its verdict, its prior and every coupling at it, preserves every sign, $\Lambda$ and
+$\LCS$. (v) $\sum_{r\in\Rcon}\log(1-p_r)\le\Lambda(\R)\le-\log\pi(\xs)$. (vi) A support's gain is
+at most $-\log\bigl(1-p_r(1-\PR(\xs))\bigr)$. (vii) For $p_r>0$, a second copy of a support adds
+strictly less than the first.
+\end{proposition}
+
+$\Lambda$ is thus evidence, in nats, that adds across independent sub-arguments, and redundant
+support saturates. Each relation's leave-one-out contribution $\Delta_r$ has a guaranteed sign (the
+bars of Figure~\ref{fig:voyager}). Computing $Z_\R$ is \#P-hard in general but exact here, by
+variable elimination.

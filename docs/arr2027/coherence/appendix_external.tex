@@ -2,7 +2,7 @@
 % by scripts/ext_eval.py. Both graph miners (macros with suffixes Gpt and Oss).
 
 %% ============================================================================
-\section{External Checks in Detail}
+\section{External Evaluation in Detail}
 \label{app:external}
 %% ============================================================================
 
@@ -30,9 +30,44 @@ after the first results were read; both add an analysis and remove none.
   (\extHOneAExclGpt{} and \extHOneCExclGpt{} with GPT-6): the entity graph keeps
   \extLocoPermInvEntity\% and \extCdPermInvEntity\% within $\tau$.
 \item[D2.] ContraDoc's clean documents were re-mined with fresh samples, to measure the miner's
-  noise floor, as the LoCoBench test-split records already allow.
+  noise floor, as the LoCoBench records already allow.
 \end{description}
-The analyses marked \emph{exploratory} below were not pre-registered.
+The analyses marked \emph{exploratory} below were not pre-registered, and neither was the essay
+study (App.~\ref{app:asap}). Table~\ref{tab:ext-hyp} lists every
+pre-registered hypothesis with its outcome, including those that failed.
+
+\begin{table*}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{5.3cm}>{\raggedright\arraybackslash}p{6.2cm}cc@{}}
+\toprule
+& & & \multicolumn{2}{c}{Outcome} \\
+\cmidrule(l){4-5}
+& Prediction & Result (GPT-6 arm) & GPT-6 & gpt-oss \\
+\midrule
+H1a & LoCoBench: under paragraph permutation, $\LCS$ stays within $\tau$ more often than every discourse baseline and the judge & $\LCS$ \extLocoPermInvGpt\% (re-mined unchanged: \extLocoNoiseInvGpt\%); entity graph \extLocoPermInvEntity\%; G-Eval \extLocoPermInvJudge\% & \extHOneAGpt & \extHOneAOss \\
+H1c & ContraDoc, clean documents: the same & $\LCS$ \extCdPermInvGpt\% (re-mined unchanged: \extCdNoiseInvGpt\%); entity graph \extCdPermInvEntity\%; G-Eval \extCdPermInvJudge\% & \extHOneCGpt & \extHOneCOss \\
+H1d & SummEval: $|\rho(\LCS,\text{expert coherence})|<0.1$ & $\rho=\extSeRhoCohGpt$ & \extHOneDGpt & \extHOneDOss \\
+H2a & ContraDoc: with every claim true, inserting a contradiction lowers $\LCS$ & falls \extCdAssertDecGpt, rises \extCdAssertIncGpt{} of \extCdPairs{} ($p<\extCdAssertPGpt$) & \extHTwoAAssertGpt & \extHTwoAAssertOss \\
+H2a$'$ & with the inserted sentence false, a found contradiction raises $\LCS$ & rises \extCdVerdEdgeIncGpt, falls \extCdVerdEdgeDecGpt{} of \extCdVerdEdgeNGpt{} ($p=\extCdVerdEdgePGpt$) & \extHTwoAVerdGpt & \extHTwoAVerdOss \\
+H2b & recall within a sentence and locally exceeds global recall & within sentence \extCdRecallIntraGpt\%, local \extCdRecallLocalGpt\%, global \extCdRecallGlobalGpt\% & \extHTwoBGpt & \extHTwoBOss \\
+H3a & ChatProtect: every relation found between the two sentences has the predicted sign at all four worlds & \extCpSweepAgreeGpt\% of \extCpSweepNGpt{} cases & \extHThreeAGpt & \extHThreeAOss \\
+H3 & the miner finds the contradiction more often in contradictory pairs & \extCpConfStrongGpt\% against \extCpConfNoneGpt\% & \extHThreeMinerGpt & \extHThreeMinerOss \\
+H3c & with every claim true, the contradicting sentence lowers $\LCS$ & falls \extCpAssertDecGpt, rises \extCpAssertIncGpt{} of \extCpAssertNGpt{} ($p<\extCpAssertPGpt$) & \extHThreeCGpt & \extHThreeCOss \\
+H4b & GDTB: senses with no coupling receive one less often than coupling senses receive theirs & \extGdNoneGpt\% against \extGdCorrectGpt\% & \extHFourBNoneGpt & \extHFourBNoneOss \\
+H4b$'$ & recall is higher for explicit than for implicit relations & \extGdExplicitGpt\% against \extGdImplicitGpt\% & \extHFourBExplicitGpt & \extHFourBExplicitOss \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Every pre-registered external hypothesis}: results with the GPT-6 arm, and the
+outcome for both arms (gpt-oss-120b's numbers are in the subsections below). ``Within $\tau$'':
+the share of permutations that move a score by at most $\tau=0.01$ on its own scale; ``re-mined
+unchanged'' is the same share when the unchanged text is mined again. $p$: two-sided sign test.
+Labels follow the pre-registration, whose number is the check and whose letter the sub-analysis;
+sub-analyses 1b, 3b and 4a are descriptive and have no hypothesis. H3 is the pre-registration's
+H3-miner, and a prime marks a second hypothesis of the same sub-analysis.}
+\label{tab:ext-hyp}
+\end{table*}
+
 
 \begin{table*}[t]
 \centering\small
@@ -47,6 +82,7 @@ SummEval \citep{summeval} & 1{,}600 & sentences; mean of three expert ratings pe
 ChatProtect \citep{mundler2024} & 1{,}660 & sentences; 830 pairs (prefix $+\,s$, prefix $+\,s+s'$), contradiction label, false side on a subset & Apache-2.0 \\
 QT30 \citep{qt30} & 300 & propositions in windows of 12--20; inference, conflict and rephrase relations & not stated \\
 GDTB \citep{gdtb} & \extGdItems & the two arguments of a PDTB-3 relation; Reddit excluded & CC BY-NC-SA \\
+ASAP~2.0 \citep{crossley2025asap} & \asapEssays & atomized claims; holistic 1--6 essay score; not pre-registered (App.~\ref{app:asap}) & CC BY 4.0 \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{External data.} Items are built by \texttt{scripts/ext\_build.py}; raw files and
@@ -281,5 +317,7 @@ Inference Anchoring Theory annotates the inferences and conflicts that speakers'
 including across speakers' turns. Our miners are instructed to emit only relations
 the text draws, which caps recall on this corpus by design.
 
-% Flush this section's floats before the next appendix section.
+% Flush the floats of the pre-registered checks before the essay subsection.
 \clearpage
+
+\input{appendix_asap}

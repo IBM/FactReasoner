@@ -1,0 +1,84 @@
+%% ============================================================================
+\section{The Voyager Responses in Full}
+\label{app:voyager}
+%% ============================================================================
+
+The two responses of Figure~\ref{fig:voyager}, verbatim. Each claim's first mention is marked
+\claimref{i}, and italics mark the spans read as relations. Both responses assert $a_1$--$a_3$ and
+reject $a_4$ and $a_5$, so they share claims, stance and verdicts. In A, $a_1\Rightarrow a_2$ is
+\sense{Cause-Effect}, $a_2\Rightarrow a_3$ is \sense{Evidence}, and $a_2\con a_4$ and
+$a_3\con a_5$ are \sense{Refutation}. In B, $a_1\Rightarrow a_2$ is \sense{Cause-Effect},
+$a_1\Rightarrow a_4$ is \sense{Condition}, and $a_2\con a_3$ and $a_3\con a_5$ are
+\sense{Refutation}. Both responses deny exactly $a_4$ and $a_5$, so assertion polarity gives the
+same committed world and the same scores as verdict polarity. Reading the denied claims as asserted
+($\xs=\one$) keeps the order, A $\vyALamAs$ against B $\vyBLamAs$, but charges A for its
+refutations ($\vyADAsThree$, $\vyADAsFour$) as if they were self-contradictions, which is why
+assertion polarity takes the response's stance.
+
+\smallskip\noindent\textbf{Response A.}
+Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and \emph{in consequence}, in the
+days that followed, its instruments measured a sharp rise in plasma density\,\claimref{2} --- the
+signature of the denser medium beyond the boundary, and \emph{the measurement that showed} that
+Voyager~1 is in interstellar space.\,\claimref{3} Two persistent misconceptions are worth clearing
+up. The first is that the probe's plasma wave instrument had failed permanently before the
+crossing;\,\claimref{4} \emph{it cannot have, since it is precisely that instrument which returned
+the density profile.} The second is that Voyager~1 has left the Solar System
+altogether.\,\claimref{5} \emph{Its being in interstellar space rules that out}: the interstellar
+space it has reached lies deep inside the Oort cloud, which the Sun's gravity holds far beyond the
+probe's present distance.
+
+\smallskip\noindent\textbf{Response B.}
+Voyager~1 crossed the heliopause in August 2012,\,\claimref{1} and \emph{in consequence} its
+instruments measured a sharp rise in plasma density.\,\claimref{2} Voyager~1 is in interstellar
+space,\,\claimref{3} \emph{although that density rise cannot be squared with its being there.}
+\emph{The crossing could only have happened if} the probe's plasma wave instrument had failed
+permanently before it,\,\claimref{4} though that failure is in fact a common misconception. Nor has
+Voyager~1 left the Solar System altogether;\,\claimref{5} \emph{its being in interstellar space
+rules that out}, since it is still deep inside the Oort cloud.
+
+%% ============================================================================
+\section{Alternative Tables and Readouts}
+\label{app:earlier}
+%% ============================================================================
+
+\paragraph{Row-stochastic tables.} A natural alternative to Eq.~\ref{eq:psi} makes the asymmetric
+tables row-stochastic in the source, so that a false premise leaves its conclusion at the prior.
+Row-major over $(0,0),(0,1),(1,0),(1,1)$, with $\pi_0=\frac12$:
+$\ent=[1{-}\pi_0,\pi_0,1{-}p,p]$, $\con=[1{-}\pi_0,\pi_0,p,1{-}p]$, $\eqv=[p,1{-}p,1{-}p,p]$,
+$\exc=[1{-}p,p,p,1{-}p]$, $\cnc=[1{-}p,\pi_0,\pi_0,p]$. By Theorem~\ref{thm:necessity}, at $\xs=\one$
+they are sign-definite with the intended sign iff $p\ge\frac12$: below that, the cell $\pi_0$ exceeds the committed cell
+$p$ for \ent{} and \cnc{}, and the committed cell $1-p$ exceeds $\pi_0$ for \con{}. A lone
+entailment at $p=0.3$ and uniform priors \emph{lowers} the committed world's gain to
+$\wpWeakEntGain$. When the source is false at $\xs$ (for \ent{} and \con{}), or exactly one endpoint
+is false (for \cnc{}), the committed cell holds $\pi_0$, which is neither the maximum nor the minimum
+for any $p\neq\frac12$, so these tables fail at every weight.
+
+\paragraph{Alternative readouts.} Besides $\Lambda$ we consider five readouts, (a)--(c) over the
+row-stochastic tables and (d)--(e) over Eq.~\ref{eq:mrf}:
+(a) a two-term consistency probability, averaging $P(\text{no contradiction active})$ with a
+weight-averaged probability that supports are actively upheld;
+(b) the posterior of a reified coherence node with noisy-AND votes;
+(c) $(\log Z-\log Z_{\min})/(\log Z_{\max}-\log Z_{\min})$ with the conflict-free network as
+ceiling and the most probable world's mass as floor;
+(d) \emph{conflict escape}, $\E_{P_0}[\prod_{r\in\Rcon}\psi_r(x_{e_r})]$, with $P_0$ the
+network without conflicts;
+(e) \emph{prior expectation}, $\sigma\bigl(\frac2n\log\E_\pi[\prod_{\Rcon}(1-p_rV_r)
+\prod_{\Rsup}(1+p_rC_r)]\bigr)$, where $V_r$ indicates that a conflict is violated and $C_r$ that a
+support is credited, i.e.\ its endpoints are both true (\ent{}, \eqv{}) or exactly one is true
+(\cnc{}).
+(a), (b) and (c) fail A1: (a) and (b) when weakening a contradiction \emph{raises} the
+probability that it is active, and (c) because its floor moves with the edit. (d) is monotone in
+conflict edits but not support edits, since supports shape $P_0$. (e) is monotone in every edit, but it scores relations against the priors rather than the
+coherence MRF, so it violates A2: an exclusion and an equivalence of equal weight $p$ on one pair
+have tables whose product is the constant $1-p$, so $\PR=P_\varnothing$ and $\Lambda=0$, while (e)
+moves away from $\frac12$ ($0.364$ at $p=0.9$ and uniform priors). (e) also does not saturate: $k$
+copies of one equivalence at $0.9$ on two fair claims give
+$\padBalOne,\padBalTwo,\padBalThree,\padBalFour,\padBalFive,\padBalSix$ for $k=1,\dots,6$, against
+$\padLCSOne,\padLCSTwo,\padLCSThree,\padLCSFour,\padLCSFive,\padLCSSix$ for $\LCS$.
+
+\paragraph{Weak relations.} At $p=0.47$, the weak-band weight of the gold graphs, uniform priors and
+$\xs=\one$, adding a weak entailment under the row-stochastic tables moves the committed world's
+gain by $\wpWeakEntailment$ and a weak contradiction by $\wpWeakContradiction$, both in the wrong
+direction. Under Eq.~\ref{eq:mrf} the same relations move it by $\sdWeakEntailment$ and
+$\sdWeakContradiction$.
+

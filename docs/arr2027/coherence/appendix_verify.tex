@@ -1,0 +1,79 @@
+%% ============================================================================
+\section{Randomized Verification}
+\label{app:verify}
+%% ============================================================================
+
+\begin{table}[h]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Score (random improving edits) & lowered \\
+\midrule
+committed world, row-stochastic tables & \fallsPctAssertedWithpriors\% \\
+Shogenji measure, Eq.~\ref{eq:mrf} & \fallsPctShogenjiSigndef\% \\
+prior-expectation score (App.~\ref{app:earlier}) & \fallsPctBalanced\% \\
+$\LCS$ (ours; equivalently $\Lambda$) & \fallsPctLambda\% \\
+\bottomrule
+\end{tabular}
+\caption{Share of \thmSteps{} coherence-improving edits ($\xs=\one$) that strictly lower each
+score (exact enumeration).}
+\label{tab:falls}
+\end{table}
+
+The verification (Table~\ref{tab:falls}) draws \thmSeq{} networks with $2$--$8$ claims, priors uniform on
+$[0.05,0.95]$ and up to $2n$ relations with random couplings and weights in $[0.02,0.98]$. It
+then applies one to six random elementary improvements to each, \thmSteps{} in total. $\Lambda$
+failed to rise strictly on \thmFalls{} of them. For relations beyond pairs, \karySteps{} additions
+of random ternary supports and conflicts (random violated sets) to random ternary networks, all
+relative to $\xs=\one$, moved $\Lambda$ in the wrong direction \karyFalls{} times. With a uniformly random committed world per
+network and improvements defined relative to it, $\Lambda$ failed to rise on \xsFalls{} of
+\xsSteps{} edits. For $n=3$, flat priors and weight $0.8$, every one of the \uniqPairs{} pairs $(\xs,x)$
+with $x\ne\xs$ admits a single support relative to $\xs$ whose addition to the empty graph lowers
+the posterior gain of $x$ (Prop.~\ref{prop:unique}; \uniqBroken{} of \uniqPairs). For the only-if direction of
+Theorem~\ref{thm:necessity} with the priors held fixed, \necTrials{} random cases (a random table
+whose committed cell is not its extremum, a random context, and strong singleton relations
+concentrating the scope on the table's extremal cell) moved $\Lambda$ in the predicted wrong
+direction in \necOk{} of \necTrials. The
+released scorer agrees with an independent
+enumeration to $10^{-9}$.
+
+%% ============================================================================
+\section{Posterior Marginals as Priors}
+\label{app:twostage}
+%% ============================================================================
+
+A probabilistic factuality pipeline returns posterior marginals $v_i$, which fix $\xs$ by
+thresholding and serve as the MRF's priors, $\pi_i=v_i$ (\S\ref{sec:setup}). The released scorer
+does this by default: a value strictly inside $(0,1)$ is used as a prior, and a value of exactly $0$
+or $1$ is read as a hard label and gets the flat prior $\frac12$, so label-only and probabilistic
+pipelines need no configuration. Theorem~\ref{thm:mono} holds for any priors in $(0,1)$, so the
+guarantee is the same as with flat priors; what changes is how much each edit counts. The upper bound of Prop.~\ref{prop:props}(v) becomes
+$-\log\pi(\xs)=-\sum_i\log\pi_i^{\xs_i}(1-\pi_i)^{1-\xs_i}$, so an argument whose committed values
+the priors hold only weakly has more to gain from support. A support gains $-\log(1-p_rq_r)$, most
+when its violation is probable under the model, so that it rules out plausible worlds other than
+$\xs$. A conflict costs $\log\frac{1-p_r}{1-p_rq_r}$, most when the rest of the model already
+deems the violated configuration improbable.
+
+Confident posteriors affect the two quantities of \S\ref{sec:score} differently. As the $v_i$
+approach $0$ and $1$ at $\xs$, every violation probability $q_r$ approaches $0$ for supports and
+$1$ for conflicts, both closed forms approach $0$, and $\Lambda$ vanishes for every graph:
+$\pi(\xs)\to1$, so the relations have no probability left to add to $\xs$. $\LCS$ does not
+tend to $\frac12$. It is the logistic of the weight of evidence
+$\log P(E\mid\xs)/P(E\mid\text{not }\xs)$ of the check model (\S\ref{sec:mrf}), and both
+probabilities stay bounded away from zero. The first, $\prod_r\psi_r(\xs)$, does not depend
+on the priors. The second is the probability of passing all checks for a world other than $\xs$,
+and as the priors sharpen it is dominated by the worlds that differ from $\xs$ in a single claim.
+On Figure~\ref{fig:voyager}, priors of $0.9/0.1$, $0.99/0.01$ and $0.999/0.001$ at $\xs$ give
+$\Lambda$ of $\degAOne$, $\degATwo$, $\degAThree$ for A and $\degBOne$, $\degBTwo$, $\degBThree$
+for B, but $\LCS$ of $\degALCSOne$, $\degALCSTwo$, $\degALCSThree$ for A and $\degBLCSOne$,
+$\degBLCSTwo$, $\degBLCSThree$ for B, against $\vyALCS$ and $\vyBLCS$ under flat priors: the scale
+moves with the priors, but A stays far above B.
+Theorem~\ref{thm:mono} holds throughout. Confident posteriors therefore leave $\LCS$ informative,
+one of the reasons it, rather than $\Lambda$, is the reported score (\S\ref{sec:score}). Two caveats apply. Under the
+scorer's default rule a posterior of exactly $1$ gets the flat prior while $0.999$ is used as is,
+so the score jumps between the two (for B, $\LCS$ moves from $\degBLCSThree$ to $\vyBLCS$); a
+pipeline that reports exact $0/1$ posteriors is best treated as label-only throughout. And the posteriors
+should be computed without the response's claim--claim relations, as they are when the factuality
+model relates claims only to retrieved evidence; otherwise those relations are counted twice.
+

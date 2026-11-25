@@ -163,7 +163,7 @@ def main() -> int:
     ax.set_xlim(lo - 1.6, 10.6)
     ax.set_ylim(-0.1, 1.04)
     ax.set_xlabel(r"$\Lambda$ (nats)")
-    ax.set_title("(b) every response of the test split, both scales", fontsize=7.5, color=INK,
+    ax.set_title("(b) every LoCoBench response, both scales", fontsize=7.5, color=INK,
                  loc="left")
     ax.legend(fontsize=6.2, frameon=False, loc="lower right", markerscale=2.2, handletextpad=0.3,
               bbox_to_anchor=(1.0, 0.08))
