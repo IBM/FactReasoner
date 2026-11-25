@@ -6,8 +6,11 @@
 \label{app:external}
 %% ============================================================================
 
-\paragraph{Protocol.} Table~\ref{tab:ext-data} lists the data. Every prediction, test and threshold was fixed in a pre-registration
-committed before any graph of these checks was mined. The settings are:
+\paragraph{Protocol.} Table~\ref{tab:ext-data} lists the data. Every advance prediction, with its
+test and threshold, was written in an analysis plan that was committed to version control, with the
+analysis code, before any graph of these checks was mined. Table~\ref{tab:ext-hyp} lists all ten,
+with the labels of that plan and the numbers E1--E7 they carry in \S\ref{sec:exp-external}. The
+settings are:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item the graph-level miner with GPT-6 and with gpt-oss-120b, two arms ($k=5$, the taxonomy of Table~\ref{tab:couplings}, the gateway's response
   cache bypassed);
@@ -18,12 +21,12 @@ committed before any graph of these checks was mined. The settings are:
   source document or nodeset).
 \end{itemize}
 The baselines are those of \S\ref{sec:exp-baselines} that read a single text: DiscoScore RC and
-LC, the entity graph and G-Eval with GPT-6, averaged over three runs (the pre-registered number,
-against five in \S\ref{sec:exp-baselines}, for the larger corpora). Two deviations were logged
+LC, the entity graph and G-Eval with GPT-6, averaged over three runs (the number the plan fixed,
+against five in \S\ref{sec:exp-baselines}, for the larger corpora). Two deviations from the plan were logged
 after the first results were read; both add an analysis and remove none.
 \begin{description}[leftmargin=1.2em,itemsep=1pt,topsep=2pt,font=\normalfont\itshape]
 \item[D1.] DiscoScore RC and LC count noun repetitions regardless of sentence order, so, like the
-  length controls the pre-registration excluded, they are order-free by definition. They never
+  length controls the plan excluded, they are order-free by definition. They never
   change under a LoCoBench permutation, and on ContraDoc they stay within $\tau$ on
   \extCdPermInvRc\% and \extCdPermInvLc\% of permutations, presumably because permuting a long
   document changes its sentence segmentation. H1a and H1c fail with them excluded too
@@ -39,7 +42,7 @@ effect, a fall and a rise would be equally likely, so among the $n$ untied pairs
 would follow a $\mathrm{Binomial}(n,\frac12)$ distribution. The $p$-value is the probability, under
 that null, of a split at least as lopsided as the one observed. It is \emph{two-sided}: it counts
 lopsidedness in either direction, which is the more conservative choice for a directional
-prediction (roughly doubling $p$) and the one the pre-registration fixed. The test uses only the
+prediction (roughly doubling $p$) and the one the plan fixed. The test uses only the
 direction of each change, not its size, so it needs no assumption about how the changes are
 distributed, which matters because changes in $\LCS$ range from tiny to several nats. For example,
 inserting a contradiction into a ContraDoc document lowers $\LCS$ on \extCdAssertDecGpt{} pairs and
@@ -49,39 +52,39 @@ of ten, when it is very small. A small $p$ says that the direction of the effect
 accident. It says nothing about the effect's size, which the split itself conveys, and it does not
 cover systematic errors such as a biased miner, which the design and the Limitations address.
 
-The analyses marked \emph{exploratory} below were not pre-registered, and neither was the essay
-study (App.~\ref{app:asap}). Table~\ref{tab:ext-hyp} lists every
-pre-registered hypothesis with its outcome, including those that failed.
+Analyses marked \emph{diagnostic} below were computed after the results were read, to explain
+them, and the essay study (App.~\ref{app:asap}) is outside the plan.
 
 \begin{table*}[t]
 \centering\small
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{5.3cm}>{\raggedright\arraybackslash}p{6.2cm}cc@{}}
+\begin{tabular}{@{}ll>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{6.0cm}cc@{}}
 \toprule
-& & & \multicolumn{2}{c}{Outcome} \\
-\cmidrule(l){4-5}
-& Prediction & Result (GPT-6 arm) & GPT-6 & gpt-oss \\
+& & & & \multicolumn{2}{c}{Outcome} \\
+\cmidrule(l){5-6}
+Plan & \S\ref{sec:exp-external} & Prediction & Result (GPT-6 arm) & GPT-6 & gpt-oss \\
 \midrule
-H1a & LoCoBench: under paragraph permutation, $\LCS$ stays within $\tau$ more often than every discourse baseline and the judge & $\LCS$ \extLocoPermInvGpt\% (re-mined unchanged: \extLocoNoiseInvGpt\%); entity graph \extLocoPermInvEntity\%; G-Eval \extLocoPermInvJudge\% & \extHOneAGpt & \extHOneAOss \\
-H1c & ContraDoc, clean documents: the same & $\LCS$ \extCdPermInvGpt\% (re-mined unchanged: \extCdNoiseInvGpt\%); entity graph \extCdPermInvEntity\%; G-Eval \extCdPermInvJudge\% & \extHOneCGpt & \extHOneCOss \\
-H1d & SummEval: $|\rho(\LCS,\text{expert coherence})|<0.1$ & $\rho=\extSeRhoCohGpt$ & \extHOneDGpt & \extHOneDOss \\
-H2a & ContraDoc: with every claim true, inserting a contradiction lowers $\LCS$ & falls \extCdAssertDecGpt, rises \extCdAssertIncGpt{} of \extCdPairs{} ($p<\extCdAssertPGpt$) & \extHTwoAAssertGpt & \extHTwoAAssertOss \\
-H2a$'$ & with the inserted sentence false, a found contradiction raises $\LCS$ & rises \extCdVerdEdgeIncGpt, falls \extCdVerdEdgeDecGpt{} of \extCdVerdEdgeNGpt{} ($p=\extCdVerdEdgePGpt$) & \extHTwoAVerdGpt & \extHTwoAVerdOss \\
-H2b & recall within a sentence and locally exceeds global recall & within sentence \extCdRecallIntraGpt\%, local \extCdRecallLocalGpt\%, global \extCdRecallGlobalGpt\% & \extHTwoBGpt & \extHTwoBOss \\
-H3a & ChatProtect: every relation found between the two sentences has the predicted sign at all four worlds & \extCpSweepAgreeGpt\% of \extCpSweepNGpt{} cases & \extHThreeAGpt & \extHThreeAOss \\
-H3 & the miner finds the contradiction more often in contradictory pairs & \extCpConfStrongGpt\% against \extCpConfNoneGpt\% & \extHThreeMinerGpt & \extHThreeMinerOss \\
-H3c & with every claim true, the contradicting sentence lowers $\LCS$ & falls \extCpAssertDecGpt, rises \extCpAssertIncGpt{} of \extCpAssertNGpt{} ($p<\extCpAssertPGpt$) & \extHThreeCGpt & \extHThreeCOss \\
-H4b & GDTB: senses with no coupling receive one less often than coupling senses receive theirs & \extGdNoneGpt\% against \extGdCorrectGpt\% & \extHFourBNoneGpt & \extHFourBNoneOss \\
-H4b$'$ & recall is higher for explicit than for implicit relations & \extGdExplicitGpt\% against \extGdImplicitGpt\% & \extHFourBExplicitGpt & \extHFourBExplicitOss \\
+H1a & E2 & LoCoBench: under paragraph permutation, $\LCS$ stays within $\tau$ more often than every discourse baseline and the judge & $\LCS$ \extLocoPermInvGpt\% (re-mined unchanged: \extLocoNoiseInvGpt\%); entity graph \extLocoPermInvEntity\%; G-Eval \extLocoPermInvJudge\% & \extHOneAGpt & \extHOneAOss \\
+H1c & E2 & ContraDoc, clean documents: the same & $\LCS$ \extCdPermInvGpt\% (re-mined unchanged: \extCdNoiseInvGpt\%); entity graph \extCdPermInvEntity\%; G-Eval \extCdPermInvJudge\% & \extHOneCGpt & \extHOneCOss \\
+H1d & E1 & SummEval: $|\rho(\LCS,\text{expert coherence})|<0.1$ & $\rho=\extSeRhoCohGpt$ & \extHOneDGpt & \extHOneDOss \\
+H2a & E3 & ContraDoc: with every claim true, inserting a contradiction lowers $\LCS$ & falls \extCdAssertDecGpt, rises \extCdAssertIncGpt{} of \extCdPairs{} ($p<\extCdAssertPGpt$) & \extHTwoAAssertGpt & \extHTwoAAssertOss \\
+H2a$'$ & E6 & with the inserted sentence false, a found contradiction raises $\LCS$ & rises \extCdVerdEdgeIncGpt, falls \extCdVerdEdgeDecGpt{} of \extCdVerdEdgeNGpt{} ($p=\extCdVerdEdgePGpt$) & \extHTwoAVerdGpt & \extHTwoAVerdOss \\
+H2b & miner & recall within a sentence and locally exceeds global recall & within sentence \extCdRecallIntraGpt\%, local \extCdRecallLocalGpt\%, global \extCdRecallGlobalGpt\% & \extHTwoBGpt & \extHTwoBOss \\
+H3a & E5 & ChatProtect: every relation found between the two sentences has the predicted sign at all four worlds & \extCpSweepAgreeGpt\% of \extCpSweepNGpt{} cases & \extHThreeAGpt & \extHThreeAOss \\
+H3 & miner & the miner finds the contradiction more often in contradictory pairs & \extCpConfStrongGpt\% against \extCpConfNoneGpt\% & \extHThreeMinerGpt & \extHThreeMinerOss \\
+H3c & E4 & with every claim true, the contradicting sentence lowers $\LCS$ & falls \extCpAssertDecGpt, rises \extCpAssertIncGpt{} of \extCpAssertNGpt{} ($p<\extCpAssertPGpt$) & \extHThreeCGpt & \extHThreeCOss \\
+H4b & E7 & GDTB: senses with no coupling receive one less often than coupling senses receive theirs & \extGdNoneGpt\% against \extGdCorrectGpt\% & \extHFourBNoneGpt & \extHFourBNoneOss \\
+H4b$'$ & miner & recall is higher for explicit than for implicit relations & \extGdExplicitGpt\% against \extGdImplicitGpt\% & \extHFourBExplicitGpt & \extHFourBExplicitOss \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Every pre-registered external hypothesis}: results with the GPT-6 arm, and the
+\caption{\textbf{All ten advance predictions}: the seven about the score (E1--E7 in
+\S\ref{sec:exp-external}) and three about the miner alone, with results for the GPT-6 arm and the
 outcome for both arms (gpt-oss-120b's numbers are in the subsections below). ``Within $\tau$'':
 the share of permutations that move a score by at most $\tau=0.01$ on its own scale; ``re-mined
 unchanged'' is the same share when the unchanged text is mined again. $p$: two-sided sign test.
-Labels follow the pre-registration, whose number is the check and whose letter the sub-analysis;
-sub-analyses 1b, 3b and 4a are descriptive and have no hypothesis. H3 is the pre-registration's
-H3-miner, and a prime marks a second hypothesis of the same sub-analysis.}
+Plan labels: the number is the check and the letter the sub-analysis; sub-analyses 1b, 3b and
+4a are descriptive and have no prediction. H3 is the plan's H3-miner, and a prime marks a second
+prediction of the same sub-analysis.}
 \label{tab:ext-hyp}
 \end{table*}
 
@@ -99,7 +102,7 @@ SummEval \citep{summeval} & 1{,}600 & sentences; mean of three expert ratings pe
 ChatProtect \citep{mundler2024} & 1{,}660 & sentences; 830 pairs (prefix $+\,s$, prefix $+\,s+s'$), contradiction label, false side on a subset & Apache-2.0 \\
 QT30 \citep{qt30} & 300 & propositions in windows of 12--20; inference, conflict and rephrase relations & not stated \\
 GDTB \citep{gdtb} & \extGdItems & the two arguments of a PDTB-3 relation; Reddit excluded & CC BY-NC-SA \\
-ASAP~2.0 \citep{crossley2025asap} & \asapEssays & atomized claims; holistic 1--6 essay score; not pre-registered (App.~\ref{app:asap}) & CC BY 4.0 \\
+ASAP~2.0 \citep{crossley2025asap} & \asapEssays & atomized claims; holistic 1--6 essay score; outside the plan (App.~\ref{app:asap}) & CC BY 4.0 \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{External data.} Items are built by \texttt{scripts/ext\_build.py}; raw files and
@@ -216,7 +219,7 @@ need comment:
   because the inserted sentence repeats the nouns of the sentence it contradicts, which these
   scores reward as cohesion.
 \end{itemize}
-\emph{Exploratory.} With the inserted sentence false, the \extCdAssertEdgeNGpt{} graphs with a
+\emph{Diagnostic.} With the inserted sentence false, the \extCdAssertEdgeNGpt{} graphs with a
 found contradiction draw \extCdEvSupGpt{} relations to it, all of them supports and
 \extCdEvConGpt{} conflicts. Every one of the \extCdVerdFallsGpt{} pairs whose score nevertheless
 fell has no conflict on the inserted sentence: the two versions were mined independently, and
@@ -259,7 +262,7 @@ The GPT-6 arm finds the contradiction in \extCpConfStrongGpt\% of the pairs anno
 contradictory and in \extCpConfNoneGpt\% of the others: low recall, no false alarms. With every
 claim true, adding the second sentence lowers $\LCS$ on \extCpAssertDecGpt{} and raises it on
 \extCpAssertIncGpt{} of \extCpAssertNGpt{} contradictory pairs ($p<\extCpAssertPGpt$). The split
-by whether the contradiction was found is exploratory:
+by whether the contradiction was found is diagnostic:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item where it was found, $\LCS$ falls on \extCpFoundFallGpt{} pairs and rises on
   \extCpFoundRiseGpt;
@@ -314,7 +317,7 @@ upper block of Table~\ref{tab:ext-gdtb} measures recall of the coupling; the low
 the compile map's central claim, that contrast, concession and temporal sequence constrain
 nothing. The difference between the two rates, \extGdCorrectGpt\% against \extGdNoneGpt\%, has a
 95\% interval well above zero. The weakest categories are those the miner most often maps to a
-neighbouring coupling: disjunction and restatement. The pre-registered \sense{Evidence} category
+neighbouring coupling: disjunction and restatement. The planned \sense{Evidence} category
 (PDTB \sense{Cause+Belief}) has no instance in the GDTB documents we use, so it is
 absent from the table.
 
@@ -334,7 +337,7 @@ Inference Anchoring Theory annotates the inferences and conflicts that speakers'
 including across speakers' turns. Our miners are instructed to emit only relations
 the text draws, which caps recall on this corpus by design.
 
-% Flush the floats of the pre-registered checks before the essay subsection.
+% Flush the floats of the planned checks before the essay subsection.
 \clearpage
 
 \input{appendix_asap}
