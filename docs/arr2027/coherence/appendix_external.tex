@@ -32,6 +32,23 @@ after the first results were read; both add an analysis and remove none.
 \item[D2.] ContraDoc's clean documents were re-mined with fresh samples, to measure the miner's
   noise floor, as the LoCoBench records already allow.
 \end{description}
+\paragraph{The sign test.} Several hypotheses compare paired scores, such as a document before
+and after a contradiction is inserted, and predict the direction of the change. For each pair we
+record only whether the score fell, rose or tied, and drop the ties. If the edit had no systematic
+effect, a fall and a rise would be equally likely, so among the $n$ untied pairs the number of falls
+would follow a $\mathrm{Binomial}(n,\frac12)$ distribution. The $p$-value is the probability, under
+that null, of a split at least as lopsided as the one observed. It is \emph{two-sided}: it counts
+lopsidedness in either direction, which is the more conservative choice for a directional
+prediction (roughly doubling $p$) and the one the pre-registration fixed. The test uses only the
+direction of each change, not its size, so it needs no assumption about how the changes are
+distributed, which matters because changes in $\LCS$ range from tiny to several nats. For example,
+inserting a contradiction into a ContraDoc document lowers $\LCS$ on \extCdAssertDecGpt{} pairs and
+raises it on \extCdAssertIncGpt{} (Table~\ref{tab:ext-contradoc}); under the null, a split this
+uneven has probability below $\extCdAssertPGpt$. Tables report $p$ as such an upper bound, a power
+of ten, when it is very small. A small $p$ says that the direction of the effect is not a sampling
+accident. It says nothing about the effect's size, which the split itself conveys, and it does not
+cover systematic errors such as a biased miner, which the design and the Limitations address.
+
 The analyses marked \emph{exploratory} below were not pre-registered, and neither was the essay
 study (App.~\ref{app:asap}). Table~\ref{tab:ext-hyp} lists every
 pre-registered hypothesis with its outcome, including those that failed.
