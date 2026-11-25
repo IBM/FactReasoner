@@ -648,8 +648,10 @@ def write_macros(ev, path):
                 m(f"CdNoiseInv{tag}", pct(c["noise_floor"]["lcs"]["invariant"]))
                 m(f"CdNoiseMean{tag}", f"{c['noise_floor']['lcs']['mean_abs']:.3f}")
             m(f"HOneC{tag}", held(c["H_pass"]))
+            m(f"HOneCExcl{tag}", held(c["H_pass_excl_order_free"]))
             if tag == "Gpt":
-                for b, bt in (("judge_geval@gpt-6-sol", "Judge"), ("discourse_entity_graph", "Entity")):
+                for b, bt in (("judge_geval@gpt-6-sol", "Judge"), ("discourse_entity_graph", "Entity"),
+                              ("discourse_rc", "Rc"), ("discourse_lc", "Lc")):
                     if b in P:
                         m(f"CdPermInv{bt}", pct(P[b]["invariant"]))
                         m(f"CdPermDec{bt}", pct(P[b]["decrease"]))
@@ -688,8 +690,14 @@ def write_macros(ev, path):
                 key, val = k.split("=")
                 if val in ("global", "local", "intra", "Insert", "Replace", "news", "story", "wiki"):
                     m(f"CdRecall{val.title()}{tag}", pct(v["recall"]))
+                    if val in ("global", "local", "intra") and v.get("ci"):
+                        m(f"CdRecall{val.title()}{tag}Lo", pct(v["ci"][0]))
+                        m(f"CdRecall{val.title()}{tag}Hi", pct(v["ci"][1]))
             m(f"HTwoB{tag}", held(x.get("H2b_pass")))
             m(f"CdFp{tag}", pct(x["fp_docs"]["share_with_conflict"]))
+            cpp = x["fp_docs"]["conflicts_per_pair"]
+            ex = int(math.floor(math.log10(cpp)))
+            m(f"CdFpPair{tag}", f"\\ensuremath{{{cpp / 10 ** ex:.1f}\\times10^{{{ex}}}}}")
             if tag == "Gpt":
                 if "spot" in x:
                     m("CdSpotContradicted", x["spot"].get("contradicted", 0))
@@ -725,6 +733,8 @@ def write_macros(ev, path):
             m(f"QtPairP{tag}", f"{q['pair']['p']:.2f}")
             m(f"QtPairR{tag}", f"{q['pair']['r']:.2f}")
             m(f"QtCoupF{tag}", f"{q['coupling']['f1']:.2f}")
+            m(f"QtCoupP{tag}", f"{q['coupling']['p']:.2f}")
+            m(f"QtCoupR{tag}", f"{q['coupling']['r']:.2f}")
             for k, v in q["recall_by_coupling"].items():
                 m(f"QtRec{k.title().replace('_', '')}{tag}", pct(v))
             m(f"QtDir{tag}", pct(q["entailment_direction"]))

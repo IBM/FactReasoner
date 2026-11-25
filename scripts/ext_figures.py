@@ -101,17 +101,18 @@ def main() -> int:
     none = ["Contrast", "Concession", "Temporal", "EntRel/NoRel"]
     names = coup + none
     ys = list(range(len(names)))[::-1]
-    vals = [100 * by[c]["any"] for c in names]
+    # coupling senses: the correct coupling; senses that compile to none: any coupling (an error)
+    vals = [100 * by[c]["correct"] for c in coup] + [100 * by[c]["any"] for c in none]
     colors = [BLUE] * len(coup) + [ORANGE] * len(none)
     bars = ax.barh(ys, vals, height=0.7, color=colors, zorder=2)
     label(ax, bars, horizontal=True)
     ax.set_yticks(ys, [n.replace("EntRel/NoRel", "EntRel, NoRel") for n in names])
     ax.set_xlim(0, 100)
-    ax.set_xlabel("receives a coupling (%)")
+    ax.set_xlabel("relations coupled (%)")
     ax.xaxis.grid(True, color=GRID, lw=0.5, zorder=0)
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=BLUE, label="sense has a coupling"),
-                       Patch(color=ORANGE, label="sense compiles to none")],
+    ax.legend(handles=[Patch(color=BLUE, label="has a coupling: the correct one"),
+                       Patch(color=ORANGE, label="compiles to none: any coupling")],
               fontsize=5.6, frameon=False, loc="center right", bbox_to_anchor=(1.0, 0.36),
               handlelength=1.0)
     ax.set_title("(c) GDTB", fontsize=7.5, color=INK, loc="left")

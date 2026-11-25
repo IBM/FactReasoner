@@ -57,7 +57,7 @@ ROWS = [
     ("arm:graph_gptoss:lambda", "graph-level miner, gpt-oss-120b", "ours"),
     ("arm:pair_gptoss:lambda", "pairwise miner, gpt-oss-120b", "ours"),
     ("arm:pair_llama:lambda", "pairwise miner, Llama-3.3-70B", "ours"),
-    ("header", "Other readouts of the same model (gold graphs)", None),
+    ("header", "The same model at another world (gold graphs)", None),
     ("arm:gold:lambda_assert", "LCS at the asserted world", "other"),
     ("header", "Baselines (read the text)", None),
     ("base:judge_geval@gpt-6-sol", "LLM judge, G-Eval, GPT-6", "other"),

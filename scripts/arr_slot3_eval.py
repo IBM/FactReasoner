@@ -457,7 +457,7 @@ def write_macros(path, out):
     m("sThreeFamilies", out["n_families"])
     m("sThreeTol", f"{TOL:g}")
     m("sThreeLadders", out["n_ladders"])
-    m("sThreeItems", out["n_items"])
+    m("sThreeItems", f"{out['n_items']:,}".replace(",", "{,}"))
     g = out["arms"]["gold"]["lambda"]
     m("sThreeNIncPairs", g["inc"][1])
     m("sThreeNInvPairs", g["inv"][1])
@@ -505,7 +505,7 @@ def write_macros(path, out):
             m(f"sThree{tg}CoupF", f"{e['coupling'][2]:.2f}")
     ll = out["lambda_vs_lcs"]
     m("sThreeLamLcsSignDis", sum(v[2] for v in ll.values()))
-    m("sThreeLamLcsPairs", sum(v[0] for v in ll.values()))
+    m("sThreeLamLcsPairs", f"{sum(v[0] for v in ll.values()):,}".replace(",", "{,}"))
     for arm in out["arms"]:
         n, dis, _sg = ll[f"{arm}:lambda"]
         m(f"sThree{tags[arm]}LamLcsDis", f"{dis}/{n}")

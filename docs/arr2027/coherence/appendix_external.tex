@@ -1,16 +1,16 @@
 % Details of the external checks (Sec. "External Checks"). Numbers: numbers_ext.tex, generated
-% by scripts/ext_eval.py. Results are for the GPT-6 graph miner (macros with suffix Gpt); the
-% gpt-oss-120b arm (suffix Oss) is being mined.
+% by scripts/ext_eval.py. Both graph miners (macros with suffixes Gpt and Oss).
 
 %% ============================================================================
 \section{External Checks in Detail}
 \label{app:external}
 %% ============================================================================
 
-\paragraph{Protocol.} Every prediction, test and threshold was fixed in a pre-registration
-committed before any graph was mined. The settings are:
+\paragraph{Protocol.} Table~\ref{tab:ext-data} lists the data. Every prediction, test and threshold was fixed in a pre-registration
+committed before any graph of these checks was mined. The settings are:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item the GPT-6 graph miner ($K{=}5$, taxonomy v2, the gateway's response cache bypassed);
+\item the graph-level miner with GPT-6 and with gpt-oss-120b, two arms ($k=5$, the taxonomy of Table~\ref{tab:couplings}, the gateway's response
+  cache bypassed);
 \item $\LCS$ and $\Lambda$ with flat priors, $\Lambda$ exact by variable elimination on each
   connected component;
 \item invariance within $\tau=0.01$;
@@ -18,11 +18,17 @@ committed before any graph was mined. The settings are:
   source document or nodeset).
 \end{itemize}
 The baselines are those of \S\ref{sec:exp-baselines} that read a single text: DiscoScore RC and
-LC, the entity graph and G-Eval with GPT-6, averaged over three runs. Two deviations were logged
+LC, the entity graph and G-Eval with GPT-6, averaged over three runs (the pre-registered number,
+against five in \S\ref{sec:exp-baselines}, for the larger corpora). Two deviations were logged
 after the first results were read; both add an analysis and remove none.
 \begin{description}[leftmargin=1.2em,itemsep=1pt,topsep=2pt,font=\normalfont\itshape]
 \item[D1.] DiscoScore RC and LC count noun repetitions regardless of sentence order, so, like the
-  length controls the pre-registration excluded, they cannot change under a permutation.
+  length controls the pre-registration excluded, they are order-free by definition. They never
+  change under a LoCoBench permutation, and on ContraDoc they stay within $\tau$ on
+  \extCdPermInvRc\% and \extCdPermInvLc\% of permutations, presumably because permuting a long
+  document changes its sentence segmentation. H1a and H1c fail with them excluded too
+  (\extHOneAExclGpt{} and \extHOneCExclGpt{} with GPT-6): the entity graph keeps
+  \extLocoPermInvEntity\% and \extCdPermInvEntity\% within $\tau$.
 \item[D2.] ContraDoc's clean documents were re-mined with fresh samples, to measure the miner's
   noise floor, as the LoCoBench test-split records already allow.
 \end{description}
@@ -35,7 +41,7 @@ The analyses marked \emph{exploratory} below were not pre-registered.
 \toprule
 Dataset & Items & Claims and gold & Licence \\
 \midrule
-LoCoBench, shuffled & 720 & the items' claims and gold; 180 families $\times$ (unchanged, 2 paragraph permutations, sentence shuffle) & ours \\
+LoCoBench, shuffled & 720 & the items' claims and gold; the bottom rungs of the 180 non-\cp{order} families $\times$ (unchanged, 2 paragraph permutations, sentence shuffle) & ours \\
 ContraDoc \citep{contradoc} & 1{,}369 & sentences; 178 insertion pairs differing by one claim, 271 replacements, 442 clean documents, 300 permutations & Apache-2.0 \\
 SummEval \citep{summeval} & 1{,}600 & sentences; mean of three expert ratings per dimension & MIT \\
 ChatProtect \citep{mundler2024} & 1{,}660 & sentences; 830 pairs (prefix $+\,s$, prefix $+\,s+s'$), contradiction label, false side on a subset & Apache-2.0 \\
@@ -61,24 +67,27 @@ the text, is made a claim of its own, so an insertion pair differs by exactly on
 & permuted & sent.\ shuffled & permuted \\
 \midrule
 gold $\LCS$ & 100 & 100 & -- \\
-$\LCS$, GPT-6 miner & \extLocoPermInvGpt & \extLocoSentInvGpt & \extCdPermInvGpt \\
+$\LCS$, GPT-6 arm & \extLocoPermInvGpt & \extLocoSentInvGpt & \extCdPermInvGpt \\
 \quad re-mined & \extLocoNoiseInvGpt & & \extCdNoiseInvGpt \\
+$\LCS$, gpt-oss arm & \extLocoPermInvOss & \extLocoSentInvOss & \extCdPermInvOss \\
+\quad re-mined & \extLocoNoiseInvOss & & \extCdNoiseInvOss \\
 \midrule
-DiscoScore RC$^\dagger$ & \extLocoPermInvRc & \extLocoSentInvRc & -- \\
-DiscoScore LC$^\dagger$ & \extLocoPermInvLc & \extLocoSentInvLc & -- \\
+DiscoScore RC$^\dagger$ & \extLocoPermInvRc & \extLocoSentInvRc & \extCdPermInvRc \\
+DiscoScore LC$^\dagger$ & \extLocoPermInvLc & \extLocoSentInvLc & \extCdPermInvLc \\
 entity graph & \extLocoPermInvEntity & \extLocoSentInvEntity & \extCdPermInvEntity \\
 G-Eval, GPT-6 & \extLocoPermInvJudge & \extLocoSentInvJudge & \extCdPermInvJudge \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{Order.} Share (\%) of cases a score keeps within $\tau$ on its own scale.
-$^\dagger$Order-invariant by definition (D1). ``Re-mined'': the share an unchanged text keeps when
+$^\dagger$Order-free by definition (D1); the ContraDoc changes presumably come from sentence
+segmentation. ``Re-mined'': the share an unchanged text keeps when
 it is mined again, the ceiling the mined rows can reach.}
 \label{tab:ext-order}
 \end{table}
 
 \paragraph{Order.} Gold-graph $\LCS$ is identical across every permutation, as it must be: the
-claims and relations do not change. The mined score moves only as much as re-mining moves it
-(Table~\ref{tab:ext-order}):
+claims and relations do not change. With the GPT-6 arm, the mined score moves about as much as
+re-mining moves it (Table~\ref{tab:ext-order}):
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item on LoCoBench, a mean absolute change of \extLocoPermMeanGpt{} under permutation; beyond
   $\tau$ it falls on \extLocoPermDownTolGpt{} and rises on \extLocoPermUpTolGpt{} of
@@ -86,6 +95,9 @@ claims and relations do not change. The mined score moves only as much as re-min
 \item on ContraDoc, a mean change of \extCdPermMeanGpt{} under permutation against
   \extCdNoiseMeanGpt{} under re-mining.
 \end{itemize}
+gpt-oss-120b is noisier, and permutation moves its score more than re-mining does: a mean change
+of \extCdPermMeanOss{} against \extCdNoiseMeanOss{} on ContraDoc. For that miner, part of the
+movement comes from the order in which it reads the text.
 The noise grows with document length (median 39 claims on ContraDoc against 14 on LoCoBench),
 because five sampled graphs over many claims agree less often. More samples per document would
 lower it. Sentence shuffles move the mined score slightly more (\extLocoSentInvGpt\% within
@@ -103,7 +115,8 @@ and \extCdPermDecJudge\% of ContraDoc permutations.
 SummEval's ``consistency'' is faithfulness to the source article, which the score does not
 measure. \extSeEmptyGpt\% of the summaries, about three sentences long, have no factor relation
 at all, so the check is weak by construction: it shows that the score does not track rated
-coherence, not that it tracks anything else.
+coherence, not that it tracks anything else. The G-Eval judge, by contrast, correlates with the
+same coherence ratings at $\rho=\extSeJudgeRhoCoh$, as a discourse-coherence measure should.
 
 %% ----------------------------------------------------------------------------
 \subsection{Check 2: Conflicts in Natural Documents}
@@ -115,12 +128,18 @@ coherence, not that it tracks anything else.
 \toprule
 & falls & rises & $p$ \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{$\LCS$, every claim true}} \\
+\multicolumn{4}{@{}l}{\emph{$\LCS$ (GPT-6 arm), every claim true}} \\
 all pairs & \extCdAssertDecGpt & \extCdAssertIncGpt & \extCdAssertPGpt \\
 contradiction found & \extCdAssertEdgeDecGpt & \extCdAssertEdgeIncGpt & \extCdAssertEdgePGpt \\
-\multicolumn{4}{@{}l}{\emph{$\LCS$, inserted sentence false}} \\
+\multicolumn{4}{@{}l}{\emph{$\LCS$ (GPT-6 arm), inserted sentence false}} \\
 all pairs & \extCdVerdAllDecGpt & \extCdVerdAllIncGpt & \extCdVerdAllPGpt \\
 contradiction found & \extCdVerdEdgeDecGpt & \extCdVerdEdgeIncGpt & \extCdVerdEdgePGpt \\
+\multicolumn{4}{@{}l}{\emph{$\LCS$ (gpt-oss arm), every claim true}} \\
+all pairs & \extCdAssertDecOss & \extCdAssertIncOss & \extCdAssertPOss \\
+contradiction found & \extCdAssertEdgeDecOss & \extCdAssertEdgeIncOss & \extCdAssertEdgePOss \\
+\multicolumn{4}{@{}l}{\emph{$\LCS$ (gpt-oss arm), inserted sentence false}} \\
+all pairs & \extCdVerdAllDecOss & \extCdVerdAllIncOss & \extCdVerdAllPOss \\
+contradiction found & \extCdVerdEdgeDecOss & \extCdVerdEdgeIncOss & \extCdVerdEdgePOss \\
 \midrule
 G-Eval, GPT-6 & \extCdJudgeDec & \extCdJudgeInc & \\
 DiscoScore RC & \extCdRcDec & \extCdRcInc & \\
@@ -129,9 +148,9 @@ entity graph & \extCdEntityDec & \extCdEntityInc & \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{ContraDoc insertion pairs} (\extCdPairs): how each score moves when the
-contradicting sentence is inserted; ties make up the rest. ``Contradiction found'': the inserted
+contradicting sentence is inserted; ties make up the rest. $p$: two-sided sign test; a power of ten is an upper bound. ``Contradiction found'': the inserted
 document's graph has a contradiction or exclusion on the inserted claim
-(\extCdAssertEdgeNGpt{} pairs).}
+(\extCdAssertEdgeNGpt{} pairs with GPT-6, \extCdAssertEdgeNOss{} with gpt-oss).}
 \label{tab:ext-contradoc}
 \end{table}
 
@@ -151,15 +170,20 @@ fell has no conflict on the inserted sentence: the two versions were mined indep
 the rest of their graphs came out differently. The sign of each relation follows the truth
 values, and the comparison across documents carries the miner's sampling noise. A paired design,
 mining the clean document once and adding only the inserted claim's relations, would remove that
-noise.
+noise. With gpt-oss-120b, \extCdEvSupOss{} of the relations drawn to the false sentence
+are supports and \extCdEvConOss{} a conflict (an inference drawn from a true claim to the false
+one, which the sign rule correctly charges); \extCdVerdFallsNoConOss{} of its \extCdVerdFallsOss{}
+verdict-world falls have no conflict on the inserted sentence.
 
-\paragraph{Recall.} The miner finds the contradiction in \extCdRecallGpt\% of the 449 contradicted
-documents:
+\paragraph{Recall.} The GPT-6 arm finds the contradiction in \extCdRecallGpt\% of the 449
+contradicted documents (gpt-oss-120b: \extCdRecallOss\%):
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item by edit: \extCdRecallInsertGpt\% of insertions and \extCdRecallReplaceGpt\% of
   replacements;
-\item by scope: \extCdRecallGlobalGpt\% global, \extCdRecallLocalGpt\% local and
-  \extCdRecallIntraGpt\% within a sentence;
+\item by scope: \extCdRecallGlobalGpt\% global
+  {\scriptsize[\extCdRecallGlobalGptLo,\,\extCdRecallGlobalGptHi]}, \extCdRecallLocalGpt\% local
+  {\scriptsize[\extCdRecallLocalGptLo,\,\extCdRecallLocalGptHi]} and \extCdRecallIntraGpt\%
+  within a sentence {\scriptsize[\extCdRecallIntraGptLo,\,\extCdRecallIntraGptHi]};
 \item by document type: \extCdRecallNewsGpt\% news, \extCdRecallStoryGpt\% stories and
   \extCdRecallWikiGpt\% Wikipedia.
 \end{itemize}
@@ -167,7 +191,8 @@ A contradiction within one sentence is internal to a single claim at sentence gr
 relation between two claims can find it; finer claims, as from an atomizer, could. A replacement
 removes the sentence the new one would contradict, which leaves the miner less to link to. On the
 442 clean documents, \extCdFpGpt\% of graphs contain at least one contradiction, the false-alarm
-rate against which recall should be read.
+rate against which recall should be read; per claim pair, the rate is $\extCdFpPairGpt$
+(gpt-oss-120b: \extCdFpOss\% of graphs, $\extCdFpPairOss$ per pair).
 
 %% ----------------------------------------------------------------------------
 \subsection{Check 3: The Sign Follows the Truth}
@@ -177,7 +202,7 @@ sentences. In every case the leave-one-out contribution of the relation is negat
 the world falls in the relation's violated cells. This checks the implementation on natural
 graphs and confirms Lemma~\ref{lem:edit} at work.
 
-The miner finds the contradiction in \extCpConfStrongGpt\% of the pairs annotated as
+The GPT-6 arm finds the contradiction in \extCpConfStrongGpt\% of the pairs annotated as
 contradictory and in \extCpConfNoneGpt\% of the others: low recall, no false alarms. With every
 claim true, adding the second sentence lowers $\LCS$ on \extCpAssertDecGpt{} and raises it on
 \extCpAssertIncGpt{} of \extCpAssertNGpt{} contradictory pairs ($p<\extCpAssertPGpt$). The split
@@ -190,6 +215,12 @@ by whether the contradiction was found is exploratory:
 Every rise is a pair whose contradiction the miner missed; the score itself never moves the wrong
 way.
 
+gpt-oss-120b finds the contradiction in \extCpConfStrongOss\% and \extCpConfNoneOss\% of the two
+groups, and its sweep covers \extCpSweepNOss{} cases, every one with the predicted sign. Where it
+finds the contradiction, $\LCS$ falls on all \extCpFoundFallOss{} pairs, but it finds so few that
+over all pairs falls and rises are even (\extCpAssertDecOss{} and \extCpAssertIncOss), so H3c
+fails for it.
+
 On the subset whose false side the annotators recorded, the contradictions found are
 \extCpRealSupportGpt{} supports and \extCpRealConflictGpt{} conflicts at the real verdicts. A
 self-contradiction between two false sentences, or between a true and a false one, is a support
@@ -201,23 +232,25 @@ at the verdict world. Counting contradictions would treat all of them as defects
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{@{}lrcc@{}}
+\begin{tabular}{@{}lrcccc@{}}
 \toprule
-Category & $n$ & any & correct \\
+& & \multicolumn{2}{c}{GPT-6} & \multicolumn{2}{c}{gpt-oss} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Category & $n$ & any & correct & any & correct \\
 \midrule
-\sense{Cause-Effect} & \extGdCauseEffectN & \extGdCauseEffectAnyGpt & \extGdCauseEffectCorrectGpt \\
-\sense{Condition} & \extGdConditionN & \extGdConditionAnyGpt & \extGdConditionCorrectGpt \\
-\sense{Instantiation} & \extGdInstantiationN & \extGdInstantiationAnyGpt & \extGdInstantiationCorrectGpt \\
-\sense{Restatement} & \extGdRestatementN & \extGdRestatementAnyGpt & \extGdRestatementCorrectGpt \\
-\sense{Disjunction} & \extGdDisjunctionN & \extGdDisjunctionAnyGpt & \extGdDisjunctionCorrectGpt \\
+\sense{Cause-Effect} & \extGdCauseEffectN & \extGdCauseEffectAnyGpt & \extGdCauseEffectCorrectGpt & \extGdCauseEffectAnyOss & \extGdCauseEffectCorrectOss \\
+\sense{Condition} & \extGdConditionN & \extGdConditionAnyGpt & \extGdConditionCorrectGpt & \extGdConditionAnyOss & \extGdConditionCorrectOss \\
+\sense{Instantiation} & \extGdInstantiationN & \extGdInstantiationAnyGpt & \extGdInstantiationCorrectGpt & \extGdInstantiationAnyOss & \extGdInstantiationCorrectOss \\
+\sense{Restatement} & \extGdRestatementN & \extGdRestatementAnyGpt & \extGdRestatementCorrectGpt & \extGdRestatementAnyOss & \extGdRestatementCorrectOss \\
+\sense{Disjunction} & \extGdDisjunctionN & \extGdDisjunctionAnyGpt & \extGdDisjunctionCorrectGpt & \extGdDisjunctionAnyOss & \extGdDisjunctionCorrectOss \\
 \midrule
-\sense{Contrast} & \extGdContrastN & \extGdContrastAnyGpt & \extGdContrastCorrectGpt \\
-\sense{Concession} & \extGdConcessionN & \extGdConcessionAnyGpt & \extGdConcessionCorrectGpt \\
-temporal & \extGdTemporalN & \extGdTemporalAnyGpt & \extGdTemporalCorrectGpt \\
-EntRel / NoRel & \extGdEntRelNoRelN & \extGdEntRelNoRelAnyGpt & \extGdEntRelNoRelCorrectGpt \\
+\sense{Contrast} & \extGdContrastN & \extGdContrastAnyGpt & \extGdContrastCorrectGpt & \extGdContrastAnyOss & \extGdContrastCorrectOss \\
+\sense{Concession} & \extGdConcessionN & \extGdConcessionAnyGpt & \extGdConcessionCorrectGpt & \extGdConcessionAnyOss & \extGdConcessionCorrectOss \\
+temporal & \extGdTemporalN & \extGdTemporalAnyGpt & \extGdTemporalCorrectGpt & \extGdTemporalAnyOss & \extGdTemporalCorrectOss \\
+EntRel / NoRel & \extGdEntRelNoRelN & \extGdEntRelNoRelAnyGpt & \extGdEntRelNoRelCorrectGpt & \extGdEntRelNoRelAnyOss & \extGdEntRelNoRelCorrectOss \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{GDTB by category}, GPT-6 miner (\%). ``any'': the miner emits a coupling
+\caption{\textbf{GDTB by category} (\%). ``any'': the miner emits a coupling
 between the two arguments. ``correct'': the gold coupling for the upper block, and no coupling
 for the lower block, whose senses compile to none.}
 \label{tab:ext-gdtb}
@@ -228,11 +261,15 @@ upper block of Table~\ref{tab:ext-gdtb} measures recall of the coupling; the low
 the compile map's central claim, that contrast, concession and temporal sequence constrain
 nothing. The difference between the two rates, \extGdCorrectGpt\% against \extGdNoneGpt\%, has a
 95\% interval well above zero. The weakest categories are those the miner most often maps to a
-neighbouring coupling: disjunction and restatement.
+neighbouring coupling: disjunction and restatement. The pre-registered \sense{Evidence} category
+(PDTB \sense{Cause+Belief}) has no instance in the GDTB documents we use, so it is
+absent from the table.
 
-\paragraph{QT30.} Over \extQtWindows{} windows of the BBC debates, the GPT-6 miner reaches
+\paragraph{QT30.} Over \extQtWindows{} windows of the BBC debates, the GPT-6 arm reaches
 pair-level precision, recall and F1 of \extQtPairPGpt, \extQtPairRGpt{} and \extQtPairFGpt, and a
-coupling-level F1 of \extQtCoupFGpt{}. Recall by coupling:
+coupling-level precision, recall and F1 of \extQtCoupPGpt, \extQtCoupRGpt{} and \extQtCoupFGpt.
+gpt-oss-120b reaches \extQtPairFOss{} and \extQtCoupFOss, with
+inference recall \extQtRecEntailmentOss\%. GPT-6's recall by coupling:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item inference: \extQtRecEntailmentGpt\% of \extQtNEntailment, with the direction right in
   \extQtDirGpt\% of those found;

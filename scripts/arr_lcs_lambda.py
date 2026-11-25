@@ -143,7 +143,7 @@ def main() -> int:
 
     ax = axes[1]
     lo = -10.0
-    for arm, col, lab in (("gold", GOLD, "gold graphs"), ("graph_gpt6", MINED, "GPT-6 miner")):
+    for arm, col, lab in (("gold", GOLD, "gold graphs"), ("graph_gpt6", MINED, "graph-level miner, GPT-6")):
         rows = data[arm]
         lam = np.array([max(r[0], lo) for r in rows])
         lcs = np.array([r[1] for r in rows])
@@ -163,7 +163,7 @@ def main() -> int:
     ax.set_xlim(lo - 1.6, 10.6)
     ax.set_ylim(-0.1, 1.04)
     ax.set_xlabel(r"$\Lambda$ (nats)")
-    ax.set_title("(b) every rung of the test split, both scales", fontsize=7.5, color=INK,
+    ax.set_title("(b) every response of the test split, both scales", fontsize=7.5, color=INK,
                  loc="left")
     ax.legend(fontsize=6.2, frameon=False, loc="lower right", markerscale=2.2, handletextpad=0.3,
               bbox_to_anchor=(1.0, 0.08))

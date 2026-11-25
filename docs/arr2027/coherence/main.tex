@@ -120,14 +120,18 @@ and the logical coherence score (LCS) measures the weight of evidence that the r
 lend to that assignment: refuting a falsehood counts as support, and deriving a falsehood from a
 truth counts as conflict. We prove the score strictly monotone for any priors and relation graph,
 characterize the pairwise relation potentials under which adding or deleting a relation is
-monotone, show that the score must be read at the world that defines the order, and compute it
+monotone, show that no readout increasing in the posterior of any other single world is monotone
+in the same order, and compute it
 with one partition-function query. On a benchmark of \sThreeLadders{} coherence ladders
 (\sThreeItems{} responses), each spliced from one template, the score satisfies every declared
 ordering and invariance on gold relation graphs,
 while the score read at the asserted world misranks the ladders that derive or refute a
-falsehood. On graphs mined by four extractors its errors fall only on pairs whose
-extracted graphs no sequence of improving edits connects, which locates them in relation
-extraction, while LLM judges miss about half of the declared increases.
+falsehood. On graphs mined by two miners with two models each, the score follows the extracted graphs wherever
+the coherence order ranks them (one tie of $4\times10^{-14}$ aside), so its misses trace to
+relation extraction, while LLM judges miss about half of the declared increases. In pre-registered
+checks on five datasets that others built and labelled, the mined score is uncorrelated with rated
+discourse coherence, falls when a contradiction is inserted into a document, and its relations take
+the predicted sign in every case tested; relation recall is the bottleneck.
 \end{abstract}
 
 %% ============================================================================
@@ -193,7 +197,8 @@ responses that state the same five claims with the same stance.
   magnitude depends on the rest of the argument but whose sign never does. Adding or deleting a
   pairwise relation moves the score in a fixed direction in every context exactly when the
   relation's table is sign-definite, which tables normalized in the premise are not at low weights
-  or false premises; and the score must be read at the world that defines the order.
+  or false premises; and no readout increasing in the posterior of another single world is
+  monotone in the same order.
 \item \textbf{A coherence score with a guarantee} (\S\ref{sec:setup}--\ref{sec:props}). $\LCS$ is
   strictly monotone in every coherence-improving edit, for any priors and relation graph. It takes
   labels or posteriors from any factuality pipeline, does not depend on whether a claim enters as
@@ -203,10 +208,15 @@ responses that state the same five claims with the same stance.
   \sThreeLadders{} three-rung ladders built for the purpose (\sThreeFamilies{} families,
   \sThreeItems{} responses), every declared ordering and invariance holds on gold graphs, a check of the theory and its implementation, while the score read at
   the asserted world misranks the ladders that derive or refute a falsehood. On
-  graphs from four miners every error falls on a pair whose extracted graphs are incomparable in
-  the coherence order, which separates extraction errors from scoring errors; LLM judges, a
-  frontier one included, recognize explicit contradictions but miss about half of the
-  declared increases and are close to chance on added inferences.
+  graphs from four mined arms (two miners, two models each) the score follows the extracted graphs on every pair the coherence order
+  ranks (one tie of $4\times10^{-14}$ aside), and its remaining misses are on pairs the order cannot
+  rank, which separates extraction errors from scoring errors; LLM judges, a frontier one
+  included, recognize explicit contradictions but miss about half of the declared increases and
+  are close to chance on added inferences.
+\item \textbf{External checks} (\S\ref{sec:exp-external}). Pre-registered tests on five datasets
+  that others built and labelled find the mined score unrelated to rated discourse coherence,
+  lowered by contradictions inserted into documents, and sign-correct on every relation tested,
+  with relation recall, not the score, as the binding constraint.
 \end{itemize}
 
 
@@ -261,7 +271,8 @@ The \emph{committed world} $\xs\in\{0,1\}^n$ assigns each claim the truth value,
 \emph{polarity}, under which the argument is evaluated. Under \emph{verdict polarity}, $\xs_i$ is
 a factuality pipeline's verdict on claim $i$: $1$ if supported, $0$ if not. Under
 \emph{assertion polarity}, $\xs_i$ is the response's own stance: $1$ if it asserts claim $i$ and
-$0$ if it denies it. When every claim is asserted, as in a decomposition that records only
+$0$ if it denies it. We call the two committed worlds the \emph{verdict world} and the
+\emph{asserted world}. When every claim is asserted, as in a decomposition that records only
 asserted claims, assertion polarity is $\xs=\one$; in our evaluation data this holds for every
 response except those that refute a falsehood (\S\ref{sec:exp-setup}).
 \end{definition}
@@ -280,7 +291,7 @@ response asserts exactly the claims the verdicts support and denies the rest, as
 Figure~\ref{fig:voyager} do. There, $\xs=(1,1,1,0,0)$ under either polarity.
 
 Verdict polarity makes the score a measure of how well an argument holds up \emph{given} the
-verdicts, and three consequences follow. A response that sets a true claim against a false one is
+verdicts, and four consequences follow. A response that sets a true claim against a false one is
 credited for refuting the falsehood, even if it asserts both; asserting the falsehood is penalized
 by the factuality score, not by this one, and assertion polarity is the reading that treats such a
 pair as a self-contradiction. Likewise, an entailment from a false claim cannot be broken in the
@@ -339,7 +350,7 @@ negating one end of \eqv{} gives \exc{}.
 
 \begin{definition}[Relation and compile map]
 \label{def:relation}
-A \emph{relation} $r=(e_r,\tau_r,p_r)$ has a scope $e_r=(s_r,t_r)$ of two claims, a coupling, and
+A \emph{relation} $r=(e_r,\tau_r,p_r)$ has a scope $e_r=(s_r,t_r)$ of two distinct claims, a coupling, and
 a weight $p_r\in[0,1)$, the confidence and strength with which the response draws it
 (\S\ref{sec:mining}). For a world $x$ and any pair
 of claims $e=(s,t)$, we write $x_e=(x_s,x_t)$ for the truth values of the two claims; in particular
@@ -431,7 +442,8 @@ including A's two refutations, and every entailment a support, including B's $a_
 (App.~\ref{app:voyager}).
 
 \paragraph{Claims and their negations.} A decomposition may record a denied claim as itself, as
-here, or as its asserted negation, ``the instrument had not failed''. The choice does not matter.
+here, or as its asserted negation, ``the instrument had not failed''. The choice does not matter
+(a posterior of exactly $\frac12$, which thresholding sends to $1$ either way, aside).
 Replacing $a_i$ by $\neg a_i$ flips $\xs_i$, replaces $\pi_i$ by $1-\pi_i$, and rewrites every
 coupling at $a_i$ by the closure above, so $a_2\con a_4$ becomes $a_2\Rightarrow\neg a_4$; each
 relation keeps its sign, and the score is unchanged (Prop.~\ref{prop:neg}). What matters is only
@@ -451,8 +463,9 @@ p_r\;=\;c_r\cdot g_r,\qquad c_r,g_r\in[0,1],
 so that a confidently identified weak link and a doubtfully identified strong one are not
 confused; the product is clipped below $1$ so that $p_r<1$. The product is a modelling choice: a
 relation whose type is uncertain could instead enter as a mixture of tables, but when the mixed
-couplings disagree in sign at $\xs$, the mixture places the committed cell strictly between its
-extremes, which loses the guarantee of \S\ref{sec:why}, whereas the product keeps every factor
+couplings disagree in sign at $\xs$, the mixture can place the committed cell strictly between its
+extremes (an entailment--contradiction mixture whose support is the likelier reading does), which
+loses the guarantee of \S\ref{sec:why}, whereas the product keeps every factor
 two-valued. We describe two miners that estimate Eq.~\ref{eq:decomp}
 differently; both are grounded in the response.
 
@@ -548,7 +561,7 @@ score read from it does.
 
 Figure~\ref{fig:mrf-a} shows the MRF of Response~A: five claims with flat priors, two entailment
 factors that penalize a premise holding while its conclusion fails, and two contradiction factors
-that penalize worlds in which a true claim and a false one both hold. A world drawn from the priors passes all
+that penalize worlds in which a true claim and the falsehood it refutes both hold. A world drawn from the priors passes all
 four checks with probability $Z_A=\vyAZ$. The committed world violates none of them, and its
 probability rises from $\pi(\xs)=2^{-5}\approx\vyAPiX$ to $P_A(\xs)=\vyAPX$. Under B's relations
 the same world falls to $P_B(\xs)=\vyBPX$, because it violates both of B's conflicts.
@@ -612,8 +625,8 @@ also known as the log-likelihood-ratio measure of confirmation \citep{fitelson19
 therefore the probability of $\xs$ after the relations for a reader who started from even odds on
 it. It lies in $(0,1)$, with three reference points (Figure~\ref{fig:lcs-range}). A
 \emph{completely incoherent} response, whose relations rule out the committed world, has
-$\LCS\to0$: $\PR(\xs)\to0$, as when $\xs$ violates conflicts of weight approaching $1$ that some
-other world satisfies. A response whose relations neither confirm nor disconfirm $\xs$, including
+$\LCS\to0$: $\PR(\xs)\to0$, as when $\xs$ violates conflicts of weight approaching $1$ that a
+single other world satisfies all of. A response whose relations neither confirm nor disconfirm $\xs$, including
 one with no relations, has $\PR(\xs)=\pi(\xs)$ and $\LCS=\frac12$. A \emph{completely coherent}
 response, whose relations force the committed world, has $\LCS\to1$: $\PR(\xs)\to1$, which requires
 relations that rule out every other world. Entailments, equivalences and contradictions never rule
@@ -642,7 +655,11 @@ statement about $\Lambda$ holds for $\LCS$; we state
 the results for $\Lambda$, where they take a closed form. The two differ in one respect. $\LCS$
 depends on $\pi(\xs)$ and so on the whole claim set: adding a claim that no relation touches leaves
 $\Lambda$ unchanged but moves $\LCS$ slightly towards $\sigma(\Lambda)$. The additivity and bounds
-of \S\ref{sec:props} are therefore properties of $\Lambda$, not of $\LCS$. To see why the score
+of \S\ref{sec:props} are therefore properties of $\Lambda$, not of $\LCS$. We nonetheless report
+$\LCS$: it is bounded, it reads as a probability, with $\frac12$ as the uninformative point, and it
+stays informative when a pipeline's posteriors are confident, where $\Lambda$ tends to $0$ for
+every graph (App.~\ref{app:twostage}). App.~\ref{app:lcs-lambda} collects the relation between
+the two scales. To see why the score
 behaves well, consider adding a single relation.
 
 \begin{lemma}[Edit identity]
@@ -650,8 +667,9 @@ behaves well, consider adding a single relation.
 For any $\R$, any relation $r$ and any priors,
 $\Lambda(\R\uplus\{r\})-\Lambda(\R)=\log\psi_r(\xs)-\log\E_{\PR}[\psi_r]$. With
 $q_r=\PR(x_{e_r}\in V(\tau_r))$, this is $-\log(1-p_rq_r)>0$ for a support and
-$\log\frac{1-p_r}{1-p_rq_r}<0$ for a conflict (for $p_r>0$ and non-trivial $V(\tau_r)$, which
-ensure $0<q_r<1$).
+$\log\frac{1-p_r}{1-p_rq_r}<0$ for a conflict. Here $0<q_r<1$, because the scope's two claims are
+distinct, $V(\tau_r)$ is a non-empty proper subset of the cells, and every world has positive
+mass; the sign is strict when $p_r>0$.
 \end{lemma}
 
 A relation's effect is its value at the committed world relative to its average under the current
@@ -683,8 +701,8 @@ to rule out.
 
 Theorem~\ref{thm:mono} rests on two choices, the potentials and the world at which the posterior is
 read. We show that sign-definite tables are the only pairwise tables with the property, that the
-readout world must be the world that defines the order, that a classical coherence measure fails,
-and that the obvious simpler score fails too. The results are elementary; their value is in what
+readout cannot be taken at any other single world, that a classical coherence measure fails,
+and that the obvious simpler score, though monotone, violates A2. The results are elementary; their value is in what
 they rule out. First, is sign-definiteness merely sufficient, or is it needed?
 
 \begin{theorem}[Sign-definiteness is necessary and sufficient]
@@ -695,7 +713,7 @@ Fix the priors and $\xs$. Adding a positive table $\psi$ over a pair of claims $
 \end{theorem}
 
 The theorem concerns adding and deleting relations; for weight changes, App.~\ref{app:proof-why}
-gives the analogous sufficient condition. A natural alternative to Eq.~\ref{eq:mrf} uses tables that
+gives the analogous sufficient condition. A natural alternative to Eq.~\ref{eq:psi} uses tables that
 are row-stochastic in the source, so that a false premise leaves its conclusion at the prior
 (App.~\ref{app:earlier}). Such tables fail the test. At $\xs=\one$ they are sign-definite with the
 intended sign only for $p\ge\frac12$; below it the committed cell of an entailment is the table's
@@ -705,7 +723,7 @@ maximum nor the minimum, so they fail at every weight except $p=\frac12$, where 
 constant and has no effect. Second, the order of Def.~\ref{def:order}
 is defined at $\xs$; could the score be read at another world?
 
-\begin{proposition}[The readout world must define the order]
+\begin{proposition}[No other readout world]
 \label{prop:unique}
 For $n\ge2$ and any world $x\neq\xs$, some elementary improvement strictly lowers
 $\log\PR(x)-\log\pi(x)$, for any priors and any $\R$.
@@ -713,7 +731,9 @@ $\log\PR(x)-\log\pi(x)$, for any priors and any $\R$.
 
 The proposition does not say that $\xs$ is the right world; choosing it is the factuality
 pipeline's job. It says that the order and the readout must use the same world, so a score
-monotone in agreement with the verdicts has to be read at the verdicts.
+monotone in agreement with the verdicts cannot be read off the posterior of any other single
+world. The proposition does not exclude readouts that combine several worlds; of the five
+App.~\ref{app:earlier} examines, four are not monotone and the fifth violates A2.
 
 Third, classical coherence measures, which ignore the committed world, are not monotone either:
 over \thmSteps{} random improving edits at $\xs=\one$, Shogenji's coherence measure
@@ -733,7 +753,7 @@ where different $\beta$ can rank incomparable graphs differently. We take $\beta
 probability that a check catches a violation, so that the check reading of
 \S\ref{sec:mrf} holds with the weights as estimated.
 
-\paragraph{Why not count relations?} Monotonicity alone admits trivial scores: the signed weight sum
+\paragraph{Why not count relations?} Finally, monotonicity alone admits trivial scores: the signed weight sum
 $\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is monotone by construction. But a count credits every relation
 in full, whether or not it rules out anything plausible, so it depends on how an argument is
 presented rather than on what it rules out. Two entailments $a\Rightarrow b$ and $b\Rightarrow a$ of
@@ -774,8 +794,8 @@ the question of padding: if supports never hurt, can a response gain without bou
 \begin{proposition}[Bounds and saturation]
 \label{prop:sat}
 (i) $\sum_{r\in\Rcon}\log(1-p_r)\le\Lambda(\R)\le-\log\pi(\xs)$. (ii) A support's gain is at most
-$-\log\bigl(1-p_r(1-\PR(\xs))\bigr)$. (iii) A second copy of a support adds strictly less than the
-first.
+$-\log\bigl(1-p_r(1-\PR(\xs))\bigr)$. (iii) For $p_r>0$, a second copy of a support adds strictly less
+than the first.
 \end{proposition}
 
 A support earns credit only for the probability it removes from worlds other than $\xs$, so once
@@ -818,8 +838,8 @@ here we state each point as a property of $\LCS$.
   score's closest analogue to a truth-independent notion (\S\ref{sec:setup}).
 \item \textbf{Supports count, not only conflicts.} Consistency is the absence of contradiction
   \citep{summac,selfcheckgpt,mundler2024}, so it cannot rise when an inference is added. By
-  Theorem~\ref{thm:mono} every added support raises $\LCS$, with diminishing returns
-  (Prop.~\ref{prop:sat}).
+  Theorem~\ref{thm:mono} every added support of positive weight raises $\LCS$, and each further
+  copy of the same support earns less (Prop.~\ref{prop:sat}).
 \item \textbf{The claims are held fixed, and their truth is not scored.} Probabilistic coherence
   measures compare different sets of propositions, and holistic ratings \citep{summeval,geval}
   compare whole texts that differ in content. The score's guarantee holds over one claim set and
@@ -847,8 +867,8 @@ spirit of LoCoBench \citep{anonlocobench}, with a construction designed for the 
 
 \paragraph{Ladders spliced from one template.} A family is one expert answer written once, as a
 \emph{template} with marked \emph{slots}. A slot is a pair of consecutive claims together with
-\emph{fillers}: one or two sentences that assert the slot's claims and draw exactly one link
-between them, either none, a support or a conflict relative to the committed world. A ladder's
+\emph{fillers}: one or two sentences that assert the slot's claims and draw at most one link
+between them: none, a support or a conflict relative to the committed world. A ladder's
 three \emph{rungs} are the template with different fillers spliced in (for \cp{order}, with its
 paragraphs permuted), so two rungs differ only where their fillers differ and share every other
 word, every claim and every verdict. Gold relations are compiled with the map of
@@ -866,15 +886,17 @@ are declared increasing at verdict polarity and the last two invariant. \cp{conf
 \cp{chain} edit only links between true claims, so their order holds under either polarity;
 \cp{sign} is the one ladder whose order assertion polarity reverses.
 
-\paragraph{Two splits.} Every family carries a primary ladder and a \cp{control} ladder on one
-more slot, whose bottom rung is the primary ladder's middle rung. A generator (Claude Opus~5)
+\paragraph{Generation and admission.} Every family carries a primary ladder and a \cp{control}
+ladder on one more slot, whose bottom rung is the primary ladder's middle rung. A generator (Claude Opus~5)
 writes the question, the claims with their factuality labels, the plan, the template and the
 fillers. A committee of three models from three vendors (GPT-6.1, Gemini~3.1 Pro and Claude
 Opus~5.5) admits a template only if a majority rates it fluent and free of annotation leakage,
 finds every claim asserted, and confirms its relations pair by pair without seeing the plan; it
 admits a filler only if a majority, not told which link was intended, reads exactly that link. A
 misread filler is regenerated on its own, and where the committee's reading of a fixed relation
-departs from the plan, gold follows the reading. A 16-family development split was used to tune the
+departs from the plan, gold follows the reading.
+
+\paragraph{Two splits.} A 16-family development split was used to tune the
 prompts; all results below are on a held-out \emph{test split} of \sThreeFamilies{} families,
 6--7 on each of 36 topics in 4 domains, every topic with all four primary types. It has
 \sThreeLadders{} ladders (\sThreeNConflict{} of each primary type and \sThreeNControl{}
@@ -899,17 +921,20 @@ differences arise in practice.
 The theory makes three predictions, which we test on the test split. \textbf{(P1)} On gold
 relation graphs, where every rung transition is an elementary improvement or leaves the graph
 unchanged, $\LCS$ satisfies every ordering and every invariance the ladders declare.
-\textbf{(P2)} On mined graphs, where no guarantee applies, every pair on which $\LCS$ misses
-the declared order is one whose two extracted graphs the coherence order leaves unranked.
-\textbf{(P3)} On \cp{sign}, the score read at the asserted world and readouts that ignore the
+\textbf{(P2)} On mined graphs, where no guarantee covers the extraction, $\LCS$ follows the
+extracted graphs: where the coherence order ranks the two extracted graphs, the score moves as
+that ranking requires, so every miss of the declared order is on a pair whose extracted graphs are
+reversed, equal or unranked.
+\textbf{(P3)} On \cp{sign}, the score read at the asserted world and scores that ignore the
 verdicts disagree with the declared order. Figure~\ref{fig:ladders} gives the overview for every
 score; \S\ref{sec:exp-gold}--\S\ref{sec:exp-polarity} take one prediction each, and
-\S\ref{sec:exp-baselines} compares the baselines.
+\S\ref{sec:exp-baselines} compares the baselines. \S\ref{sec:exp-external} then tests the
+paper's claims on natural text that others built and labelled.
 
 \subsection{Setup}
 \label{sec:exp-setup}
 
-\paragraph{Assertions.} Each ladder contributes its three rung pairs ($\rho_0$ vs.\ $\rho_1$,
+\paragraph{Declared orders.} Each ladder contributes its three rung pairs ($\rho_0$ vs.\ $\rho_1$,
 $\rho_1$ vs.\ $\rho_2$, $\rho_0$ vs.\ $\rho_2$): \sThreeNIncPairs{} \emph{Increase} pairs from the
 \cp{conflict}, \cp{chain} and \cp{sign} ladders, and \sThreeNInvPairs{} \emph{Invariance} pairs
 from the \cp{order} and \cp{control} ladders. An Increase pair is satisfied by a strict increase
@@ -923,7 +948,7 @@ resamples of families.
 
 \paragraph{Arms and scores.} An \emph{arm} fixes where the relation graph comes from and holds the
 claims, verdicts and scorer identical. \cp{gold} uses the items' relations at the midpoints of
-their strength bands. Four mined arms estimate the graph from the text
+their strength bands. Four mined arms, each a miner run with one model, estimate the graph from the text
 (\S\ref{sec:mining}): the graph-level miner ($k=5$) with GPT-6, a frontier model that is neither
 the generator nor on the committee, and with gpt-oss-120b; and the pairwise miner (window $w=4$,
 evidence span required) with gpt-oss-120b and Llama-3.3-70B. Each arm's graph is read two ways:
@@ -938,7 +963,8 @@ both. Both are fixed before any prose exists: the generator writes each family's
 their factuality labels first, the plan then fixes which claims each rung asserts or denies, and
 only then are the template and fillers written around them (App.~\ref{sec-full-locobench}). The
 \emph{verdict world} sets each claim to its factuality label. The claim pool includes a few
-claims that are deliberately plausible but false; every response asserts 2--3 of them, and they
+claims that are deliberately plausible but false; every response asserts one to three of them,
+most two, and they
 are $0$ in the verdict world. The committee checks that each false claim is asserted as written, not
 that the labels are right; the labels stand in for the verdicts of a factuality pipeline
 (\S\ref{sec:setup}), here an error-free one. The \emph{asserted world} sets each claim to the
@@ -968,9 +994,9 @@ even large steps beyond any fixed resolution: on one pairwise-miner ladder the l
 $\LCS\approx10^{-17}$, and a step of $13$ nats in $\Lambda$ from it moves $\LCS$ by
 $5\times10^{-12}$.
 Taking the same decision on $\LCS$ would change nothing on gold graphs or on either graph-level
-miner's graphs (\sThreeGoldLamLcsDis, \sThreeGraphGptLamLcsDis{} and \sThreeGraphOssLamLcsDis{}
+arm's graphs (\sThreeGoldLamLcsDis, \sThreeGraphGptLamLcsDis{} and \sThreeGraphOssLamLcsDis{}
 rung pairs) but would turn
-\sThreePairOssLamLcsDis{} and \sThreePairLlamaLamLcsDis{} of the pairwise miners' rung pairs into
+\sThreePairOssLamLcsDis{} and \sThreePairLlamaLamLcsDis{} of the pairwise arms' rung pairs into
 ties. \emph{How far} the score moves, the tolerance $\tau$, resolved increases, saturation and
 every plotted value, is read on $\LCS$'s $[0,1]$ scale, the scale a user of the score sees. Step
 sizes quoted in nats are steps in $\Lambda$: a step of $\Delta$ nats multiplies the probability of
@@ -992,8 +1018,8 @@ rises strictly; \emph{middle:} share on which it falls (the rest are ties). A sc
 the edits gets $0\%$ in both, a random one about $50\%$ in both. \emph{Right:} share of Invariance pairs on which the score stays within $\tau=\sThreeTol$ on its
 $[0,1]$ scale; a score that ignores the edits gets $100\%$, so this panel is informative only
 next to the left one. \emph{Blue:} our score, $\LCS$ at verdict polarity, on gold and on mined
-graphs. \emph{Gray:} other readouts of the same MRF, and the baselines. Hollow markers flag
-invariances kept for a reason other than the score's: the pairwise miners pin $\LCS$ near $0$ on
+graphs. \emph{Gray:} $\LCS$ read at the asserted world, on gold graphs, and the baselines. Hollow markers flag
+invariances kept for a reason other than the score's: the pairwise arms pin $\LCS$ near $0$ on
 both rungs (\S\ref{sec:exp-mined}), and the claim-level baselines never change within a family.
 Lines are 95\% family-bootstrap intervals. Counts are in Tables~\ref{tab:ladders}
 and~\ref{tab:baselines}.}
@@ -1027,7 +1053,7 @@ pairwise, Llama-3.3-70B & \sThreePairLlamaCoupF
   & \sThreePairLlamaLamIncPct & \sThreePairLlamaLamInvPct & \sThreePairLlamaLamInvTolPct \\
 \bottomrule
 \end{tabular}
-\caption{Ladder assertions satisfied on the test split, in \% of the \sThreeNIncPairs{} Increase
+\caption{Declared orders satisfied on the test split, in \% of the \sThreeNIncPairs{} Increase
 and \sThreeNInvPairs{} Invariance pairs, per arm and readout. Inv.: equality within $10^{-9}$;
 Inv.$_\tau$: within $\tau=\sThreeTol$ on the readout's $[0,1]$ scale. F1:
 coupling-level extraction F1 against gold. Counts per ladder type are in Table~\ref{tab:bytype}.}
@@ -1038,7 +1064,7 @@ coupling-level extraction F1 against gold. Counts per ladder type are in Table~\
 \label{sec:exp-gold}
 
 On gold graphs $\LCS$ satisfies all \sThreeGoldLamInc{} Increase and all \sThreeGoldLamInv{}
-Invariance pairs (Figure~\ref{fig:ladders}, top row), as Theorem~\ref{thm:mono} and A2 predict:
+Invariance pairs (Figure~\ref{fig:ladders}, top row; Table~\ref{tab:ladders}), as Theorem~\ref{thm:mono} and A2 predict:
 every gold transition is an improvement in the coherence order at the verdicts or leaves the
 graph unchanged. This is a check of the theory and its implementation rather than new evidence.
 It also resolves \sThreeGoldLamIncTol{} of the increases. The 17 it does not resolve all lie where
@@ -1056,26 +1082,32 @@ is right on every \cp{conflict} pair (\sThreeGoldLamAConflict) and every \cp{cha
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_dominance.pdf}
-\caption{\textbf{Every miss of $\LCS$ on mined graphs is an extraction the coherence order
-cannot rank.} Each arm's \sThreeNIncPairs{} Increase pairs, split by how the two rungs' extracted
+\caption{\textbf{On mined graphs, $\LCS$ follows the extracted graphs wherever the coherence
+order ranks them.} Each arm's \sThreeNIncPairs{} Increase pairs, split by how the two rungs' extracted
 graphs compare in the coherence order at the verdicts (Def.~\ref{def:order}). Where they are
-ordered as declared, $\LCS$ rises on every pair (blue); where they are equal or reversed it ties
-or falls, as the theorem requires (gray); all misses (orange) are on incomparable pairs. Numbers
-are pair counts. Counts are in Table~\ref{tab:dominance}.}
+ordered as declared, $\LCS$ rises on every pair (blue), except one pairwise-Llama tie of
+$4\times10^{-14}$; where they are equal or reversed it ties
+or falls, as the theorem requires (gray). On incomparable pairs the theorem makes no prediction:
+$\LCS$ rises on most (green) and misses on the rest (orange). Numbers are pair counts, also
+given in Table~\ref{tab:dominance}.}
 \label{fig:dominance}
 \end{figure}
 
 On mined graphs no score has a guarantee, because a miner may change relations in both directions
 between two rungs. We can still ask, pair by pair, whether a miner's two graphs are ordered as the
 ladder declares (Def.~\ref{def:order} at the verdicts, with parallel relations merged), and
-Figure~\ref{fig:dominance} splits the Increase pairs accordingly. P2 holds on every arm. Where the
-extracted graphs are ordered as declared, $\LCS$ rises on every pair; where they are reversed it
-falls, and where they are equal it ties; every miss is on a pair whose extracted graphs are
-incomparable. The graph-level miner with GPT-6 orders \sThreeGraphGptDomForward{} of the
+Figure~\ref{fig:dominance} splits the Increase pairs accordingly. P2 holds on every arm, up to one numerical tie. Where the
+extracted graphs are ordered as declared, $\LCS$ rises on every pair but that one; where they are
+reversed it falls, and where they are equal it ties, as the theorem requires. The misses are
+therefore of two kinds: pairs on which the miner reversed or erased the edit
+(\sThreeGraphGptDomBackward, \sThreeGraphOssDomBackward, \sThreePairOssDomBackward{} and
+\sThreePairLlamaDomBackward{} reversed, and \sThreeGraphGptDomEqual, \sThreeGraphOssDomEqual,
+\sThreePairOssDomEqual{} and \sThreePairLlamaDomEqual{} equal, for the four mined arms in the order of
+Table~\ref{tab:dominance}), and pairs it left incomparable. The graph-level miner with GPT-6 orders \sThreeGraphGptDomForward{} of the
 \sThreeNIncPairs{} pairs as declared and $\LCS$ rises on all of them; of the
 \sThreeGraphGptDomIncomparable{} pairs it leaves incomparable, $\LCS$ rises on
-\sThreeGraphGptDomIncomparableOk. The weaker the extraction, the more pairs are incomparable, and
-that is where the errors are: the pairwise miners order only \sThreePairOssDomForward{}
+\sThreeGraphGptDomIncomparableOk. The pairwise arms leave the most pairs incomparable, and
+that is where the errors are: they order only \sThreePairOssDomForward{}
 (gpt-oss-120b) and \sThreePairLlamaDomForward{} (Llama) pairs as declared. On one pairwise-Llama
 pair whose graphs are ordered, the score rises by only $4\times10^{-14}$ in $\Lambda$, below the
 $10^{-9}$ at which we count an increase: the two graphs differ in a single weight, by $10^{-8}$.
@@ -1183,7 +1215,7 @@ on \cp{chain}, where it adds an inference (\sThreeBGevalGptChain{} rise,
 $\tau$, which for a five-run mean in steps of $0.05$ means equal, G-Eval with GPT-6 keeps only
 \sThreeBGevalGptInvTolUPct\% of the invariances; counted within its own five-run spread it keeps
 \sThreeBGevalGptInvTol{} (App.~\ref{app:results}), so most of its movement between rungs that
-should score alike is run-to-run noise. $\LCS$ on the GPT-6 miner's graphs rises on
+should score alike is run-to-run noise. $\LCS$ on the GPT-6 graph-level arm's graphs rises on
 \sThreeGraphGptLamIncPct\% of the increases from the same text, because the edit it must detect is
 one relation, and the score is designed to respond to exactly that.
 
@@ -1201,13 +1233,16 @@ leaves out.
 \paragraph{What the guarantee covers.} Theorem~\ref{thm:mono} is a statement about the map from
 relation graphs to scores, not about the graphs themselves. It guarantees that the score never
 misranks two responses whose relations are ordered. Observing this on mined graphs is a check of
-the implementation rather than new evidence, but it is useful: it confines every ranking error to
-pairs whose extracted graphs are incomparable, where any score must choose how to net gains against
-costs and a different monotone score might choose differently. No learned or judge-based score
-offers even this much, and on our ladders the judges moved between rungs that should score alike
-at least as often as they rose between rungs that should not. The guarantee
+the implementation rather than new evidence, but it is useful: it traces every ranking error to
+the extraction, either to graphs that reverse or erase the edit or to graphs the order cannot
+rank, where any score must choose how to net gains against costs and a different monotone score
+might choose differently. No learned or judge-based score
+offers even this much, and on our ladders the judges moved on more invariance pairs than they rose on increase
+pairs, mostly from their own run-to-run noise (\S\ref{sec:exp-baselines}). The guarantee
 does not make relation extraction easier; it marks extraction as the place where improvements
-will show.
+will show. The external checks point the same way on natural text: every relation tested takes
+the predicted sign, and what limits the score is relation recall, lowest for contradictions within
+a single sentence, which no relation between two claims can represent (\S\ref{sec:exp-external}).
 
 \paragraph{What the weights do.} The guarantee holds for any weights, but how informative the
 score is depends on them. The pairwise miner shows the failure mode in its plainest form: weights that are
@@ -1266,10 +1301,9 @@ the relations a reader infers between segments \citep{hobbs1979,mann,pdtb}. Enti
 \citep{barzilay}, neural coherence models \citep{li}, DiscoScore \citep{discoscore} and
 entity--discourse graphs \citep{liustrube} score it from surface statistics, learned
 representations or discourse relations, and LLM judges are the practical incumbent
-\citep{geval,zheng2023judge}. These methods measure cohesion and organization, which do not depend
-on whether the claims are true and change when a text is reordered; logical coherence is the
-reverse on both counts (\S\ref{sec:notions}), and none of these methods guarantees how its score
-responds to a change in the truth-functional constraints between claims.
+\citep{geval,zheng2023judge}. \S\ref{sec:notions} sets out how what they measure differs from
+logical coherence; none of them guarantees how its score responds to a change in the
+truth-functional constraints between claims.
 
 \paragraph{Argumentation.} Argument mining recovers support and attack relations from text
 \citep{stab2017}, and argument-quality frameworks rate dimensions such as cogency
@@ -1313,15 +1347,17 @@ monotone in that setting.
 
 We asked what a coherence score over a response's own relations must guarantee and answered with
 a single requirement, monotonicity in the coherence order over a fixed claim set. The score that
-meets it is the weight of evidence that the coherence MRF lends to the committed world: the claims, with
+meets it is a monotone transform of the weight of evidence that the coherence MRF lends to the committed world: the claims, with
 the truth values a factuality pipeline assigns them. It is strictly monotone in every context;
 among pairwise tables, sign-definiteness is exactly what monotonicity in additions and deletions
-requires; and the score must be read at the world that defines the order. Its log-ratio form is
+requires; and no readout at another single world is monotone in the same order. Its log-ratio form is
 neutral, additive and saturating. On \sThreeLadders{} coherence ladders it behaves as the theory
 predicts: it satisfies every declared ordering on gold graphs, separates deriving a falsehood from
-refuting one where readouts that ignore the verdicts cannot, and confines its errors on mined
-graphs to pairs the miner left incomparable. Relation extraction, and the calibration of the
-weights it produces, is the open problem.
+refuting one where scores that ignore the verdicts cannot, and on mined graphs follows the
+extracted graphs wherever the order ranks them. On five external datasets it is unrelated to
+rated discourse coherence, falls when a document contradicts itself and the contradiction is
+found, and gives every relation tested its predicted sign. Relation extraction, its recall above
+all, and the calibration of the weights it produces, is the open problem.
 
 \section*{Limitations}
 
@@ -1338,8 +1374,11 @@ are given rather than extracted, so atomization errors are absent. The benchmark
 whether a score orders responses as its theory predicts and separates extraction errors from
 scoring errors; it does not measure agreement with human judgements of natural responses, or how
 often incoherence occurs in practice. Because relations are explicitly marked, mined-graph results
-are best read as upper bounds on extraction from natural text, and an evaluation on natural
-responses with human ratings is needed to establish external validity.
+are best read as upper bounds on extraction from natural text. The external checks
+(\S\ref{sec:exp-external}) test the score on natural text with human labels (rated coherence,
+contradiction labels, annotated discourse and argument relations), but none of these labels rates
+the logical coherence of a response, so agreement with human judgements of logical coherence
+remains to be established.
 \textbf{Selection.} Admission checks relations with a blind pair-by-pair verification rather than
 the graph-level miner's prompt, but the committee and the miners share vendors, and the generator's
 explicit fillers favour any extractor that reads connectives. Mined results on this corpus are
@@ -1360,7 +1399,7 @@ neither supports nor refutes is treated as false. With a probabilistic pipeline 
 also inherits the calibration of its posteriors, which set how much each relation counts
 (App.~\ref{app:twostage}); with a label-only pipeline it uses no confidence at all. Assertion
 polarity assumes the decomposition records the response's stance on each claim, or records a
-denied claim as its negation (Prop.~\ref{prop:neg}). In our experiments the verdicts are the
+denied claim as its negation (Prop.~\ref{prop:neg}). In the LoCoBench experiments the verdicts are the
 generator's own factuality labels, which no one re-verified, so they model an error-free
 factuality pipeline; the effect of verdict errors on the score is not measured.
 \textbf{Modelling.} Relation weights in the gold arm are band midpoints, in the graph-level arms
@@ -1382,9 +1421,11 @@ evidence of truth, and should not be used on its own to certify content. The cor
 and contains no personal data. By design it contains plausible false claims written as expert prose
 without hedging; every item carries per-claim factuality labels, and released copies should keep
 them attached so that the false claims are not reused as fact. The responses were generated by
-commercial models and are released under those providers' terms for research use. The human
-studies on the benchmark are reported, with their ethics provisions, in the companion paper; this
-paper collects no new human data. LLMs were used to generate the benchmark
+commercial models and are released under those providers' terms for research use. A human
+study of the benchmark is specified, with its ethics provisions, in the companion paper; this
+paper collects no new human data. The external checks use public datasets under their licences
+(Table~\ref{tab:ext-data}); the raw files of datasets whose licences restrict or do not state
+redistribution are not redistributed. LLMs were used to generate the benchmark
 responses, to validate them, to extract relations and as judges, as described; they were also
 used for editing assistance in preparing this paper.
 
@@ -1445,8 +1486,7 @@ $\PR(\one)=1/4.4=\wkChainP$, $\Lambda=\log(8/4.4)=\wkChainLam$, and
 $\PR(a_1{=}a_3{=}1)=1.1/4.4=\wkPOneThree$. Adding the contradiction therefore costs exactly
 $\log\frac{0.2}{1-0.8\cdot\wkPOneThree}=\wkConflictGain$, as Lemma~\ref{lem:edit} predicts.
 Weakening it to $0.44$ recovers most of the loss. The posterior marginals under the chain
-are $(0.295,0.500,0.705)$: sign-definite entailments lower the premise's marginal, one more reason
-the score is not a function of the marginals.
+are $(0.295,0.500,0.705)$: sign-definite entailments lower the premise's marginal.
 
 \begin{table}[h]
 \centering\small
@@ -1487,14 +1527,15 @@ theorem holds under the same assumption. \emph{Weight changes.} For a parametric
 $\psi_p$ added to a graph $\R_0$, the change in $\Lambda$ is exactly
 $-\log\E_{P_{\R_0}}[\psi_p/\psi_p(c^\ast)]$, so it is monotone in $p$ in every context if each likelihood ratio $\psi_p(c)/\psi_p(c^\ast)$ is
 non-increasing in $p$ for supports and non-decreasing for conflicts. This condition is sufficient;
-we do not claim it is necessary. The potentials of Eq.~\ref{eq:mrf} satisfy it, since the ratios
+we do not claim it is necessary. The potentials of Eq.~\ref{eq:psi} satisfy it, since the ratios
 are $1$, $1-p$ or $1/(1-p)$. $\square$
 
 \paragraph{Proposition~\ref{prop:unique}.} Let $x\ne\xs$, pick $i$ with $x_i\ne\xs_i$ and any
 $j\ne i$. As above, every singleton $\{(x_i,x_j)\}$ is the violated set of some coupling on
 $(a_i,a_j)$; let $r$ be that relation. Since $(\xs_i,\xs_j)\ne(x_i,x_j)$, $r$ is a support
-relative to $\xs$, so adding it is an elementary improvement. It multiplies $\PR(x)$ by
-$\psi_r(x)/\E_{\PR}[\psi_r]=(1-p)/(1-pq)$ with $q=\PR(x_e\in V)<1$, which is less than $1$.
+relative to $\xs$, so adding it with weight $p>0$ is an elementary improvement. It multiplies
+$\PR(x)$ by $\psi_r(x)/\E_{\PR}[\psi_r]=(1-p)/(1-pq)$ with $q=\PR(x_e\in V)<1$, which is less
+than $1$.
 $\square$
 
 \subsection{Further Properties (\S\ref{sec:props})}
@@ -1523,14 +1564,16 @@ increasing in $q_r$. (iii) After adding a support $r$ with violation probability
 violation probability is $q'=q(1-p)/(1-pq)<q$ for $p>0$ and $q<1$, so a second copy gains
 $-\log(1-pq')<-\log(1-pq)$. $\square$
 
-\paragraph{Saturation in numbers.} Five copies of one equivalence ($p=0.9$) on two fair claims gain
-$\satGainOne$, $\satGainTwo$, $\satGainThree$, $\satGainFour$, \dots{} nats, converging to
-$\satLamFive=\log2$ rather than to the bound $\satBound$: an equivalence cannot distinguish ``both
-hold'' from ``both fail''. Under the prior-expectation score of App.~\ref{app:earlier} the same
-padding drives the score from $\padBalOne$ to $\padBalSix$, while $\LCS$ stays at $\padLCSSix$.
+\paragraph{Saturation in numbers.} Successive copies of one equivalence ($p=0.9$) on two fair
+claims gain $\satGainOne$, $\satGainTwo$, $\satGainThree$, $\satGainFour$, \dots{} nats; after five
+copies $\Lambda=\satLamFive$, and it converges to $\log2$ rather than to the bound $\satBound$: an
+equivalence cannot distinguish ``both hold'' from ``both fail''. Under the prior-expectation score
+of App.~\ref{app:earlier}, one to six copies drive the score from $\padBalOne$ to $\padBalSix$,
+while $\LCS$ goes from $\padLCSOne$ to $\padLCSSix$ and does not move, to three decimals, after the
+third copy.
 
 %% ============================================================================
-\section{LCS as a Function of $\Lambda$}
+\section{LCS as a Function of \texorpdfstring{$\Lambda$}{Lambda}}
 \label{app:lcs-lambda}
 %% ============================================================================
 
@@ -1555,7 +1598,8 @@ For a fixed $u_0\in(0,1)$:
   $\Lambda\to-\log u_0$, that is, as the relations force $\xs$.
 \item $\LCS\ge\sigma(\Lambda)$ for $\Lambda\ge0$ and $\LCS\le\sigma(\Lambda)$ for $\Lambda\le0$,
   with equality only at $\Lambda=0$: $\LCS$ is always at least as far from $\frac12$ as
-  $\sigma(\Lambda)$. For a fixed $\Lambda$, $\LCS\to\sigma(\Lambda)$ as $u_0\to0$.
+  $\sigma(\Lambda)$. For a fixed $\Lambda\ne0$, $|\LCS-\sigma(\Lambda)|$ decreases strictly as $u_0$
+  decreases, and $\LCS\to\sigma(\Lambda)$ as $u_0\to0$.
 \end{enumerate}
 \end{proposition}
 
@@ -1576,19 +1620,22 @@ For a fixed $u_0\in(0,1)$:
   As $e^{\Lambda}\to1/u_0$, $\LCS\to\frac{(1-u_0)/u_0}{1+(1-2u_0)/u_0}=1$.
 \item[(v)] The correction $\log\frac{1-u_0}{1-u}$ added to $\Lambda$ in (ii) is positive exactly
   when $u>u_0$, that is when $\Lambda>0$, negative when $\Lambda<0$, and zero at $\Lambda=0$, and
-  $\sigma$ is strictly increasing. For a fixed $\Lambda$, $u=u_0e^{\Lambda}\to0$ as $u_0\to0$, so
-  the correction vanishes. $\square$
+  $\sigma$ is strictly increasing. For a fixed $\Lambda$, the correction
+  $c(u_0)=\log(1-u_0)-\log(1-u_0e^{\Lambda})$ has
+  $c'(u_0)=\frac{e^{\Lambda}-1}{(1-u_0)(1-u_0e^{\Lambda})}$, which has the sign of $\Lambda$, as $c$
+  does; so $|c|$ shrinks strictly as $u_0$ falls, and $c\to0$ as $u_0\to0$, because then
+  $u=u_0e^{\Lambda}\to0$. $\square$
 \end{itemize}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_lcs_lambda.pdf}
 \caption{\textbf{$\LCS$ and $\Lambda$.} (a) The map of Prop.~\ref{prop:lcs-lambda} with flat
-priors for $n=2$, $5$ and $14$ claims; each curve ends at its cap $\Lambda=n\log2$, where
-$\LCS=1$. The dashed line is the limit $\sigma(\Lambda)$; at $n=14$ the curve coincides with it.
-(b) Every rung of the test split as $(\Lambda,\LCS)$, on gold graphs and on the GPT-6 miner's
+priors for $n=2$, $5$ and $14$ claims; each curve approaches $\LCS=1$ at its cap $\Lambda=n\log2$
+(a supremum that no graph reaches). The dashed line is the limit $\sigma(\Lambda)$; at $n=14$ the curve coincides with it.
+(b) Every response of the test split as $(\Lambda,\LCS)$, on gold graphs and on the GPT-6 graph-level arm's
 graphs, with each scale's distribution as a rug. $\Lambda$ ranges over several nats in either
-direction, while $\LCS$ crowds towards $0$ and $1$; the points lie on the curves for the
+direction, and $\LCS$ over most of $(0,1)$, compressed near its ends; the points lie on the curves for the
 ladders' $12$--$14$ claims.}
 \label{fig:lcs-lambda}
 \end{figure*}
@@ -1598,13 +1645,13 @@ priors, so the cap $n\log2$ lies at \lclLamCapMin--\lclLamCapMax{} nats. The obs
 well below it:
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item on gold graphs, $\Lambda$ runs from $\lclLamMinGold$ to $\lclLamMaxGold$;
-\item on the GPT-6 miner's graphs, from $\lclLamMinGpt$ to $\lclLamMaxGpt$.
+\item on the GPT-6 graph-level arm's graphs, from $\lclLamMinGpt$ to $\lclLamMaxGpt$.
 \end{itemize}
 So $u$ stays small, the correction in (ii) is negligible, and $\LCS$ equals $\sigma(\Lambda)$ to
-within $\lclMaxDevSigma$ on every rung (Figure~\ref{fig:lcs-lambda}b). The closed form (ii)
-reproduces the scorer on the \lclNGold{} rungs of each arm to within $\lclCheckErr$, and the inverse
-in (iii) recovers $\Lambda$ to within $\lclInvErr$. On gold graphs \lclLowGold\% of rungs, and on
-the GPT-6 miner's \lclLowGpt\%, have $\LCS<0.01$; none exceeds $0.99$.
+within $\lclMaxDevSigma$ on every response (Figure~\ref{fig:lcs-lambda}b). The closed form (ii)
+reproduces the scorer on the \lclNGold{} responses of each arm to within $\lclCheckErr$, and the inverse
+in (iii) recovers $\Lambda$ to within $\lclInvErr$. On gold graphs \lclLowGold\% of responses, and on
+the GPT-6 graph-level arm's \lclLowGpt\%, have $\LCS<0.01$; none exceeds $0.99$.
 
 \paragraph{Why two scales.} By (iii), a step $\Delta$ in $\Lambda$ moves $\LCS$ by about
 $\LCS(1-\LCS)\,\Delta/(1-u)$, which is $\LCS(1-\LCS)\,\Delta$ while $u$ is small. Moving $\LCS$ by
@@ -1614,7 +1661,7 @@ $\tau$ therefore takes a step of about $\tau/[\LCS(1-\LCS)]$ nats:
 \item about one nat at $\LCS=0.01$ or $0.99$;
 \item far more than any single relation can supply near $\LCS\approx10^{-17}$.
 \end{itemize}
-This is why some gold increases fall below $\tau$ only near the ends of the scale, and why
+This is why the gold increases that fall below $\tau$ all lie near the ends of the scale, and why
 \emph{whether} the score moves is decided on $\Lambda$ while \emph{how far} it moves is read on
 $\LCS$ (``One score, two scales'', \S\ref{sec:exp-setup}). Since the map is strictly increasing,
 the two scales never disagree on the direction of a change.
@@ -1669,7 +1716,7 @@ rules that out}, since it is still deep inside the Oort cloud.
 \label{app:earlier}
 %% ============================================================================
 
-\paragraph{Row-stochastic tables.} A natural alternative to Eq.~\ref{eq:mrf} makes the asymmetric
+\paragraph{Row-stochastic tables.} A natural alternative to Eq.~\ref{eq:psi} makes the asymmetric
 tables row-stochastic in the source, so that a false premise leaves its conclusion at the prior.
 Row-major over $(0,0),(0,1),(1,0),(1,1)$, with $\pi_0=\frac12$:
 $\ent=[1{-}\pi_0,\pi_0,1{-}p,p]$, $\con=[1{-}\pi_0,\pi_0,p,1{-}p]$, $\eqv=[p,1{-}p,1{-}p,p]$,
@@ -1773,10 +1820,10 @@ prompt follows verbatim.
 \promptfile{prompts/PROMPT_GRAPH_V2.txt}
 
 \paragraph{Gold arm.} Each gold relation's weight is the midpoint of its labelled strength band
-(strong $[0.85,1]$, moderate $[0.60,0.84]$, weak $[0.35,0.59]$). The corpus' factuality labels give
+(strong $[0.85,1]$, moderate $[0.60,0.84]$, weak $[0.35,0.59]$). The corpus's factuality labels give
 the committed world ($\xs_i=1$ for claims labelled factual, $0$ otherwise), and each response's
 stance on each claim gives the world of assertion polarity. The score's MRF uses flat priors. No miner is a member of the committee that admitted
-the corpus' items.
+the corpus's items.
 
 %% ============================================================================
 \section{Discourse Senses, by Example}
@@ -1900,7 +1947,7 @@ many-to-one in places, so senses are annotated directly rather than converted.}
 
 Our ladders follow LoCoBench's idea of coherence ladders \citep{anonlocobench} with a different
 construction: every rung of a family is spliced from one template, so rungs differ only in the
-sentences a ladder edits.
+sentences a ladder edits. Table~\ref{tab:lb-ladders} summarizes the five ladder types.
 
 \paragraph{Construction.} The generator writes, in turn, a question on a canonical topic; a pool
 of 26 tagged atomic claims, a few of them plausible but false; a plan that selects 10--14 claims
@@ -1978,8 +2025,8 @@ generated with Claude Opus~5 alone.
 \input{example_sign}
 
 \paragraph{One ladder, end to end.} Table~\ref{tab:example} shows a \cp{sign} ladder with every
-score. On the gold graph $\LCS$ rises at each rung; on the GPT-6 miner's graphs it rises too. The
-score read at the asserted world rates deriving the falsehood and refuting it alike. The G-Eval judge also
+score. On the gold graph $\LCS$ rises at each rung; on the GPT-6 graph-level arm's graphs it rises too. The
+score read at the asserted world rates deriving the falsehood and refuting it alike. The G-Eval judge
 prefers the rung that derives the falsehood, and the 1--5 rating does not move.
 
 \begin{table*}[t]
@@ -2087,8 +2134,8 @@ spread on every response, and it is not reported.
 The development split (\sPilotFamilies{} families, \sPilotLadders{} ladders, \sPilotItems{}
 responses, four ladders of each primary type) was used to tune the generation
 prompts, and the experiments of \S\ref{sec:experiments} were first run on it with the same arms,
-baselines, readouts, tolerance and script. We report it for completeness; it was not used to
-choose any analysis, but it is small (\sPilotNIncPairs{} Increase and \sPilotNInvPairs{}
+baselines, readouts, tolerance and script. We report it for completeness (Table~\ref{tab:dev}); beyond fixing $\tau$, it was not
+used to choose any analysis, but it is small (\sPilotNIncPairs{} Increase and \sPilotNInvPairs{}
 Invariance pairs) and its prompts are not held out.
 
 \begin{table}[h]
@@ -2112,7 +2159,7 @@ G-Eval, gpt-oss & \sPilotBGevalOssInc & \sPilotBGevalOssInv & \sPilotBGevalOssIn
 rating, gpt-oss & \sPilotBDirectOssInc & \sPilotBDirectOssInv & \sPilotBDirectOssInvTolU \\
 \bottomrule
 \end{tabular}
-\caption{Development split: ladder assertions satisfied (counts as in
+\caption{Development split: declared orders satisfied (counts as in
 Table~\ref{tab:ladders}). Judge rows give the judge's own score.}
 \label{tab:dev}
 \end{table}
@@ -2153,16 +2200,16 @@ score (exact enumeration).}
 \label{tab:falls}
 \end{table}
 
-Table~\ref{tab:falls} draws \thmSeq{} networks with $2$--$8$ claims, priors uniform on
+The verification (Table~\ref{tab:falls}) draws \thmSeq{} networks with $2$--$8$ claims, priors uniform on
 $[0.05,0.95]$ and up to $2n$ relations with random couplings and weights in $[0.02,0.98]$. It
 then applies one to six random elementary improvements to each, \thmSteps{} in total. $\Lambda$
 failed to rise strictly on \thmFalls{} of them. For relations beyond pairs, \karySteps{} additions
-of random ternary supports and conflicts (random violated sets) to random ternary networks moved
-$\Lambda$ in the wrong direction \karyFalls{} times. With a uniformly random committed world per
+of random ternary supports and conflicts (random violated sets) to random ternary networks, all
+relative to $\xs=\one$, moved $\Lambda$ in the wrong direction \karyFalls{} times. With a uniformly random committed world per
 network and improvements defined relative to it, $\Lambda$ failed to rise on \xsFalls{} of
-\xsSteps{} edits. For $n=3$, every one of the \uniqPairs{} pairs $(\xs,x)$ with $x\ne\xs$ admits a
-support relative to $\xs$ whose addition lowers the posterior gain of $x$
-(Prop.~\ref{prop:unique}; \uniqBroken{} of \uniqPairs). For the only-if direction of
+\xsSteps{} edits. For $n=3$, flat priors and weight $0.8$, every one of the \uniqPairs{} pairs $(\xs,x)$
+with $x\ne\xs$ admits a single support relative to $\xs$ whose addition to the empty graph lowers
+the posterior gain of $x$ (Prop.~\ref{prop:unique}; \uniqBroken{} of \uniqPairs). For the only-if direction of
 Theorem~\ref{thm:necessity} with the priors held fixed, \necTrials{} random cases (a random table
 whose committed cell is not its extremum, a random context, and strong singleton relations
 concentrating the scope on the table's extremal cell) moved $\Lambda$ in the predicted wrong
@@ -2191,8 +2238,9 @@ Confident posteriors affect the two quantities of \S\ref{sec:score} differently.
 approach $0$ and $1$ at $\xs$, every violation probability $q_r$ approaches $0$ for supports and
 $1$ for conflicts, both closed forms approach $0$, and $\Lambda$ vanishes for every graph:
 $\pi(\xs)\to1$, so the relations have no probability left to add to $\xs$. $\LCS$ does not
-vanish. It is the weight of evidence $\log P(E\mid\xs)/P(E\mid\text{not }\xs)$ of the check model
-(\S\ref{sec:mrf}), and neither term goes to zero. The first, $\prod_r\psi_r(\xs)$, does not depend
+tend to $\frac12$. It is the logistic of the weight of evidence
+$\log P(E\mid\xs)/P(E\mid\text{not }\xs)$ of the check model (\S\ref{sec:mrf}), and both
+probabilities stay bounded away from zero. The first, $\prod_r\psi_r(\xs)$, does not depend
 on the priors. The second is the probability of passing all checks for a world other than $\xs$,
 and as the priors sharpen it is dominated by the worlds that differ from $\xs$ in a single claim.
 On Figure~\ref{fig:voyager}, priors of $0.9/0.1$, $0.99/0.01$ and $0.999/0.001$ at $\xs$ give
@@ -2201,7 +2249,7 @@ for B, but $\LCS$ of $\degALCSOne$, $\degALCSTwo$, $\degALCSThree$ for A and $\d
 $\degBLCSTwo$, $\degBLCSThree$ for B, against $\vyALCS$ and $\vyBLCS$ under flat priors: the scale
 moves with the priors, but A stays far above B.
 Theorem~\ref{thm:mono} holds throughout. Confident posteriors therefore leave $\LCS$ informative,
-which is why it, rather than $\Lambda$, is the reported score. Two caveats apply. Under the
+one of the reasons it, rather than $\Lambda$, is the reported score (\S\ref{sec:score}). Two caveats apply. Under the
 scorer's default rule a posterior of exactly $1$ gets the flat prior while $0.999$ is used as is,
 so the score jumps between the two (for B, $\LCS$ moves from $\degBLCSThree$ to $\vyBLCS$); a
 pipeline that reports exact $0/1$ posteriors is best treated as label-only throughout. And the posteriors
