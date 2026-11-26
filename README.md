@@ -208,7 +208,7 @@ pip install "git+ssh://git@github.ibm.com/generative-computing/mellea-ibm.git"
 ### Dependencies
 
 FactReasoner requires:
-- Python >= 3.11
+- Python >= 3.11.5
 - [`Merlin`](https://github.com/radum2275/merlin) - C++ probabilistic inference engine (must be compiled locally)
 - [`Mellea`](https://pypi.org/project/mellea/) - LLM interaction library
 
