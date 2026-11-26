@@ -13,7 +13,8 @@ authors = [
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
-requires-python = ">=3.11"
+# 3.11.5 floor: soupsieve >= 3.0.2 (the patched releases) requires it.
+requires-python = ">=3.11.5"
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
@@ -43,11 +44,9 @@ dependencies = [
     "langchain-text-splitters",
     "mellea==0.8.0",
     "networkx",
-    # CVE-2026-81726 (nltk <= 3.10.3, no patched release) is in the
-    # TransitionParser model-file APIs; we only call sent_tokenize. nltk cannot
-    # be dropped -- mellea and rouge-score depend on it -- so the alert is
-    # dismissed as "vulnerable code not used". Raise the floor once a fix ships.
-    "nltk>=3.10.3",
+    # 3.10.4 patches the CVE-2026-126295..129234 batch against 3.10.3. nltk
+    # cannot be dropped -- mellea and rouge-score depend on it.
+    "nltk>=3.10.4",
     "numpy",
     # 0.6.3 adds the System One client (AsyncClient.systemone) that
     # DecisionNLIExtractor uses to query decision models such as kev.
@@ -57,7 +56,7 @@ dependencies = [
     # pypdf supersedes the abandoned PyPDF2 (last release 3.0.1, CVE-2023-36464
     # unpatched). Drop-in for the only API we use: PdfReader(BytesIO(...)),
     # .pages and .extract_text() in core/retriever.py.
-    "pypdf>=6.21.1",
+    "pypdf>=6.21.4",
     "python-dotenv",
     "requests",
     "rouge-score",
@@ -79,9 +78,10 @@ dependencies = [
     # deliberate change rather than a silent one.
     "langsmith>=0.8.18,<0.15",
     "multidict>=6.9.1",
+    "opentelemetry-api>=1.45.2",
     "pillow>=13.0.0",
     "pydantic-settings>=2.14.2",
-    "soupsieve>=2.8.4",
+    "soupsieve>=4.0.0",
     "urllib3>=2.7.0",
 ]
 
