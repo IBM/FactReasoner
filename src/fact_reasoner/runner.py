@@ -247,7 +247,9 @@ class FactualityRunner:
             extraction, atom revision, NLI or context summarization propagates
             to the caller unchanged. Default False: the error is printed and the
             stage falls back to its default result (no atoms, an unrevised
-            atom, a neutral relation, an empty summary).
+            atom, a neutral relation, an empty summary). It also stops context
+            retrieval when the search API refuses a request (``SearchAPIError``,
+            e.g. an invalid key), instead of leaving that atom without contexts.
         item_concurrency: How many dataset items :meth:`assess_file` works on
             at once. Default 1 (one after another). Raise it with local servers,
             so the LLM and NLI servers are both busy instead of taking turns;
@@ -430,6 +432,7 @@ class FactualityRunner:
         return ContextRetriever(
             retriever=retriever,
             context_summarizer=self.context_summarizer,
+            raise_errors=self.raise_errors,
         )
 
     def _make_pipeline(self, context_retriever: ContextRetriever):
