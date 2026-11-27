@@ -24,7 +24,7 @@ recovers the relations annotated in QT30 and GDTB. The settings are:
   source document or nodeset).
 \end{itemize}
 The baselines are those of \S\ref{sec:exp-baselines} that read a single text: DiscoScore RC and
-LC, the entity graph and G-Eval with GPT-6, averaged over three runs (against five in
+LC, the entity graph and G-Eval with GPT-6, averaged over three runs (five for the essays of App.~\ref{app:asap}, and five in
 \S\ref{sec:exp-baselines}, for the larger corpora). To measure the miner's noise floor,
 ContraDoc's clean documents were mined a second time with fresh samples, as the LoCoBench records
 already allow.
@@ -63,7 +63,7 @@ on word count, as a share of the sample), one dot per essay and the median per s
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lr>{\raggedright\arraybackslash}p{8.0cm}>{\raggedright\arraybackslash}p{2.0cm}@{}}
 \toprule
-Dataset & Items & Claims and gold & Licence \\
+Dataset & Items & Claims and gold & License \\
 \midrule
 LoCoBench, shuffled & 720 & the items' claims and gold; the bottom rungs of the 180 non-\cp{order} families $\times$ (unchanged, 2 paragraph permutations, sentence shuffle) & ours \\
 ContraDoc \citep{contradoc} & 1{,}369 & sentences; 178 insertion pairs differing by one claim, 271 replacements, 442 clean documents, 300 permutations & Apache-2.0 \\
@@ -215,10 +215,16 @@ median change is $\extCpEffFoundMedianGpt$ where the contradiction is found
 times and rise \extCdAssertNotFoundIncGpt{}, $p=\extCdAssertNotFoundPGpt$). The signed weight sum
 over the same graphs falls on \extCdWsumDecGpt{} and rises on \extCdWsumIncGpt{} ContraDoc pairs
 (\extCdWsumEdgeDecGpt{} and \extCdWsumEdgeIncGpt{} where the contradiction is found), and on
-\extCpWsumDecGpt{} and \extCpWsumIncGpt{} ChatProtect pairs, so it falls less often than $\LCS$. In
-the sum a found contradiction can be outweighed by the supports the added sentence also receives;
-in $\LCS$ each relation's effect depends on the rest of the graph through $q_r$
-(Lemma~\ref{lem:edit}).
+\extCpWsumDecGpt{} and \extCpWsumIncGpt{} ChatProtect pairs. Paired (exact McNemar tests on falls), the
+two differ on ContraDoc only where the contradiction is found (\extCdMcFoundOnlyLcsGpt{} pairs where
+only $\LCS$ falls against \extCdMcFoundOnlySumGpt{}, $p=\extCdMcFoundPGpt$; over all pairs
+\extCdMcAllOnlyLcsGpt{} against \extCdMcAllOnlySumGpt, $p=\extCdMcAllPGpt$). On ChatProtect $\LCS$ falls
+alone on \extCpMcAllOnlyLcsGpt{} pairs and the sum on \extCpMcAllOnlySumGpt{} ($p<\extCpMcAllPGpt$), but
+\extCpMcNotFoundOnlyLcsGpt{} of those are pairs with no detected contradiction, and on the consistent
+control $\LCS$ falls alone at the same rate (\extCpMcCtlOnlyLcsGpt{} of \extCpCtlNGpt{} pairs, against
+\extCpMcCtlOnlySumGpt{} for the sum; $p=\extCpMcCtlPGpt$). The difference is therefore not sensitivity
+to contradictions: the added sentence is also a new claim, which moves $\LCS$ slightly through
+$u_0$ (App.~\ref{app:lcs-lambda}) and leaves the sum unchanged.
 
 
 \paragraph{Recall and false alarms.} On ContraDoc, the GPT-6 arm finds the contradiction in \extCdRecallGpt\% of the 449
@@ -245,7 +251,7 @@ contradictory and in \extCpConfNoneGpt\% of the others: low recall, no false ala
 gpt-oss-120b finds it in \extCpConfStrongOss\% and \extCpConfNoneOss\% of the two groups.
 
 %% ----------------------------------------------------------------------------
-\subsection{Order: Within the Noise on Short Responses, Not on Long Documents}
+\subsection{Order}
 \label{app:ext-order}
 
 \begin{table}[t]
@@ -322,8 +328,13 @@ $p=\extMtEqNoisePGpt$), so the earlier drift came from mining in separate runs. 
 it moves the score by $\extMtPermMeanGpt$ on average against $\extMtNoiseMeanGpt$ for re-mining, a
 difference of $\extMtEqDiffGpt$ with 90\% interval [\extMtEqLoGpt, \extMtEqHiGpt], and upwards
 more often than downwards (\extMtEqPermUpGpt{} against \extMtEqPermDownGpt, $p=\extMtEqPermPGpt$).
-On long documents the order of the paragraphs therefore changes what GPT-6 extracts, as it does for
-gpt-oss-120b; the score itself is order-free, but its extraction is not.
+This comparison is confounded, however. ContraDoc's documents are split into paragraphs at blank
+lines, so in its 94 Wikipedia documents every section header (``= = History = ='') is a paragraph and
+a claim of its own, and a permutation separates headers from their sections and can move the title
+into the middle of the text. Permuted documents are therefore partly degraded, not reordered, and
+both the extra movement of $\LCS$ and the judge's falls may reflect the damage rather than order.
+A rebuilt set that keeps headers with their sections is needed before the ContraDoc order result
+can be read.
 
 % Flush the floats of K.1-K.3 before the essay subsection.
 \clearpage
@@ -397,7 +408,7 @@ upper block of Table~\ref{tab:ext-gdtb} measures recall of the coupling; the low
 the compile map's central claim, that contrast, concession and temporal sequence constrain
 nothing. The difference between the two rates, \extGdCorrectGpt\% against \extGdNoneGpt\%, has a
 95\% interval well above zero. The weakest categories are those the miner most often maps to a
-neighbouring coupling: disjunction and restatement. The \sense{Evidence} category
+neighboring coupling: disjunction and restatement. The \sense{Evidence} category
 (PDTB \sense{Cause+Belief}) has no instance in the GDTB documents we use, so it is
 absent from the table.
 

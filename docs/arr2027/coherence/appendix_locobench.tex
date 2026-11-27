@@ -12,7 +12,7 @@ Opus~5) writes a question, a pool of claims with factuality labels (a few plausi
 plan that fixes the relations and slots, and a template with the fillers of every slot. A
 deterministic gate checks, before any prose is written, that each ladder's gold graphs are ordered
 in the coherence order at the verdicts, with a step of at least $0.05$ nats in $\Lambda$ between
-neighbouring rungs. A committee of three models from three vendors (GPT-6.1, Gemini~3.1 Pro and
+neighboring rungs. A committee of three models from three vendors (GPT-6.1, Gemini~3.1 Pro and
 Claude Opus~5.5) admits a template only if a majority rates it fluent and free of annotation
 leakage, finds every claim asserted, and confirms its relations pair by pair without seeing the
 plan. It admits a filler only if a majority, not told which link was intended, reads exactly that
@@ -313,9 +313,12 @@ the normalization gives $\LCS$:
   premise is contested on \zsDoubtLcs\% of the \zsDoubtN{} graphs (\zsDoubtGainDoubt{} against
   \zsDoubtGainPlain{} nats); the signed sum credits it equally.
 \end{itemize}
-These are consequences of A2 and of saturation rather than findings, but they show what the
-signed sum gives up: it can be raised by restating one constraint as two, or by repeating an
-inference. On the ladders such edits do not occur, which is why the two scores tie there.
+These are consequences of A2 and of saturation rather than findings, and they are deterministic,
+so the 100\% against 0\% says nothing about accuracy. They show what a plain signed sum gives up:
+it can be raised by restating one constraint as two, or by repeating an inference. A sum over
+deduplicated constraints (one term per pair of claims and set of violated cells) would pass the first
+two tests; only the third, which depends on how the rest of the graph bears on the premise, needs
+the model. On the ladders such edits do not occur, and there the sum does slightly better.
 
 \paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
 that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of

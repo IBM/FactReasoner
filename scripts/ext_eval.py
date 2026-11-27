@@ -1,6 +1,6 @@
 """Evaluate the external checks of LCS (Part A of .claude/plans/external-datasets-eval.md).
 
-Every prediction tested here is fixed in results/ext/PREREG.md. Records come from
+The analyses and their thresholds are fixed in this script. Records come from
 scripts/run_ext_mined.sh (results/ext/<dataset>/arms/<arm>/records), baselines from
 scripts/run_slot3_baselines.py (results/ext/<dataset>/baselines).
 
@@ -97,6 +97,14 @@ def mean_abs_diff_ci(A_, B_, n=BOOT, seed=SEED):
         vals.append(st.mean(a) - st.mean(b))
     vals.sort()
     return vals[int(0.05 * n)], vals[int(0.95 * n) - 1], vals[int(0.025 * n)], vals[int(0.975 * n) - 1]
+
+
+def mcnemar(rows, a, b):
+    """Paired comparison of two binary outcomes on the same rows (exact two-sided McNemar):
+    rows where only `a` holds against rows where only `b` holds."""
+    only_a = sum(1 for r in rows if r[a] and not r[b])
+    only_b = sum(1 for r in rows if r[b] and not r[a])
+    return {"only_a": only_a, "only_b": only_b, "n": len(rows), "p": sign_test(only_a, only_b)}
 
 
 def order_equivalence(perm, noise):
@@ -281,7 +289,7 @@ def check1(args):
                     if x["id"] in base.get(b, {}) and o["id"] in base.get(b, {}):
                         row[b], row[b + "_orig"] = base[b][x["id"]], base[b][o["id"]]
                 rows.append(row)
-        # D2 (exploratory): noise floor from re-mining the 150 orig documents.
+        # Noise floor: the 150 orig documents re-mined with fresh samples.
         rr, _ = records("contradoc-rerun", arm)
         noise = []
         for fam, V in by.items():
@@ -385,7 +393,7 @@ def check1(args):
                                                            [r["coherence"] for r in JNE])
         out["H1d_pass"] = abs(out["rho_coherence"]) < 0.1
         res[f"1d:{arm}"] = out
-    # Pre-registered verdicts for H1a / H1c
+    # Order checks H1a / H1c: LCS kept within TOL more often than every baseline
     for key in [k for k in res if k[:2] in ("1a", "1c")]:
         P = res[key]["perm"]
         if "lcs" in P:
@@ -492,6 +500,10 @@ def check2(args):
                "asserted": counts(pairs, "asserted"), "verdict_all": counts(pairs, "verdict"),
                "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted"),
                "wsum": counts(pairs, "wsum"), "wsum_edge": counts(edge, "wsum"),
+               "mcnemar_falls": mcnemar([dict(r, lf=r["asserted_b"] < r["asserted_a"] - TIE,
+                                              wf=r["wsum_b"] < r["wsum_a"] - TIE) for r in pairs], "lf", "wf"),
+               "mcnemar_falls_edge": mcnemar([dict(r, lf=r["asserted_b"] < r["asserted_a"] - TIE,
+                                                   wf=r["wsum_b"] < r["wsum_a"] - TIE) for r in edge], "lf", "wf"),
                "asserted_notfound": counts([r for r in pairs if not r["edge_on_evidence"]], "asserted"),
                "effect": {k: {"mean": st.mean(r["asserted_b"] - r["asserted_a"] for r in R),
                               "median": st.median(r["asserted_b"] - r["asserted_a"] for r in R),
@@ -594,6 +606,7 @@ def check3(args):
                 x0 = [1] * d0["num_atoms"]
                 s0 = int(d0["expected"]["s_atom"][1:])
                 x0[s0] = xs_
+                row["nfv"] = nfv
                 row["v1"] = lcs_at(d1["num_atoms"], R, x1)[0]
                 row["v0"] = lcs_at(d0["num_atoms"], rels_of(recs[d0["id"]]), x0)[0]
                 row["a1"] = lcs_at(d1["num_atoms"], R)[0]
@@ -646,10 +659,16 @@ def check3(args):
         out["asserted_notfound"] = split([r for r in S if not r["conflict"]])
         out["wsum"] = split(S, "w0", "w1")
         out["wsum_found"] = split([r for r in S if r["conflict"]], "w0", "w1")
+        fl = lambda R: [dict(r, lf=r["d1"] < r["d0"] - TIE, wf=r["w1"] < r["w0"] - TIE) for r in R]  # noqa: E731
+        out["mcnemar_falls"] = mcnemar(fl(S), "lf", "wf")
+        out["mcnemar_falls_found"] = mcnemar(fl([r for r in S if r["conflict"]]), "lf", "wf")
+        out["mcnemar_falls_notfound"] = mcnemar(fl([r for r in S if not r["conflict"]]), "lf", "wf")
+        out["mcnemar_falls_control"] = mcnemar(fl(C), "lf", "wf")
         VW = [r for r in rows if "v1" in r]
         out["verdict_world"] = {"all": split(VW, "v0", "v1"),
                                 "found": split([r for r in VW if r["conflict"]], "v0", "v1"),
-                                "found_asserted": split([r for r in VW if r["conflict"]], "a0", "a1")}
+                                "found_asserted": split([r for r in VW if r["conflict"]], "a0", "a1"),
+                                "found_both_false": sum(1 for r in VW if r["conflict"] and r["nfv"] == "both")}
         out["wsum_control"] = split(C, "w0", "w1")
         out["effect"] = {k: {"mean": st.mean(r["d1"] - r["d0"] for r in R),
                              "median": st.median(r["d1"] - r["d0"] for r in R), "n": len(R)}
@@ -945,6 +964,11 @@ def write_macros(ev, path):
                 m(f"Cd{kt}N{tag}", x[k_]["n"])
                 m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
             m(f"CdAssertTie{tag}", x["asserted"]["tie"])
+            for k_, kt in (("mcnemar_falls", "McAll"), ("mcnemar_falls_edge", "McFound")):
+                if k_ in x:
+                    m(f"Cd{kt}OnlyLcs{tag}", x[k_]["only_a"])
+                    m(f"Cd{kt}OnlySum{tag}", x[k_]["only_b"])
+                    m(f"Cd{kt}P{tag}", pval(x[k_]["p"]))
             for k_, kt in (("found", "Found"), ("notfound", "NotFound")):
                 if k_ in x["effect"]:
                     m(f"CdEff{kt}Mean{tag}", f2(x["effect"][k_]["mean"]))
@@ -960,6 +984,14 @@ def write_macros(ev, path):
                 m(f"Cp{kt}N{tag}", y[k_]["n"])
                 m(f"Cp{kt}P{tag}", pval(y[k_]["p_sign"]))
             m(f"CpAssertTie{tag}", y["asserted"]["n"] - y["asserted"]["decrease"] - y["asserted"]["increase"])
+            for k_, kt in (("mcnemar_falls", "McAll"), ("mcnemar_falls_found", "McFound"),
+                           ("mcnemar_falls_notfound", "McNotFound"), ("mcnemar_falls_control", "McCtl")):
+                if k_ in y:
+                    m(f"Cp{kt}OnlyLcs{tag}", y[k_]["only_a"])
+                    m(f"Cp{kt}OnlySum{tag}", y[k_]["only_b"])
+                    m(f"Cp{kt}P{tag}", pval(y[k_]["p"]))
+            if "found_both_false" in y.get("verdict_world", {}):
+                m(f"CpVwFoundBothFalse{tag}", y["verdict_world"]["found_both_false"])
             for k_, kt in (("all", "VwAll"), ("found", "VwFound"), ("found_asserted", "VwFoundAssert")):
                 v_ = y.get("verdict_world", {}).get(k_)
                 if v_:

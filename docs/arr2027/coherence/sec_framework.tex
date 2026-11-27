@@ -9,8 +9,8 @@ and introduce the Logical Coherence Score (LCS).
 \subsection{Claims and the Committed World}
 \label{sec:setup}
 
-A response is decomposed into atomic claims $\A=(a_1,\dots,a_n)$, binary variables with $a_i=1$
-read as ``the claim holds''; a \emph{world} is an assignment $x\in\{0,1\}^n$. A claim is a
+A response is decomposed into atomic claims $\A=(a_1,\dots,a_n)$; a \emph{world}
+$x\in\{0,1\}^n$ assigns each claim a truth value, with $x_i=1$ read as ``$a_i$ holds''. A claim is a
 statement the response mentions, whether it asserts it or denies it.
 
 %: both responses of Figure~\ref{fig:voyager} mention $a_4$ in order to reject it.
@@ -47,7 +47,7 @@ it excludes. We focus on binary relations only.
 \label{def:coupling}
 \label{def:relation}
 A \emph{coupling} $\kappa$ is identified with the set $V(\kappa)\subseteq\{0,1\}^2$ of joint
-assignments of its endpoints $(a_s,a_t)$ that \emph{violate} it: entailment \ent{}
+truth values $(x_s,x_t)$ of its endpoints $a_s,a_t$ that \emph{violate} it: entailment \ent{}
 ($a_s\Rightarrow a_t$, $V=\{(1,0)\}$), equivalence \eqv{} ($\{(0,1),(1,0)\}$), co-necessity \cnc{}
 (at least one holds, $\{(0,0)\}$), contradiction \con{} (not both, $\{(1,1)\}$), exclusion \exc{}
 (exactly one, $\{(0,0),(1,1)\}$), and \emph{none} ($\varnothing$). A \emph{relation}
@@ -132,8 +132,8 @@ explicitly asserted by the response (see App.~\ref{app:estimation} for details).
 \subsection{The Coherence Markov Random Field}
 \label{sec:mrf}
 
-The proposed coherence Markov random field (MRF) model contains one binary variable $X_i$ per claim, 
-where $X_i=1$ indicates that the claim is true. Each claim is assigned a prior factor $\phi_i(x_i)=\pi_i^{x_i}(1-\pi_i)^{1-x_i}$
+The coherence Markov random field (MRF) has one binary variable per claim, whose value $x_i=1$
+means that claim $a_i$ is true. Each claim is assigned a prior factor $\phi_i(x_i)=\pi_i^{x_i}(1-\pi_i)^{1-x_i}$
 and each relation $r$ contributes a factor $\psi_r$ that penalizes exactly the joint truth assignments that the relation forbids:
 \begin{equation}
 \psi_r(u,v)=

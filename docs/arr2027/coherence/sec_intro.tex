@@ -22,7 +22,7 @@ largely ignores the truth of its claims, and can be disrupted by reordering sent
 paragraphs \citep{grosz1995,barzilay}. By contrast, \emph{logical coherence} is a property of 
 an argument: the extent to which the truth-functional relations it draws among a fixed set of 
 claims are supported by the truth values of those claims. As a result, logical coherence is 
-invariant to reordering and captures aspects of reasoning that discourse coherence does not. 
+invariant to reordering (a mined score inherits its extractor's sensitivity to order) and captures aspects of reasoning that discourse coherence does not. 
 A contradiction may be rhetorically well integrated yet logically incoherent; a false 
 conclusion may follow from a well-structured argument; and adding a valid inference
 can improve logical coherence even when consistency and discourse structure remain unchanged.
@@ -43,25 +43,25 @@ In summary, our contributions are:
 
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item \textbf{A principled coherence score with theoretical guarantees} (\S\ref{sec:framework}). We introduce LCS, a coherence 
-metric that is strictly monotone under every coherence-improving edit, for any priors and relation
-graph, relative to the committed world a factuality pipeline supplies. Within product MRFs read by
+metric that is strictly monotone under every coherence-improving edit of a coherence order we
+define, for any priors and relation graph, relative to the committed world a factuality pipeline
+supplies. Within product MRFs read by
 a single-world log-ratio, this requirement forces two-valued relation tables and the committed
 world as the readout (App.~\ref{app:why}). 
 % We further characterize the class of relation factors that 
 % admit this guarantee and show that no readout based on a different single world satisfies the same coherence 
 % order.
 
-\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On mined graphs,
-LCS falls only on pairs whose edit the miner reversed or left incomparable, as the theorem
-requires; gold graphs, which the benchmark admits only if they are ordered as declared, check the
-implementation. LLM judges rating one response at a time rise and fall about equally often when the only
-edit is an added valid inference, although a judge comparing two responses, given the verdicts and
-our definition, ranks most pairs as declared. A signed sum of relation weights does as well on these ladders, which exercise each
-relation's sign but not the interactions that the MRF adds.
+\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On GPT-6-mined
+graphs LCS rises on \sThreeGraphGptLamIncPct\% of the declared increases, and on \subLlamaLcsInc\% with
+a miner outside the benchmark's vendors; every fall lies where the extracted graphs are not ordered
+as declared, as the theorem requires. A signed sum of relation weights does slightly better on
+these ladders. LLM judges rating one response at a time rise and fall about equally often when the only edit is an
+added valid inference; a judge comparing two responses, given the verdicts and our definition, is
+competitive with LCS.
 
 \item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). On existing
-human-labelled data, none of which rates logical coherence, LCS is related to but not a proxy for
-rated discourse coherence, falls when a detected contradiction is added and rises when a consistent
-sentence is, and at real verdicts rises when a contradiction refutes a falsehood. On student
-essays, it tracks quality beyond length and a rubric-prompted grader.
+human-labeled data, none of which rates logical coherence, LCS is not a proxy for rated discourse
+coherence, falls when a detected contradiction is added and rises when a consistent sentence is.
+On student essays, it tracks quality beyond length and a rubric-prompted grader.
 \end{itemize}

@@ -8,11 +8,12 @@ fixed set of claims and their verdicts, it must rise under every coherence-impro
 argument's relations. $\LCS$, the weight of evidence that the coherence MRF lends to the committed
 world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
-committed world as the readout (App.~\ref{app:why}). On LoCoBench's mined graphs $\LCS$ falls only
-on pairs the miner reversed or left incomparable, while LLM judges rating single responses miss added inferences; a signed
-sum of relation weights does as well on these ladders. On natural text the score is related to but
-not a proxy for rated discourse coherence, falls under detected contradictions more often than the
-signed sum, and tracks essay quality beyond length. What limits $\LCS$ is
+committed world as the readout (App.~\ref{app:why}). On LoCoBench, a signed sum of relation weights
+does slightly better than $\LCS$, and a judge comparing two responses with their verdicts is
+competitive with it. On natural
+text the score is not a proxy for rated discourse coherence, falls under detected contradictions,
+and tracks essay quality beyond length. Its advantage over the signed sum is so far a matter of
+design (presentation invariance, saturation of repeated support) rather than of accuracy. What limits $\LCS$ is
 relation extraction (recall, above all for contradictions within a sentence, and calibrated
 weights) and the verdicts it is read against. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
@@ -24,7 +25,7 @@ admitted by a single committee, so results may reflect one model's writing style
 are the committee's reading of each response, not human annotations. The ladders are diagnostic, not
 a sample of how real responses argue: rungs differ in one or two spliced sentences with explicit
 markers, and claims are given rather than extracted. The committee and the miners share vendors, and
-explicit markers favour any extractor that reads connectives, so mined-graph results on LoCoBench
+explicit markers favor any extractor that reads connectives, so mined-graph results on LoCoBench
 are optimistic, an upper bound on extraction from natural text. A graph-level miner from outside
 those vendors (Llama-3.3-70B, on \subLadders{} ladders) reaches a pair-level F1 of \subLlamaPairF{}
 against \subGptPairF{} for GPT-6, and $\LCS$ on its graphs falls on \subLlamaLcsFalls\% of the
@@ -32,12 +33,13 @@ increases.
 
 \paragraph{External evaluation.} The natural-text datasets carry human labels (rated coherence,
 contradictions, discourse and argument relations, essay scores), but none rates the logical
-coherence of a response, so agreement with human judgements of logical coherence remains to be
+coherence of a response, so agreement with human judgments of logical coherence remains to be
 established, and no human study checks that people rank LoCoBench's rungs as declared. Every
 natural-text test reads the asserted world, so the verdict polarity is tested only on LoCoBench.
 $\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The score is
-order-free, but on long documents its extraction is not: permuting paragraphs changes what the
-miner finds. The essays come from one prompt, sampled uniformly over score
+order-free, but its extraction need not be: on LoCoBench equivalence with re-mining noise is not
+established, and the ContraDoc order test is confounded by permutations that split section headers
+from their text. The essays come from one prompt, sampled uniformly over score
 levels, and were mined with one model.
 
 \paragraph{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a
@@ -57,11 +59,11 @@ evidence neither supports nor refutes is treated as false. On LoCoBench the verd
 generator's factuality labels, which model an error-free pipeline, so the effect of verdict errors
 is not measured.
 
-\paragraph{Modelling.} Relations join two claims, so a contradiction within a single claim cannot
+\paragraph{Modeling.} Relations join two claims, so a contradiction within a single claim cannot
 be represented; on ContraDoc this is where recall is lowest. No relation weight is calibrated, and
 the pairwise miner's weights saturate the score. Only \sense{Refutation} compiles to \con{}, so an
 incompatibility conveyed without being asserted produces no factor. Couplings are material
-constraints, so relevance of premise to conclusion is not modelled. Saturation bounds redundant
+constraints, so relevance of premise to conclusion is not modeled. Saturation bounds redundant
 support but cannot stop a miner from hallucinating new support, so the score inherits the
 extractor's precision.
 
@@ -78,9 +80,9 @@ evidence of truth, and it should not be used on its own to certify content. LoCo
 and contains no personal data. By design it contains plausible false claims written as expert prose,
 and every item carries per-claim factuality labels, which released copies should keep attached.
 This paper collects no new human data. The external evaluation uses public datasets under their
-licences (App.~\ref{app:external}). The raw files of datasets whose licences restrict or do not
+licenses (App.~\ref{app:external}). The raw files of datasets whose licenses restrict or do not
 state redistribution are not redistributed. GDTB is released under CC BY-NC-SA and is used for
-research only; QT30 states no licence, so we use it for research only and redistribute nothing from
+research only; QT30 states no license, so we use it for research only and redistribute nothing from
 it. The ASAP~2.0 essays were written by school students in grades 6--10 and are released under CC BY
 4.0. We use their text and scores only, no demographic metadata; the text was sent to commercial
 model APIs for claim extraction, relation mining and source checking. We do not redistribute the

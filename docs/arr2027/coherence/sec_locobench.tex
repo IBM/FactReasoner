@@ -38,7 +38,8 @@ percentile-bootstrap intervals over families.
 rises strictly; \emph{middle:} share on which it falls (the rest are ties). A score that ignores the
 edits gets $0\%$ in both, a random one about $50\%$ in both. \emph{Right:} share of Invariance
 pairs on which the score stays equal. \emph{Blue:}
-$\LCS$ at the verdict world, on gold and mined graphs. \emph{Gray:} the signed weight sum over the
+$\LCS$ at the verdict world, on gold and mined graphs. Judges average five runs, the verdict-aware
+absolute judge three. \emph{Gray:} the signed weight sum over the
 graph-level arms' graphs (all arms in Table~\ref{tab:signed}), $\LCS$ at the asserted world, and the
 baselines. The entity graph reads the text but scores only nouns shared by nearby sentences, so it too
 almost never moves.}
@@ -62,26 +63,25 @@ response states it, the gold graphs still satisfy every \cp{conflict} and \cp{ch
 \sThreeGoldLamASign{} \cp{sign} pairs, as does any signed score: a derived falsehood counts as a
 support there, so deriving and refuting it can tie (App.~\ref{app:asserted-sign}).
 
-\paragraph{Mined graphs: every miss traces to extraction.} With mined graphs $\LCS$ rises on
-\sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\% (pairwise
-Llama) of the increases, and falls on some. Theorem~\ref{thm:mono} predicts a direction only when
-one rung's extracted graph improves on the other's. Where the miner recovered the edit, $\LCS$
-rises on every pair (one numerical tie); where it erased or reversed it, $\LCS$ ties or falls;
-where it changed relations in both directions, the theorem is silent and $\LCS$ rises on most
-(\sThreeGraphGptDomIncomparableOk{} of \sThreeGraphGptDomIncomparable{} with GPT-6;
-Figure~\ref{fig:dominance}, App.~\ref{app:results}). Every fall is therefore on a pair the miner
-reversed or left incomparable. GPT-6 recovers \sThreeGraphGptDomForward{} of the
-\sThreeNIncPairs{} edits, each pairwise arm \sThreePairOssDomForward, whose weights drift and
-saturate. Invariance on mined graphs measures the miner's stability: GPT-6 keeps
-\sThreeGraphGptLamInvPct\% of the invariances, the other miners at most \sThreeGraphOssLamInvPct\%.
+\paragraph{Mined graphs: extraction sets the rate.} With mined graphs $\LCS$ rises on
+\sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\% (pairwise Llama)
+of the increases, and by more than $\tau$ on \sThreeGraphGptLamIncTolPct\% to \sThreePairOssLamIncTolPct\%.
+As Theorem~\ref{thm:mono} requires, it falls only where the miner erased, reversed or mixed the
+edit (Figure~\ref{fig:dominance}), so the rates measure extraction. GPT-6, which shares vendors with the
+benchmark's committee, recovers \sThreeGraphGptDomForward{} of the \sThreeNIncPairs{} edits. A
+graph-level miner from outside those vendors (Llama-3.3-70B, \subLadders{} ladders) reaches a
+pair-level F1 of \subLlamaPairF{} against \subGptPairF{} for GPT-6, and $\LCS$ falls on
+\subLlamaLcsFalls\% of its increases, so the GPT-6 results are an upper bound. 
 
-\paragraph{A signed sum does as well on the ladders.} The signed weight sum over the same graphs
-rises on \sThreeGraphGptWsumIncPct\% of the increases with GPT-6 ($\LCS$: \sThreeGraphGptLamIncPct\%)
-and matches or exceeds $\LCS$ on the increases of every arm (Table~\ref{tab:signed}): the ladders
-test the sign each relation takes at the committed world, which the two scores share. What $Z_\R$
-adds appears elsewhere: on every gold graph, the sum counts a constraint stated as two halves twice
-and rates one inference repeated three times as highly as three distinct ones, and $\LCS$ does
-neither (App.~\ref{app:results}).
+\paragraph{A signed sum does slightly better on the ladders.} The signed weight sum over the same
+graphs rises on \sThreeGraphGptWsumIncPct\% of the increases with GPT-6 ($\LCS$:
+\sThreeGraphGptLamIncPct\%), on \sThreeGraphGptDomWIncomparableOk{} of the incomparable pairs against
+\sThreeGraphGptDomIncomparableOk{} for $\LCS$, and matches or exceeds $\LCS$ on the increases of every
+arm (Table~\ref{tab:signed}): the ladders test the sign each relation takes at the committed world,
+which the two scores share. What $Z_\R$ adds is a matter of design (App.~\ref{app:results}): $\LCS$
+scores a constraint the same whether it is stated whole or as two halves, credits a repeated
+inference less than distinct ones, and credits an inference less when its premise is contested; a
+sum over deduplicated constraints would match the first two, but not the third.
 
 \paragraph{Text baselines and LLM judges.} Length and DiscoScore fall about as often as they rise
 (Figure~\ref{fig:ladders}). Judges rating one response at a time miss added inferences: on
@@ -91,6 +91,6 @@ claims, their verdicts and our definition it still does not separate them (rise\
 \fjAbsChainCounts). Asked instead which of two rungs is more coherent, in both orders and with the
 claims, verdicts and definition, GPT-6 prefers the declared rung on \fjPairVIncRise\% of the
 increases (\cp{chain}: \fjPairVChainRise\%) and calls \fjPairVInvTie\% of the invariance pairs equal;
-without them it prefers fewer inferences on \cp{chain} (\fjPairChainCounts). A head-to-head judge
-given the construct can make these comparisons; $\LCS$ scores one response on an absolute scale,
-with a guarantee and attribution to relations (App.~\ref{app:results}).
+without them it prefers fewer inferences on \cp{chain} (\fjPairChainCounts). This judge is
+competitive with $\LCS$ on GPT-6 graphs (\sThreeGraphGptLamIncPct\% and \sThreeGraphGptLamInvPct\%);
+$\LCS$ scores each response on its own, with a guarantee and attribution (App.~\ref{app:results}).

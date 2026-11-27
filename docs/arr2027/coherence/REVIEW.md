@@ -399,3 +399,110 @@ Main text still ends on p. 8; build clean. New result files: `numbers_zstress.te
 - Response-grounded NLI (3.3), not run because of cost.
 - Bibliography details (m9).
 - Notation and spelling items (m7).
+
+---
+
+## 8. Second review (2026-11-27, after Phases 1–3)
+
+Before the review I fixed the bibliography and notation items:
+- Bibliography (m9): removed 3 uncited entries (2 were duplicates); dropped arXiv notes from published papers; normalized venue names; removed stray URL fields; set the Milne title in math; gave GDTB's full author list; relabeled ASAP as a dataset.
+- Notation (m7): claims a_i with truth values x_i throughout (X_i dropped), and the same in the coupling definition; discourse senses in italics; American spelling. One substitution broke "optimistic"; that is fixed.
+
+`results/ext/PREREG.md`, this file and `.claude/` are marked `export-ignore` in `.gitattributes`. The two shipped files that pointed to PREREG.md, the `ext_eval.py` docstring and comments and `data/ext/contradoc-rerun/README.md`, are reworded.
+
+**How the review was made.**
+- Three fresh, independent reviewers on the rebuilt PDF, with no access to this file or to PREREG.md: the LoCoBench evaluation; the natural-text evaluation; a holistic ARR area-chair review with scores.
+- My own read.
+- Paired checks I ran myself (`/tmp/review_meta/mcnemar.py`, now also in `ext_eval.py` as the `Mc*` macros).
+
+### Scores
+
+| | Holistic reviewer | LoCoBench reviewer | Natural-text reviewer | **Mine** |
+|---|---|---|---|---|
+| Soundness | 3 | 2.5–3 | 2.5 (3 if fixed) | **3** |
+| Excitement | 2.5 | – | – | **2.5** |
+| Overall | 2.5 | – | – | **2.5 (borderline Findings)** |
+| Confidence | 4 | – | – | **4** |
+| Reproducibility | 3 | – | – | **3** |
+
+**Why my overall score did not rise.** Soundness rose from 2.5 to 3: the claims are now much more honest, the gold result is framed as a check, the signed sum and the strong judges are reported, and the controls are in place. But the new evidence cuts against the paper's distinctive claims, and three of my Phase 3 framings overclaim:
+1. The signed sum is not merely equal but slightly better on the ladders.
+2. The natural-text advantage of LCS over the sum does not survive a control.
+3. The verdict-world result in the main text is the one positive slice of several tests.
+
+The paper is now a careful, candid account of a score whose added value over a signed count is shown only by construction.
+
+### New or reassessed findings (verified unless marked)
+
+| # | Severity | Finding | Evidence |
+|---|---|---|---|
+| N1 | **critical** | **No empirical setting shows LCS beating the signed sum.** On LoCoBench the sum is *better*, not equal: paired family-cluster bootstrap, LCS − sum on increases −1.1 pp [−2.2, −0.2]. On incomparable pairs the sum rises more and falls less on every arm (falls 4 vs 11 GPT-6, 63 vs 84 gpt-oss). On natural text, "LCS falls under contradictions more often than the sum" (abstract, intro, Conclusion) does not hold up. ChatProtect gives 50 vs 5 LCS-only falls (p < 10⁻⁹), but 47 of the 50 are on pairs with *no* detected contradiction, and the non-contradictory control shows the same rate (7 of 113, 6%, against 50 of 717, 7%; McNemar p = 0.34). That points to the artefact of adding a claim, which shifts LCS through u₀, not to sensitivity to contradictions. Only ContraDoc pairs where the contradiction is found support it (8 vs 1, p = 0.04, one of several tests). The "where Z matters" constructions are deterministic and are compared with an undeduplicated sum; a canonicalized sum would pass "repetition" and "presentation". | LoCo reviewer (cluster bootstrap); me (McNemar: `CpMc*`, `CdMc*` macros) |
+| N2 | **major** | **The ContraDoc permutations are flawed by construction.** Wiki section headers ("= = History = =") count as paragraphs and claims, so a permutation separates headers from their sections and puts the title mid-text (for example `neg-3499318675_5` p1 opens with two headers); 94 of the 150 documents are wiki pages. The long-document order result (permutation moves LCS beyond the matched noise) and the judge's 97% falls are therefore confounded by degraded text. | me (inspected) |
+| N3 | **major** | **The verdict-world evidence in the main text is selective.** The main text reports 14/14 ChatProtect pairs. It omits ContraDoc at the verdict world (54 rises vs 43 falls, p = 0.31), all 64 ChatProtect pairs with verdicts (20/12/32, p = 0.22) and the ASAP strict world (partial drops 0.50 → 0.35). 8 of the 14 pairs have both sentences false, where LCS "rises" because a second falsehood contradicts the first: a sign check, arguably perverse. The preamble also says "no per-claim verdicts", though ASAP has committee verdicts. | natural-text reviewer |
+| N4 | **major, your decision** | **The planned pass/fail tests remain in the code.** `ext_eval.py` still computes the H1a/H1c/H1d/H2a/H2b/H3a/H3c/H4b verdicts and the "four of six held" summaries. Several failed with GPT-6: H1a, H1c, H2a-verdict and H2b. Keeping PREREG.md out of the release does not hide this; a reviewer reading the code sees criteria whose failures the paper never reports. Options: (a) disclose the criteria and outcomes in one appendix table (recommended); (b) remove the pass/fail flags from the released code. I have not done (b): it would hide results rather than present them. | natural-text reviewer |
+| N5 | major | **"Order: within the noise on short responses" is not established.** On LoCoBench the TOST fails (90% CI up to +0.011 against τ = 0.01); permutations lean downward (42 vs 26, p = 0.07); and the noise floor compares two different runs, the design that drifted on ContraDoc. | natural-text reviewer |
+| N6 | major | **SummEval is still framed generously.** "Related to" rests on a post-hoc ablation (+0.31) that is no better than a plain inference count (+0.26). The −0.18 on summaries with a relation is significant and appears only in Table 2. The restatement effect lives largely at the level of the summarization system (16 systems, ρ = −0.51). | natural-text reviewer |
+| N7 | major | **The ASAP comparisons are untested.** 0.50 vs 0.44 (G-Eval) and 0.46 (sum) are given without a test of the difference. The plain relation count (0.44 after length; 0.25 after length and the rubric grader) is omitted from the main text, so "information a rubric grader does not have" belongs to the mined relations, not to LCS. Within length thirds, word count orders essays as well or better (0.79 vs 0.75; 0.59 vs 0.50), and those values are computed but not reported. | natural-text reviewer |
+| N8 | major | **The vendor-independent miner belongs in §3.1, not only in Limitations.** Llama graph-level: F1 0.72; LCS falls on 31% of increases. The 97% GPT-6 headline is an upper bound. | LoCo and holistic reviewers |
+| N9 | major | **The strongest judge is undersold.** The pairwise judge with verdicts is within 3.5 pp of LCS on increases [0.7, 6.5] and 39 pp better on invariances [33, 45]; the abstract's "does better" (than single-response judges) hides that it is competitive overall. Also, strict "rises" credit LCS for any change above 10⁻¹⁰: the pairwise miners resolve only 181 and 202 of 540 increases beyond τ, against the 79% and 75% shown in Fig. 2. | LoCo reviewer |
+| N10 | major | **Construct validity of the ladders.** The `chain` fillers add causal assertions between true claims; since couplings are material, linking any two true claims is a support, and no non-sequitur control exists. A 15-pattern regex marker score rises on 167/180 `conflict` pairs and 76/180 `chain` pairs with ≤ 2 falls, so explicit markers make the ladders easy. | LoCo reviewer |
+| N11 | major | **Tautologies are still framed as findings.** "Mined graphs: every miss traces to extraction" (heading, abstract) follows from Theorem 1. For the pairwise miners 490/540 pairs are incomparable, so the theorem says nothing about most of them. | LoCo and holistic reviewers |
+| N12 | minor | Sign tests ignore clustering (ContraDoc 178 pairs from 102 sources; matched comparisons reuse originals; ChatProtect from 31 topics). The large effects survive, but p = 0.001 / 0.07 are anti-conservative. | natural-text reviewer |
+| N13 | minor | Footnote 1 promises costs in the appendix, which says they were not logged. Judge run counts are mixed (3 vs 5) without labels; ASAP G-Eval runs are given as 3 in one place and 5 in another. | LoCo and natural-text reviewers |
+| N14 | minor | The "optimiztic" typo is fixed. Fig. 1 callouts (about 5 pt) and Fig. 2 labels (about 6 pt) are still small. | all |
+| N15 | minor | The `sign` result rests on oracle verdicts; no ladder evaluation with injected verdict noise or a real factuality pipeline exists. | LoCo and holistic reviewers |
+
+### Fix plan
+
+**Decisions (yours).**
+1. **Positioning (N1).** With the sum ≥ LCS on ladders and no robust natural-text advantage, option (a) ("show where Z matters") has not succeeded empirically. Recommended: reframe the contribution as a *principled justification of a signed, verdict-aware relation score*. The theory fixes the sign by the committed world and the class of admissible scores. LCS is the member with saturation and presentation invariance, a design argument backed by the constructions rather than by benchmark wins, and the signed sum is reported throughout as a strong simple member. Alternatively, keep (a), which needs a natural-text setting with genuine redundancy or contested premises, tested pairwise.
+2. **Planned tests (N4):** disclose them in an appendix table (recommended), or leave them as they are.
+3. **Human study (Phase 4):** every reviewer still lists it among the top changes.
+
+**Phase A: accuracy of the text (no new runs).**
+- **Abstract, intro, Conclusion:** remove "more often than the signed sum" (N1); state that the pairwise judge with verdicts is competitive (N9); stop presenting dominance as a finding (N11); state the order result for short responses only once N2 and N5 are resolved; qualify "invariant to reordering" as a property of the construct, not of the mined score.
+- **§3.1:** add the Llama graph-level result (N8); report resolved rates beside strict ones (N9); say "slightly better" for the sum, with the cluster CI (N1).
+- **§3.2:**
+  - report every verdict-world test, and call the 14-pair result a sign check (N3);
+  - retitle P1 "Not a proxy for discourse coherence", state the −0.18, and compare the ablation with the inference count (N6);
+  - retitle P3, since equivalence is not established (N5);
+  - ASAP: add the relation count, the word-count tertiles and difference CIs (N7);
+  - fix "no per-claim verdicts" (ASAP has committee verdicts).
+- **Footnote 1 and judge labels** (N13).
+
+**Phase B: re-analysis (scripts only).** Cluster-level sign tests and paired cluster-bootstrap CIs for LCS vs sum and vs judges (N1, N9, N12); resolved rates in Fig. 2 (N9); a regex-marker baseline in Table 8 (N10); `sign` ladders under injected verdict noise of 5–20% (N15); a canonicalized (deduplicated) signed sum as a baseline (N1).
+
+**Phase C: new runs.**
+1. Rebuild the ContraDoc permutations keeping headers with their sections, and re-mine them in the matched design (N2).
+2. The matched re-mining design on LoCoBench (N5).
+3. A G-Eval re-run noise floor (N2, N5).
+4. A non-sequitur `chain` control: links between unrelated true claims (N10). This needs generation.
+5. Verdicts from a real factuality pipeline on one dataset (N3, N15).
+
+**Phase D: human study.** Pairwise preferences on LoCoBench rungs (especially `chain` and `sign`) and on a natural-text sample, with agreement for LCS, the signed sum and the pairwise judge.
+
+---
+
+## 9. Changelog (2026-11-27): Phase A of the second review (text accuracy)
+
+The main text ends on p. 8 (last line); build clean. One new macro was computed:
+`extCpVwFoundBothFalse` (8 of the 14 found verdict-world pairs). The paired LCS-vs-sum tests
+(`CdMc*`, `CpMc*`) were added in §8's review.
+
+| # | Status | What changed |
+|---|---|---|
+| N1 | text done; CI in Phase B | The abstract, intro and Conclusion no longer claim LCS falls more often than the sum. §3.1 is retitled "A signed sum does slightly better on the ladders", with the incomparable-pair counts. The value of Z_R is stated as design, and a deduplicated sum would pass two of the three constructions (§3.1, App. H). The Conclusion says the advantage over the sum is "a matter of design … rather than of accuracy". §3.2 and App. L.2 report the McNemar results and the control showing the ChatProtect gap is an artefact of adding a claim (u₀). |
+| N2 | text done; rebuild in Phase C | The ContraDoc order row is removed from Table 2. §3.2, App. L.3 and Limitations state the header-splitting confound and withdraw the long-document claim. |
+| N3 | done | The §3.2 opening reports every verdict-world test (ChatProtect 14 found, 8 both false, called a sign check; 64 pairs 20/12, p = 0.22; ContraDoc 54/43, p = 0.31; ASAP strict weaker). |
+| N4 | **open, your decision** | The planned pass/fail flags remain in `ext_eval.py`. |
+| N5 | done | P3 is retitled "Order"; equivalence is not established. |
+| N6 | done | Retitled "Not a proxy for discourse coherence"; −0.18 on summaries with a relation stated in prose; ablation (+0.31) compared with the inference count (+0.26). |
+| N7 | done | The relation count (0.44; 0.25 after the grader) is in §3.2, with "no difference resolved"; App. L.4 reports word count within thirds as well and calls that check weak. |
+| N8 | done | The Llama graph-level miner is in §3.1 (F1 0.72 vs 0.97; falls 31%), the abstract and intro (69%). |
+| N9 | partly | The pairwise judge is "competitive with LCS" in the abstract, intro, §3.1 and Conclusion, with LCS's 97% / 52% beside it; resolved rates (beyond τ) are in §3.1. Resolved rates in Fig. 2 are left for Phase B. |
+| N10 | open (Phases B, C) | |
+| N11 | done | Heading "Mined graphs: extraction sets the rate"; the dominance result is stated "as Theorem 1 requires", and the rates are the finding; the intro states the coherence order is the paper's own. |
+| N12 | open (Phase B) | |
+| N13 | done | Footnote 1 no longer promises costs; the Fig. 2 caption gives the judges' run counts; App. L gives the essay G-Eval run count (five). |
+| N14 | partly | The typo is fixed; Fig. 1 font size is still open. |
+| N15 | open (Phase B) | |
