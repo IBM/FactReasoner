@@ -63,7 +63,13 @@ REL_TIE = 1e-10
 # (The baselines used an absolute 1e-6 before; only the gpt-oss-120b judges, whose ratings are
 # probability-weighted over the rating token's logprobs and drift by 1e-13..1e-5, were affected.)
 DECIDE = {"lambda": (REL_TIE, True), "lambda_assert": (REL_TIE, True),
-          "mean_marginal": (REL_TIE, True)}
+          "mean_marginal": (REL_TIE, True),
+          "wsum": (REL_TIE, True), "count": (REL_TIE, True),
+          "wsum_assert": (REL_TIE, True), "count_assert": (REL_TIE, True)}
+#: The signed baselines over the same graphs, by readout key -> (macro tag, display name).
+SIGNED = {"wsum": ("Wsum", "signed weight sum"), "count": ("Count", "signed count"),
+          "wsum_assert": ("WsumA", "signed weight sum, asserted"),
+          "count_assert": ("CountA", "signed count, asserted")}
 # Invariance within a tolerance, on each score's own [0, 1] scale (LCS for the MRF arms,
 # the mean marginal, each baseline's score). Exact equality is unattainable for a mined
 # graph: a pairwise miner's weights are token log-probabilities, which move by ~1e-8 when
@@ -147,8 +153,16 @@ def score_item(item, rels):
     lam_a = A.confirmation(pu, tup, xa)
     pri = {aid: (0.9 if a["factual"] else 0.1) for aid, a in zip(ids, atoms)}
     mm = A.old_readouts(ids, pri, rels)["mean_marginal"]
+    # Non-probabilistic baselines on the same graph (review C1): each relation counts +p (or +1)
+    # if the committed world satisfies it and -p (or -1) if it violates it. Both are monotone
+    # under every elementary improvement, like LCS, but read no MRF (no normalization Z).
+    def signed(x, weighted):
+        return float(sum((r[3] if weighted else 1.0) * (1 if A.is_support(r, x) else -1)
+                         for r in tup))
     return {"lambda": lam, "lcs": A.lcs_flat(lam, n), "lambda_assert": lam_a,
             "lcs_assert": A.lcs_flat(lam_a, n),
+            "wsum": signed(xv, True), "count": signed(xv, False),
+            "wsum_assert": signed(xa, True), "count_assert": signed(xa, False),
             "mean_marginal": mm, "n": n, "graph": tup, "xv": xv, "xa": xa}
 
 
@@ -251,8 +265,12 @@ def dominance_rows(ladders, scores):
     return rows
 
 
-def dominance(ladders, scores):
-    """Increase pairs by how the two graphs compare in the coherence order at x*."""
+def dominance(ladders, scores, key="lcs", tol=1e-12):
+    """Increase pairs by how the two graphs compare in the coherence order at x*.
+
+    ``key`` is the score read on each pair (LCS, or a signed baseline over the same graphs);
+    ``tol`` is the weight tolerance of the comparison (exact by default; 1e-3 absorbs the
+    ~1e-8 drift of the pairwise miners' token-probability weights)."""
     # On LCS: rises (> tie), n, falls (< -tie), ties (|d| <= tie), rises exactly (d > 0)
     d = defaultdict(lambda: [0, 0, 0, 0, 0])
     for lad in ladders:
@@ -263,11 +281,11 @@ def dominance(ladders, scores):
             continue
         for i, j in itertools.combinations(range(3), 2):
             lo, hi = scores[ids[i]], scores[ids[j]]
-            g = A.dominates(hi["graph"], lo["graph"], hi["xv"])
-            rev = A.dominates(lo["graph"], hi["graph"], hi["xv"])
+            g = A.dominates(hi["graph"], lo["graph"], hi["xv"], tol=tol)
+            rev = A.dominates(lo["graph"], hi["graph"], hi["xv"], tol=tol)
             kind = ("forward" if g == "strict" else "equal" if g == "equal" else
                     "backward" if rev == "strict" else "incomparable")
-            dc, t = hi["lcs"] - lo["lcs"], _thr(hi["lcs"], lo["lcs"], REL_TIE, True)
+            dc, t = hi[key] - lo[key], _thr(hi[key], lo[key], REL_TIE, True)
             d[kind][0] += dc > t
             d[kind][1] += 1
             d[kind][2] += dc < -t
@@ -378,7 +396,13 @@ def main() -> int:
                        tol_value=lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None)
             for ro in ("lambda", "lambda_assert", "mean_marginal")
         }
+        for ro in SIGNED:
+            res[arm][ro] = assess(ladders, lambda i, ro=ro, sc=sc: sc[i][ro] if i in sc else None,
+                                  DECIDE[ro][0], rel=DECIDE[ro][1])
         res[arm]["dominance"] = dominance(ladders, sc)
+        res[arm]["dominance_wsum"] = dominance(ladders, sc, key="wsum")
+        res[arm]["dominance_tol3"] = dominance(ladders, sc, tol=1e-3)
+        res[arm]["dominance_tol3_wsum"] = dominance(ladders, sc, key="wsum", tol=1e-3)
         # Saturation: near-certain weights pin LCS near 0, compressing Lambda's steps.
         w = [r[3] for v in sc.values() for r in v["graph"]]
         steps = [sc[l["item_ids"][j]]["lambda"] - sc[l["item_ids"][i]]["lambda"]
@@ -415,7 +439,8 @@ def main() -> int:
             "lambda": [float(np.mean([scores["gold"][l["item_ids"][k]]["lambda"] for l in ls]))
                        for k in range(3)],
         }
-    unit = {"lambda": "lcs", "lambda_assert": "lcs_assert", "mean_marginal": "mean_marginal"}
+    unit = {"lambda": "lcs", "lambda_assert": "lcs_assert", "mean_marginal": "mean_marginal",
+            **{ro: ro for ro in SIGNED}}
     pairs = {arm: {ro: pair_rows(ladders, lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc
                                  else None, DECIDE[ro][0],
                                  lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None,
@@ -511,6 +536,19 @@ def write_macros(path, out):
                       "lad_inv": "LadInv"}.get(key, key.replace("pair_", "").replace(
                           "tol_", "Tol").title())
                 m(f"sThree{tg}{rt}{kk}", _frac(c.get(key)))
+        for ro, (st, _disp) in SIGNED.items():
+            c = r[ro]
+            for key in ("inc", "inv", "lad_inc", "lad_inv") + tuple(f"pair_{t}" for t in TYPES):
+                kk = {"inc": "Inc", "inv": "Inv", "lad_inc": "LadInc",
+                      "lad_inv": "LadInv"}.get(key, key.replace("pair_", "").title())
+                m(f"sThree{tg}{st}{kk}", _frac(c.get(key)))
+        for dk, dt in (("dominance_wsum", "DomW"), ("dominance_tol3", "DomT"),
+                       ("dominance_tol3_wsum", "DomTW")):
+            for kind in ("forward", "incomparable", "backward", "equal"):
+                d = tuple(r[dk].get(kind, (0, 0, 0, 0, 0)))
+                m(f"sThree{tg}{dt}{kind.title()}", d[1])
+                m(f"sThree{tg}{dt}{kind.title()}Ok", d[0])
+                m(f"sThree{tg}{dt}{kind.title()}Falls", d[2])
         for kind in ("forward", "incomparable", "backward", "equal"):
             d = tuple(r["dominance"].get(kind, (0, 0, 0, 0)))
             m(f"sThree{tg}Dom{kind.title()}", d[1])
@@ -594,6 +632,13 @@ def report(out):
                   f"ladders inc {_frac(c.get('lad_inc')):6s} inv {_frac(c.get('lad_inv')):6s} | "
                   + " ".join(f"{t}:{_frac(c.get('pair_'+t))}" for t in TYPES))
         print(f"  dominance {r['dominance']}  spread {r['spread']}")
+        for ro in SIGNED:
+            c = r[ro]
+            print(f"  {ro:14s} inc {_frac(c.get('inc')):7s} inv {_frac(c.get('inv')):7s} "
+                  f"lad_inc {_frac(c.get('lad_inc')):6s} | "
+                  + " ".join(f"{t}:{_frac(c.get('pair_'+t))}" for t in TYPES))
+        print(f"  dominance_wsum {r['dominance_wsum']}")
+        print(f"  dominance_tol3 {r['dominance_tol3']}  (wsum {r['dominance_tol3_wsum']})")
         if "extraction" in r:
             e = r["extraction"]
             print(f"  extraction pair P/R/F {tuple(round(x, 2) for x in e['pair'])} "

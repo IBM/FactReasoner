@@ -81,7 +81,7 @@ the text, is made a claim of its own, so an insertion pair differs by exactly on
 \end{table*}
 
 %% ----------------------------------------------------------------------------
-\subsection{Not a Proxy for Discourse Coherence}
+\subsection{Related to, but Not a Proxy for, Discourse Coherence}
 \label{app:ext-logical}
 
 \paragraph{SummEval.} $\LCS$ with every claim true correlates with the expert ratings as follows:
@@ -120,6 +120,17 @@ while raters penalize the redundancy it signals; the summarizers that repeat the
 rated least coherent. With gpt-oss-120b the pattern is the same: $\extSeNonEmptyRhoCohOss$ on the
 \extSeNonEmptyNOss{} summaries with a relation, $\extSeCountRestateRhoCohOss$ for the number of
 restatements and $\extSeInfOnlyRhoCohOss$ on inference-only graphs.
+
+\paragraph{Ablation and signed sum (exploratory).} Dropping every restatement factor and keeping
+the rest of each graph, $\LCS$ correlates with rated coherence at $\extSeNoRestateRhoCohGpt$ over
+all summaries and at $\extSeNoRestateNonEmptyRhoCohGpt$
+{\scriptsize[\extSeNoRestateNonEmptyRhoCohGptLo,\,\extSeNoRestateNonEmptyRhoCohGptHi]} over those with
+a relation (gpt-oss-120b: $\extSeNoRestateRhoCohOss$ and $\extSeNoRestateNonEmptyRhoCohOss$). The
+inferences that remain therefore make a summary both more logically and more discursively
+coherent, and it is the restatements that pull the two apart. The signed weight sum is
+uncorrelated with rated coherence ($\extSeWsumRhoCohGpt$; $\extSeWsumNonEmptyRhoCohGpt$ on the
+summaries with a relation). A score that counts a restatement as support rewards repetition, which
+raters penalize; capping repeated support is one remedy, which we leave to future work.
 
 %% ----------------------------------------------------------------------------
 \subsection{Detected Conflicts Lower the Score}
@@ -193,6 +204,22 @@ With gpt-oss-120b, $\LCS$ falls on all \extCpFoundFallOss{} pairs where the mine
 contradiction, but it finds so few (below) that over all pairs falls and
 rises are even (\extCpAssertDecOss{} and \extCpAssertIncOss; $p=\extCpAssertPOss$).
 
+\paragraph{Control, ties and effect sizes.} On ChatProtect's \extCpCtlNGpt{} pairs annotated as not
+contradictory, adding the second sentence raises $\LCS$ on \extCpCtlIncGpt{}, lowers it on
+\extCpCtlDecGpt{} and leaves it unchanged on \extCpCtlTieGpt{} (median change
+$\extCpEffCtlMedianGpt$): a consistent sentence earns supports. On the \extCpAssertNGpt{}
+contradictory pairs, \extCpAssertTieGpt{} ties come from prefixes whose graph is unchanged. The
+median change is $\extCpEffFoundMedianGpt$ where the contradiction is found
+($\extCdEffFoundMedianGpt$ on ContraDoc) and $\extCpEffNotFoundMedianGpt$ where it is missed
+($\extCdEffNotFoundMedianGpt$ on ContraDoc, where the missed pairs fall \extCdAssertNotFoundDecGpt{}
+times and rise \extCdAssertNotFoundIncGpt{}, $p=\extCdAssertNotFoundPGpt$). The signed weight sum
+over the same graphs falls on \extCdWsumDecGpt{} and rises on \extCdWsumIncGpt{} ContraDoc pairs
+(\extCdWsumEdgeDecGpt{} and \extCdWsumEdgeIncGpt{} where the contradiction is found), and on
+\extCpWsumDecGpt{} and \extCpWsumIncGpt{} ChatProtect pairs, so it falls less often than $\LCS$. In
+the sum a found contradiction can be outweighed by the supports the added sentence also receives;
+in $\LCS$ each relation's effect depends on the rest of the graph through $q_r$
+(Lemma~\ref{lem:edit}).
+
 
 \paragraph{Recall and false alarms.} On ContraDoc, the GPT-6 arm finds the contradiction in \extCdRecallGpt\% of the 449
 contradicted documents (gpt-oss-120b: \extCdRecallOss\%):
@@ -218,7 +245,7 @@ contradictory and in \extCpConfNoneGpt\% of the others: low recall, no false ala
 gpt-oss-120b finds it in \extCpConfStrongOss\% and \extCpConfNoneOss\% of the two groups.
 
 %% ----------------------------------------------------------------------------
-\subsection{Order Leaves the Score Unchanged}
+\subsection{Order Moves the Score About as Much as Re-Mining}
 \label{app:ext-order}
 
 \begin{table}[t]
@@ -272,6 +299,21 @@ and \extCdPermDecJudge\% of ContraDoc permutations.
 The entity graph is the most stable score in Table~\ref{tab:ext-order} because it barely reacts to
 anything: it scores only nouns shared by nearby sentences, and on LoCoBench it rises on none of the
 declared increases (Figure~\ref{fig:ladders}).
+
+\paragraph{Equivalence and drift.} We test whether permutation moves $\LCS$ no more than
+re-mining does by two one-sided tests at $\alpha=0.05$ with margin $\tau$ on the difference in mean
+absolute change, using a 90\% group-bootstrap interval. On LoCoBench the difference is
+$\extLocoEqDiffGpt$ with interval [\extLocoEqLoGpt, \extLocoEqHiGpt]; on ContraDoc it is
+$\extCdEqDiffGpt$ with [\extCdEqLoGpt, \extCdEqHiGpt]. Neither interval lies inside $(-\tau,\tau)$,
+so equivalence is not established, narrowly on LoCoBench. The direction of the changes beyond
+$\tau$ matters as well. On LoCoBench, re-mining is balanced (\extLocoEqNoiseUpGpt{} rises,
+\extLocoEqNoiseDownGpt{} falls, $p=\extLocoEqNoisePGpt$), and permutation leans down
+(\extLocoEqPermUpGpt{} and \extLocoEqPermDownGpt, $p=\extLocoEqPermPGpt$). On ContraDoc both lean
+up: permutation \extCdEqPermUpGpt{} against \extCdEqPermDownGpt{} ($p=\extCdEqPermPGpt$), and
+re-mining \extCdEqNoiseUpGpt{} against \extCdEqNoiseDownGpt{} ($p=\extCdEqNoisePGpt$). The re-run
+used the same configuration about an hour after the original; independent samples would not drift
+in one direction, so the drift is unexplained and the ContraDoc noise floor is itself uncertain. A matched design, mining each original and its permutations together and repeatedly,
+would settle the question.
 
 % Flush the floats of K.1-K.3 before the essay subsection.
 \clearpage

@@ -96,6 +96,8 @@
 \input{numbers_pilot}
 \input{numbers_ext}
 \input{numbers_lcslambda}
+% Verdict-flip sensitivity: scripts/arr_verdict_flip.py.
+\input{numbers_flip}
 % ASAP 2.0 essays: scripts/asap_lcs.py (score --macros).
 \input{asap_numbers}
 \newcommand{\asapCI}[2]{\,{\scriptsize[#1,\,#2]}}
@@ -110,7 +112,7 @@
 \begin{abstract}
   Long-form factuality metrics verify claims in isolation and therefore
   cannot assess whether a response's claims collectively form a logically coherent argument.
-  We define \emph{logical coherence} as the degree to which the relations an argument
+  We define \emph{logical coherence} as the extent to which the relations an argument
   draws among its claims are supported by the claims' truth values. To quantify this property,
   we encode these relations in a Markov random field over claim truth values and define the
   \emph{Logical Coherence Score} (LCS), the weight of evidence that the relations lend to the truth
@@ -118,11 +120,12 @@
   We prove that LCS is strictly monotone under every coherence-improving edit, for any priors and
   relation graph.
   On LoCoBench, a benchmark that holds claims fixed while varying only
-  their relational structure, LCS satisfies every gold coherence ordering, and on mined graphs
-  every error traces to relation extraction rather than scoring, while LLM judges are near chance
-  at recognizing an added valid inference. On natural text labelled by others, LCS is not a proxy
-  for rated discourse coherence, falls when a detected contradiction is added, is unaffected by the
-  order of paragraphs, and tracks the quality of student essays beyond their length.
+  their relational structure, LCS on mined graphs falls only where the extracted graphs are
+  reversed or incomparable, while LLM judges rise and fall about equally often when the only edit
+  is an added valid inference; a signed sum of relation weights over the same graphs does as well
+  on these ladders. On existing human-labelled data, LCS is related to but not a proxy for rated
+  discourse coherence, falls when a detected contradiction is added, more often than the signed sum
+  does, and tracks the quality of student essays beyond their length.
 \end{abstract}
 
 

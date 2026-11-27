@@ -3,26 +3,17 @@
 \label{sec:eval}
 %% ============================================================================
 
-In this section, we evaluate the theoretical predictions of §\ref{sec:framework} in two complementary settings. 
-On LoCoBench (§\ref{sec:experiments}), a controlled benchmark of coherence ladders with 
-gold relation graphs, responses differ only in their argument structure while preserving 
-the underlying claims and verdicts. This lets us test each prediction directly, both under 
-gold graphs and under automatically mined graphs, and compare LCS against text-based metrics 
-and LLM judges. On natural text (§\ref{sec:exp-external}), we use three existing datasets 
-together with a corpus of rated student essays. These datasets do not provide human 
-annotations of \emph{logical coherence}; instead, they are labelled for discourse coherence, 
-inserted contradictions, or overall essay quality. 
-We therefore test four properties that the framework implies: $\LCS$ is not a proxy for discourse 
-coherence, falls when a detected contradiction is added, ignores the order of paragraphs, and 
-tracks the quality of arguments beyond confounds such as length.
-
+We evaluate $\LCS$ on LoCoBench (§\ref{sec:experiments}), a controlled benchmark whose responses
+differ only in their relations, with gold and mined graphs, signed and text baselines, and LLM
+judges; and on existing human-labelled natural text (§\ref{sec:exp-external}), none of which rates
+logical coherence, through four properties of the score.
 
 \paragraph{Common setup.} Unless stated otherwise, relations are extracted with the 
-graph-level miner (§\ref{sec:mining}) using GPT-6\footnote{In all our experiments we used GPT-6-Sol.}, 
-which was not involved in constructing 
-LoCoBench; results with gpt-oss-120b are also reported. For LoCoBench, we additionally 
-evaluate the pairwise miner (window size $4$) with gpt-oss-120b and Llama-3.3-70B. We use 
-flat (or uniform) claim priors throughout.
+graph-level miner (§\ref{sec:mining}) using GPT-6\footnote{GPT-6 denotes the GPT-6-Sol
+deployment; settings, prompts and costs are in App.~\ref{app:results}.}, which did not generate
+LoCoBench (a later version, GPT-6.1, sits on its admission committee); results with gpt-oss-120b are
+also reported. For LoCoBench, we additionally evaluate the pairwise miner (window size $4$) with
+gpt-oss-120b and Llama-3.3-70B. We use flat claim priors throughout.
 
 
 \input{sec_locobench}

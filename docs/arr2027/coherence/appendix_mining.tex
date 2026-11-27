@@ -66,6 +66,26 @@ the committed world ($\xs_i=1$ for claims labelled factual, $0$ otherwise), and 
 stance on each claim gives the world of assertion polarity. The score's MRF uses flat priors. No miner is a member of the committee that admitted
 the corpus's items.
 
+\paragraph{Pairwise miner.} The pairwise miner asks one question per candidate pair within a window
+of four claims, and reads $c_r$ from the label-token probabilities and $g_r$ from a
+\texttt{Yes}/\texttt{No} judgement (\S\ref{sec:mining}). Its prompt follows verbatim.
+\promptfile{prompts/PROMPT_PAIR_SENSE_V2.txt}
+
+\paragraph{Judges.} Both judges see the response only, not its claims or verdicts. G-Eval uses the
+SummEval coherence rubric as published; the direct judge asks for a 1--5 rating of logical
+coherence. Each response is rated five times, with the gateway's response cache bypassed. The
+GPT-6 judges sample an integer rating; the gpt-oss-120b judges report the rating's expectation under
+the rating token's probabilities, which is why they almost never tie. The prompts follow verbatim.
+\promptfile{prompts/JUDGE_GEVAL.txt}
+\promptfile{prompts/JUDGE_DIRECT.txt}
+
+\paragraph{Other baselines.} DiscoScore uses \texttt{bert-base-uncased}. NLI contradiction and
+ROSCOE self-consistency use gpt-oss-120b as the NLI model and read only the claims, not the
+response; the claims are identical across a ladder's rungs, so both tie on every pair by
+construction and are omitted from Figure~\ref{fig:ladders}. The signed weight sum and the signed
+count (each relation $+p_r$ or $+1$ if it is a support, $-p_r$ or $-1$ if it is a conflict) read
+the same graphs and committed worlds as $\LCS$.
+
 %% ============================================================================
 \section{Discourse Senses, by Example}
 \label{app:senses}

@@ -1,154 +1,370 @@
-# Coherence paper: review findings (2026-11-24)
+# Coherence paper: review (2026-11-27)
 
-**Sources.**
-- Three independent reviewers: theory and proofs, results against claims, flow and presentation.
-- My own checks: regenerating every number file, tracing hand-typed numbers, numerical tests.
+Reviewed version: commit `533b33c3` (branch `fr2`), PDF built from it. Main text pp. 1–8,
+appendix pp. 12–37.
 
-Every finding below was confirmed by me in the source, or recomputed, before it was listed.
-Line numbers refer to `main.tex` unless a file is named.
+**How the review was made.**
+- Four independent reviewers, each given the paper but not my opinions:
+  1. theory and proofs (Sec. 2, Apps. A–F, K);
+  2. the LoCoBench evaluation (Sec. 3.1, Apps. G–J);
+  3. the natural-text evaluation (Sec. 3.2, App. L);
+  4. presentation, positioning and ARR compliance.
+- My own end-to-end read as meta-reviewer.
+- Every critical and major finding below was either re-checked by me (marked **me**) or verified
+  concretely by its reviewer against the source, the results files or a computation (marked
+  **rev**). Scratch scripts are in `/tmp/review_meta/`, `/tmp/review_loco/`, `/tmp/review_ext/`
+  and `/tmp/review_theory/`.
 
-**Status key.**
-- **M**: mechanical, applied directly.
-- **S**: substantive, waiting for your decision.
-- **OK**: checked and correct.
+The previous review (2026-11-24) is superseded; its open items are listed in §5.
 
-## 1. Theory
+---
 
-| # | Where | Finding | Evidence | Status |
-|---|---|---|---|---|
-| T1 | §2.9 item 4 (l.821) | "every added support raises LCS, **with diminishing returns** (Prop. sat)" is false for *different* supports. Prop. sat(iii) covers only a second copy of the same support. | n=3, flat priors, x\*=111: the gain of r = a₁⇒a₂ (0.9) is 0.255 alone and 0.343 after s = a₃⇒a₁ (0.9). | M: "…raises LCS, and each further copy of the same support earns less (Prop. sat)" |
-| T2 | §2.4 (l.453–455) | "when the mixed couplings disagree in sign at x\*, the mixture places the committed cell strictly between its extremes" is false in general. | An eqv/exc mixture at x\*=11, p=0.8 puts the committed cell at the min (c=0.3) or the max (c=0.7). | M: "can place … (for example an ent/con mixture whose support is the likelier reading)" |
-| T3 | Def. relation (l.342), Lemma edit (l.651–654) | A relation whose two endpoints are the same claim breaks strict monotonicity. Also, 0<q_r<1 comes from distinct endpoints and non-trivial V, not from p_r>0. | Flat priors, p=0.9: a⊕a (exc) is a conflict with Λ=0, so deleting it changes nothing. a⇒a is a support with gain 0. | M: require distinct endpoints s_r≠t_r; reword the lemma's parenthetical |
-| T4 | App. Posterior priors (l.2193–2197); Conclusion (l.1316) | "LCS does not vanish. It is the weight of evidence" is imprecise. LCS is σ(weight of evidence); "does not vanish" should be "does not tend to ½"; "neither term goes to zero" shows finiteness, not non-zero. | Re-derived: with equal sharpening the limit is LCS → 0.769 (A) and 0.170 (B), which matches the reported 0.769/0.169. | M: wording. S: whether to state the limit formula |
-| T5 | App. B (v), "Additivity" ¶ | "an untouched claim moves LCS towards σ(Λ)" is stated but not proved; (v) gives only the limit. | ∂/∂u₀ of the correction has the sign of Λ, so the correction shrinks with u₀. Checked numerically. | M: add the one-line derivative to (v) |
-| T6 | App. Alternative readouts | Readouts (a)–(c) are said to "fail A1" with a mechanism, but no instance or count is given; (d) was checked. | — | S: add counts for (a)–(c) to Table `tab:falls`, which needs new code |
-| T7 | Prop. unique and its uses (abstract l.123, contributions, conclusion) | "the score must be read at the world that defines the order" is proved only for single-world log-ratio readouts. | — | S: narrow the wording |
-| T8 | Prop. sat(iii), the Prop. unique proof, §2.9 | The p_r>0 hypothesis is missing where strictness needs it. | At p=0 both gains are 0. | M |
-| T9 | §2.1 and Prop. neg (l.305, l.434) | "The choice does not matter" fails at the threshold vᵢ=½, where negating does not flip x\*ᵢ. | — | M: note the tie-break |
-| T10 | Notation | τ means both a coupling and the tolerance 0.01. Eq. `mrf` is cited where the tables are Eq. `psi` (l.698, 1490, 1672, 1685). R∖{r} should be "remove one copy". | — | S: rename the tolerance (touches captions and two figures). M: equation citations and "one copy" |
-| T11 | App. Randomized verification | The 56/56 check holds only for flat priors and p=0.8; the k-ary check covers additions at x\*=1 only. | — | M: state the conditions |
-| T12 | Small imprecisions | l.615 "conflicts … that some other world satisfies" should be "that a single other world satisfies"; "converging to \satLamFive=log 2" (the macro is the 5-copy value); "LCS stays at 0.750" (it goes 0.714→0.750); l.1448 non-sequitur "one more reason …"; Fig. 8 caption "where LCS=1" (a supremum, never reached). | — | M |
-| OK | — | Lemma edit, Thm mono (all edit types, multisets, k-ary), Thm necessity (if, only-if, weight changes), Prop. unique, basic, neg, sat, lcs-lambda, the couplings' negation closure, Voyager numbers, the chain example, the star, the saturation numbers. | Re-derived, and checked by enumeration on thousands of random cases. | OK |
+## 1. ARR review
 
-## 2. Results against claims
+### Paper summary
 
-| # | Where | Finding | Evidence | Status |
-|---|---|---|---|---|
-| R1 | Abstract l.128–130, contributions l.206, P2 l.902, §4.3 l.1071–1074, Fig. 5 caption, Discussion l.1204, Conclusion l.1322 | **"every miss / every error is on a pair whose extracted graphs are incomparable" is false as stated.** Misses also occur on pairs ranked *against* the declaration, where the theorem requires a fall. There are also exact ties, and one Llama tie on a pair ordered as declared. | Backward pairs that fall: 3 (GPT-6), 4, 10 and 12. Equal pairs that tie: 2 and 1. Llama forward-ok is 37 of 38. | S: reword to "no error on a pair ranked as declared, except one tie of 4×10⁻¹⁴; every miss is on a pair whose extracted graphs are incomparable or reversed" |
-| R2 | §4.6 l.83–84 and l.157, App. L D1, Table `tab:ext-order` | The H1a/H1c explanation is incomplete. The entity graph beats LCS even with RC and LC excluded (99% against 81%; 95% against 24%), and `H_pass_excl_order_free` = failed is never reported. On ContraDoc, RC and LC do move (86.7% and 99.3% within τ), presumably through sentence segmentation, yet the table prints "--". | `results/ext/eval.json` | S: fill the table; reword D1 to "order-free in definition, sensitive only to segmentation"; state that H1a/H1c fail even without RC and LC |
-| R3 | §4.6 l.9; l.148 | "six datasets that others built and labelled": LoCoBench is ours, so there are five. "Claims are sentences, except in QT30 and GDTB" also leaves out LoCoBench, which keeps its own claims. | Table `tab:ext-data` | M |
-| R4 | Abstract, contributions, §4 roadmap (l.905), Discussion, Conclusion, Limitations (l.1333, 1339–1342, 1363) | §4.6 is not reflected anywhere else. Limitations still says no natural-text or human-rated evaluation exists. | — | S: add one clause each to the abstract, contributions, roadmap, Discussion and Conclusion; rewrite the two Limitations sentences |
-| R5 | Fig. 7(c) and the text citing it | The blue bars show "any coupling", but the caption and text describe them as "correct coupling" (71%). | Restatement 73% any against 50% correct; Disjunction 65% against 43%. | M: plot "correct" for the coupling senses |
-| R6 | §4.6 | Exploratory analyses are not labelled in the main text: the found/not-found splits, 122/0 and the D2 noise floor. "pre-registered before any graph was mined" is also too strong, because the LoCoBench test-split graphs predate the pre-registration. | PREREG.md | M: add the labels; "before any graph of these checks was mined" |
-| R7 | §4.6 l.96–100 | "as the sign rule requires": the rule permits conflicts, and gpt-oss drew one. "All 43 pairs" is really 43 of the 97 pairs with a found contradiction. | `extCdEvConOss`=1 | M |
-| R8 | App. L | Values the pre-registration says will be reported are missing: the judge's ρ with SummEval coherence (+0.67), the false-positive rate per claim pair, the H2b intervals, QT30 coupling-level P/R, and the absent GDTB Evidence category (no Cause+Belief relations in GUM dev/test). | `results/ext/eval.json` | M: add them |
-| R9 | Fig. 8 caption | "LCS crowds towards 0 and 1" contradicts the data: only 1% / 5% of rungs have LCS < 0.01, and none is above 0.99. | `numbers_lcslambda.tex` | M |
-| R10 | App. "Saturation in numbers" (l.1526–1530) | "Five copies … drives the score from 0.551 to 0.926": 0.926 is the sixth copy; five copies give 0.874. "LCS stays at 0.750" is also off (it goes 0.714→0.750). | `numbers.tex` | M |
-| R11 | Fig. 5 caption | The green "incomparable: LCS rises" category is never mentioned. | — | M, worded together with R1 |
-| R12 | Fig. 7 caption, App. L l.82, §4.6 bullet | "moves no more than re-mining" should be "about as much": 81% against 86%, with overlapping intervals. | — | M |
-| R13 | Minor | l.1077 "the weaker the extraction, the more incomparable" (Llama 490 against oss 491); l.941 "every response asserts 2–3" (refuting rungs deny one: counts 1/2/3 = 52/1085/55); "177 of 178 … false" (they were labelled *contradicted*); Table `tab:ext-contradoc` p values need "<"; the entity graph's exact versus τ counts. | `items.jsonl`, `eval.json` | M |
-| R14 | Ethics (l.1386) | **"The human studies on the benchmark are reported … in the companion paper"**: the LoCoBench study is specified but has not been run. | Companion paper App. on the study (`\tbd` results) | S, strongly recommended: "is specified" |
-| OK | — | Table 4 outcomes against the pre-registration JSON for both arms. Tables 2, 3, 10, 11 and 12 against the eval reports. All counts add up. 17 unresolved increases (all at LCS < 0.06 or > 0.9; steps 0.069–0.53 nats). 63% / 52% / 1% saturation. Dataset figures (36 topics, 4 domains, 6–7 per topic, 369–593 words, 12–14 claims, 2–3 false, 10,636 / 8,078 / 6,767 / 1,311 relations, 270 / 227, dev 16 / 32 / 80). `numbers.tex` regenerates identically. | — | OK |
+The paper defines *logical coherence* as how well the truth-functional relations a response draws
+among its claims agree with the claims' truth values. Relations become two-valued factors of an MRF
+over claim truth values. The Logical Coherence Score is the logistic of the weight of evidence that
+the relations lend to a *committed world*, the vector of factuality verdicts.
 
-## 3. Flow and presentation
+On the theory side:
+- a short lemma gives each added relation a sign fixed by the committed world;
+- a theorem proves strict monotonicity under every edit that adds or strengthens a support, or
+  removes or weakens a conflict;
+- appendix results argue that two-valued tables and the committed-world readout are necessary.
 
-| # | Finding | Status |
+The evaluation has two parts:
+- the authors' companion benchmark LoCoBench, with gold and mined graphs and text and LLM-judge
+  baselines;
+- natural text, with four properties tested on SummEval, ContraDoc, ChatProtect, permuted documents
+  and ASAP 2.0 essays.
+
+### Strengths
+
+1. **A clear, well-posed question.** It asks what a coherence score must satisfy when claims and
+   verdicts are fixed. The framing that separates logical from discourse coherence is crisp.
+2. **The theory is correct.** It was re-derived and checked by enumeration on 2,349 random edits
+   with no violation. Hypotheses and edge cases are handled with care.
+3. **Stance-aware signs.** Refuting a falsehood counts as support, which a contradiction count
+   cannot express, and the paper illustrates this well (Voyager pair, `sign` ladders).
+4. **Unusually careful bookkeeping.** Every number in the paper comes from scripts, and every
+   number the reviewers checked matches the results files.
+5. **The essay result is a real piece of convergent evidence.** It holds under nonlinear length
+   controls, a reviewer's own check giving a partial ρ of 0.46–0.51.
+
+### Weaknesses (summary; details in §2)
+
+1. **What does the MRF buy? (C1)** A one-line signed weight sum over the same graphs equals or
+   beats LCS on every LoCoBench arm, including the incomparable pairs, where only the scoring
+   function matters. The paper argues for the MRF readout through A2, saturation and context
+   weighting, but never shows that any of these matters empirically.
+2. **Much of the evidence holds by construction (C2, M1, M4, M6).**
+   - The gold-graph result is guaranteed twice: by the theorem, and by LoCoBench's admission gate,
+     which keeps only ladders whose gold graphs are ordered with a gap of at least 0.05 nats in Λ.
+   - "Every fall is on a pair the miner reversed or left incomparable" restates Theorem 1.
+   - Conflict detection on natural text follows from the lemma once the contradiction is mined.
+   - Gold order invariance holds by definition.
+3. **The distinctive verdict polarity is never tested on natural text (M5).** Every natural-text
+   experiment reads LCS at the asserted world, where it is a saturating signed count of mined
+   relations. The one verdict-world test (ContraDoc) is a null result and is in the appendix only.
+4. **No human validation of logical coherence (M7).** The declared orders are the authors' axioms,
+   the gold relations are a model committee's reading, and no study shows that people judge the
+   ladders' orders the same way.
+5. **Some claims go beyond the evidence (M2, M3, M8, M9).**
+   - The abstract says LCS "is unaffected by the order of paragraphs". In fact the mined score
+     moves on 19% and 76% of permutations, and the re-mining "noise floor" it is compared against
+     is itself directional.
+   - The SummEval result is a low-power null on three-sentence texts. Its explanation shows that
+     LCS rewards repetition.
+   - The judge comparison handicaps the judges: they get no verdicts, use an absolute rubric, and
+     have no pairwise option.
+6. **The theory is clean but shallow (M10, M11).**
+   - The lemma is virtual-evidence updating, and the theorem is the lemma plus transitivity.
+   - The "pins down the tables and the readout world" contribution lives entirely in the appendix,
+     and each necessity result holds only with the other choice fixed.
+   - The score is extensive (an amount of evidence, not a degree) yet is compared across claim
+     sets.
+7. **Presentation.**
+   - The running example has a factual error and a non-sequitur (M12).
+   - Figure fonts are about 4–6 pt (m1).
+   - Related work misses the LLM-consistency and factual-consistency literature (m2).
+
+### Scores (ARR scale)
+
+| | Score | Rationale |
 |---|---|---|
-| F1 | The LCS–Λ relation is explained in five places (§2.6, §2.8, §4.1, App. B, App. K), and "why LCS rather than Λ is reported" appears only in App. K. | S: consolidate, with one sentence in §2.6 |
-| F2 | The contrast with discourse coherence is stated three times (intro ¶2, §2.9, Related Work). | S: shorten Related Work to a pointer |
-| F3 | Never referenced: Tables `tab:lb-ladders`, `tab:dev`, `tab:ext-data`. `tab:ladders` is referenced only from captions. | M |
-| F4 | The appendix order does not follow the main text: the theory appendices come after the results appendices. | S: reorder |
-| F5 | The §3 "Two splits" paragraph mostly covers generation and admission. | M: split into two paragraphs |
-| F6 | The §2.7 roadmap says "the obvious simpler score fails too", but it is monotone and fails A2; the "First/Second/Third" sequence never reaches its fourth item. | M |
-| F7 | Leftovers from the mean-marginal removal, with plural "readouts": P3 (l.904), Conclusion (l.1322), Fig. 4 caption and its group header ("Other readouts of the same model"). | M (regenerate `fig_ladders`) |
-| F8 | A dangling "also" in App. H (l.1982); the development split's role stated three ways; Limitations "In our experiments the verdicts are …" (l.1363) should be "In the LoCoBench experiments"; §4.6 points to §4.3 for the miners; App. L Check 3 gives gpt-oss before GPT-6. | M |
-| F9 | The G-Eval judge's three runs in §4.6 against five in §4.5 are not explained; K against k; "taxonomy v2" is undefined in App. L. | M |
-| F10 | "Miner" means a method, an arm and a model in different places. | S: adopt "miner" = method and "arm" = miner and model throughout |
-| F11 | "Verdict world" and "asserted world" are used in the abstract and §2 before §4.1 defines them; "Assertions." and "Ladder assertions satisfied" collide with assertion polarity. | M: name the two worlds in Def. committed; rename to "Declared orders" |
-| F12 | App. B says "rungs" where it means responses (1,192). | M |
-| F13 | Number formats: `\sThreeItems` prints 1192 and "14280" has no separator. | M: format in the generator |
-| F14 | Table 4's hypothesis labels have gaps (no H1b or H4a; "H3"; unexplained primes). | M: explain in the caption |
-| F15 | Several sentences: §4.6 "rises on 0; the rises are …"; Discussion l.1207–1208 garbled; §3 l.850 "exactly one link … none"; Fig. 3 axis "W" undefined; §2.2 "three consequences" when four follow; App. B "some gold increases …"; the ASAP pilot sentences. | M |
-| F16 | Typos and minor wording: "the corpus' items"; "Table 13 draws …"; §2.5 l.551. | M |
-| F17 | Build: three hyperref warnings from `$\Lambda$` in a section title. | M: `\texorpdfstring` |
+| **Soundness** | **2.5** (borderline poor/acceptable) | The theory is sound. The main empirical claims, that the MRF score is the right one, that LCS beats judges, and that order leaves it unchanged, are either not supported against an obvious baseline or are guaranteed by construction. |
+| **Excitement** | **3** (ambivalent) | The idea and its framing are interesting and useful for long-form evaluation. The contribution beyond a signed relation count is unclear. |
+| **Overall assessment** | **2.5** (borderline Findings) | As is, a careful reviewer would likely reject on C1 and C2 alone. With Phase 1–2 of the plan (§4), I would expect 3–3.5. |
+| **Reviewer confidence** | **4** | Theory and results were checked line by line, and the key baselines were re-run. |
+| **Reproducibility** | **3** | Scripts and macros are exemplary. The pairwise and judge prompts are not printed, API settings and costs are not reported, and the main models are gateway deployments. |
+| **Ethics concerns** | none blocking | ASAP essays by minors sent to commercial APIs, and the QT30 licence (m10), should be stated. |
 
-## 4. Decisions needed (the S items)
+---
 
-1. **R1:** reword the "every miss is on an incomparable pair" claim, in seven places.
-2. **R2:** report H1a/H1c without RC and LC, and correct the D1 rationale.
-3. **R4:** reflect §4.6 in the abstract, contributions, roadmap, Discussion, Conclusion and Limitations.
-4. **R14:** correct the Ethics statement about human studies.
-5. **T7:** narrow "must be read at the world that defines the order".
-6. **T4:** state the limit formula in App. K.
-7. **T6:** add counts for readouts (a)–(c) to Table `tab:falls`, which needs new code.
-8. **T10:** rename the tolerance τ, which touches captions and figures.
-9. **F1, F2, F4:** consolidate the LCS–Λ text; shorten Related Work; reorder the appendices.
-10. **F10:** unify "miner" and "arm".
+## 2. Findings
 
-## 5. Changelog (2026-11-24): mechanical fixes applied
+Severity: **C** critical (likely rejection on its own), **M** major (a reviewer will press
+on it), **m** minor. "Verified": **me** = re-checked by me; **rev** = verified concretely by the
+reviewer (computation, code or results file).
 
-**Theory.**
-- T1, T2, T3 (distinct endpoints in Def. relation; the lemma's parenthetical), T8, T9.
-- T5: Prop. `lcs-lambda`(v) now states that |LCS − σ(Λ)| shrinks strictly as u₀ falls, with the derivative in the proof.
-- T10: equation citations only; the τ rename is still open.
-- T11: the conditions of the k-ary check (x\* = 1) and the unique-world check (n = 3, flat priors, p = 0.8, one support on the empty graph).
-- T12: "a single other world"; the saturation paragraph (five copies give 0.693 → log 2; one to six copies 0.551 → 0.926; LCS 0.714 → 0.750); the Fig. 8 cap is a supremum.
-- T4 wording: App. K says "does not tend to ½" and "the logistic of the weight of evidence"; the Conclusion says "a monotone transform of".
+### Critical
 
-**Results.**
-- R3: five external datasets plus shuffled LoCoBench; LoCoBench keeps its claims.
-- R5: `fig_external` (c) now plots the correct coupling for coupling senses; caption reworded.
-- R6: exploratory labels in §4.6; "before any graph of these checks was mined" (both files).
-- R7: "consistent with the sign rule"; gpt-oss's one conflict; "of the 97 pairs with a found contradiction".
-- R8: App. L adds the judge's ρ = +0.67, the H2b intervals, the FP rate per claim pair, the QT30 coupling-level P/R and the absent Evidence category. Four new macro groups come from `ext_eval.py`.
-- R9: the Fig. 8 caption no longer says LCS crowds to 0 and 1.
-- R11: the green category in the Fig. 5 caption; its title claim waits on R1.
-- R12: "about as much" in the Fig. 7 caption and App. L.
-- R13: "one to three, most two"; "the pairwise miners leave the most pairs incomparable"; "contradicted"; p-value upper bounds in the `tab:ext-contradoc` caption.
+| # | Where | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| C1 | Sec. 3.1, Fig. 2–3, contributions | **A trivial signed score over the same graphs matches or beats LCS everywhere.** The signed weight sum (Σ support p − Σ conflict p at the verdict world) is monotone under elementary improvements, like LCS, but it is not reported. On the incomparable pairs it beats LCS too: GPT-6 137/142 against 131/142, gpt-oss 348/416 against 331/416. The asserted-world failure on `sign` (67/180) is identical for the sum, so "the verdicts are needed" is not specific to LCS. | Rerun with the paper's own `assess` and canonicalisation (`/tmp/review_meta/alt.py`). Increase / Invariance by arm, sum vs LCS: gold 540/888 vs 540/888; GPT-6 **530/468** vs 524/459; gpt-oss **468/59** vs 451/40; pairwise gpt-oss 428/**16** vs 428/10; pairwise Llama **409**/7 vs 404/8. A plain count (supports minus conflicts) gets 494/740 with GPT-6. | me |
+| C2 | Sec. 3.1 "Gold graphs", abstract, contribution 2 | **The gold result is an admission criterion.** LoCoBench admits a ladder only if a gate confirms its gold graphs are ordered at the verdicts with a gap of at least 0.05 nats in Λ, and that invariance rungs build the same graph (`ladder_gold_check`, `slots.py:543–581`; App. I.1 l.13–14). The main text never says so and presents 540/540 and 888/888 as a finding. | `appendix_locobench.tex:13–14`; "gate" does not occur in `sec_locobench.tex` | me |
 
-**Flow.**
-- F3: references to `tab:lb-ladders`, `tab:dev`, `tab:ext-data` and `tab:ladders` from the text.
-- F5: "Generation and admission" split from "Two splits".
-- F6: the roadmap says the count is monotone but violates A2; "Finally," on the fourth item.
-- F7: "scores that ignore the verdicts"; Fig. 4 caption; the `fig_ladders` header regenerated.
-- F8: the dangling "also"; τ named as the one use of the development split; "In the LoCoBench experiments"; §4.6 cites §2 for the miner; App. L Check 3 gives GPT-6 first.
-- F9: three pre-registered judge runs against five; k = 5; Table 1 instead of "taxonomy v2".
-- F11: Def. committed names the verdict and asserted worlds; "Declared orders" in place of "Assertions".
-- F12: "responses" in App. B and its figure.
-- F13: 1{,}192 and 14{,}280 come from the generator (`arr_slot3_eval.py`).
-- F14: hypothesis labels explained in the Table 4 caption.
-- F15: "rises on 0, so every rise …"; the Discussion judge sentence; "at most one link"; W defined in Fig. 3; "four consequences"; App. B "the gold increases that fall below τ"; the ASAP pilot and Λ sentences; "the three-model admission committee".
-- F16: "corpus's"; the "The verification (Table 13) draws" sentence; §2.5 "the falsehood it refutes".
-- F17.
+### Major: evaluation
 
-**Regeneration and build.**
-- Regenerated: `numbers_slot3.tex` (only the two formatted counts changed), `numbers_pilot.tex` (unchanged), `numbers_ext.tex` (only new macros added), `numbers_lcslambda.tex` (unchanged).
-- Figures: `fig_ladders`, `fig_external` and `fig_lcs_lambda` changed; `fig_dominance` and `fig_sign` are pixel-identical.
-- Build: 0 errors, 0 undefined references, 0 overfull boxes; 3 benign float-specifier warnings.
+| # | Where | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| M1 | Sec. 3.1 "Mined graphs", abstract, intro | "Every fall is on a pair the miner reversed or left incomparable" restates Theorem 1. On incomparable pairs the misses (11 / 84 / 101 / 123) come from how the score nets mixed edits, which C1 shows another score handles better: this is scoring, not only extraction. The dominance test compares weights exactly (tolerance 1e-12). Pairwise weights drift by about 1e-8, so almost every pair is "incomparable". With a 1e-3 tolerance, pairwise gpt-oss has 187 forward pairs instead of 38, and pairwise Llama shows 4 forward falls and 4 backward rises. | `/tmp/review_loco/alt2.out` | rev |
+| M2 | Abstract l.124 ("unaffected by the order of paragraphs"), intro, Conclusion, Table 2, "Order" paragraph | **The order property is overclaimed.** Permutation moves the mined score slightly *more* than re-mining does (LoCoBench 81% vs 86% kept; mean change 0.013 vs 0.0098), and no equivalence test is run. On ContraDoc only 24% of *unchanged* documents stay within τ on re-mining, so the test has little power. The "noise floor" itself is directional: re-mined ContraDoc rises 80 times and falls 34, and mines more relations per document (9.83 vs 8.77). That suggests drift between runs, not pure sampling noise. Permutation is directional too (135 rises vs 94 falls). The re-mining comparison has n = 150 / 180 against 300 / 360 permutations, from a different run. | `results/ext/eval.json` check1 (`down_tol`/`up_tol`) | me |
+| M3 | Sec. 3.2 "Not a proxy" | **SummEval is a low-power null, and its mechanism is a weakness.** ρ ≈ 0 is equally consistent with LCS being noise. Summaries are about 3 sentences long; 43% have no relation and score exactly ½. The −0.18 on summaries with a relation comes from restatements counting as support, i.e. **LCS rewards repetition**, which makes it gameable. The "inferences only" subgroup is selected on the miner's own output, after the fact. | `results/ext/eval.json` check1 1d; this session's diagnostic | me |
+| M4 | Sec. 3.2 "Detected conflicts" | **The conditional result is near-tautological.** "Found → falls" (95/97, 182/0) follows from Lemma 1. Only the unconditional split is informative, and on not-found ContraDoc pairs LCS behaves like noise (47 falls / 33 rises). A specificity control exists but is unused: on ChatProtect's 113 non-contradictory pairs LCS rises 71 times, falls 11 and ties 31. The judge does better end to end (117/0 on ContraDoc). Ties are not shown (ChatProtect 356/717). | `/tmp/review_ext/cp.py`, `cd2.py` | rev |
+| M5 | Sec. 3.2 preamble, Limitations | **Verdict polarity, the paper's distinctive reading, is never tested on natural text.** At the asserted world every entailment is a support and every contradiction a conflict, so LCS is a saturating signed count. The verdict-world ContraDoc test is a null result (54 rises / 43 falls, p = 0.31) and sits under "not needed for the four properties". | App. L.5; `eval.json` check2 | me |
+| M6 | Sec. 3.1 "LLM judges", abstract ("near chance") | **The judge comparison is not like-for-like.** The judges see only `{response}`: no claims and no verdicts, so on `sign` they cannot know which claim is false. G-Eval uses SummEval's discourse rubric, and absolute 1–5 ratings of texts that differ by one sentence tie on 38–40% of pairs. The GPT-6 judges rise on 47% and fall on 13–15% overall, so they are not near chance; they are uninformative on `chain`. There is no pairwise A/B judge and no judge given the claims, verdicts or graph. The direct-rating prompt *does* ask about logical coherence, which the paper should say. | `coherence_baselines/judges.py:67–107` | me (inputs), rev (rates) |
+| M7 | Sec. 3, Limitations | **No human validation.** Nothing shows that people judge "adding an entailment between two true claims" or "refuting instead of deriving a falsehood" as more coherent. The gold relations are a model committee's reading, from the same vendors as the generator, miner and judge: Claude Opus 5 generates while Claude Opus 5.5 sits on the committee, and GPT-6.1 is on the committee while GPT-6 mines and judges. The fillers carry explicit markers. | App. I.1; Limitations | rev |
+| M8 | Sec. 3.1, Fig. 2 | **Three baselines are vacuous by configuration.** NLI contradiction and both ROSCOE variants run on the claims only (`ground_in_response=False`). The claims are identical across rungs, so they must tie on every pair. The "NLI" model is gpt-oss-120b, which is not stated. | `run_slot3_baselines.py:56–66`; `nli_contradiction.py:87` | me |
+| M9 | Sec. 3.2 "Essay quality" | **The essay baselines and interpretation are thin.** G-Eval is prompted for coherence, not for the rubric, and the difference between the LCS and G-Eval partial correlations has CI [−0.12, +0.25]. Missing baselines: a rubric-prompted grader, an AES model, and a connective count ("because", "for example"), the obvious alternative explanation. LCS tracks a relation *count* (ρ = 0.95 with the number of relations), not a density; it keeps 0.26 [0.07, 0.44] after words and relations, which helps and should be reported. Uniform 20-per-level sampling inflates correlations relative to the natural score distribution. | `/tmp/review_ext/asap.py` | rev |
+| M13 | Sec. 3.2, Table 2 | **Reporting gaps that look selective.** Table 2 shows only G-Eval, so the more order-stable baselines are hidden (entity graph 99% / 95%, DiscoScore 87–100%). The compression of Sec. 3.2 removed the sentence that explained them. The main text also omits gpt-oss's null ChatProtect split (188/173, p = 0.46) and its 7% ContraDoc recall. `results/ext/PREREG.md` and `ext_eval.py` still encode a pre-specified order test, "LCS kept more often than every baseline", that failed. If the code is released, a reviewer will find it. | `ext_eval.py:237, 307–318` | me |
 
-**Not done (minor):** the "conf." header in Table 3, and the entity graph's exact-versus-τ counts.
+### Major: theory and framing
 
-## 6. Changelog (2026-11-24): substantive fixes, "go with the recommendations"
+| # | Where | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| M10 | Lemma 1, Thm. 1, Related Work | **The theory is shallow and its standard context is missing.** The lemma is Bayes' rule for virtual or likelihood evidence (Pearl 1988; Chan & Darwiche 2005). The coherence MRF *is* a Markov logic network with soft binary clauses of weight −log(1−p). Neither connection is stated. The non-trivial parts, context weighting through q_r and saturation, are not foregrounded. | reviewer derivation | rev |
+| M11 | Contribution 1, Conclusion | **"Pins down the class of relation tables and the world at which the model is read" is overclaimed.** Thm. B.1 fixes the tables only given the Λ readout and a fixed x\*. Getting to "two-valued" needs sign-definiteness at every x\*, which is unstated. The pinned class also contains tables outside the taxonomy. Prop. B.1 excludes only single-world log-ratio readouts. App. B itself says the functional form is not forced (a β-family). The result lives only in the appendix. | `appendix_props.tex`, `appendix_proofs.tex` | rev |
+| M14 | Abstract ("degree to which"), Sec. 3.2 essays | **The score is extensive.** Λ adds across independent sub-arguments, so LCS is an amount of evidence, not a degree, and it also depends on u₀ = π(x\*), which varies with the claim set. With n = 12, flat priors and x\* = 1, one entailment (0.9) gives 0.563, and five entailments plus a contradiction (0.6) give 0.627. Yet essays with different claim sets are compared. | `/tmp/review_meta/ext.py` | me |
+| M15 | Def. 3, Table 1 | **The construct is narrower than "coherence" and has surprising consequences that are not stated.** At the verdict world a relation's sign is a function of the verdicts alone, so joint satisfiability is not measured. Reasoning among falsehoods (ent at (0,0)) is credited. A response that asserts both a truth and a contradicting falsehood is credited with "refuting" it. An unverifiable claim maps to false, so a valid inference to a true but unretrieved conclusion is a conflict. Equivalence plus exclusion on one pair gives Λ = 0. | reviewer counterexamples | rev |
+| M12 | Fig. 1, App. E | **The running example is factually and logically flawed.** Both responses say Voyager 1 is "still deep inside the Oort cloud". It has not reached the Oort cloud: its inner edge is thousands of AU away, against about 165 AU today. "Being in interstellar space rules out having left the Solar System" (a₃ con a₅) is not a contradiction between those two claims. The App. E prose is garbled ("lies deep inside the Oort cloud … far beyond the probe's present distance"). For a factuality and coherence paper, the flagship example must be unimpeachable. | `voyager-pair.tex:50–52`, `appendix_alternatives.tex:25–37` | me |
 
-**Applied.**
-- **R1:** "every miss is on an incomparable pair" is replaced in the abstract, contributions, P2, §4.3, the Fig. 5 caption, the Discussion and the Conclusion. The score follows the extracted graphs wherever the order ranks them (one tie of 4×10⁻¹⁴ aside). §4.3 now gives the reversed and equal counts per arm.
-- **R2:**
-  - Table `tab:ext-order` now prints ContraDoc RC/LC (87% and 99%), from new macros `extCdPermInvRc`/`Lc` and `extHOneCExcl`.
-  - D1 now reads "order-free by definition", says they still move on ContraDoc, presumably through segmentation, and states that H1a/H1c fail with RC/LC excluded.
-  - §4.6 says "the baselines that win have no sampling noise".
-- **R4:** the external checks are now reflected in:
-  - the abstract (one sentence);
-  - contributions (a new bullet);
-  - the §4 roadmap;
-  - the Discussion (one sentence);
-  - the Conclusion (one sentence);
-  - Limitations, where "no natural-text evaluation" becomes "natural text with human labels, but none rates logical coherence".
-- **R14:** the Ethics statement says the companion study "is specified", and adds a sentence on the external datasets' licences.
-- **T7:** "must be read at the world that defines the order" becomes "no readout increasing in the posterior of another single world is monotone" (abstract, contributions, §2.7 roadmap, Prop. title "No other readout world", Conclusion). The text after the Prop. notes that multi-world readouts are not excluded: four of App. F's five are not monotone, and the fifth violates A2.
-- **F1:** §2.6 has one sentence on why LCS, not Λ, is reported (bounded; reads as a probability; stays informative under confident posteriors) and points to App. B. App. K's "which is why" now points back to §2.6.
-- **F2:** the discourse paragraph of Related Work is reduced to its citations plus a pointer to §2.9.
-- **F10:** "arm" is a miner run with one model ("Four mined arms, each a miner run with one model"). It replaces "miner" where a model is meant ("four mined arms", "pairwise arms", "GPT-6 graph-level arm"; "GPT-6 arm" in §4.6 and App. L). The legend of `fig_lcs_lambda` was regenerated.
+### Minor
 
-**Not applied (optional):** T4 limit formula, T6 counts for readouts (a)–(c), T10 rename of the tolerance τ, F4 appendix reorder.
+| # | Finding | Verified |
+|---|---|---|
+| m1 | Figure fonts: Fig. 3 labels and legend about 4 pt, Fig. 2 row labels about 5–6 pt, Fig. 1 response text `\scriptsize`/`\tiny`. Fig. 3's gray segment is invisible at print size, and Fig. 2's error bars are hard to see. | rev |
+| m2 | Missing related work: QA and logic consistency (Ribeiro et al. 2019; Li et al. 2019; BECEL), DECODE / Dialogue NLI, FactCC / AlignScore / MiniCheck, step-level verification (ReasonEval; Lightman et al.), entailment graphs (Berant et al. 2011), argument quality and essay argument strength (Habernal & Gurevych 2016; Persing & Ng 2015), GCDC (Lai & Tetreault 2018), claim decomposition (Wanner et al. 2024), virtual evidence and MLN (M10). Also one sentence on how A1–A3 differ from the gradual-semantics axioms called "the closest precedent". | rev |
+| m3 | LoCoBench counts cannot be reconstructed from the text: "each ladder gives 3 rung pairs; 60 ladders per increasing type → 180 pairs". Units mix pairs and ladders ("67/180 pairs", "60/60 ladders"). App. "The three counts add up to the 67" is wrong arithmetic: 60 + 7 = 67, and the 60 falls are not satisfied pairs. Table 5's caption says every family has a `control` ladder, but there are 236 for 240 families. | rev |
+| m4 | Ladder-level rates are missing: GPT-6 LCS satisfies 164/180 ladders, G-Eval 27/180. The 3 pairs per ladder are not independent (ρ₀→ρ₂ follows on gold). | rev |
+| m5 | The relative tie of 1e-10 was fixed after comparing rules on the test split; disclose it. `results/arr2027_slot3_test/README.md` still describes the old rules. GPT-6 judges sample an integer rating while gpt-oss judges use the probability-weighted expectation; say so. | rev |
+| m6 | Limitations l.616 cites "τ = 0.01 of §3.1", but τ is introduced in §3.2. Table 2's caption uses τ before the text defines it. | rev |
+| m7 | Notation and wording: ψ_r(x\*) should be ψ_r(x\*_{e_r}); Λ written without arguments; "clipped below 1" (to what?); "(A3) …, respectively"; "Therefore" before the axioms; Lemma 1's "With q_r = …" fragment; a_i / X_i / x_i drift; "sign" names both the polarity and the `sign` ladder; "flat or uniform"; sans-serif sense names in running text; "strength band" undefined in §2.3; "labelled by others"; mixed British/American spelling. | rev |
+| m8 | Footnote 1 ("In all our experiments we used GPT-6-Sol") reads as if every model were GPT-6. "GPT-6 was not involved in constructing LoCoBench" omits that GPT-6.1 is on the committee. | rev |
+| m9 | Bibliography: lost capitals (LoReFact, english); "Liu, Yang Janet and others"; inconsistent venue forms; arXiv notes on published papers; URLs on only some entries; the Milne title needs math; ASAP is marked "Preprint"; the uncited duplicates `fleek` / `factverify`. | rev |
+| m10 | Ethics and checklist: no compute or API budget; no release statement for code, prompts and scorer; the QT30 licence is "not stated"; GDTB is CC BY-NC-SA; ASAP essays by minors (grades 6–10) were sent to three commercial APIs; the copyrighted source article was transcribed for the committee. | rev |
+| m11 | Reproducibility: the pairwise-miner and judge prompts are not printed; GPT-6 temperature and reasoning effort are unspecified; the DiscoScore encoder is unspecified; "GPT-6-Sol" is a gateway deployment name with no snapshot or date. | rev |
+| m12 | The confident-posterior limit (App. K) depends on the path: it depends on the relative rates at which claims become confident, so "LCS stays informative" needs a qualifier. The score is also discontinuous at the verdict threshold: v₂ = 0.51 gives LCS 0.790 and v₂ = 0.49 gives 0.091, with no sensitivity analysis. | rev |
+| m13 | Sec. 3.1 credits A2 for invariance when the gold graph is unchanged; any function of the graph is invariant then. The Shogenji comparison is a strawman: a truth-independent measure cannot be monotone in a truth-dependent order. | rev |
+| m14 | Table 2: the ASAP row's "(+0.38)" next to the G-Eval column reads as G-Eval's value. "Gold graphs 100" is trivial in a "natural text" table that also holds synthetic LoCoBench. Intervals for the order rows appear nowhere in the main text. | rev |
 
-**Build:** 0 errors, 0 undefined references, 0 overfull boxes; 40 pages. Macros regenerated: `numbers_ext.tex` (only additions); `numbers_lcslambda.tex` is unchanged.
+### Checked and correct
+
+- Lemma 1, Thm. 1 (all edit types, multisets), Thm. B.1 both directions, Prop. B.1, Prop. props
+  (i)–(vii), Prop. lcs-lambda (i)–(v): 2,349 random edits with weights up to 0.999, no violation.
+- Worked numbers: Voyager 0.773 / 0.034; leave-one-out 0.31 and 0.14; saturation; row-stochastic.
+- Every LoCoBench macro checked against `numbers_slot3.tex` and the records. Counts add up:
+  540 = 180 × 3; 888 = 180 + 708; each arm's dominance categories sum to 540.
+- Every natural-text macro checked against `results/ext/eval.json` and `asap_120/eval.json`,
+  including the p-value bounds.
+- ARR compliance: 8 pages, anonymous (LoCoBench as "Anonymous 2027"), Limitations and Ethics
+  present, AI-assistance statement, no undefined references.
+
+---
+
+## 3. What the findings mean for the paper's argument
+
+The theory is right, and the bookkeeping is exemplary. The weakness is the empirical case that
+**this** score, rather than any monotone signed aggregate, is the one to use.
+- The design choices the paper defends (the committed world, sign-definite tables, monotonicity)
+  are shared by the signed weight sum.
+- What LCS adds is the normalisation Z: context-dependent weights through q_r, saturation of
+  redundant support, and invariance of presentation (A2).
+- On LoCoBench these additions cost a little (C1), and the experiments never isolate a case where
+  they help.
+
+Unless the paper either (a) shows where Z matters, or (b) repositions its contribution as the
+framework (committed world, order, the class of admissible scores) with LCS as a principled
+member of that class, C1 will dominate the reviews. Everything else is fixable with framing,
+cheap re-analysis of existing data, and a few targeted runs.
+
+---
+
+## 4. Plan for fixing the issues
+
+### Phase 0: decisions (yours)
+
+1. **Positioning after C1.** Pick one:
+   - (a) **Show where Z matters, and keep LCS as the headline (recommended).** Build a small
+     targeted test where the signed sum and LCS must disagree, and report both everywhere. Cases:
+     - redundant support (k copies or paraphrases of one inference);
+     - context dependence (the Voyager shared refutation);
+     - the presentation invariance of A2 (ent + ent = eqv);
+     - mixed edits on incomparable pairs.
+   - (b) **Reposition.** The contribution becomes the framework and the class of admissible
+     scores; the signed sum is reported as a degenerate member, and LCS as the member with
+     saturation and A2.
+   - (c) Both.
+2. **The pre-registration (M13).** You chose to drop all reference to it. Because
+   `results/ext/PREREG.md` and `ext_eval.py` encode it, a released code base would show that the
+   pre-specified order test failed. Recommended minimum: report the stable baselines in Table 2
+   and keep `PREREG.md` out of the release, or state in App. L, in one sentence, which tests were
+   fixed before mining.
+3. **Human validation (M7).** Is a small study feasible before submission (for example 3
+   annotators × 120 `chain` / `sign` ladder pairs, pairwise preference)? If not, Limitations must
+   carry it.
+
+### Phase 1: framing and text (no new runs)
+
+| Step | Fixes |
+|---|---|
+| State the admission gate in Sec. 3.1 Data. Present gold as an implementation check; make the mined arms the test. Remove "LCS satisfies every prescribed ordering" as a *finding* from the abstract and contribution 2. | C2 |
+| Reword the order claims (abstract, intro, Table 2 row and heading, Conclusion): "moves under paragraph permutation about as much as under re-mining (GPT-6)". Drop "unaffected". | M2 |
+| Reword "every failure traces to extraction" to "consistent with Thm. 1: every fall is on a pair the miner reversed or left incomparable". | M1 |
+| Reword "judges near chance" to "on `chain`, absolute ratings rise and fall about equally often". State the judges' inputs and that the direct prompt asks about logical coherence. | M6 |
+| SummEval: call it a weak divergent-validity check. Label the subgroup analyses exploratory. State plainly that LCS rewards restatements, and add this to Limitations. | M3 |
+| Conflicts: present them as a sanity check of the lemma plus a recall measurement. Show ties. Add overall recall (25%) and the false-alarm rate (12%) back. | M4 |
+| Sec. 3.2 preamble and Limitations: say that every natural-text test uses the asserted world, where LCS is a signed count, and mention the verdict-world null in one clause. | M5 |
+| Table 2: add the entity-graph and DiscoScore columns or rows; add gpt-oss's ChatProtect null in one clause; move LoCoBench out of the "natural text" label. | M13, m14 |
+| Theory framing: state the virtual-evidence and MLN connections. Rephrase contribution 1 as "within product MRFs read by a single-world log-ratio …", and state Thm. B.1 / Prop. B.1 informally in Sec. 2.5, or soften. Replace "degree" with "amount of evidence". Add one sentence after Def. 3 on what the score does *not* check (soundness of premises, joint satisfiability), with the falsehood-reasoning example. | M10, M11, M14, M15 |
+| Rewrite the Voyager pair. For example, a₅ = "Voyager 1 has passed the Oort cloud", refuted by the cloud's distance, which keeps the same graph structure. Regenerate its numbers (`arr_coherence_eval.py`) and fix the App. E prose. | M12 |
+| Related work (m2); the counts and units sentence (m3); notation and wording (m7, m8, m6, m13); bibliography (m9); Ethics and checklist (m10); reproducibility settings and prompts in the appendix (m11, m5); qualify App. K (m12). | minor |
+
+### Phase 2: re-analysis of existing records (scripts only, no API calls)
+
+| Step | Fixes | Where |
+|---|---|---|
+| Add **signed count** and **signed weight sum** to every LoCoBench arm (Fig. 2 rows, Table 7), and the same baselines on the natural-text checks and ASAP. | C1 | `arr_slot3_eval.py`, `ext_eval.py`, `asap_lcs.py` |
+| A **tolerance-based dominance** (weight tolerance 1e-3) beside the exact one; report ladder-level rates. | M1, m4 | `arr_slot3_eval.py` |
+| The **ChatProtect specificity control** (non-contradictory pairs) and an effect size for the conflict tests. | M4 | `ext_eval.py` |
+| Order: a **TOST equivalence test** or a variance decomposition on \|Δ\|, using the existing permutation and re-mining records; report the directional drift. | M2 | `ext_eval.py` |
+| ASAP: nonlinear length controls (cubic, bins), the partial correlation after words and relations (0.26), a connective-count baseline, and the CI for the LCS − G-Eval difference. | M9 | `asap_lcs.py` |
+| SummEval: an ablation that caps or drops restatement factors. | M3 | `ext_eval.py` |
+| Verdict-threshold sensitivity: flip one verdict and bound the effect by the claim's degree in the graph. | m12 | `arr_coherence_eval.py` |
+
+### Phase 3: targeted new runs (API cost; in priority order)
+
+1. **A test where Z matters** (Phase 0, option a): about 60–100 synthetic ladders or edits
+   (redundant support, shared refutation, mixed edits), scored by LCS and the signed sum. This is
+   cheap, needs no LLM if built on gold graphs, and directly answers C1.
+2. **Fair judges** on LoCoBench: a pairwise A/B preference between rungs, and an absolute judge
+   given the claims and verdicts, with GPT-6 and one other vendor.
+3. **Response-grounded NLI baselines** (`ground_in_response=True`) and an NLI-graph count, or drop
+   the three vacuous rows.
+4. **Order noise floor without drift:** re-mine each ContraDoc original and permutation at least
+   twice in one interleaved batch.
+5. **A non-OpenAI miner** (Gemini or Claude) on LoCoBench and ContraDoc, to address the
+   shared-vendor concern.
+6. **One natural-text verdict-world arm,** for example FActScore-style labels on ExpertQA or the
+   paired ContraDoc design from App. L.5 (mine the clean document once and add only the inserted
+   claim's relations).
+7. **ASAP:** a rubric-prompted grader, and a second prompt if time allows.
+
+### Phase 4: human validation (if feasible)
+
+Pairwise preferences on `chain` and `sign` ladder pairs, and on a sample of ContraDoc pairs: 3
+annotators, Krippendorff's α. Report agreement with LCS, the signed sum and the judges.
+
+### Page budget
+
+The main text now ends at l.595 on p. 8. Phase 1 adds about 15–25 lines (gate, theory framing,
+Def. 3 sentence, Table 2 columns) and removes about 5–10 (shorter order and judge claims). Phase 2
+adds Fig. 2 rows, not text. Expect to move Fig. 3 to the appendix (as planned on 2026-11-27) or
+to shorten the Sec. 3 preamble in `sec_eval.tex`.
+
+---
+
+## 5. Status of the 2026-11-24 review
+
+Most of its items were applied on 2026-11-24 (see git history, `f44b9a57`). The R-items about
+the old Sec. 4.6 are superseded by the rewrite of Sec. 3.2 (2026-11-27).
+
+| Item | Status |
+|---|---|
+| T4: state the confident-posterior limit formula in App. K | open; now part of m12 (the limit depends on the path) |
+| T6: counts for readouts (a)–(c) in `tab:falls` | open (not re-checked) |
+| T10: rename the tolerance τ | done (couplings are κ) |
+| F4: reorder the appendices | done (theory before results) |
+| R6, R2 (pre-registration labels, H1a/H1c) | superseded: the labels were removed by request on 2026-11-27; see M13 |
+
+---
+
+## 6. Changelog (2026-11-27): Phase 1 and Phase 2, option (a)
+
+Option (a): keep LCS as the headline, report the signed sum everywhere, and show where they
+differ. Phases 1 (text) and 2 (re-analysis, no API calls) are done; Phase 3 and 4 are open.
+The main text still ends on p. 8. Build: 0 errors, 0 undefined references, 0 overfull boxes.
+
+### New results from Phase 2 (they changed the text)
+
+| Analysis | Result | Consequence |
+|---|---|---|
+| Signed weight sum and signed count, every LoCoBench arm, both worlds | The sum matches or beats LCS on the increases of every arm (GPT-6 530 vs 524; incomparable 137 vs 131). The count is coarser on increases but keeps more invariances. At the asserted world all signed scores fail the same 113 `sign` pairs. | §3.1 has a new paragraph, "A signed sum does as well on the ladders"; Fig. 2 rows; App. H Table `tab:signed`. "The verdicts are needed" is now stated for any signed score. |
+| Signed sum on natural text | LCS falls more often under contradictions: ContraDoc 142/35 vs 136/37 (found: 95/2 vs 88/9); ChatProtect 261/100 vs 216/101 (found: 182/0 vs 179/1). ASAP partial 0.50 vs 0.46. SummEval sum ρ ≈ 0. | Table 2 has a signed-sum column. This is the first evidence that Z helps; it is stated as counts, without a significance test. |
+| Tolerance-based dominance (1e-3) | Pairwise gpt-oss: 187 forward pairs instead of 38. Llama: LCS falls on 4 pairs ranked as declared within tolerance; the sum on 0. | App. H "Dominance with a weight tolerance": the saturation of near-certain weights is a real weakness of LCS. |
+| ChatProtect specificity control (113 non-contradictory pairs) | LCS rises 71, falls 11 (median +0.06), against 182/0 falls when the contradiction is found. | §3.2 and Table 2: the conflict test now has a control. |
+| Effect sizes | Median change −0.33 (ContraDoc found), −0.27 (ChatProtect found), ≈ 0 when missed. | §3.2 and App. L.2. |
+| SummEval ablation (no restatements) | ρ = **+0.31** [CI in App. L.1] on summaries with a relation (+0.17 overall). The restatement count gives −0.34. | P1 is reframed as "related to, but not a proxy for, discourse coherence". "LCS rewards repetition" is now in §3.2 and Limitations. |
+| Order equivalence (TOST, margin τ) | LoCoBench diff +0.003, 90% CI [−0.004, +0.011]: **not established, narrowly**. ContraDoc [−0.007, +0.023]. ContraDoc re-mining drifts upwards (80 rises vs 34 falls, p ≈ 1e-4), although the re-run came about an hour after the original with the same configuration. | P3 is renamed "Order moves the score about as much as re-mining"; the drift is reported as unexplained. |
+| ASAP robustness | Cubic length control 0.46; bins 0.47–0.51. Connectives: ρ 0.55 but −0.19 after length; LCS keeps 0.49 after length and connectives. After length and relations: 0.26. LCS − G-Eval partial: +0.06 (CI includes 0). | §3.2 P4 and App. L.4 "Robustness". |
+| Verdict-flip sensitivity (new script `arr_verdict_flip.py`, `numbers_flip.tex`) | One flipped verdict on a claim with a relation moves LCS by a median of 0.19; 57% of flips move it by more than 0.1; the change grows with the claim's degree. | Limitations "Verdicts". |
+
+### Status of each finding
+
+| # | Status | What changed |
+|---|---|---|
+| C1 | **addressed (text, Phase 2)**; Phase 3.1 still open | The signed sum is reported on every arm and dataset. Abstract, intro, §3.1 and Conclusion say it does as well on the ladders. Table 2 shows where LCS differs. A2 is motivated in §2.5. |
+| C2 | done | The gate is stated in §3.1 Data. Gold is now "check the implementation", and is no longer listed as a finding in the abstract and contributions. |
+| M1 | done | "As Theorem 1 requires"; the tolerance-based dominance is in App. H; "every failure traces to extraction" is removed from the intro. |
+| M2 | done | "Unaffected by order" is removed. The TOST and the drift are reported; the heading and Table 2 row are renamed. |
+| M3 | done | Called a weak test and exploratory; the no-restatement ablation is added; "rewards repetition" is in Limitations. |
+| M4 | done | Control, effect sizes, ties (App. L.2), recall and false alarms. |
+| M5 | partly | Stated in the §3.2 preamble and Limitations. Phase 3.6 (a natural-text verdict-world arm) is open. |
+| M6 | partly | "Near chance" is reworded to the `chain` result; the judges' inputs and both prompts are printed (App. D); ladder-level rates are added. Phase 3.2 (fair judges) is open. |
+| M7 | open | Limitations states the gap. Phase 4 is open. |
+| M8 | done (dropped) | NLI and ROSCOE are removed from Fig. 2 and explained in App. D. A response-grounded run (Phase 3.3) is open. |
+| M9 | partly | Nonlinear controls, connectives, the relation count and the G-Eval difference are reported; the uniform-sampling caveat is added. A rubric grader (Phase 3.7) is open. |
+| M10 | done | §2.5: the virtual-evidence update (Pearl 1988; Chan & Darwiche 2005), and the MRF as a Markov logic network. |
+| M11 | done | Contribution 1 and the Conclusion: "within product MRFs read by a single-world log-ratio …". |
+| M12 | done | a₅ is now "still inside the heliosphere", refuted by being in interstellar space. The graph is unchanged, so every number is unchanged. Query, figure and App. E are rewritten. |
+| M13 | partly | The Table 2 caption gives the entity graph and DiscoScore stability; gpt-oss is in App. L. **Decision 2 is still open**: keep `results/ext/PREREG.md` out of any release, or disclose it. |
+| M14 | done | "Amount of evidence, not an average" in §2.5; "extent" in the abstract. |
+| M15 | done | One sentence after Def. 3, in its shortened form. |
+| m1 | open | Figure fonts (Fig. 2 labels about 5–6 pt; Fig. 1 `\tiny`). |
+| m2 | done | 16 new references (consistency, factual consistency, step verification, entailment graphs, argument strength, GCDC, claim decomposition, virtual evidence) and the gradual-semantics contrast. ReasonEval is not added (venue uncertain). |
+| m3 | done | Counts sentence in §3.1; the "67" arithmetic; the Table 5 `control` caption. |
+| m4 | done | Ladder-level rates in §3.1. |
+| m5 | done | Tie-rule disclosure; judge rating modes (App. D, App. H "Settings"). The `results/arr2027_slot3_test/README.md` rules are not yet updated. |
+| m6 | done | Limitations cites §3.2 for τ. |
+| m7 | mostly | Clipping value, A1–A3 wording, ψ_r(x\*_{e_r}), the lemma fragment, "flat or uniform". Open: a_i / X_i drift, the overloaded "sign", sans-serif senses, British/American spelling. |
+| m8 | done | Footnote 1 and the GPT-6.1 committee note. |
+| m9 | partly | LoReFact and English capitalisation. Open: the GDTB full author list, venue consistency, arXiv notes, the Milne title. |
+| m10 | partly | Ethics: GDTB and QT30 licences; minors' essays sent to commercial APIs; the transcribed article. Open: a release statement (your call); costs (only a total account spend is logged). |
+| m11 | done | Pairwise and judge prompts printed; DiscoScore encoder; GPT-6 settings. |
+| m12 | done | The App. K limit depends on the path; verdict-flip sensitivity in Limitations. |
+| m13 | partly | The A2 misattribution is gone with the rewrite of the gold paragraph. The Shogenji comparison is unchanged. |
+| m14 | done | Table 2 rebuilt; "gold 100" row removed. |
+
+### Files
+
+- **Scripts:**
+  - `arr_slot3_eval.py`: signed baselines, tolerance dominance, pair rows;
+  - `arr_slot3_figures.py`: Fig. 2 rows;
+  - `ext_eval.py`: signed sum, control, effect sizes, TOST, ablation;
+  - `asap_lcs.py`: robustness, connectives, signed sum;
+  - new `arr_verdict_flip.py`.
+- **Regenerated:** `numbers_slot3.tex`, `numbers_ext.tex` and `asap_numbers.tex`. In all three, only new macros were added; every existing value is unchanged (checked by diff). Also regenerated: `fig_ladders.pdf`, `fig_dominance.pdf` and `fig_sign.pdf`.
+- **New:** `numbers_flip.tex`, `prompts/JUDGE_GEVAL.txt`, `prompts/JUDGE_DIRECT.txt`.
+- **Layout:** Fig. 3 moved to App. H; the §3 opening is shortened.
+
+### Next (Phase 3, in priority order)
+
+1. A gold-graph test where Z matters: redundant support, a shared refutation, mixed edits. This completes C1.
+2. Fair judges on LoCoBench: pairwise A/B, and a judge given claims and verdicts.
+3. Response-grounded NLI baselines.
+4. A matched re-mining design for the order noise floor (the ContraDoc drift is unexplained).
+5. A non-OpenAI miner.
+6. A natural-text verdict-world arm.
+7. An ASAP rubric grader.

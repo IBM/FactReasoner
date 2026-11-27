@@ -43,24 +43,26 @@ In summary, our contributions are:
 
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item \textbf{A principled coherence score with theoretical guarantees} (\S\ref{sec:framework}). We introduce LCS, a coherence 
-metric that is strictly monotone under every coherence-improving edit, for any prior distribution, 
-relation graph, and factuality pipeline, and show that this requirement pins down the class of
-relation tables and the world at which the model is read (App.~\ref{app:why}). 
+metric that is strictly monotone under every coherence-improving edit, for any priors and relation
+graph, relative to the committed world a factuality pipeline supplies. Within product MRFs read by
+a single-world log-ratio, this requirement forces two-valued relation tables and the committed
+world as the readout (App.~\ref{app:why}). 
 % We further characterize the class of relation factors that 
 % admit this guarantee and show that no readout based on a different single world satisfies the same coherence 
 % order.
 
-\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). We show that on the benchmark's coherence ladders, 
-LCS satisfies every prescribed ordering and invariance when using gold graphs. On automatically mined graphs, 
-it falls only on pairs whose edit the miner reversed or left incomparable, so every failure traces to
-relation extraction rather than to the scoring function. In contrast, strong LLM judges 
-are near chance at recognizing coherence gains introduced solely by additional valid inferences.
+\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On mined graphs,
+LCS falls only on pairs whose edit the miner reversed or left incomparable, as the theorem
+requires; gold graphs, which the benchmark admits only if they are ordered as declared, check the
+implementation. LLM judges rise and fall about equally often when the only edit is an added valid
+inference. A signed sum of relation weights does as well on these ladders, which exercise each
+relation's sign but not the interactions that the MRF adds.
 
-\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). On data labelled
-by others, none of which rates logical coherence, LCS shows four properties the framework implies.
-It is not a proxy for rated discourse coherence, and where the two diverge it is for a principled
-reason: restating a claim is consistent but redundant. It falls when a detected contradiction is
-added, and almost every rise traces to a contradiction the miner missed. Permuting paragraphs moves it
-no more than mining the same text again, while an LLM judge treats reordering as incoherence.
-On rated student essays, it tracks quality beyond length.
+\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). On existing
+human-labelled data, none of which rates logical coherence, we test four properties of LCS. It is
+related to but not a proxy for rated discourse coherence: inferences raise both, but a restatement
+raises LCS while raters penalize the redundancy. It falls when a detected contradiction is
+added, more often than the signed sum, and rises when a consistent sentence is added. Permuting
+paragraphs moves it about as much as re-mining, while an LLM judge treats reordering as
+incoherence. On student essays, it tracks quality beyond length.
 \end{itemize}

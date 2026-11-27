@@ -79,6 +79,47 @@ def lcs_at(n, rels, x=None):
     return A.lcs_flat(lam, n), lam
 
 
+def signed_sum(n, rels, x=None, weighted=True):
+    """Review C1 baseline: +p (or +1) for each relation the world satisfies, -p (or -1) for
+    each it violates. Monotone under elementary improvements like LCS, but reads no MRF."""
+    x = x if x is not None else [1] * n
+    return float(sum((r[3] if weighted else 1.0) * (-1 if (x[r[0]], x[r[1]]) in VIOLATED[r[2]] else 1)
+                     for r in rels))
+
+
+def mean_abs_diff_ci(A_, B_, n=BOOT, seed=SEED):
+    """Group bootstrap of mean|d|(A) - mean|d|(B), with A and B lists of groups of |d|."""
+    rng = random.Random(seed)
+    vals = []
+    for _ in range(n):
+        a = [v for g in (rng.choice(A_) for _ in A_) for v in g]
+        b = [v for g in (rng.choice(B_) for _ in B_) for v in g]
+        vals.append(st.mean(a) - st.mean(b))
+    vals.sort()
+    return vals[int(0.05 * n)], vals[int(0.95 * n) - 1], vals[int(0.025 * n)], vals[int(0.975 * n) - 1]
+
+
+def order_equivalence(perm, noise):
+    """Is the permutation effect on LCS equivalent to re-mining noise? TOST at alpha = 0.05 with
+    margin TOL on the difference of mean |change| (90% group-bootstrap interval inside
+    (-TOL, TOL)), plus the direction of the changes beyond TOL in each set."""
+    def groups(R):
+        G = defaultdict(list)
+        for r in R:
+            G[r["group"]].append(abs(r["lcs"] - r["lcs_orig"]))
+        return list(G.values())
+    lo90, hi90, lo95, hi95 = mean_abs_diff_ci(groups(perm), groups(noise))
+    up = lambda R: sum(r["lcs"] > r["lcs_orig"] + TOL for r in R)  # noqa: E731
+    dn = lambda R: sum(r["lcs"] < r["lcs_orig"] - TOL for r in R)  # noqa: E731
+    return {"diff": st.mean(abs(r["lcs"] - r["lcs_orig"]) for r in perm)
+            - st.mean(abs(r["lcs"] - r["lcs_orig"]) for r in noise),
+            "ci90": (lo90, hi90), "ci95": (lo95, hi95), "margin": TOL,
+            "equivalent": -TOL < lo90 and hi90 < TOL,
+            "perm_up": up(perm), "perm_down": dn(perm), "perm_p": sign_test(dn(perm), up(perm)),
+            "noise_up": up(noise), "noise_down": dn(noise), "noise_p": sign_test(dn(noise), up(noise)),
+            "n_perm": len(perm), "n_noise": len(noise)}
+
+
 def gold_rels(item):
     """LoCoBench gold relations (band-midpoint weights), as in scripts/arr_slot3_eval.py."""
     out = []
@@ -212,7 +253,8 @@ def check1(args):
         names = ["lcs", "gold"] + list(BASELINES)
         res[f"1a:{arm}"] = {"errors": err, "perm": invariance_block(perm, names),
                             "sent": invariance_block(sent, names),
-                            "noise_floor": invariance_block(noise, ["lcs"])}
+                            "noise_floor": invariance_block(noise, ["lcs"]),
+                            "equivalence": order_equivalence(perm, noise) if noise else None}
     # 1c: ContraDoc clean documents
     it = items("contradoc")
     base = baselines("contradoc")
@@ -249,7 +291,8 @@ def check1(args):
                               "lcs": lcs_at(o["num_atoms"], rels_of(rr[o["id"]]))[0],
                               "lcs_orig": lcs_at(o["num_atoms"], rels_of(recs[o["id"]]))[0]})
         res[f"1c:{arm}"] = {"errors": err, "perm": invariance_block(rows, ["lcs"] + list(BASELINES)),
-                            "noise_floor": invariance_block(noise, ["lcs"])}
+                            "noise_floor": invariance_block(noise, ["lcs"]),
+                            "equivalence": order_equivalence(rows, noise) if noise else None}
     # 1d: SummEval
     it = items("summeval")
     base = baselines("summeval")
@@ -262,6 +305,9 @@ def check1(args):
             r = rels_of(recs[iid])
             kinds = Counter(t for _, _, t, _ in r)
             rows.append({"group": x["expected"]["family_id"], "lcs": lcs_at(x["num_atoms"], r)[0],
+                         "wsum": signed_sum(x["num_atoms"], r),
+                         "lcs_norestate": lcs_at(x["num_atoms"],
+                                                 [q for q in r if q[2] != "equivalence"])[0],
                          "empty": not r, "n_ent": kinds["entailment"], "n_eqv": kinds["equivalence"],
                          "n_con": sum(kinds[k] for k in CONFLICTISH), "n_rel": len(r),
                          **x["expected"]["expert"],
@@ -294,6 +340,12 @@ def check1(args):
             g = lambda S, c=col: spearman([r[c] for r in S], [r["coherence"] for r in S])  # noqa: E731
             out[f"count_{key}_rho_coherence"] = g(NE)
             out[f"count_{key}_rho_coherence_ci"] = boot(g, grouped(NE, "group"))
+        for key, col in (("wsum", "wsum"), ("norestate", "lcs_norestate")):
+            g = lambda S, c=col: spearman([r[c] for r in S], [r["coherence"] for r in S])  # noqa: E731
+            out[f"{key}_rho_coherence"] = g(rows)
+            out[f"{key}_rho_coherence_ci"] = boot(g, groups)
+            out[f"{key}_nonempty_rho_coherence"] = g(NE)
+            out[f"{key}_nonempty_rho_coherence_ci"] = boot(g, grouped(NE, "group"))
         out["relations_by_kind"] = {"inference": sum(r["n_ent"] for r in NE),
                                     "restatement": sum(r["n_eqv"] for r in NE),
                                     "conflict": sum(r["n_con"] for r in NE),
@@ -383,6 +435,7 @@ def check2(args):
                    "asserted_a": lcs_at(a["num_atoms"], ra)[0], "asserted_b": lcs_at(b["num_atoms"], rb)[0],
                    "verdict_a": lcs_at(a["num_atoms"], ra)[0],  # a has no evidence claim: x* = 1
                    "verdict_b": lcs_at(b["num_atoms"], rb, xb)[0], "edge_on_evidence": bool(on_ev),
+                   "wsum_a": signed_sum(a["num_atoms"], ra), "wsum_b": signed_sum(b["num_atoms"], rb),
                    "spot": (spot.get(a["id"]) or {}).get("majority"),
                    # Exploratory: sign, at the verdict world, of every relation on the evidence.
                    "ev_supports": sum((xb[r[0]], xb[r[1]]) not in VIOLATED[r[2]] for r in touch),
@@ -408,7 +461,15 @@ def check2(args):
                    "verdict_falls": len(falls),
                    "verdict_falls_without_evidence_conflict": sum(r["ev_conflicts"] == 0 for r in falls)},
                "asserted": counts(pairs, "asserted"), "verdict_all": counts(pairs, "verdict"),
-               "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted")}
+               "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted"),
+               "wsum": counts(pairs, "wsum"), "wsum_edge": counts(edge, "wsum"),
+               "asserted_notfound": counts([r for r in pairs if not r["edge_on_evidence"]], "asserted"),
+               "effect": {k: {"mean": st.mean(r["asserted_b"] - r["asserted_a"] for r in R),
+                              "median": st.median(r["asserted_b"] - r["asserted_a"] for r in R),
+                              "n": len(R)}
+                          for k, R in (("found", edge),
+                                       ("notfound", [r for r in pairs if not r["edge_on_evidence"]]))
+                          if R}}
         out["H2a_asserted_pass"] = out["asserted"]["decrease"] > out["asserted"]["increase"] and \
             out["asserted"]["p_sign"] < 0.05
         out["H2a_verdict_pass"] = out["verdict_edge"]["increase"] > out["verdict_edge"]["decrease"] and \
@@ -495,8 +556,10 @@ def check3(args):
             row = {"group": pid, "label": d1["expected"]["label"], "conflict": conflict,
                    "nonfactual": d1["expected"].get("nonfactual")}
             if d0 and d0["id"] in recs:
+                R0 = rels_of(recs[d0["id"]])
                 row["d1"] = lcs_at(d1["num_atoms"], R)[0]
-                row["d0"] = lcs_at(d0["num_atoms"], rels_of(recs[d0["id"]]))[0]
+                row["d0"] = lcs_at(d0["num_atoms"], R0)[0]
+                row["w1"], row["w0"] = signed_sum(d1["num_atoms"], R), signed_sum(d0["num_atoms"], R0)
             rows.append(row)
             nf = d1["expected"].get("nonfactual")
             if nf in ("none", "1", "2", "both") and conflict:
@@ -526,6 +589,26 @@ def check3(args):
             "notfound_fall": sum(not r["conflict"] and r["d1"] < r["d0"] - TIE for r in S),
             "notfound_rise": sum(not r["conflict"] and r["d1"] > r["d0"] + TIE for r in S)}
         out["asserted"] = {"n": len(S), "decrease": dec, "increase": inc, "p_sign": sign_test(dec, inc)}
+
+        def split(R, a="d0", b="d1"):
+            dn = sum(r[b] < r[a] - TIE for r in R)
+            up = sum(r[b] > r[a] + TIE for r in R)
+            return {"n": len(R), "decrease": dn, "increase": up, "tie": len(R) - dn - up,
+                    "p_sign": sign_test(dn, up)}
+        # Specificity control: the same edit (adding the second sentence) on pairs that are NOT
+        # contradictory. LCS should fall less often there than on contradictory pairs.
+        C = [r for r in none if "d0" in r]
+        out["control_noncontradictory"] = split(C)
+        out["asserted_found"] = split([r for r in S if r["conflict"]])
+        out["asserted_notfound"] = split([r for r in S if not r["conflict"]])
+        out["wsum"] = split(S, "w0", "w1")
+        out["wsum_found"] = split([r for r in S if r["conflict"]], "w0", "w1")
+        out["wsum_control"] = split(C, "w0", "w1")
+        out["effect"] = {k: {"mean": st.mean(r["d1"] - r["d0"] for r in R),
+                             "median": st.median(r["d1"] - r["d0"] for r in R), "n": len(R)}
+                         for k, R in (("found", [r for r in S if r["conflict"]]),
+                                      ("notfound", [r for r in S if not r["conflict"]]),
+                                      ("control", C)) if R}
         out["H3c_pass"] = dec > inc and out["asserted"]["p_sign"] < 0.05
         res[f"3:{arm}"] = out
     return res
@@ -778,6 +861,55 @@ def write_macros(ev, path):
             m(f"CpRealConflict{tag}", y["real_verdict_signs"].get("conflict", 0))
             for h, ht in (("H3a_pass", "HThreeA"), ("H3_miner_pass", "HThreeMiner"), ("H3c_pass", "HThreeC")):
                 m(f"{ht}{tag}", held(y[h]))
+        # Phase 2 of the 2026-11-27 review: signed baselines, controls, effect sizes, equivalence.
+        def f3(v):
+            return "--" if v is None else f"\\ensuremath{{{v:+.3f}}}"
+        for key, kt in (("1a", "Loco"), ("1c", "Cd")):
+            e = (c1.get(f"{key}:{arm}") or {}).get("equivalence")
+            if e:
+                m(f"{kt}EqDiff{tag}", f3(e["diff"]))
+                m(f"{kt}EqLo{tag}", f3(e["ci90"][0]))
+                m(f"{kt}EqHi{tag}", f3(e["ci90"][1]))
+                m(f"{kt}EqHeld{tag}", "yes" if e["equivalent"] else "no")
+                for k_ in ("perm_up", "perm_down", "noise_up", "noise_down", "n_perm", "n_noise"):
+                    m(f"{kt}Eq{k_.title().replace('_', '')}{tag}", e[k_])
+                m(f"{kt}EqPermP{tag}", pval(e["perm_p"]))
+                m(f"{kt}EqNoiseP{tag}", pval(e["noise_p"]))
+        d = c1.get(f"1d:{arm}")
+        if d and "wsum_rho_coherence" in d:
+            for key, kt in (("wsum", "Wsum"), ("norestate", "NoRestate")):
+                m(f"Se{kt}RhoCoh{tag}", f2(d[f"{key}_rho_coherence"]))
+                m(f"Se{kt}NonEmptyRhoCoh{tag}", f2(d[f"{key}_nonempty_rho_coherence"]))
+                m(f"Se{kt}NonEmptyRhoCoh{tag}Lo", f2(d[f"{key}_nonempty_rho_coherence_ci"][0]))
+                m(f"Se{kt}NonEmptyRhoCoh{tag}Hi", f2(d[f"{key}_nonempty_rho_coherence_ci"][1]))
+        x = c2.get(f"2:{arm}")
+        if x and "wsum" in x:
+            for k_, kt in (("wsum", "Wsum"), ("wsum_edge", "WsumEdge"), ("asserted_notfound", "AssertNotFound")):
+                m(f"Cd{kt}Dec{tag}", x[k_]["decrease"])
+                m(f"Cd{kt}Inc{tag}", x[k_]["increase"])
+                m(f"Cd{kt}Tie{tag}", x[k_]["tie"])
+                m(f"Cd{kt}N{tag}", x[k_]["n"])
+                m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
+            m(f"CdAssertTie{tag}", x["asserted"]["tie"])
+            for k_, kt in (("found", "Found"), ("notfound", "NotFound")):
+                if k_ in x["effect"]:
+                    m(f"CdEff{kt}Mean{tag}", f2(x["effect"][k_]["mean"]))
+                    m(f"CdEff{kt}Median{tag}", f2(x["effect"][k_]["median"]))
+        y = c3.get(f"3:{arm}")
+        if y and "control_noncontradictory" in y:
+            for k_, kt in (("control_noncontradictory", "Ctl"), ("asserted_found", "Found"),
+                           ("asserted_notfound", "NotFound"), ("wsum", "Wsum"), ("wsum_control", "WsumCtl"),
+                           ("wsum_found", "WsumFound")):
+                m(f"Cp{kt}Dec{tag}", y[k_]["decrease"])
+                m(f"Cp{kt}Inc{tag}", y[k_]["increase"])
+                m(f"Cp{kt}Tie{tag}", y[k_]["tie"])
+                m(f"Cp{kt}N{tag}", y[k_]["n"])
+                m(f"Cp{kt}P{tag}", pval(y[k_]["p_sign"]))
+            m(f"CpAssertTie{tag}", y["asserted"]["n"] - y["asserted"]["decrease"] - y["asserted"]["increase"])
+            for k_, kt in (("found", "Found"), ("notfound", "NotFound"), ("control", "Ctl")):
+                if k_ in y["effect"]:
+                    m(f"CpEff{kt}Mean{tag}", f2(y["effect"][k_]["mean"]))
+                    m(f"CpEff{kt}Median{tag}", f2(y["effect"][k_]["median"]))
         q = c4.get(f"4a:{arm}")
         if q:
             m(f"QtPairF{tag}", f"{q['pair']['f1']:.2f}")

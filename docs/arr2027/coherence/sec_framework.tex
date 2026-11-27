@@ -107,6 +107,8 @@ A contradiction between two truths is a conflict,
 but between a truth and a falsehood it is a support ($+$), since it refutes the falsehood. An entailment
 from a truth to a falsehood is a conflict ($-$). For example, Response~B in Figure~\ref{fig:voyager} has $\Rsup=\{a_1\Rightarrow a_2,\
 a_3\con a_5\}$ and $\Rcon=\{a_2\con a_3,\ a_1\Rightarrow a_4\}$, while all of Response~A's relations are supports.
+The sign depends only on the verdicts, so an inference between two false claims counts as a
+support: whether premises are true is the factuality score's job.
 
 \subsection{Estimating Relations}
 \label{sec:mining}
@@ -117,7 +119,7 @@ In practice, the relations are estimated from the response. A relation's weight 
 p_r=c_r\cdot g_r,\qquad c_r,g_r\in[0,1],
 \label{eq:decomp}
 \end{equation}
-clipped below $1$. For our purpose, we develop two relation miners. A \emph{pairwise} miner evaluates candidate
+clipped to at most $1-10^{-6}$. For our purpose, we develop two relation miners. A \emph{pairwise} miner evaluates candidate
 claim pairs within a local window, estimating $c_r$ from label-token probabilities and $g_r$ from 
 a \texttt{Yes}/\texttt{No} judgment \citep{kadavath}. Alternatively, a \emph{graph-level} miner extracts 
 all relations expressed in a response, together with their sense, direction, and strength, in a single call. 
@@ -178,9 +180,11 @@ amount, counting an addition or a deletion as a change from or to weight $0$.
 
 % Edits that improve one part of an argument and degrade another stay unranked. 
 
-Therefore, for a fixed $\xs$, a score $S(\R;\pi)$ should be \textbf{(A1) monotone},
+For a fixed $\xs$, we require a score $S(\R;\pi)$ to be \textbf{(A1) monotone},
 $\R'\scoh\R\Rightarrow S(\R')>S(\R)$ for every $\pi$; \textbf{(A2) MRF-grounded}, a functional of
-$\PR$ and $\pi$; and \textbf{(A3) neutral}, with $S(\varnothing;\pi)$ independent of $\pi$, respectively.
+$\PR$ and $\pi$; and \textbf{(A3) neutral}, with $S(\varnothing;\pi)$ independent of $\pi$. A1
+and A3 alone admit simpler scores, such as the signed sum of relation weights; A2 makes relations
+interact through $Z_\R$, so that redundant supports saturate (App.~\ref{app:why}).
 
 % A1 is demanding because the edited relation can sit anywhere in an
 % arbitrary graph. It suggests reading the MRF at the world the argument is about, before and after
@@ -200,7 +204,8 @@ the relations contribute in favor of the complete truth assignment $\xs$. The lo
 function converts this evidence into an interpretable score: $\LCS(\R)$ is the probability 
 of $\xs$ for a reader who starts from even odds and updates using the evidence supplied by the 
 relations. Consequently, $\LCS(\R)=\tfrac12$ when the relations neither confirm nor disconfirm it (as with no relations), tends to $0$ 
-when they rule out $\xs$, and tends to $1$ when they force it.
+when they rule out $\xs$, and tends to $1$ when they force it. It measures an amount of evidence,
+not an average, so it grows with the number of supports.
 
 
 The results are easier to understand in terms of:
@@ -208,8 +213,8 @@ The results are easier to understand in terms of:
 \Lambda=\log\frac{\PR(\xs)}{\pi(\xs)}=\sum_{r\in\Rcon}\log(1-p_r)-\log Z_\R,
 \label{eq:lambda}
 \end{equation}
-where the second equality holds because $\psi_r(\xs)=1$ for a supporting relation and $\psi_r(\xs)=1-p_r$ for a
-conflicting relation. Thus $\Lambda$ is simply the total log-evidence contributed by conflicts, 
+where the second equality holds because $\psi_r(\xs_{e_r})=1$ for a supporting relation and
+$\psi_r(\xs_{e_r})=1-p_r$ for a conflicting relation. Thus $\Lambda$ is simply the total log-evidence contributed by conflicts, 
 offset by the normalization term $\log Z_\R$. For a fixed claim set and prior, $\LCS$ is a strictly 
 increasing function of $\Lambda$ (App.~\ref{app:lcs-lambda}), so any ordering of relation sets 
 induced by $\Lambda$ is preserved by $\LCS$. 
@@ -221,13 +226,15 @@ is \#P-hard in general \cite{koller2009probabilistic}.
 \begin{lemma}[Edit identity]
 \label{lem:edit}
 For any $\R$, relation $r$ and priors,
-$\Lambda(\R\uplus\{r\})-\Lambda(\R)=\log\psi_r(\xs)-\log\E_{\PR}[\psi_r]$. With
-$q_r=\PR(x_{e_r}\in V(\kappa_r))\in(0,1)$, this is $-\log(1-p_rq_r)>0$ for a support and
+$\Lambda(\R\uplus\{r\})-\Lambda(\R)=\log\psi_r(\xs_{e_r})-\log\E_{\PR}[\psi_r(x_{e_r})]$. Let
+$q_r=\PR(x_{e_r}\in V(\kappa_r))\in(0,1)$; then this is $-\log(1-p_rq_r)>0$ for a support and
 $\log\frac{1-p_r}{1-p_rq_r}<0$ for a conflict, strictly when $p_r>0$.
 \end{lemma}
 
-A relation's effect depends on the context in magnitude, through $q_r$, but not in sign. Every
-elementary improvement is one addition, deletion or weight change, so the main result follows.
+The lemma is the virtual-evidence update \citep{pearl1988,chan2005}, and the MRF a Markov logic
+network \citep{mln} with clause weights $-\log(1-p_r)$; what is new is the reading at $\xs$. A relation's effect
+depends on the context in magnitude, through $q_r$, but not in sign. Every elementary improvement
+is one addition, deletion or weight change, so the main result follows.
 
 \begin{theorem}[Monotonicity]
 \label{thm:mono}

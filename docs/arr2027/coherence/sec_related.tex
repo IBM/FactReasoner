@@ -4,24 +4,32 @@
 %% ============================================================================
 
 \paragraph{Factuality and consistency.} Claim-level metrics aggregate independent per-claim
-verdicts \citep{factscore,safe,veriscore}, and FactReasoner \citep{factreasoner} replaces counting
-with inference over claims and evidence; \citet{lorefact} show that such pipelines miss errors in
-the logic that connects the claims. NLI-based detectors flag inconsistencies with a source
-\citep{summac}, across samples \citep{selfcheckgpt}, within one generation \citep{mundler2024} or across a model's beliefs \citep{elazar2021},
-and reasoning-chain metrics score explicit derivations \citep{roscoe,receval,entailmentbank}. None of them says
+verdicts \citep{factscore,safe,veriscore}, over decompositions whose choice matters
+\citep{wanner2024}, and FactReasoner \citep{factreasoner} replaces counting with inference over
+claims and evidence; \citet{lorefact} show that such pipelines miss errors in the logic that
+connects the claims. Factual-consistency metrics check a text against a source
+\citep{factcc,summac,alignscore,minicheck}; other detectors flag inconsistencies across samples
+\citep{selfcheckgpt}, within one generation \citep{mundler2024} or a dialogue
+\citep{welleck2019,decode}, and across a model's answers or beliefs
+\citep{ribeiro2019,li2019logic,elazar2021,becel}. Reasoning-chain metrics and verifiers score
+explicit derivations step by step \citep{roscoe,receval,entailmentbank,lightman2024}. None of them says
 how supports and conflicts should combine into one score, and none fixes a committed world under
 which refuting a falsehood counts as support.
 
 \paragraph{Discourse coherence.} It is explained by cohesive ties \citep{hallidayhasan1976}, entity
 continuity \citep{grosz1995} or inferred relations \citep{hobbs1979,mann,pdtb}, and scored by entity
 grids \citep{barzilay}, neural models \citep{li}, DiscoScore \citep{discoscore}, entity--discourse
-graphs \citep{liustrube} and LLM judges \citep{geval,zheng2023judge}, none with a guarantee on how
-the score responds to the truth constraints between claims.
+graphs \citep{liustrube} and LLM judges \citep{geval,zheng2023judge}, and rated on natural text
+\citep{gcdc}, none with a guarantee on how the score responds to the truth constraints between
+claims.
 
 \paragraph{Argumentation and logical constraints.} Argument mining recovers support and attack
-relations \citep{stab2017}, and argument quality is rated for cogency \citep{wachsmuth2017}. Gradual semantics for bipolar argumentation grade arguments under
-axioms such as neutrality and monotony \citep{cayrol2005,amgoud2016,amgoud2018,baroni2019}, the
-closest precedent to our axioms, and probabilistic argumentation and explanatory coherence constrain
+relations \citep{stab2017}, argument quality and strength are rated for cogency and persuasiveness
+\citep{wachsmuth2017,habernal2016,persing2015}, and entailment graphs link propositions
+\citep{berant2011}. Gradual semantics for bipolar argumentation grade arguments under axioms such
+as neutrality and monotony \citep{cayrol2005,amgoud2016,amgoud2018,baroni2019}, the closest
+precedent to our axioms, but they grade acceptability from attacks and supports, not accordance
+with a committed truth assignment. Probabilistic argumentation and explanatory coherence constrain
 beliefs by attacks or by positive and negative constraints
 \citep{thimm2012,hunter2013,thagard1989,thagard1998}. BeliefBank \citep{beliefbank}, ConCoRD \citep{concord}
 and Maieutic prompting \citep{maieutic} use weighted MAX-SAT or factor graphs over NLI constraints

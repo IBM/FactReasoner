@@ -59,6 +59,9 @@ ROWS = [
     ("arm:graph_gptoss:lambda", "graph-level miner, gpt-oss-120b", "ours"),
     ("arm:pair_gptoss:lambda", "pairwise miner, gpt-oss-120b", "ours"),
     ("arm:pair_llama:lambda", "pairwise miner, Llama-3.3-70B", "ours"),
+    ("header", "Signed weight sum over the same graphs (no MRF)", None),
+    ("arm:graph_gpt6:wsum", "graph-level miner, GPT-6", "other"),
+    ("arm:graph_gptoss:wsum", "graph-level miner, gpt-oss-120b", "other"),
     ("header", "The same model at another world (gold graphs)", None),
     ("arm:gold:lambda_assert", "LCS at the asserted world", "other"),
     ("header", "Baselines (read the text)", None),
@@ -70,10 +73,9 @@ ROWS = [
     ("base:discourse_lc", "DiscoScore LC", "other"),
     ("base:discourse_entity_graph", "entity graph (DiscoScore)", "other"),
     ("base:control_length", "response length", "other"),
-    ("base:control_claim_count", "claim count (claims)", "other"),
-    ("base:nli_contradiction", "NLI contradiction (claims)", "other"),
-    ("base:roscoe_sc", "ROSCOE self-consistency (claims)", "other"),
 ]
+# NLI contradiction and ROSCOE read only the claims, which every rung shares, so they tie on
+# every pair by construction (review M8); they stay in the appendix table, not in the figure.
 
 
 #: Baselines that read only the claims, which are identical across a family's rungs.

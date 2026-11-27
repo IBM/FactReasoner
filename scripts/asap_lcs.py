@@ -321,6 +321,45 @@ def spearman(x, y):
     return _pearson(_rank(x), _rank(y))
 
 
+#: Argumentative connectives, counted per essay: the obvious surface explanation of what a
+#: relation miner picks up (review M9). Case-insensitive, whole words or phrases.
+CONNECTIVES = ("because", "since", "therefore", "thus", "hence", "so", "consequently",
+               "as a result", "for example", "for instance", "this shows", "this means",
+               "which means", "if", "then", "however", "but", "although", "though",
+               "in conclusion", "this is why", "that is why")
+
+
+def count_connectives(text):
+    import re
+    t = text.lower()
+    return sum(len(re.findall(r"\b" + re.escape(c) + r"\b", t)) for c in CONNECTIVES)
+
+
+def partial_design(x, y, Z):
+    """Spearman correlation of x and y after least-squares removal of the columns of Z (an
+    already-built design: polynomials of the length rank, or bin dummies) from both ranks."""
+    import numpy as np
+    rx, ry = (np.array(_rank(v), float) for v in (x, y))
+    A = np.column_stack([np.asarray(Z, float), np.ones_like(rx)])
+    ex = rx - A @ np.linalg.lstsq(A, rx, rcond=None)[0]
+    ey = ry - A @ np.linalg.lstsq(A, ry, rcond=None)[0]
+    return _pearson(list(ex), list(ey))
+
+
+def length_design(words, kind):
+    """Nonlinear length controls: 'cubic' (rank, rank^2, rank^3, centred and scaled) or
+    'binsK' (K equal-count length bins as dummies)."""
+    import numpy as np
+    r = np.array(_rank(words), float)
+    if kind == "cubic":
+        z = (r - r.mean()) / (r.std() or 1.0)
+        return np.column_stack([z, z ** 2, z ** 3])
+    k = int(kind[4:])
+    edges = np.quantile(r, np.linspace(0, 1, k + 1)[1:-1])
+    b = np.searchsorted(edges, r, side="right")
+    return np.column_stack([(b == j).astype(float) for j in range(1, k)])
+
+
 def partial_spearman(x, y, z):
     """Spearman correlation of x and y with the ranks of z (one control, or a list of controls)
     partialled out of both."""
@@ -384,12 +423,15 @@ def score_rows(tag, arm):
         v = verdicts.get(it["id"], {})
         row = {"id": it["id"], "score": it["expected"]["score"], "words": it["meta"]["words"],
                "claims": n, "relations": len(rels),
+               "connectives": count_connectives(it["response"]),
                "senses": dict(Counter(x.get("sense") for x in rec.get("relations") or [])),
                **{lab: sum(l == lab for l in v.values()) for lab in LABELS + ("unresolved",)}}
         for w in WORLDS:
             ex = lambda_exact(n, rels, X[w])
             sup = sum(A.is_support(r, X[w]) for r in rels)
+            wsum = sum(r[3] * (1 if A.is_support(r, X[w]) else -1) for r in rels)
             row[w] = {"lambda": ex["lambda"], "lcs": lcs_flat(ex["lambda"], n), "supports": sup,
+                      "wsum": float(wsum),
                       "conflicts": len(rels) - sup, "width": ex["max_induced_width"],
                       "largest": max(ex["component_sizes"] or [0])}
         for name, sc in base.items():
@@ -402,12 +444,14 @@ def score_rows(tag, arm):
 def analyze(rows):
     sc = lambda R: [r["score"] for r in R]  # noqa: E731
     metrics = {"words": lambda r: r["words"], "claims": lambda r: r["claims"],
-               "relations": lambda r: r["relations"]}
+               "relations": lambda r: r["relations"],
+               "connectives": lambda r: r.get("connectives", float("nan"))}
     for w in WORLDS:
         metrics[f"lcs_{w}"] = (lambda w: lambda r: r[w]["lcs"])(w)
         metrics[f"lambda_{w}"] = (lambda w: lambda r: r[w]["lambda"])(w)
         metrics[f"lpc_{w}"] = (lambda w: lambda r: r[w]["lambda"] / r["claims"])(w)
         metrics[f"conflicts_{w}"] = (lambda w: lambda r: r[w]["conflicts"])(w)
+        metrics[f"wsum_{w}"] = (lambda w: lambda r: r[w].get("wsum", float("nan")))(w)
     names = sorted({k for r in rows for k in r.get("baselines", {})})
     for b in names:
         metrics[b] = (lambda b: lambda r: r.get("baselines", {}).get(b, float("nan")))(b)
@@ -434,6 +478,22 @@ def analyze(rows):
             v = partial_spearman([f(r) for r in RJ], sc(RJ), ctl(RJ))
             lo, hi = boot_ci(lambda S: partial_spearman([f(r) for r in S], sc(S), ctl(S)), RJ)
             out[k]["partial_wj"], out[k]["partial_wj_ci"] = v, (lo, hi)
+    # Robustness of "beyond length" (review M9): nonlinear length controls, length plus the
+    # relation or connective count, and the LCS - G-Eval difference of partial correlations.
+    lcs = lambda S: [r["asserted"]["lcs"] for r in S]  # noqa: E731
+    W = lambda S: [r["words"] for r in S]  # noqa: E731
+    rob = {}
+    for kind in ("cubic", "bins6", "bins10", "bins20"):
+        f = lambda S, k=kind: partial_design(lcs(S), sc(S), length_design(W(S), k))  # noqa: E731
+        rob[kind] = {"value": f(rows), "ci": boot_ci(f, rows)}
+    for extra in ("relations", "connectives"):
+        f = lambda S, e=extra: partial_spearman(lcs(S), sc(S), [W(S), [r[e] for r in S]])  # noqa: E731
+        rob[f"words_{extra}"] = {"value": f(rows), "ci": boot_ci(f, rows)}
+    if len(RJ) >= 10:
+        def dif(S):
+            return (partial_spearman(lcs(S), sc(S), W(S))
+                    - partial_spearman([r["baselines"][J] for r in S], sc(S), W(S)))
+        rob["diff_geval"] = {"value": dif(RJ), "ci": boot_ci(dif, RJ)}
     # Within length tertiles: does LCS still order essays by score at a similar length?
     W = sorted(r["words"] for r in rows)
     cuts = (W[len(W) // 3], W[2 * len(W) // 3])
@@ -457,7 +517,7 @@ def analyze(rows):
                         **{f"conflicts_{w}": st.mean(r[w]["conflicts"] for r in R) for w in WORLDS},
                         "not_in_source_share": st.mean(r["not_in_source"] / r["claims"] for r in R),
                         "contradicted": sum(r["contradicted"] for r in R)}
-    return {"corr": out, "tertiles": tert, "cuts": cuts, "levels": level}
+    return {"corr": out, "tertiles": tert, "cuts": cuts, "levels": level, "robust": rob}
 
 
 def cmd_score(args) -> int:
@@ -552,6 +612,11 @@ def write_macros(path, tag, report, data):
             m("Pwj" + tag_, f2(c["partial_wj"]))
             m("Pwj" + tag_ + "Lo", f2(c["partial_wj_ci"][0]))
             m("Pwj" + tag_ + "Hi", f2(c["partial_wj_ci"][1]))
+    for k, v in arm.get("robust", {}).items():
+        tag_ = "".join(p.title() for p in k.split("_"))
+        m("Rob" + tag_, f2(v["value"]))
+        m("Rob" + tag_ + "Lo", f2(v["ci"][0]))
+        m("Rob" + tag_ + "Hi", f2(v["ci"][1]))
     for b, T in arm["tertiles"].items():
         t = b.title()
         m("Tert" + t + "N", T["n"])

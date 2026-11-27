@@ -38,8 +38,9 @@ Ladder & Slots & Rungs $\rho_0\to\rho_1\to\rho_2$ & Declared \\
 \bottomrule
 \end{tabular}
 \caption{The five ladder types. Every family has one primary ladder (\cp{conflict}, \cp{chain},
-\cp{sign} or \cp{order}) and a \cp{control} ladder on one extra slot, whose $\rho_0$ is the
-primary ladder's $\rho_1$; a family therefore has five distinct responses. Declared orders are at
+\cp{sign} or \cp{order}), and \sThreeNControl{} of the \sThreeFamilies{} families also have a
+\cp{control} ladder on one extra slot, whose $\rho_0$ is the primary ladder's $\rho_1$; such a
+family has five distinct responses. Declared orders are at
 verdict polarity; only \cp{sign}'s changes under assertion polarity.}
 \label{tab:lb-ladders}
 \end{table*}
@@ -204,7 +205,8 @@ differently (Figure~\ref{fig:sign}).
   a true claim. Asserting $F$ on $\rho_0$ makes that contradiction a conflict, and denying it on
   $\rho_2$ makes it a support, so $\rho_2$ scores higher.
 \end{itemize}
-The three counts add up to the \sThreeGoldLamASign{} \cp{sign} pairs satisfied. Read at the
+The \sThreeGoldLamASign{} \cp{sign} pairs satisfied are the rises on $\rho_1\to\rho_2$ and on
+$\rho_0\to\rho_2$; the falls on $\rho_0\to\rho_1$ are not satisfied. Read at the
 response's own stance, deriving a falsehood and refuting it are rated alike, and only the verdicts
 tell them apart. On \cp{conflict} and \cp{chain} ladders the asserted world is the same on every
 rung and agrees with the verdict world on every edited relation, since the edits join true claims,
@@ -243,6 +245,68 @@ Length and DiscoScore move with the surface of the edit and fall about as often 
 \sThreeBCtlLengthChain{} \cp{chain} pairs without reading any logic, the confound a length control
 exists to expose; it falls on \sThreeBCtlLengthConflictFalls{} \cp{conflict} pairs, because a
 filler that sets two claims against each other is longer than one that does not.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_dominance.pdf}
+\caption{\textbf{On mined graphs, $\LCS$ follows the extracted graphs wherever the coherence order
+ranks them.} Each arm's Increase pairs, split by how the two rungs' extracted graphs compare in the
+order (Def.~\ref{def:order}). Ordered as declared: $\LCS$ rises (blue), except one numerical
+tie (a relative step of $4\times10^{-14}$). Equal or reversed: it ties or falls, as the theorem requires (gray).
+Incomparable: no prediction; $\LCS$ rises on most (green) and misses on the rest (orange). Counts
+are in Table~\ref{tab:dominance}.}
+\label{fig:dominance}
+\end{figure}
+
+\paragraph{Signed baselines over the same graphs.} Table~\ref{tab:signed} compares $\LCS$ with the
+signed weight sum and the signed count on every arm. All three satisfy every gold pair: they are
+monotone under elementary improvements, and the gate admits only ordered gold graphs. At the
+asserted world all three fail the same \sThreeGoldWsumASign{} \cp{sign} pairs of the gold graphs,
+so the need for the verdicts holds for any signed score. On mined graphs the weight sum matches or
+exceeds $\LCS$ on increases, including the incomparable pairs, where only the scoring function
+decides. The count is coarser on increases, but as an integer it ignores the drift of the weights
+and keeps more invariances. The ladders change one or two relations between rungs and rarely
+repeat a relation, so the interactions through $Z_\R$ that separate $\LCS$ from the sum
+(saturation of redundant support, cancellation, context-dependent magnitudes) are not exercised.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{1.4pt}
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+& \multicolumn{3}{c}{Increase} & \multicolumn{3}{c}{Invariance} & Incomp. \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(l){8-8}
+Arm & $\LCS$ & sum & count & $\LCS$ & sum & count & $\LCS$\,/\,sum \\
+\midrule
+gold & \sThreeGoldLamIncPct & \sThreeGoldWsumIncPct & \sThreeGoldCountIncPct & \sThreeGoldLamInvPct & \sThreeGoldWsumInvPct & \sThreeGoldCountInvPct & -- \\
+graph, GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptWsumIncPct & \sThreeGraphGptCountIncPct & \sThreeGraphGptLamInvPct & \sThreeGraphGptWsumInvPct & \sThreeGraphGptCountInvPct & \sThreeGraphGptDomIncomparableOk\,/\,\sThreeGraphGptDomWIncomparableOk \\
+graph, gpt-oss & \sThreeGraphOssLamIncPct & \sThreeGraphOssWsumIncPct & \sThreeGraphOssCountIncPct & \sThreeGraphOssLamInvPct & \sThreeGraphOssWsumInvPct & \sThreeGraphOssCountInvPct & \sThreeGraphOssDomIncomparableOk\,/\,\sThreeGraphOssDomWIncomparableOk \\
+pair, gpt-oss & \sThreePairOssLamIncPct & \sThreePairOssWsumIncPct & \sThreePairOssCountIncPct & \sThreePairOssLamInvPct & \sThreePairOssWsumInvPct & \sThreePairOssCountInvPct & \sThreePairOssDomIncomparableOk\,/\,\sThreePairOssDomWIncomparableOk \\
+pair, Llama & \sThreePairLlamaLamIncPct & \sThreePairLlamaWsumIncPct & \sThreePairLlamaCountIncPct & \sThreePairLlamaLamInvPct & \sThreePairLlamaWsumInvPct & \sThreePairLlamaCountInvPct & \sThreePairLlamaDomIncomparableOk\,/\,\sThreePairLlamaDomWIncomparableOk \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{$\LCS$ against signed baselines over the same graphs} (\%; verdict world). ``Sum'':
+$\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$; ``count'': supports minus conflicts. Incomparable rises: the
+incomparable Increase pairs (\sThreeGraphGptDomIncomparable, \sThreeGraphOssDomIncomparable,
+\sThreePairOssDomIncomparable{} and \sThreePairLlamaDomIncomparable{} per arm) on which each score
+rises.}
+\label{tab:signed}
+\end{table}
+
+\paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
+that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of
+their pairs incomparable. Comparing weights to $10^{-3}$ instead, gpt-oss-120b has
+\sThreePairOssDomTForward{} pairs ranked as declared (against \sThreePairOssDomForward{} exactly) and
+Llama \sThreePairLlamaDomTForward{} (against \sThreePairLlamaDomForward). Within that tolerance a
+pair ranked as declared may still differ by sub-tolerance weight changes, and near $p_r=1$ these move
+$\Lambda$ a lot: $\LCS$ falls on \sThreePairLlamaDomTForwardFalls{} such Llama pairs, the signed sum on
+\sThreePairLlamaDomTWForwardFalls. This is the saturation of near-certain weights at work.
+
+\paragraph{Settings.} The tie tolerance of $\LCS$ was fixed after comparing it with the
+alternatives on the test split (App.~\ref{app:setup-details}): deciding on $\Lambda$ gives the same
+decision on all \sThreeLcsRulePairs{} rung pairs, and nearby relative tolerances differ on at most
+\sThreeLcsRuleAltMaxDis. GPT-6 is the GPT-6-Sol deployment, served
+through an API gateway at the provider's default sampling settings; per-run costs were not logged.
 
 \input{example_sign}
 

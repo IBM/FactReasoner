@@ -160,9 +160,24 @@ result:
 \item \textbf{It is conservative.} Part of why good essays are long is that they argue more, so
   removing length also removes some genuine quality signal.
 \item \textbf{It removes only the rank-linear part of the length effect.} A dependence on length
-  that is not monotone, or that interacts with the score, can survive it. The within-tertile
-  correlations below are a check that does not assume linearity.
+  that is not linear in rank, or that interacts with the score, can survive it. The nonlinear
+  controls below relax this; the within-tertile correlations are a weaker check, since length still
+  varies within each third.
 \end{itemize}
+
+\paragraph{Robustness.} Nonlinear length controls give the same picture: a cubic in the length
+rank leaves \asapRobCubic{} \asapCI{\asapRobCubicLo}{\asapRobCubicHi}, and 6, 10 and 20 equal-count
+length bins leave \asapRobBinsSix, \asapRobBinsOneZero{} and \asapRobBinsTwoZero. A count of
+argumentative connectives (\emph{because}, \emph{therefore}, \emph{for example} and 19 others)
+correlates with the score at \asapRhoConnectives{} but carries nothing beyond length
+(\asapParConnectives), and $\LCS$ keeps \asapRobWordsConnectives{} once length and connectives are
+both removed. Removing the number of mined relations as well leaves \asapRobWordsRelations{}
+\asapCI{\asapRobWordsRelationsLo}{\asapRobWordsRelationsHi}, so $\LCS$ is more than a relation
+count. The signed weight sum over the same graphs gives \asapParWsumAsserted{} after length. The
+difference between the partial correlations of $\LCS$ and of G-Eval is \asapRobDiffGeval{}
+\asapCI{\asapRobDiffGevalLo}{\asapRobDiffGevalHi}, so the two cannot be told apart here. Sampling
+\asapPerLevel{} essays per level weights the extreme scores more than the natural score
+distribution does, which inflates every correlation in the table.
 
 \paragraph{Findings.} Table~\ref{tab:asap-corr} gives the correlations, Table~\ref{tab:asap-levels}
 the levels and Figure~\ref{fig:asap} the essays.
