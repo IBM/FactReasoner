@@ -364,6 +364,35 @@ favours $\LCS$ by \asapCI{\vnDiffLoConflictTwenty}{\vnDiffHiConflictTwenty} poin
 \cp{chain} it costs \asapCI{\vnDiffLoChainTwenty}{\vnDiffHiChainTwenty}; \cp{sign} pairs, whose edit
 involves the falsehood itself, are decided identically.
 
+\paragraph{Verdicts from a fallible verifier.} A closed-book verifier replaces the generator's labels:
+GPT-6 judges each of the \vfGptClaims{} distinct claims TRUE, FALSE or UNSURE from its own knowledge,
+with the family's question as context, and, as verdict polarity prescribes, an unverifiable claim
+counts as false. Against the labels it is \vfGptAcc\% accurate; it catches \vfGptFalseRecall\% of the
+false claims but marks \vfGptUnsure\% of all claims UNSURE, so only \vfGptTrueRecall\% of the true
+ones count as true. At its verdicts, with the declared orders of the labels, $\LCS$ on gold graphs
+satisfies \vfGptGoldLcsInc\% of the increases and the signed sum \vfGptGoldWsumInc\% (paired
+difference [\vfGptGoldDiffloInc, \vfGptGoldDiffhiInc] points; on \cp{conflict}
+[\vfGptGoldDiffloConflict, \vfGptGoldDiffhiConflict]). On GPT-6's mined graphs the two are
+\vfGptMinedLcsInc\% and \vfGptMinedWsumInc\% ([\vfGptMinedDiffloInc, \vfGptMinedDiffhiInc]): $\LCS$
+is still ahead on \cp{conflict} ([\vfGptMinedDiffloConflict, \vfGptMinedDiffhiConflict]) but behind on
+\cp{chain} ([\vfGptMinedDiffloChain, \vfGptMinedDiffhiChain]) and \cp{sign}
+([\vfGptMinedDiffloSign, \vfGptMinedDiffhiSign]). With gpt-oss-120b as the verifier (\vfOssAcc\% accurate) the gold-graph
+difference is [\vfOssGoldDiffloInc, \vfOssGoldDiffhiInc] points (\vfOssGoldLcsInc\% against
+\vfOssGoldWsumInc\%). Real verdict errors thus reproduce the pattern of the injected ones: the context weighting of $\LCS$ helps where flipped signs mix conflicts and supports,
+and costs where it discounts supports.
+
+\paragraph{A non-sequitur control.} For the rung-0 response of each increasing family, a sentence
+asserting that one true claim follows from another, with no gold relation between them, from
+different paragraphs and sharing almost no words, is appended (``That this is so follows from the
+fact that \ldots''); the claims are unchanged, and both versions were mined in one run. Couplings
+are material, so an extracted inference between two true claims is a support and must raise
+$\LCS$. The GPT-6 miner extracts the planted inference in only \nsExtracted\% of the \nsPairs{}
+responses, and otherwise $\LCS$ rises on \nsLcsRise\% and falls on \nsLcsFall\% of them, the
+re-mining noise of an unrelated edit. The pairwise judge with verdicts prefers the response without
+the non-sequitur on \nsJudgeOrig\% of the pairs and with it on \nsJudgeNonseq\%. Relevance is
+therefore enforced by the extractor, which declines to read an irrelevant inference as one, not by
+the score, which would credit it.
+
 \paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
 that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of
 their pairs incomparable. Comparing weights to $10^{-3}$ instead, gpt-oss-120b has

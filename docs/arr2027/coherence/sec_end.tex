@@ -36,9 +36,8 @@ coherence of a response, so agreement with human judgments of logical coherence 
 established, and no human study checks that people rank LoCoBench's rungs as declared. Every
 natural-text test reads the asserted world, so the verdict polarity is tested only on LoCoBench.
 $\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The score is
-order-free, but its extraction need not be: on LoCoBench equivalence with re-mining noise is not
-established, and the ContraDoc order test is confounded by permutations that split section headers
-from their text. The essays come from one prompt, sampled uniformly over score
+order-free, but its extraction is only nearly so: on LoCoBench, permuting paragraphs moves the mined
+score slightly beyond the miner's re-mining noise. The essays come from one prompt, sampled uniformly over score
 levels, and were mined with one model.
 
 \paragraph{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a
@@ -54,7 +53,9 @@ wrong verdict can flip the sign of the relations at that claim. On LoCoBench's g
 one verdict of a claim with a relation moves $\LCS$ by a median of \flipMedian{} (more than $0.1$
 for \flipOverTenth\% of the \flipTouched{} such flips), and the change grows with the claim's
 degree. Flipping each verdict with probability $0.2$, $\LCS$ still satisfies \vnLcsIncTwenty\% of
-LoCoBench's increases on gold graphs, against \vnWsumIncTwenty\% for the signed sum. Verdicts are binary, so a claim the
+LoCoBench's increases on gold graphs, against \vnWsumIncTwenty\% for the signed sum, and with a
+closed-book GPT-6 verifier (\vfGptAcc\% accurate) it satisfies \vfGptGoldLcsInc\% against
+\vfGptGoldWsumInc\%. Verdicts are binary, so a claim the
 evidence neither supports nor refutes is treated as false. On LoCoBench the verdicts are the
 generator's factuality labels, which model an error-free pipeline, so the effect of verdict errors
 is not measured.
@@ -63,7 +64,9 @@ is not measured.
 be represented; on ContraDoc this is where recall is lowest. No relation weight is calibrated, and
 the pairwise miner's weights saturate the score. Only \sense{Refutation} compiles to \con{}, so an
 incompatibility conveyed without being asserted produces no factor. Couplings are material
-constraints, so relevance of premise to conclusion is not modeled. Saturation bounds redundant
+constraints, so relevance of premise to conclusion is not modeled; a planted non-sequitur between
+two true claims is extracted in only \nsExtracted\% of LoCoBench responses, so relevance is left to
+the extractor. Saturation bounds redundant
 support but cannot stop a miner from hallucinating new support, so the score inherits the
 extractor's precision.
 

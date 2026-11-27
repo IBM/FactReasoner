@@ -346,6 +346,50 @@ def check1(args):
                             "perm": invariance_block(perm, ["lcs"]),
                             "noise_floor": invariance_block(noise, ["lcs"]),
                             "equivalence": order_equivalence(perm, noise) if noise and perm else None}
+    # 1f / 1g (second review, Phase C1-C3): matched designs on rebuilt ContraDoc permutations
+    # (whole headed sections) and on LoCoBench, with the G-Eval judge's noise floor beside its
+    # permutation effect.
+    for key, ds in (("1f", "contradoc-sections"), ("1g", "loco-matched")):
+        if not os.path.exists(os.path.join(REPO, "data", "ext", ds, "items.jsonl")):
+            continue
+        mi = items(ds)
+        base = baselines(ds)
+        J = base.get("judge_geval@gpt-6-sol", {})
+        for arm in ARMS:
+            recs, err = records(ds, arm)
+            if not recs:
+                continue
+            L, JL = defaultdict(dict), defaultdict(dict)
+            for iid, x in mi.items():
+                fam, v, r = x["expected"]["family_id"], x["expected"]["variant"], x["expected"]["repeat"]
+                if iid in recs:
+                    L[fam][(v, r)] = lcs_at(x["num_atoms"], rels_of(recs[iid]))[0]
+                if iid in J:
+                    JL[fam][(v, r)] = J[iid]
+
+            def matched(Lx):
+                noise, perm = [], []
+                for fam, V in Lx.items():
+                    for v in ("orig", "p1", "p2"):
+                        if (v, "r1") in V and (v, "r2") in V:
+                            noise.append({"group": fam, "lcs": V[(v, "r2")], "lcs_orig": V[(v, "r1")]})
+                    for v in ("p1", "p2"):
+                        for rp, ro in (("r1", "r2"), ("r2", "r1")):
+                            if (v, rp) in V and ("orig", ro) in V:
+                                perm.append({"group": fam, "lcs": V[(v, rp)], "lcs_orig": V[("orig", ro)]})
+                return noise, perm
+            noise, perm = matched(L)
+            out = {"errors": err, "records": len(recs),
+                   "perm": invariance_block(perm, ["lcs"]),
+                   "noise_floor": invariance_block(noise, ["lcs"]),
+                   "equivalence": order_equivalence(perm, noise) if noise and perm else None,
+                   "cluster_perm": cluster_sign(perm, lambda r: r["group"],
+                                                lambda r: r["lcs"] - r["lcs_orig"]) if perm else None}
+            jn, jp = matched(JL)
+            if jn and jp:
+                out["judge_perm"] = invariance_block(jp, ["lcs"])
+                out["judge_noise"] = invariance_block(jn, ["lcs"])
+            res[f"{key}:{arm}"] = out
     # 1d: SummEval
     it = items("summeval")
     base = baselines("summeval")
@@ -953,7 +997,7 @@ def write_macros(ev, path):
         # Phase 2 of the 2026-11-27 review: signed baselines, controls, effect sizes, equivalence.
         def f3(v):
             return "--" if v is None else f"\\ensuremath{{{v:+.3f}}}"
-        for key, kt in (("1a", "Loco"), ("1c", "Cd"), ("1e", "Mt")):
+        for key, kt in (("1a", "Loco"), ("1c", "Cd"), ("1e", "Mt"), ("1f", "Sec"), ("1g", "Lm")):
             e = (c1.get(f"{key}:{arm}") or {}).get("equivalence")
             if e:
                 m(f"{kt}EqDiff{tag}", f3(e["diff"]))
@@ -971,6 +1015,27 @@ def write_macros(ev, path):
                 m(f"{kt}ClPermDec{tag}", cl["decrease"])
                 m(f"{kt}ClPermInc{tag}", cl["increase"])
                 m(f"{kt}ClPermP{tag}", pval(cl["p_sign"]))
+        for key, kt in (("1f", "Sec"), ("1g", "Lm")):
+            z = c1.get(f"{key}:{arm}")
+            if not z:
+                continue
+            m(f"{kt}Records{tag}", z["records"])
+            m(f"{kt}PermInv{tag}", pct(z["perm"]["lcs"]["invariant"]))
+            m(f"{kt}NoiseInv{tag}", pct(z["noise_floor"]["lcs"]["invariant"]))
+            m(f"{kt}PermMean{tag}", f"{z['perm']['lcs']['mean_abs']:.3f}")
+            m(f"{kt}NoiseMean{tag}", f"{z['noise_floor']['lcs']['mean_abs']:.3f}")
+            if z.get("cluster_perm"):
+                m(f"{kt}ClPermDec{tag}", z["cluster_perm"]["decrease"])
+                m(f"{kt}ClPermInc{tag}", z["cluster_perm"]["increase"])
+                m(f"{kt}ClPermN{tag}", z["cluster_perm"]["clusters"])
+                m(f"{kt}ClPermP{tag}", pval(z["cluster_perm"]["p_sign"]))
+            if z.get("judge_perm") and tag == "Gpt":
+                m(f"{kt}JudgePermInv", pct(z["judge_perm"]["lcs"]["invariant"]))
+                m(f"{kt}JudgeNoiseInv", pct(z["judge_noise"]["lcs"]["invariant"]))
+                m(f"{kt}JudgePermDec", pct(z["judge_perm"]["lcs"]["decrease"]))
+                m(f"{kt}JudgeNoiseDec", pct(z["judge_noise"]["lcs"]["decrease"]))
+                m(f"{kt}JudgePermMean", f"{z['judge_perm']['lcs']['mean_abs']:.3f}")
+                m(f"{kt}JudgeNoiseMean", f"{z['judge_noise']['lcs']['mean_abs']:.3f}")
         mt = c1.get(f"1e:{arm}")
         if mt:
             m(f"MtRecords{tag}", mt["records"])

@@ -9,7 +9,7 @@
 
 \begin{table}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{2.6pt}
+\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{@{}lrrr@{}}
 \toprule
 Data ($n$) & $\LCS$ & signed sum & G-Eval \\
@@ -26,8 +26,9 @@ ChatProtect, contra.\ (\extCpAssertNGpt) & \extCpAssertDecGpt\,/\,\extCpAssertIn
 \quad found (\extCpFoundNGpt) & \extCpFoundDecGpt\,/\,\extCpFoundIncGpt & \extCpWsumFoundDecGpt\,/\,\extCpWsumFoundIncGpt & \\
 ChatProtect, consistent (\extCpCtlNGpt) & \extCpCtlDecGpt\,/\,\extCpCtlIncGpt & \extCpWsumCtlDecGpt\,/\,\extCpWsumCtlIncGpt & -- \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Paragraph order}: \% kept within $\tau$ (re-mined unchanged)} \\
-LoCoBench (\extLocoPermNGpt) & \extLocoPermInvGpt{} (\extLocoNoiseInvGpt) & & \extLocoPermInvJudge \\
+\multicolumn{4}{@{}l}{\textit{Paragraph order}: \% kept within $\tau$ (unchanged text again)} \\
+LoCoBench (\extLmEqNPermGpt) & \extLmPermInvGpt{} (\extLmNoiseInvGpt) & & \extLmJudgePermInv{} (\extLmJudgeNoiseInv) \\
+ContraDoc (\extSecEqNPermGpt) & \extSecPermInvGpt{} (\extSecNoiseInvGpt) & & \extSecJudgePermInv{} (\extSecJudgeNoiseInv) \\
 \midrule
 \multicolumn{4}{@{}l}{\textit{Essay quality}: partial $\rho$ with the score, length removed} \\
 ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParWsumAsserted & \asapParJudgeGevalGptSixSol \\
@@ -36,7 +37,7 @@ ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParWsumAsserted & \asapParJu
 \caption{\textbf{$\LCS$ on natural text}, GPT-6 miner, every claim true, beside the signed weight
 sum over the same graphs and the G-Eval judge. ``Contra.'': the added sentence contradicts; ``found'': the
 graph links it by a contradiction. ``Kept'': the share of paragraph permutations that move a score by at most $\tau$;
-in parentheses, the same share when the unchanged text is mined again. The entity graph and
+in parentheses, the same share when the unchanged text is mined, or judged, again in the same run. The entity graph and
 DiscoScore keep 99--100\% of LoCoBench permutations because they barely react to any edit
 (Figure~\ref{fig:ladders}). Ties, intervals and gpt-oss-120b are in App.~\ref{app:external}.}
 \label{tab:external}
@@ -77,11 +78,12 @@ signed sum behaves alike: paired, the two differ only on ContraDoc pairs whose c
 found (\extCdMcFoundOnlyLcsGpt{} pairs where only $\LCS$ falls, \extCdMcFoundOnlySumGpt{} where only the
 sum does; $p=\extCdMcFoundPGpt$). The judge falls too, never rising on ContraDoc.
 
-\paragraph{Order.} Gold-graph $\LCS$ is unchanged by permuting self-contained paragraphs. On
-LoCoBench, mined $\LCS$ stays within $\tau=\sThreeTol$ on \extLocoPermInvGpt\% of permutations
-against \extLocoNoiseInvGpt\% for re-mining, without establishing equivalence; the judge falls on
-\extLocoPermDecJudge\%. The ContraDoc permutations split section headers from their text, which
-confounds the test there (App.~\ref{app:ext-order}).
+\paragraph{Order.} Gold-graph $\LCS$ ignores the order of self-contained paragraphs; mined $\LCS$,
+with each text mined twice in one run, moves slightly more than re-mining on LoCoBench (difference
+in mean change \extLmEqLoGpt{} to \extLmEqHiGpt) and not detectably more on ContraDoc documents
+permuted by section (App.~\ref{app:ext-order}). The judge falls on \extLmJudgePermDec\% and
+\extSecJudgePermDec\% of permutations, against \extLmJudgeNoiseDec\% and \extSecJudgeNoiseDec\% when
+the same text is judged again.
 
 \paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
 \citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
@@ -89,8 +91,7 @@ Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correl
 \asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed
 (\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), the relation count
 \asapParRelations, the signed sum \asapParWsumAsserted{} and G-Eval \asapParJudgeGevalGptSixSol, with no
-difference resolved. A rubric-prompted grader tracks the score better
-(\asapParJudgeRubricGptSixSol), and after length and the grader $\LCS$ keeps \asapPwrLcsAsserted{}
-\asapCI{\asapPwrLcsAssertedLo}{\asapPwrLcsAssertedHi} and the relation count \asapPwrRelations: the
-mined relations carry information the grader does not. One prompt and one miner make this
-indicative (App.~\ref{app:asap}).
+difference resolved. A rubric-prompted grader does better
+(\asapParJudgeRubricGptSixSol), yet after length and the grader $\LCS$ keeps \asapPwrLcsAsserted{}
+\asapCI{\asapPwrLcsAssertedLo}{\asapPwrLcsAssertedHi} and the relation count \asapPwrRelations{}
+(one prompt, one miner; App.~\ref{app:asap}).

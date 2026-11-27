@@ -528,3 +528,25 @@ marker baseline in `arr_slot3_eval.py`. Every existing macro value is unchanged 
 **Still open:** Phase C (rebuild the ContraDoc permutations keeping headers with their sections,
 then re-mine; a matched LoCoBench design; a G-Eval noise floor; a non-sequitur `chain` control; a
 real factuality pipeline's verdicts) and Phase D (the human study).
+
+---
+
+## 11. Changelog (2026-11-28): Phase C, new runs
+
+The main text ends on p. 8; build clean. New data: `data/ext/contradoc-sections`, `data/ext/loco-matched`
+(`scripts/ext_build_matched.py`), `data/ext/loco-nonseq` (`scripts/ext_build_nonseq.py`). New scripts:
+`arr_phasec.py`, `run_claim_verifier.py`, `run_matched_judges*.sh`. New macro files:
+`numbers_verifier.tex`, `numbers_nonseq.tex`; additions to `numbers_ext.tex` (`Sec*`, `Lm*`).
+
+| Item | Run | Result | Where |
+|---|---|---|---|
+| C1: ContraDoc permutations rebuilt (N2) | 129 Wikipedia documents with ≥ 3 headed sections; title and lead fixed, whole sections permuted, headers kept with their sections and not claims; stories excluded; each text mined twice in one run (774 GPT-6 mines) | **The earlier long-document effect disappears.** Permutation 0.060 vs re-mining 0.048, difference [−0.003, +0.030]; no direction (65 falls / 63 rises by document, p = 0.93). The first design's effect came from damaged texts. | §3.2 "Order", Table 2, App. L.3 "Rebuilt permutations" |
+| C2: matched LoCoBench design (N5) | 180 originals and 2 permutations each, each mined twice in one run (1,080 mines) | A small order effect on extraction remains: 0.016 vs 0.009, difference [+0.001, +0.012], mostly downward (87 / 62 families, p = 0.05). Below τ on average, but not equivalent to zero. | §3.2, Table 2, App. L.3, Limitations |
+| C3: G-Eval noise floor | G-Eval (3 runs) on every matched text | The judge's response to reordering is not noise. Kept 29% / 43% of permutations against 68% / 83% re-judged; falls 68% / 56% against 16% / 8%. "Treats reordering as incoherence" now holds on clean permutations. | §3.2, Table 2, App. L.3 |
+| C4: non-sequitur control (N10) | 180 rung-0 responses with an appended inference between two unrelated true claims, plus the originals, mined in one run; pairwise judge with verdicts | **The GPT-6 miner extracts the planted inference in only 2% of responses**, so LCS does not reward it; relevance is enforced by the extractor, not the score. The judge prefers the original on 74%. | App. H, Limitations |
+| C5: real verdicts (N3, N15) | Closed-book verifiers on 3,343 claims: GPT-6 (79% accurate; 99% of false claims caught, 17% UNSURE counted false) and gpt-oss-120b (73%) | At GPT-6 verdicts on gold graphs LCS keeps 93% vs 91% of increases ([+0.6, +2.2]; `conflict` [+1.7, +6.7]); gpt-oss [+1.1, +3.5]. On mined graphs n.s. overall (−1.5 [−3.3, +0.2]): LCS ahead on `conflict`, behind on `chain` and `sign`. This matches the injected-noise pattern. | §3.1, App. H, Limitations |
+
+**Status of the second-review findings after Phase C.** N2 and N5 are resolved with data; N10 is
+partly resolved (the non-sequitur is handled by the extractor; the marker baseline shows the
+`conflict` ladders are surface-solvable); N3 and N15 are resolved (a fallible verifier reproduces
+the injected-noise result). **Still open: Phase D, the human study (M7).**

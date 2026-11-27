@@ -386,8 +386,32 @@ lines, so in its 94 Wikipedia documents every section header (``= = History = ='
 a claim of its own, and a permutation separates headers from their sections and can move the title
 into the middle of the text. Permuted documents are therefore partly degraded, not reordered, and
 both the extra movement of $\LCS$ and the judge's falls may reflect the damage rather than order.
-A rebuilt set that keeps headers with their sections is needed before the ContraDoc order result
-can be read.
+We therefore rebuilt the set (below).
+
+\paragraph{Rebuilt permutations and a matched LoCoBench design.} The rebuilt set keeps the
+\extSecClPermNGpt{} clean Wikipedia documents with at least three headed sections; the title and the
+lead stay first, each header stays with its section and is not a claim, and whole headed sections
+are permuted. Stories are excluded, since their paragraphs are not self-contained. LoCoBench's
+originals and permutations get the same matched design. Each text was mined twice in one run and
+judged twice by G-Eval (three runs each):
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item LoCoBench: $\LCS$ kept within $\tau$ on \extLmPermInvGpt\% of \extLmEqNPermGpt{} permutation
+  comparisons against \extLmNoiseInvGpt\% of \extLmEqNNoiseGpt{} re-mines; mean change
+  $\extLmPermMeanGpt$ against $\extLmNoiseMeanGpt$, difference $\extLmEqDiffGpt$ (90\% interval
+  [\extLmEqLoGpt, \extLmEqHiGpt]); by family, \extLmClPermDecGpt{} falls and \extLmClPermIncGpt{} rises
+  ($p=\extLmClPermPGpt$).
+\item ContraDoc by section: \extSecPermInvGpt\% against \extSecNoiseInvGpt\%; mean change
+  $\extSecPermMeanGpt$ against $\extSecNoiseMeanGpt$, difference $\extSecEqDiffGpt$
+  ([\extSecEqLoGpt, \extSecEqHiGpt]); by document, \extSecClPermDecGpt{} falls and
+  \extSecClPermIncGpt{} rises ($p=\extSecClPermPGpt$).
+\item G-Eval: kept on \extLmJudgePermInv\% and \extSecJudgePermInv\% of permutations against
+  \extLmJudgeNoiseInv\% and \extSecJudgeNoiseInv\% when the unchanged text is judged again; it falls on
+  \extLmJudgePermDec\% and \extSecJudgePermDec\% of permutations against \extLmJudgeNoiseDec\% and
+  \extSecJudgeNoiseDec\% of re-judgements.
+\end{itemize}
+With clean permutations the large ContraDoc effect of the first design disappears: it came from the
+damaged texts. On LoCoBench a small order effect on extraction remains, below $\tau$ on average but
+not equivalent to zero. The judge's response to reordering is not its run-to-run noise.
 
 % Flush the floats of K.1-K.3 before the essay subsection.
 \clearpage
