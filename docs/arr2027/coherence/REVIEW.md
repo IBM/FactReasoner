@@ -550,3 +550,65 @@ The main text ends on p. 8; build clean. New data: `data/ext/contradoc-sections`
 partly resolved (the non-sequitur is handled by the extractor; the marker baseline shows the
 `conflict` ladders are surface-solvable); N3 and N15 are resolved (a fallible verifier reproduces
 the injected-noise result). **Still open: Phase D, the human study (M7).**
+
+---
+
+## 12. Third review (2026-11-28, after Phase C)
+
+Three fresh, independent reviewers on the rebuilt PDF (commit `6ab7535d`), with no access to this
+file, PREREG.md or `.claude/`; plus my own checks. All numbers they checked match the result files.
+
+### Scores
+
+| | Holistic | LoCoBench reviewer | Natural-text reviewer | **Mine** (2nd review → now) |
+|---|---|---|---|---|
+| Soundness | 3 | 3 (3.5–4 if fixed) | 3.5 | 3 → **3** |
+| Excitement | 3 | – | – | 2.5 → **3** |
+| Overall | 3 (Findings) | – | – | 2.5 → **3 (Findings)** |
+| Confidence | 4 | – | – | **4** |
+| Reproducibility | 3 | – | – | **3** |
+
+**Why it rose.** The disclosure is now complete (Table 14), and the order tests are rebuilt with
+noise floors for the miner and the judge. The verdict-noise and verifier analyses give the first
+data-based role for Z. Framing is mostly honest.
+
+**Why it is not higher.**
+- The signed sum still matches LCS wherever it is realistic (mined graphs, real verdicts).
+- The mined score's test-retest reliability is weak.
+- There is no human validation.
+- Three statements that I introduced in Phases B and C overclaim; see N16–N18 below.
+
+### New findings
+
+| # | Severity | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| N16 | **major (my error)** | **The non-sequitur control is confounded.** `ext_build_nonseq.py` appends "That this is so follows from the fact that …" to the end of the conclusion's paragraph, so "this" often refers to a different sentence; the conclusion claim directly precedes it in only about 19 of 180 items. "Relevance is enforced by the extractor" (App. H, Limitations) is unsupported. | LoCo reviewer; I confirmed the builder logic | me |
+| N17 | **major (my error)** | **The order equivalence bootstrap is unpaired.** `mean_abs_diff_ci` resamples the permutation and noise groups independently, although they share documents. Paired, ContraDoc sections give +0.0125 [+0.004, +0.023], so "not detectably more on ContraDoc" (§3.2, App. L.3) is wrong. The order effect on extraction is real on both datasets, about 0.07 SD for LCS against about 0.8 SD for G-Eval. | natural-text reviewer | rev |
+| N18 | **major (my error)** | **"Robust to wrong verdicts" is overclaimed** (abstract, Conclusion). It holds on gold graphs only. On GPT-6-mined graphs with the GPT-6 verifier the difference is [−3.3, +0.2], LCS is worse on `chain` and `sign`, and the injected-noise gain is entirely on `conflict`. Limitations still also says the effect of verdict errors "is not measured". | both evaluation reviewers | me |
+| N19 | major | **Reliability.** Mined LCS keeps 52% of invariances (Inv_τ 70%); re-mining an unchanged ContraDoc text moves LCS by more than τ on 64%. Test-retest ICC is 0.84 for LCS against 0.96 for the judge on ContraDoc sections (0.99 vs 0.91 on LoCoBench). The pairwise judge trails by +3.5 on increases but leads by 39 points on invariances, and the abstract does not say the latter. | all three | rev |
+| N20 | major | **The McNemar sentence in §3.2 is inconsistent and unadjusted.** It says the two "differ only on ContraDoc found pairs", but ChatProtect gives 50 vs 5. The new-claim (u₀) artefact likely explains ContraDoc too, and p = 0.04 is one of about six tests (fails Holm). | natural-text reviewer | rev |
+| N21 | major | **Surface cues solve two of three increasing types.** Markers solve `conflict` (177/180) and length solves `chain` (163/180), so only `sign` needs verdicts. Judges' `chain` behaviour may reflect a redundancy penalty, not missed inferences. | LoCo reviewer | rev |
+| N22 | major | **The guarantee's coverage is low for weaker miners** (ordered as declared: GPT-6 393/540, gpt-oss 120, pairwise 38, Llama 11/108). The Llama comparison mixes capability with vendor and uses mismatched denominators (69% subset vs 97% full; GPT-6 on the same subset is 95%). | LoCo reviewer | rev |
+| N23 | major | **ASAP "beyond the grader".** The rubric grader is compressed (no 6; 59 fours), so a tied covariate leaves residual variation; the relation count also keeps +0.25. No CIs for LCS vs relation count or vs grader. | natural-text reviewer | rev |
+| N24 | major | **Verdict polarity still has almost no natural-text support** (H2a′ fails; ChatProtect 64 pairs n.s.; ASAP strict hurts); the paired ContraDoc design was never run. | natural-text and holistic reviewers | rev |
+| N25 | major | **No cross-response validation** with different claim sets against human judgments (W4); no human check of the declared orders (W6). | holistic reviewer | rev |
+| N26 | minor | The main text omits that H1a, H1c and H2a′ failed and that gpt-oss does not reproduce ChatProtect or order. H1d is "held" on the point estimate though its CI crosses ±0.1. A 90% interval is shown without its level. "54%" is insertion recall only (25% overall). The Fig. 8 panel (b) and caption use the old order design. τ is not defined in the main text. Fig. 2 labels print at about 5.7 pt. Crossley 2025 is incomplete. The Responsible NLP checklist is not visible. | all | rev |
+
+### Fix plan (text and cheap re-analysis; no new runs except E)
+
+- **A. Correct my three overclaims (N16–N18).**
+  - Remove "relevance is enforced by the extractor".
+  - Replace "not detectably more on ContraDoc" with the paired result, and make `mean_abs_diff_ci` paired.
+  - Limit "robust to wrong verdicts" to gold graphs and report the mined/verifier null in the main text.
+  - Remove the contradictory Limitations sentence.
+- **B. Reliability (N19).** Add test-retest ICC by document length, the abstract's judge invariance (91% vs 52%), and Inv_τ in the main text.
+- **C. Statistics (N20, N26).** Holm-adjust the McNemar family and restate it; label the 90% interval; give overall recall; mark H1d as point-estimate only; update Fig. 8b to the matched design.
+- **D. Framing (N21, N22).**
+  - Per-type surface-cue results in §3.1.
+  - Coverage of the guarantee per arm.
+  - Llama on matched denominators, with a CI.
+- **E. Re-runs.**
+  - The non-sequitur control with an explicit conclusion ("That <conclusion> follows from the fact that <premise>"), plus a positive control with a relevant pair.
+  - The paired ContraDoc verdict-world design (N24).
+  - A finer ASAP grader (expected score from log-probabilities) (N23).
+- **F. The human study** (N25, N21, M7), designed in `HUMAN_STUDY.md`.
