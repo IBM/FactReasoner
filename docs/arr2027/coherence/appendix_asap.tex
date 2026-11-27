@@ -123,17 +123,58 @@ what the partial correlation of Table~\ref{tab:asap-corr} measures.}
 \label{fig:asap}
 \end{figure*}
 
+\paragraph{Why length matters.} Length is the classic confound of essay scoring. Stronger students
+write more, and the rubric rewards developed arguments, which take words, so word count alone
+correlates with the score at \asapRhoWords. $\LCS$ grows with length too, for mechanical reasons:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item a longer essay has more claims (their number correlates with the score at
+  \asapRhoClaims), so the miner has more pairs to link and finds more relations;
+\item with every claim true, every relation it finds is a support unless it is a conflict, and
+  conflicts are rare (\asapConfAsserted{} in all \asapEssays{} essays);
+\item each support adds a positive term to $\Lambda$ (Lemma~\ref{lem:edit}), so more relations push
+  $\Lambda$, and with it $\LCS$, upwards.
+\end{itemize}
+A long but mediocre essay can therefore outscore a short, tight one simply because it contains more
+linked claims, and a raw correlation between $\LCS$ and the score cannot tell whether $\LCS$ tracks
+quality or only the amount of text. We ask a narrower question instead: among essays of similar
+length, do the higher-scored ones have higher $\LCS$?
+
+\paragraph{Removing length: partial rank correlation.} Let $r(\cdot)$ map a variable to its ranks
+over the $n=\asapEssays$ essays, with ties given their average rank. For a metric $m$ (here $\LCS$),
+the human score $s$ and the word count $w$, we fit $r(m)$ and $r(s)$ separately by least squares on
+$r(w)$ and an intercept, and keep the residuals
+\[
+  e_x = r(x) - \bigl(\hat a_x + \hat b_x\, r(w)\bigr), \qquad x\in\{m,s\},
+\]
+the part of each ranking that a linear function of the length ranking does not explain. The
+partial correlation after length is the Pearson correlation of the two residuals,
+$\rho_{ms\cdot w}=\operatorname{corr}(e_m,e_s)$: it is positive when, at a given length, the
+essays ranked higher by $m$ are also ranked higher by the raters. To remove the G-Eval judge as
+well, the regression has two predictors, $r(w)$ and the rank of the judge's score. Panel (c) of
+Figure~\ref{fig:asap} plots $e_m$, as a share of $n$, against the score. The 95\% intervals are
+percentile bootstraps over 2{,}000 resamples of essays, drawn with replacement within each score
+level so that every resample keeps \asapPerLevel{} essays per level; each resample recomputes the
+ranks, the regressions and the correlation. Two features of the method bear on how to read the
+result:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{It is conservative.} Part of why good essays are long is that they argue more, so
+  removing length also removes some genuine quality signal.
+\item \textbf{It removes only the rank-linear part of the length effect.} A dependence on length
+  that is not monotone, or that interacts with the score, can survive it. The within-tertile
+  correlations below are a check that does not assume linearity.
+\end{itemize}
+
 \paragraph{Findings.} Table~\ref{tab:asap-corr} gives the correlations, Table~\ref{tab:asap-levels}
 the levels and Figure~\ref{fig:asap} the essays.
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item \textbf{Most of the association runs through length.} With every claim true, $\LCS$ rises
   with the score ($\rho=\asapRhoLcsAsserted$), but word count alone does slightly better
-  ($\asapRhoWords$). Longer essays make more claims, and more claims allow more supports. Once
-  length is removed, $\asapParLcsAsserted$ remains, and $\asapPwjLcsAsserted$ remains once the
+  ($\asapRhoWords$). Once length is removed, $\asapParLcsAsserted$ remains, and $\asapPwjLcsAsserted$ remains once the
   G-Eval judge is removed as well. Within thirds of the length range, $\LCS$ still orders essays
   by score ($\asapTertShortRhoLcsAsserted$, $\asapTertMediumRhoLcsAsserted$,
   $\asapTertLongRhoLcsAsserted$ for short, medium and long essays). Removing length means
-  removing much of what the raters reward, so the partial correlations are conservative.
+  removing much of what the raters reward, so the partial correlations are conservative. The
+  number of claims carries nothing beyond length ($\asapParClaims$).
 \item \textbf{The signal is support density, not conflict.} The count of mined relations carries
   most of the same signal ($\asapParRelations$ after length), and so does $\Lambda$ per claim
   ($\asapParLpcAsserted$). Conflicts carry none: with every claim true the miner finds
