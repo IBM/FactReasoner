@@ -9,7 +9,7 @@ argument's relations. $\LCS$, the weight of evidence that the coherence MRF lend
 world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
 committed world as the readout (App.~\ref{app:why}). On LoCoBench's mined graphs $\LCS$ falls only
-on pairs the miner reversed or left incomparable, while LLM judges miss added inferences; a signed
+on pairs the miner reversed or left incomparable, while LLM judges rating single responses miss added inferences; a signed
 sum of relation weights does as well on these ladders. On natural text the score is related to but
 not a proxy for rated discourse coherence, falls under detected contradictions more often than the
 signed sum, and tracks essay quality beyond length. What limits $\LCS$ is
@@ -25,16 +25,19 @@ are the committee's reading of each response, not human annotations. The ladders
 a sample of how real responses argue: rungs differ in one or two spliced sentences with explicit
 markers, and claims are given rather than extracted. The committee and the miners share vendors, and
 explicit markers favour any extractor that reads connectives, so mined-graph results on LoCoBench
-are optimistic, an upper bound on extraction from natural text.
+are optimistic, an upper bound on extraction from natural text. A graph-level miner from outside
+those vendors (Llama-3.3-70B, on \subLadders{} ladders) reaches a pair-level F1 of \subLlamaPairF{}
+against \subGptPairF{} for GPT-6, and $\LCS$ on its graphs falls on \subLlamaLcsFalls\% of the
+increases.
 
 \paragraph{External evaluation.} The natural-text datasets carry human labels (rated coherence,
 contradictions, discourse and argument relations, essay scores), but none rates the logical
 coherence of a response, so agreement with human judgements of logical coherence remains to be
 established, and no human study checks that people rank LoCoBench's rungs as declared. Every
 natural-text test reads the asserted world, so the verdict polarity is tested only on LoCoBench.
-$\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The order
-check depends on the tolerance $\tau=\sThreeTol$ of \S\ref{sec:exp-external}, and its noise floor
-comes from a separate mining run. The essays come from one prompt, sampled uniformly over score
+$\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The score is
+order-free, but on long documents its extraction is not: permuting paragraphs changes what the
+miner finds. The essays come from one prompt, sampled uniformly over score
 levels, and were mined with one model.
 
 \paragraph{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a

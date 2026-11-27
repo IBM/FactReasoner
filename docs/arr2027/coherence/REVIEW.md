@@ -368,3 +368,34 @@ The main text still ends on p. 8. Build: 0 errors, 0 undefined references, 0 ove
 5. A non-OpenAI miner.
 6. A natural-text verdict-world arm.
 7. An ASAP rubric grader.
+
+---
+
+## 7. Changelog (2026-11-27): Phase 3, targeted runs
+
+Main text still ends on p. 8; build clean. New result files: `numbers_zstress.tex`,
+`numbers_fairjudge.tex`, `numbers_subset.tex`, plus additions to `numbers_ext.tex` and
+`asap_numbers.tex`.
+
+| Phase 3 item | Run | Result | Where in the paper |
+|---|---|---|---|
+| 3.1 Where Z matters | `scripts/arr_z_stress.py`, 1,192 gold graphs, no LLM | LCS satisfies three principles on every graph: presentation invariance (eqv vs two ents; exc vs con+cnc), repetition (three distinct inferences > one repeated three times; 0.76 vs 0.27 nats), premise doubt (an inference from a contested premise counts less; 0.18 vs 0.26). The signed sum fails or ties all of them, by construction. | §3.1 "A signed sum does as well"; App. H "Where Z matters" |
+| 3.2 Fair judges | `scripts/run_fair_judges.py`, GPT-6, about 9.3k calls | **The pairwise judge given claims, verdicts and our definition prefers the declared rung on 94% of increases (`chain` 84%) and keeps 91% of invariances**, close to LCS on GPT-6 graphs (97% / 52%). The absolute judge with verdicts stays near chance on `chain` (42/49/89). The pairwise judge without verdicts prefers fewer inferences on `chain` (53/78/49). | Abstract, intro, §3.1 judges paragraph, Fig. 2 (two new rows replace the gpt-oss judges), App. D prompts, App. H counts |
+| 3.3 Response-grounded NLI | not run (about 93k calls) | The vacuous rows were dropped and explained (Phase 2). | App. D |
+| 3.4 Matched re-mining | ContraDoc, 900 documents mined in one interleaved run | Re-mining is balanced (153/165, p = 0.54), so the earlier drift was a separate-run artefact. **Permutation moves the mined score more than re-mining on long documents** (0.072 vs 0.052; difference +0.020, 90% CI [+0.006, +0.034]; upward 260/190). | §3.2 order paragraph renamed "within the noise on short responses, not on long documents"; intro; Limitations; App. L.3 "Matched design"; Table 2 row |
+| 3.5 Non-committee miner | Llama-3.3-70B graph-level on 48 families (240 responses, 36 increasing ladders); the full split is too slow (about 8 min per response) | **Pair-level F1 0.72 vs 0.97 for GPT-6 on the same ladders**; LCS rises on 69% of increases and falls on 31% (GPT-6: 95% / 4%); every fall is on an incomparable (31) or reversed (2) pair. GPT-6's extraction on LoCoBench is likely helped by sharing vendors with the committee. | Limitations "Data"; App. H |
+| 3.6 Natural-text verdict world | ChatProtect pairs with annotated false sides (existing records) | **On the 14 found contradictions that involve a false sentence, LCS rises on all 14 at the real verdicts and falls on all 14 at the asserted world.** | §3.2 opening |
+| 3.7 ASAP rubric grader | GPT-6 with the holistic rubric, three runs | The grader beats LCS (partial after length 0.61 vs 0.50), but LCS keeps **+0.38 [0.23, 0.52]** after length and the grader (signed sum 0.28). | §3.2 essays; App. L.4 |
+
+**What changed in the argument.**
+- The judge comparison no longer supports "LLM judges miss added inferences" in general, only for judges rating one response at a time. A head-to-head judge with the construct spelled out is the strongest competitor in the paper. LCS's case against it is an absolute per-response score, a guarantee and attribution, not accuracy on the ladders.
+- The order property holds for short responses only.
+- The verdict polarity now has natural-text evidence, although n = 14.
+- Mined-graph results on LoCoBench are an upper bound: a non-committee miner extracts far less well.
+
+**Still open after Phase 3.**
+- Phase 4: the human study (M7).
+- Decision 2: `results/ext/PREREG.md` in any release (M13).
+- Response-grounded NLI (3.3), not run because of cost.
+- Bibliography details (m9).
+- Notation and spelling items (m7).

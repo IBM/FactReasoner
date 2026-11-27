@@ -67,8 +67,8 @@ ROWS = [
     ("header", "Baselines (read the text)", None),
     ("base:judge_geval@gpt-6-sol", "LLM judge, G-Eval, GPT-6", "other"),
     ("base:judge_direct@gpt-6-sol", "LLM judge, 1–5 rating, GPT-6", "other"),
-    ("base:judge_geval@gpt-oss-120b", "LLM judge, G-Eval, gpt-oss-120b", "other"),
-    ("base:judge_direct@gpt-oss-120b", "LLM judge, 1–5 rating, gpt-oss-120b", "other"),
+    ("fair:absolute__gpt-6-sol", "LLM judge, 1–5 rating with verdicts, GPT-6", "other"),
+    ("fair:pairwise_verdicts__gpt-6-sol", "LLM judge, pairwise with verdicts, GPT-6", "other"),
     ("base:discourse_rc", "DiscoScore RC", "other"),
     ("base:discourse_lc", "DiscoScore LC", "other"),
     ("base:discourse_entity_graph", "entity graph (DiscoScore)", "other"),
@@ -123,6 +123,8 @@ def rows_for(d, key, group):
     if src == "arm":
         arm, ro = rest
         rows = d["pairs"].get(arm, {}).get(ro, [])
+    elif src == "fair":  # the fairer judges (scripts/run_fair_judges.py eval)
+        rows = d.get("fair_pairs", {}).get(rest[0], [])
     else:
         rows = d["pairs_baseline"].get(rest[0], [])
     inc = ("CONFLICT", "CHAIN", "SIGN")
@@ -139,7 +141,7 @@ def fig_ladders(d, out):
     rows = [(k, partial(d, k.split(":")[1], lab) if k.startswith("arm:") else lab, kind)
             for k, lab, kind in ROWS]
     n = len(rows)
-    fig, axes = plt.subplots(1, 3, figsize=(7.0, 0.165 * n + 0.8), sharey=True,
+    fig, axes = plt.subplots(1, 3, figsize=(6.3, 0.165 * n + 0.8), sharey=True,
                              gridspec_kw={"wspace": 0.10, "width_ratios": [1.0, 0.62, 1.0]})
     panels = [("inc", "ok", "Declared increases: score rises (%)"),
               ("inc", "falls", "… score falls (%)"),
@@ -163,7 +165,7 @@ def fig_ladders(d, out):
             if True:  # every point carries its value, in every panel
                 span = 62 if okkey == "falls" else 100
                 ax.text(hi + 0.02 * span, y, f"{p:.0f}", va="center", ha="left",
-                        fontsize=6.5, color=INK2)
+                        fontsize=6.8, color=INK2)
         if okkey == "falls":
             ax.set_xlim(-1.2, 62)
             ax.set_xticks([0, 25, 50])
@@ -295,6 +297,9 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     d = json.load(open(args.json))
+    fair = os.path.join(os.path.dirname(args.json), "fair_judges", "eval.json")
+    if os.path.exists(fair):
+        d["fair_pairs"] = json.load(open(fair))["pairs"]
     os.makedirs(args.out, exist_ok=True)
     fig_ladders(d, args.out)
     fig_dominance(d, args.out)

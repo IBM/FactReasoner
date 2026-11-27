@@ -28,7 +28,7 @@ ChatProtect, consistent (\extCpCtlNGpt) & \extCpCtlDecGpt\,/\,\extCpCtlIncGpt & 
 \midrule
 \multicolumn{4}{@{}l}{\textit{Paragraph order}: \% kept within $\tau$ (re-mined unchanged)} \\
 LoCoBench (\extLocoPermNGpt) & \extLocoPermInvGpt{} (\extLocoNoiseInvGpt) & & \extLocoPermInvJudge \\
-ContraDoc (\extCdPermNGpt) & \extCdPermInvGpt{} (\extCdNoiseInvGpt) & & \extCdPermInvJudge \\
+ContraDoc, matched (\extMtEqNPermGpt) & \extMtPermInvGpt{} (\extMtNoiseInvGpt) & & \extCdPermInvJudge \\
 \midrule
 \multicolumn{4}{@{}l}{\textit{Essay quality}: partial $\rho$ with the score, length removed} \\
 ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParWsumAsserted & \asapParJudgeGevalGptSixSol \\
@@ -43,55 +43,54 @@ DiscoScore keep 87--100\% of permutations because they barely react to any edit
 \label{tab:external}
 \end{table}
 
-LoCoBench is synthetic, and no corpus rates the logical coherence of a response, so we test four
-properties of $\LCS$ on natural text labelled for related properties (Table~\ref{tab:external}).
-Claims are sentences (atomized claims for the essays), relations come from the GPT-6 graph-level
-miner, and, since these datasets give no per-claim verdicts, $\LCS$ is read at the asserted world,
-where every inference is a support and every contradiction a conflict. These tests therefore
-exercise how the score combines mined relations, not the verdict polarity. Brackets give 95\%
-bootstrap intervals; App.~\ref{app:external} has the rest, including an inconclusive
-verdict-world test.
+LoCoBench is synthetic and no corpus rates logical coherence, so we test four properties of $\LCS$
+on natural text labelled for related properties (Table~\ref{tab:external}). Claims are sentences
+(atomized claims for the essays), relations come from the GPT-6 graph-level miner, and, since
+these datasets give no per-claim verdicts, $\LCS$ is read at the asserted world, where every
+inference is a support and every contradiction a conflict; brackets give 95\% bootstrap intervals
+(App.~\ref{app:external}). Where ChatProtect records which sentence is false, a found
+contradiction refutes it, and $\LCS$ rises on all \extCpVwFoundNGpt{} such pairs at the real
+verdicts, against falls on all \extCpVwFoundAssertNGpt{} at the asserted world.
 
 \paragraph{Related to, but not a proxy for, discourse coherence.} $\LCS$ reads only the relations
 that constrain truth values (App.~\ref{sec:notions}). On SummEval \citep{summeval} it correlates
 with expert coherence ratings at $\extSeRhoCohGpt$ \asapCI{\extSeRhoCohGptLo}{\extSeRhoCohGptHi},
 against $\extSeJudgeRhoCoh$ for G-Eval, but the test is weak: \extSeEmptyGpt\% of these
-three-sentence summaries have no relation and score $\frac12$. On the rest, the two kinds of
-support pull apart (exploratory): without restatements $\LCS$ correlates at
-$\extSeNoRestateNonEmptyRhoCohGpt$ \asapCI{\extSeNoRestateNonEmptyRhoCohGptLo}{\extSeNoRestateNonEmptyRhoCohGptHi},
-as related notions should, while the number of restatements correlates at
-$\extSeCountRestateRhoCohGpt$: restating a claim is consistent, so $\LCS$ counts it as support,
-but raters penalize the redundancy. $\LCS$ thus rewards repetition, a limitation.
+three-sentence summaries have no relation. On the rest (exploratory), without restatements $\LCS$
+correlates at $\extSeNoRestateNonEmptyRhoCohGpt$
+\asapCI{\extSeNoRestateNonEmptyRhoCohGptLo}{\extSeNoRestateNonEmptyRhoCohGptHi}, while the number
+of restatements correlates at $\extSeCountRestateRhoCohGpt$: a restatement is consistent, so $\LCS$
+counts it as support, but raters penalize the redundancy. $\LCS$ thus rewards repetition.
 
 \paragraph{Detected conflicts lower the score.} With every claim true, adding a contradiction
 lowers $\Lambda$ (Lemma~\ref{lem:edit}), so where the miner finds one the fall checks the lemma:
 $\LCS$ falls on \extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs
 \citep{contradoc} and on all \extCpFoundFallGpt{} ChatProtect pairs \citep{mundler2024} (median
 change $\extCdEffFoundMedianGpt$ and $\extCpEffFoundMedianGpt$). Over all pairs it falls far more
-often than it rises (sign tests, $p<\extCdAssertPGpt$ and $p<\extCpAssertPGpt$), while adding a
-sentence that does not contradict the first raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{}
-falls). Missed contradictions barely move it (median $\extCdEffNotFoundMedianGpt$), so recall bounds
-the result: the miner finds \extCdRecallInsertGpt\% of ContraDoc's inserted contradictions and
-\extCpConfStrongGpt\% of ChatProtect's, with false alarms in \extCdFpGpt\% of clean documents. The
-signed sum falls less often than $\LCS$ (Table~\ref{tab:external}). The judge falls too, so
-detecting contradictions alone does not separate $\LCS$ from a judge; order and LoCoBench do.
+often than it rises (sign tests, $p<\extCdAssertPGpt$ and $p<\extCpAssertPGpt$), and adding a
+consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
+contradictions barely move it, so recall bounds the result: the miner finds
+\extCdRecallInsertGpt\% of ContraDoc's and \extCpConfStrongGpt\% of ChatProtect's contradictions.
+The signed sum falls less often than $\LCS$. The judge falls too, so detection alone does not
+separate $\LCS$ from a judge.
 
-\paragraph{Order moves the score about as much as re-mining.} Permuting self-contained paragraphs
-leaves the claims, relations and committed world unchanged, so gold-graph $\LCS$ is identical under
-permutation; a mined score also carries sampling noise. On LoCoBench, $\LCS$ stays within
-$\tau=\sThreeTol$ on \extLocoPermInvGpt\% of permutations against \extLocoNoiseInvGpt\% for
-re-mining the unchanged text, a difference in mean change of $\extLocoEqDiffGpt$ (90\% interval
-up to \extLocoEqHiGpt), so equivalence within $\tau$ is narrowly not established. On ContraDoc's
-long documents re-mining itself keeps only \extCdNoiseInvGpt\% and drifts upwards, so the test has
-little power (App.~\ref{app:ext-order}). The judge falls on \extLocoPermDecJudge\% and
-\extCdPermDecJudge\% of the permutations, as if reordering were incoherence.
+\paragraph{Order: within the noise on short responses, not on long documents.} Permuting
+self-contained paragraphs changes neither claims, relations nor committed world, so gold-graph
+$\LCS$ is unchanged. On LoCoBench, mined $\LCS$ stays within $\tau=\sThreeTol$ on
+\extLocoPermInvGpt\% of permutations against \extLocoNoiseInvGpt\% for re-mining the unchanged text.
+On ContraDoc's long documents, mined twice per text in one run, permutation moves the score more
+than re-mining ($\extMtPermMeanGpt$ against $\extMtNoiseMeanGpt$; 90\% interval of the difference
+\extMtEqLoGpt{} to \extMtEqHiGpt): the miner extracts different relations from a reordered long
+text (App.~\ref{app:ext-order}). The judge falls on \extLocoPermDecJudge\% and \extCdPermDecJudge\%
+of the permutations, as if reordering were incoherence.
 
 \paragraph{Essay quality beyond length.} As a convergent-validity probe, we score \asapEssays{}
-persuasive essays from ASAP~2.0 \citep{crossley2025asap}, rated 1--6 by trained raters, with the full
-pipeline from claim extraction to mining. Length correlates with the score at \asapRhoWords.
-$\LCS$ keeps a partial correlation of \asapParLcsAsserted{}
-\asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed (\asapRobCubic{} to
-\asapRobBinsSix{} with nonlinear controls), against \asapParJudgeGevalGptSixSol{} for G-Eval and
-\asapParWsumAsserted{} for the signed sum. Argumentative connectives carry nothing beyond length
-(\asapParConnectives), and $\LCS$ keeps \asapRobWordsConnectives{} when they are removed too. One prompt
-and one miner make the result indicative (App.~\ref{app:asap}).
+ASAP~2.0 essays \citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
+Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correlation of
+\asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed
+(\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), against \asapParJudgeGevalGptSixSol{}
+for G-Eval and \asapParWsumAsserted{} for the signed sum. A rubric-prompted grader tracks the score
+better (\asapParJudgeRubricGptSixSol), but $\LCS$ keeps \asapPwrLcsAsserted{}
+\asapCI{\asapPwrLcsAssertedLo}{\asapPwrLcsAssertedHi} once both length and the grader are removed,
+and argumentative connectives carry nothing beyond length (\asapParConnectives). One prompt and
+one miner make this indicative (App.~\ref{app:asap}).

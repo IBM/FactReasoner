@@ -1,0 +1,606 @@
+{
+  "config": {
+    "data_dir": "results/arr2027_slot3_test/data",
+    "output_dir": "results/arr2027_slot3_test/arms/graph_llama",
+    "merlin_path": "/Users/radu/git/merlin/build_boost192/merlin",
+    "arms": [
+      "mined:llama-3.3-70b-instruct:graph:k5-tv2"
+    ],
+    "mined_arms": {
+      "mined:llama-3.3-70b-instruct:graph:k5-tv2": {
+        "model": "llama-3.3-70b-instruct",
+        "pair_policy": "graph"
+      }
+    },
+    "models": {
+      "llama-3.3-70b-instruct": {
+        "name": "llama-3.3-70b-instruct",
+        "model_id": "meta-llama/llama-3-3-70b-instruct",
+        "backend": "rits",
+        "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct"
+      }
+    },
+    "methods": [
+      "mean_marginal",
+      "consistency",
+      "reified",
+      "log_partition"
+    ],
+    "graded_readouts": [
+      "mean_marginal",
+      "consistency",
+      "log_partition"
+    ],
+    "concession_discount": 0.45,
+    "reified_prior": 0.5,
+    "ibound": 6,
+    "item_ids": [
+      "locobench-slot3-test-f055-t0"
+    ],
+    "window": 4,
+    "gate": "none",
+    "nli_method": "auto",
+    "strength_method": "auto",
+    "strength_samples": 8,
+    "max_concurrency": 16,
+    "max_call_error_rate": 0.02,
+    "resume": true,
+    "run_config_fingerprint": "b49abf1af0b5"
+  },
+  "dataset": {
+    "name": "data",
+    "num_items": 1,
+    "num_atoms": 14,
+    "num_atoms_factual": 12,
+    "num_atoms_not_factual": 2,
+    "senses": {
+      "Precedence": 2,
+      "Restatement": 1,
+      "Evidence": 2,
+      "Refutation": 1,
+      "Alternative": 1,
+      "Cause-Effect": 1
+    },
+    "couplings": {
+      "none": 2,
+      "equivalence": 1,
+      "entailment": 3,
+      "contradiction": 1,
+      "exclusive": 1
+    },
+    "validity": {
+      "None": 8
+    },
+    "error_kinds": {}
+  },
+  "records": [
+    {
+      "item_id": "locobench-slot3-test-f055-t0",
+      "item_name": "Geology -- ORDER r0",
+      "arm": "mined:llama-3.3-70b-instruct:graph:k5-tv2",
+      "relation_source": "mined",
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "graph",
+      "family_id": "f055",
+      "family": null,
+      "rung_index": null,
+      "rung_name": null,
+      "perturbation": null,
+      "num_atoms": 14,
+      "num_gold_relations": 8,
+      "model_id": "meta-llama/llama-3-3-70b-instruct",
+      "backend": "rits",
+      "base_url": "https://inference-3scale-apicast-production.apps.rits.fmaas.res.ibm.com/llama-3-3-70b-instruct",
+      "nli_method": "vote_share",
+      "strength_method": "vote_band",
+      "strength_model": null,
+      "strategy": "k5-tv2",
+      "graph_mode": "graph",
+      "graph_k": 5,
+      "candidate_arm": null,
+      "num_pairs_scored": null,
+      "num_llm_calls": 9,
+      "num_call_exceptions": 0,
+      "graph_samples": 3,
+      "graph_fresh_usage": {
+        "prompt_tokens": 14499,
+        "completion_tokens": 18908,
+        "reasoning_tokens": 0
+      },
+      "graph_used_usage": {
+        "prompt_tokens": 4833,
+        "completion_tokens": 4828
+      },
+      "graph_vote": [
+        {
+          "source_id": "a0",
+          "target_id": "a3",
+          "sense": "Restatement",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a0",
+          "target_id": "a10",
+          "sense": "Evidence",
+          "vote_share": 0.6666666666666666,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a1",
+          "target_id": "a0",
+          "sense": "Evidence",
+          "vote_share": 0.6666666666666666,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a4",
+          "target_id": "a10",
+          "sense": "Evidence",
+          "vote_share": 0.6666666666666666,
+          "label_share": 1.0,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a7",
+          "target_id": "a8",
+          "sense": "Refutation",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        },
+        {
+          "source_id": "a8",
+          "target_id": "a9",
+          "sense": "Evidence",
+          "vote_share": 0.6666666666666666,
+          "label_share": 0.5,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a10",
+          "target_id": "a11",
+          "sense": "Refutation",
+          "vote_share": 1.0,
+          "label_share": 0.6666666666666666,
+          "band": "moderate",
+          "resolved": false
+        },
+        {
+          "source_id": "a12",
+          "target_id": "a13",
+          "sense": "Cause-Effect",
+          "vote_share": 1.0,
+          "label_share": 1.0,
+          "band": "strong",
+          "resolved": false
+        }
+      ],
+      "call_error_rate": 0.0,
+      "num_relations": 8,
+      "coverage": {
+        "policy": "graph",
+        "pairs_scored": null,
+        "llm_calls": 9,
+        "llm_call_errors": 0,
+        "graph_samples": 3,
+        "graph_samples_cached": 2,
+        "graph_samples_fresh": 1,
+        "graph_parse_failures": 8,
+        "graph_failed_samples": 2,
+        "graph_fresh_usage": {
+          "prompt_tokens": 14499,
+          "completion_tokens": 18908,
+          "reasoning_tokens": 0
+        },
+        "graph_used_usage": {
+          "prompt_tokens": 4833,
+          "completion_tokens": 4828
+        },
+        "graph_edges_voted": 8,
+        "graph_raw_edges_per_sample": [
+          10,
+          15,
+          13
+        ],
+        "num_candidates": null,
+        "relations_kept": 8,
+        "gold_weighted_edges": 0
+      },
+      "miner_config": {
+        "relation_source": "graph_miner",
+        "nli_method": "vote_share",
+        "strength_method": "vote_band",
+        "prior": 0.5,
+        "prior_source": "per_atom",
+        "concession_discount": 0.45,
+        "k": 5,
+        "weighting": "vote_band",
+        "strength_model": null,
+        "taxonomy": "v2",
+        "graph_mode": "graph",
+        "pair_policy": "graph"
+      },
+      "node_priors": {
+        "a0": 0.9,
+        "a1": 0.9,
+        "a2": 0.9,
+        "a3": 0.1,
+        "a4": 0.9,
+        "a5": 0.9,
+        "a6": 0.9,
+        "a7": 0.9,
+        "a8": 0.1,
+        "a9": 0.9,
+        "a10": 0.9,
+        "a11": 0.9,
+        "a12": 0.9,
+        "a13": 0.9
+      },
+      "relations": [
+        {
+          "source": "a0",
+          "target": "a3",
+          "type": "equivalence",
+          "sense": "Restatement",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a0",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.6166666666666667,
+          "strength": 0.925,
+          "type_confidence": 0.6666666666666666,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a1",
+          "target": "a0",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.48,
+          "strength": 0.72,
+          "type_confidence": 0.6666666666666666,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a4",
+          "target": "a10",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.48,
+          "strength": 0.72,
+          "type_confidence": 0.6666666666666666,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a7",
+          "target": "a8",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a8",
+          "target": "a9",
+          "type": "entailment",
+          "sense": "Evidence",
+          "probability": 0.48,
+          "strength": 0.72,
+          "type_confidence": 0.6666666666666666,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a10",
+          "target": "a11",
+          "type": "contradiction",
+          "sense": "Refutation",
+          "probability": 0.72,
+          "strength": 0.72,
+          "type_confidence": 1.0,
+          "directed": false,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        },
+        {
+          "source": "a12",
+          "target": "a13",
+          "type": "entailment",
+          "sense": "Cause-Effect",
+          "probability": 0.925,
+          "strength": 0.925,
+          "type_confidence": 1.0,
+          "directed": true,
+          "concession_resolved": false,
+          "resolving_atom_id": null,
+          "evidence_span": null
+        }
+      ],
+      "lcs": {
+        "mean_marginal": 0.7836137857142857,
+        "consistency": 0.4423793752133105,
+        "reified": 0.201089,
+        "log_partition": 0.6211750252343862
+      },
+      "diagnostics": {
+        "marginals": {
+          "a0": 0.649309,
+          "a1": 0.898794,
+          "a10": 0.878699,
+          "a11": 0.792603,
+          "a12": 0.937965,
+          "a13": 0.985422,
+          "a2": 0.9,
+          "a3": 0.378513,
+          "a4": 0.89714,
+          "a5": 0.9,
+          "a6": 0.9,
+          "a7": 0.938135,
+          "a8": 0.014118,
+          "a9": 0.899895
+        },
+        "num_below_prior": 7,
+        "avg_norm_entropy": 0.4911021726334262,
+        "log_z": -5.698024,
+        "log_z_max": -4.401716,
+        "log_z_min": -7.823634
+      },
+      "comparison": {
+        "gold_edges_total": 8,
+        "gold_edges_scorable": 6,
+        "mined_edges_total": 8,
+        "pair": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 1,
+          "precision": 0.625,
+          "recall": 0.8333333333333334,
+          "f1": 0.7142857142857143
+        },
+        "coupling": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 2,
+          "precision": 0.5,
+          "recall": 0.6666666666666666,
+          "f1": 0.5714285714285715
+        },
+        "sense": {
+          "tp": 4,
+          "fp": 4,
+          "fn": 2,
+          "precision": 0.5,
+          "recall": 0.6666666666666666,
+          "f1": 0.5714285714285715
+        },
+        "recall_by_direction": {
+          "forward": {
+            "total": 5,
+            "found": 3,
+            "recall": 0.6
+          },
+          "backward": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          }
+        },
+        "recall_by_directed_flag": {
+          "False": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "True": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_window_admission": {
+          "None": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "recall_by_coupling": {
+          "contradiction": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "entailment": {
+            "total": 3,
+            "found": 2,
+            "recall": 0.6666666666666666
+          },
+          "equivalence": {
+            "total": 1,
+            "found": 1,
+            "recall": 1.0
+          },
+          "exclusive": {
+            "total": 1,
+            "found": 0,
+            "recall": 0.0
+          }
+        },
+        "recall_by_validity": {
+          "None": {
+            "total": 6,
+            "found": 4,
+            "recall": 0.6666666666666666
+          }
+        },
+        "non_relation_pairs": 5,
+        "non_relation_violations": 0,
+        "non_relation_violation_rate": 0.0
+      },
+      "duplicate_unordered_pairs": 0,
+      "elapsed_s": 272.915,
+      "run_config_fingerprint": "d098cb067f54"
+    }
+  ],
+  "families": [
+    {
+      "family_id": "f055",
+      "family": null,
+      "canonical_topic": "Geology",
+      "rungs": [
+        {
+          "rung_index": null,
+          "rung_name": null,
+          "item_id": "locobench-slot3-test-f055-t0"
+        }
+      ],
+      "gold_relations_identical_across_rungs": true,
+      "distinct_responses": 1,
+      "arms": {},
+      "note": "No families.json entry: ordering constraints not checked."
+    }
+  ],
+  "mining": {
+    "mined:llama-3.3-70b-instruct:graph:k5-tv2": {
+      "num_items": 1,
+      "gold_edges_total": 8,
+      "gold_edges_scorable": 6,
+      "mined_edges_total": 8,
+      "pair": {
+        "tp": 5,
+        "fp": 3,
+        "fn": 1,
+        "precision": 0.625,
+        "recall": 0.8333333333333334,
+        "f1": 0.7142857142857143
+      },
+      "coupling": {
+        "tp": 4,
+        "fp": 4,
+        "fn": 2,
+        "precision": 0.5,
+        "recall": 0.6666666666666666,
+        "f1": 0.5714285714285715
+      },
+      "sense": {
+        "tp": 4,
+        "fp": 4,
+        "fn": 2,
+        "precision": 0.5,
+        "recall": 0.6666666666666666,
+        "f1": 0.5714285714285715
+      },
+      "recall_by_direction": {
+        "forward": {
+          "total": 5,
+          "found": 3,
+          "recall": 0.6
+        },
+        "backward": {
+          "total": 1,
+          "found": 1,
+          "recall": 1.0
+        }
+      },
+      "recall_by_directed_flag": {
+        "False": {
+          "total": 3,
+          "found": 2,
+          "recall": 0.6666666666666666
+        },
+        "True": {
+          "total": 3,
+          "found": 2,
+          "recall": 0.6666666666666666
+        }
+      },
+      "recall_by_window_admission": {
+        "None": {
+          "total": 6,
+          "found": 4,
+          "recall": 0.6666666666666666
+        }
+      },
+      "recall_by_coupling": {
+        "contradiction": {
+          "total": 1,
+          "found": 1,
+          "recall": 1.0
+        },
+        "entailment": {
+          "total": 3,
+          "found": 2,
+          "recall": 0.6666666666666666
+        },
+        "equivalence": {
+          "total": 1,
+          "found": 1,
+          "recall": 1.0
+        },
+        "exclusive": {
+          "total": 1,
+          "found": 0,
+          "recall": 0.0
+        }
+      },
+      "recall_by_validity": {
+        "None": {
+          "total": 6,
+          "found": 4,
+          "recall": 0.6666666666666666
+        }
+      },
+      "non_relation_pairs": 5,
+      "non_relation_violations": 0,
+      "non_relation_violation_rate": 0.0,
+      "model": "llama-3.3-70b-instruct",
+      "pair_policy": "graph",
+      "num_pairs_scored": 0,
+      "num_llm_calls": 9,
+      "num_call_exceptions": 0,
+      "duplicate_unordered_pairs": 0,
+      "num_illegal_senses": 2,
+      "num_evidence_spans": 0,
+      "num_evidence_rejected": 0,
+      "num_inadmissible_dropped": 0,
+      "strategy": "k5-tv2",
+      "elapsed_s": 272.9
+    }
+  }
+}

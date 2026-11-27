@@ -83,6 +83,8 @@ MINED = {
     "graph_gptoss": ("GraphOss", "gpt-oss-120b", "graph", "gpt-oss-120b"),
     "pair_gptoss": ("PairOss", "gpt-oss-120b", "pairwise", "gpt-oss-120b"),
     "pair_llama": ("PairLlama", "llama-3.3-70b", "pairwise", "llama-3.3-70b"),
+    # Review Phase 3.5: graph-level miner from a vendor outside the generator and committee.
+    "graph_llama": ("GraphLlama", "llama-3.3-70b", "graph", "llama-3.3-70b"),
 }
 #: Baselines: name in the jsonl -> (macro tag, display name).
 BASELINES = {

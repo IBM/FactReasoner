@@ -98,6 +98,12 @@
 \input{numbers_lcslambda}
 % Verdict-flip sensitivity: scripts/arr_verdict_flip.py.
 \input{numbers_flip}
+% Where Z matters (signed sum vs LCS on gold graphs): scripts/arr_z_stress.py.
+\input{numbers_zstress}
+% Fairer LLM judges (verdicts, pairwise, ASAP rubric): scripts/run_fair_judges.py eval.
+\input{numbers_fairjudge}
+% Graph-level miner outside the generator's and committee's vendors: scripts/arr_slot3_subset.py.
+\input{numbers_subset}
 % ASAP 2.0 essays: scripts/asap_lcs.py (score --macros).
 \input{asap_numbers}
 \newcommand{\asapCI}[2]{\,{\scriptsize[#1,\,#2]}}
@@ -121,11 +127,13 @@
   relation graph.
   On LoCoBench, a benchmark that holds claims fixed while varying only
   their relational structure, LCS on mined graphs falls only where the extracted graphs are
-  reversed or incomparable, while LLM judges rise and fall about equally often when the only edit
-  is an added valid inference; a signed sum of relation weights over the same graphs does as well
-  on these ladders. On existing human-labelled data, LCS is related to but not a proxy for rated
-  discourse coherence, falls when a detected contradiction is added, more often than the signed sum
-  does, and tracks the quality of student essays beyond their length.
+  reversed or incomparable, while LLM judges rating one response at a time rise and fall about
+  equally often when the only edit is an added valid inference (a judge comparing two responses,
+  given their verdicts, does better); a signed sum of relation weights over the same graphs does as
+  well on these ladders. On existing human-labelled data, LCS is related to but not a proxy for
+  rated discourse coherence, falls when a detected contradiction is added, more often than the
+  signed sum does, and tracks the quality of student essays beyond their length and beyond a
+  rubric-prompted grader.
 \end{abstract}
 
 

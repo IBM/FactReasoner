@@ -293,6 +293,30 @@ rises.}
 \label{tab:signed}
 \end{table}
 
+\paragraph{Where $Z_\R$ matters.} The two scores agree in direction on every pair the coherence
+order ranks, so they can differ only on unranked edits. Three such edits, built on each of the
+\zsEqvN{} gold graphs at the verdict world with weight \zsP{} and flat priors, test principles that
+the normalization gives $\LCS$:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{Presentation invariance.} A constraint stated as one relation or as its two halves
+  defines the same model: an equivalence between two unrelated true claims against the two
+  entailments $a\Rightarrow b$ and $b\Rightarrow a$, and an exclusion between a true and a false
+  claim against a contradiction plus a co-necessity. $\LCS$ scores the two forms equally on
+  \zsEqvLcs\% and \zsExcLcs\% of the graphs, the signed sum on \zsEqvSum\% and \zsExcSum\%, since
+  it counts the split form twice.
+\item \textbf{Repetition.} Three distinct new inferences between unrelated true claims against one
+  of them repeated three times: $\LCS$ prefers the distinct ones on \zsRepLcs\% of the
+  \zsRepN{} graphs (a median gain of \zsRepGainNew{} against \zsRepGainRep{} nats); the signed sum
+  ties them on every graph.
+\item \textbf{Premise doubt.} The same new inference from a true claim, without and with a
+  conflict that sets the premise against another true claim: $\LCS$ credits it less when the
+  premise is contested on \zsDoubtLcs\% of the \zsDoubtN{} graphs (\zsDoubtGainDoubt{} against
+  \zsDoubtGainPlain{} nats); the signed sum credits it equally.
+\end{itemize}
+These are consequences of A2 and of saturation rather than findings, but they show what the
+signed sum gives up: it can be raised by restating one constraint as two, or by repeating an
+inference. On the ladders such edits do not occur, which is why the two scores tie there.
+
 \paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
 that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of
 their pairs incomparable. Comparing weights to $10^{-3}$ instead, gpt-oss-120b has
@@ -301,6 +325,41 @@ Llama \sThreePairLlamaDomTForward{} (against \sThreePairLlamaDomForward). Within
 pair ranked as declared may still differ by sub-tolerance weight changes, and near $p_r=1$ these move
 $\Lambda$ a lot: $\LCS$ falls on \sThreePairLlamaDomTForwardFalls{} such Llama pairs, the signed sum on
 \sThreePairLlamaDomTWForwardFalls. This is the saturation of near-certain weights at work.
+
+\paragraph{Fairer judges by ladder type.} Rise\,/\,fall\,/\,tie counts on the \sThreeNConflict{}
+ladders' 180 pairs per increasing type, and kept invariance pairs (ties), for the judges of
+App.~\ref{app:estimation}:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item absolute, with verdicts: \cp{conflict} \fjAbsConflictCounts, \cp{chain} \fjAbsChainCounts,
+  \cp{sign} \fjAbsSignCounts; invariances kept \fjAbsInvTie\% (within the judge's own spread:
+  \fjAbsInvSpreadRise\%);
+\item pairwise, with verdicts: \cp{conflict} \fjPairVConflictCounts, \cp{chain} \fjPairVChainCounts,
+  \cp{sign} \fjPairVSignCounts; invariances kept \fjPairVInvTie\%;
+\item pairwise, response only: \cp{conflict} \fjPairConflictCounts, \cp{chain} \fjPairChainCounts,
+  \cp{sign} \fjPairSignCounts; invariances kept \fjPairInvTie\%.
+\end{itemize}
+The pairwise judge with verdicts is the strongest comparison in the paper, close to $\LCS$ on GPT-6
+graphs on increases (\fjPairVIncRise\% against \sThreeGraphGptLamIncPct\%) and above it on
+invariances (\fjPairVInvTie\% against \sThreeGraphGptLamInvPct\%). It costs two calls per compared
+pair and gives a preference, not a score.
+
+\paragraph{A miner from outside the generator's and committee's vendors.} LoCoBench's generator
+(Claude Opus~5) and committee (GPT-6.1, Gemini~3.1 Pro, Claude Opus~5.5) share vendors with GPT-6.
+The graph-level miner with Llama-3.3-70B, a vendor outside both, ran on a stratified subset of 12
+families per primary ladder type (\subLadders{} ladders from \subFamilies{} families); the full split
+takes about eight minutes per response on our endpoint. On the same ladders:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item extraction: pair-level F1 against gold \subLlamaPairF{} (coupling-level \subLlamaCoupF), against
+  \subGptPairF{} for GPT-6;
+\item $\LCS$ rises on \subLlamaLcsInc\% of the \subLlamaLcsNInc{} increases and falls on
+  \subLlamaLcsFalls\% (GPT-6: \subGptLcsInc\% and \subGptLcsFalls\%); on \cp{chain}, \subLlamaLcsChain\%
+  (GPT-6: \subGptLcsChain\%); it keeps \subLlamaLcsInv\% of the invariances (GPT-6: \subGptLcsInv\%);
+\item the signed weight sum: \subLlamaWsumInc\% of the increases (GPT-6: \subGptWsumInc\%).
+\end{itemize}
+Part of GPT-6's near-perfect extraction on LoCoBench is therefore likely shared with the committee
+that wrote the gold relations, and the mined-graph results are an upper bound. As
+Theorem~\ref{thm:mono} requires, every fall is again on a pair whose graphs are not ordered as
+declared.
 
 \paragraph{Settings.} The tie tolerance of $\LCS$ was fixed after comparing it with the
 alternatives on the test split (App.~\ref{app:setup-details}): deciding on $\Lambda$ gives the same

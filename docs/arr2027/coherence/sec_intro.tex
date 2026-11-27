@@ -54,15 +54,14 @@ world as the readout (App.~\ref{app:why}).
 \item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On mined graphs,
 LCS falls only on pairs whose edit the miner reversed or left incomparable, as the theorem
 requires; gold graphs, which the benchmark admits only if they are ordered as declared, check the
-implementation. LLM judges rise and fall about equally often when the only edit is an added valid
-inference. A signed sum of relation weights does as well on these ladders, which exercise each
+implementation. LLM judges rating one response at a time rise and fall about equally often when the only
+edit is an added valid inference, although a judge comparing two responses, given the verdicts and
+our definition, ranks most pairs as declared. A signed sum of relation weights does as well on these ladders, which exercise each
 relation's sign but not the interactions that the MRF adds.
 
 \item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). On existing
-human-labelled data, none of which rates logical coherence, we test four properties of LCS. It is
-related to but not a proxy for rated discourse coherence: inferences raise both, but a restatement
-raises LCS while raters penalize the redundancy. It falls when a detected contradiction is
-added, more often than the signed sum, and rises when a consistent sentence is added. Permuting
-paragraphs moves it about as much as re-mining, while an LLM judge treats reordering as
-incoherence. On student essays, it tracks quality beyond length.
+human-labelled data, none of which rates logical coherence, LCS is related to but not a proxy for
+rated discourse coherence, falls when a detected contradiction is added and rises when a consistent
+sentence is, and at real verdicts rises when a contradiction refutes a falsehood. On student
+essays, it tracks quality beyond length and a rubric-prompted grader.
 \end{itemize}

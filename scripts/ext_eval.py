@@ -293,6 +293,35 @@ def check1(args):
         res[f"1c:{arm}"] = {"errors": err, "perm": invariance_block(rows, ["lcs"] + list(BASELINES)),
                             "noise_floor": invariance_block(noise, ["lcs"]),
                             "equivalence": order_equivalence(rows, noise) if noise else None}
+    # 1e (review Phase 3.4): matched design. Each original and permutation was mined twice in
+    # one interleaved run, so noise = two mines of the same text, and the permutation effect
+    # compares a permutation with the original from the other repeat (independent samples).
+    mi = items("contradoc-matched") if os.path.exists(os.path.join(REPO, "data", "ext",
+                                                                     "contradoc-matched")) else {}
+    for arm in ARMS:
+        if not mi:
+            break
+        recs, err = records("contradoc-matched", arm)
+        if not recs:
+            continue
+        L = defaultdict(dict)
+        for iid, x in mi.items():
+            if iid in recs:
+                fam, v, r = x["expected"]["family_id"], x["expected"]["variant"], x["expected"]["repeat"]
+                L[fam][(v, r)] = lcs_at(x["num_atoms"], rels_of(recs[iid]))[0]
+        noise, perm = [], []
+        for fam, V in L.items():
+            for v in ("orig", "p1", "p2"):
+                if (v, "r1") in V and (v, "r2") in V:
+                    noise.append({"group": fam, "lcs": V[(v, "r2")], "lcs_orig": V[(v, "r1")]})
+            for v in ("p1", "p2"):
+                for rp, ro in (("r1", "r2"), ("r2", "r1")):
+                    if (v, rp) in V and ("orig", ro) in V:
+                        perm.append({"group": fam, "lcs": V[(v, rp)], "lcs_orig": V[("orig", ro)]})
+        res[f"1e:{arm}"] = {"errors": err, "records": len(recs),
+                            "perm": invariance_block(perm, ["lcs"]),
+                            "noise_floor": invariance_block(noise, ["lcs"]),
+                            "equivalence": order_equivalence(perm, noise) if noise and perm else None}
     # 1d: SummEval
     it = items("summeval")
     base = baselines("summeval")
@@ -555,6 +584,20 @@ def check3(args):
             conflict = any(R[k][2] in CONFLICTISH for k in between)
             row = {"group": pid, "label": d1["expected"]["label"], "conflict": conflict,
                    "nonfactual": d1["expected"].get("nonfactual")}
+            nfv = d1["expected"].get("nonfactual")
+            if d0 and d0["id"] in recs and nfv in ("1", "2", "both"):
+                # Phase 3.6: the real verdicts, where the annotators recorded the false side. A
+                # contradiction that involves a false sentence is a support there.
+                xs_, xs2_ = {"1": (0, 1), "2": (1, 0), "both": (0, 0)}[nfv]
+                x1 = [1] * d1["num_atoms"]
+                x1[s], x1[s2] = xs_, xs2_
+                x0 = [1] * d0["num_atoms"]
+                s0 = int(d0["expected"]["s_atom"][1:])
+                x0[s0] = xs_
+                row["v1"] = lcs_at(d1["num_atoms"], R, x1)[0]
+                row["v0"] = lcs_at(d0["num_atoms"], rels_of(recs[d0["id"]]), x0)[0]
+                row["a1"] = lcs_at(d1["num_atoms"], R)[0]
+                row["a0"] = lcs_at(d0["num_atoms"], rels_of(recs[d0["id"]]))[0]
             if d0 and d0["id"] in recs:
                 R0 = rels_of(recs[d0["id"]])
                 row["d1"] = lcs_at(d1["num_atoms"], R)[0]
@@ -603,6 +646,10 @@ def check3(args):
         out["asserted_notfound"] = split([r for r in S if not r["conflict"]])
         out["wsum"] = split(S, "w0", "w1")
         out["wsum_found"] = split([r for r in S if r["conflict"]], "w0", "w1")
+        VW = [r for r in rows if "v1" in r]
+        out["verdict_world"] = {"all": split(VW, "v0", "v1"),
+                                "found": split([r for r in VW if r["conflict"]], "v0", "v1"),
+                                "found_asserted": split([r for r in VW if r["conflict"]], "a0", "a1")}
         out["wsum_control"] = split(C, "w0", "w1")
         out["effect"] = {k: {"mean": st.mean(r["d1"] - r["d0"] for r in R),
                              "median": st.median(r["d1"] - r["d0"] for r in R), "n": len(R)}
@@ -720,7 +767,7 @@ def write_macros(ev, path):
         return f"\\ensuremath{{{x:+.2f}}}"
 
     def pval(p):
-        if p < 1e-4:
+        if p < 1e-3:  # an upper bound, a power of ten (read as "p < ...")
             e = int(math.floor(math.log10(p)))
             return f"\\ensuremath{{10^{{{e + 1}}}}}"
         return f"{p:.2f}" if p >= 0.01 else f"{p:.3f}"
@@ -864,7 +911,7 @@ def write_macros(ev, path):
         # Phase 2 of the 2026-11-27 review: signed baselines, controls, effect sizes, equivalence.
         def f3(v):
             return "--" if v is None else f"\\ensuremath{{{v:+.3f}}}"
-        for key, kt in (("1a", "Loco"), ("1c", "Cd")):
+        for key, kt in (("1a", "Loco"), ("1c", "Cd"), ("1e", "Mt")):
             e = (c1.get(f"{key}:{arm}") or {}).get("equivalence")
             if e:
                 m(f"{kt}EqDiff{tag}", f3(e["diff"]))
@@ -875,6 +922,13 @@ def write_macros(ev, path):
                     m(f"{kt}Eq{k_.title().replace('_', '')}{tag}", e[k_])
                 m(f"{kt}EqPermP{tag}", pval(e["perm_p"]))
                 m(f"{kt}EqNoiseP{tag}", pval(e["noise_p"]))
+        mt = c1.get(f"1e:{arm}")
+        if mt:
+            m(f"MtRecords{tag}", mt["records"])
+            m(f"MtPermInv{tag}", pct(mt["perm"]["lcs"]["invariant"]))
+            m(f"MtNoiseInv{tag}", pct(mt["noise_floor"]["lcs"]["invariant"]))
+            m(f"MtPermMean{tag}", f"{mt['perm']['lcs']['mean_abs']:.3f}")
+            m(f"MtNoiseMean{tag}", f"{mt['noise_floor']['lcs']['mean_abs']:.3f}")
         d = c1.get(f"1d:{arm}")
         if d and "wsum_rho_coherence" in d:
             for key, kt in (("wsum", "Wsum"), ("norestate", "NoRestate")):
@@ -906,6 +960,14 @@ def write_macros(ev, path):
                 m(f"Cp{kt}N{tag}", y[k_]["n"])
                 m(f"Cp{kt}P{tag}", pval(y[k_]["p_sign"]))
             m(f"CpAssertTie{tag}", y["asserted"]["n"] - y["asserted"]["decrease"] - y["asserted"]["increase"])
+            for k_, kt in (("all", "VwAll"), ("found", "VwFound"), ("found_asserted", "VwFoundAssert")):
+                v_ = y.get("verdict_world", {}).get(k_)
+                if v_:
+                    m(f"Cp{kt}Dec{tag}", v_["decrease"])
+                    m(f"Cp{kt}Inc{tag}", v_["increase"])
+                    m(f"Cp{kt}Tie{tag}", v_["tie"])
+                    m(f"Cp{kt}N{tag}", v_["n"])
+                    m(f"Cp{kt}P{tag}", pval(v_["p_sign"]))
             for k_, kt in (("found", "Found"), ("notfound", "NotFound"), ("control", "Ctl")):
                 if k_ in y["effect"]:
                     m(f"CpEff{kt}Mean{tag}", f2(y["effect"][k_]["mean"]))

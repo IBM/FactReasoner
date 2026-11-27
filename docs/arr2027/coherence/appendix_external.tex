@@ -245,7 +245,7 @@ contradictory and in \extCpConfNoneGpt\% of the others: low recall, no false ala
 gpt-oss-120b finds it in \extCpConfStrongOss\% and \extCpConfNoneOss\% of the two groups.
 
 %% ----------------------------------------------------------------------------
-\subsection{Order Moves the Score About as Much as Re-Mining}
+\subsection{Order: Within the Noise on Short Responses, Not on Long Documents}
 \label{app:ext-order}
 
 \begin{table}[t]
@@ -310,10 +310,20 @@ $\tau$ matters as well. On LoCoBench, re-mining is balanced (\extLocoEqNoiseUpGp
 \extLocoEqNoiseDownGpt{} falls, $p=\extLocoEqNoisePGpt$), and permutation leans down
 (\extLocoEqPermUpGpt{} and \extLocoEqPermDownGpt, $p=\extLocoEqPermPGpt$). On ContraDoc both lean
 up: permutation \extCdEqPermUpGpt{} against \extCdEqPermDownGpt{} ($p=\extCdEqPermPGpt$), and
-re-mining \extCdEqNoiseUpGpt{} against \extCdEqNoiseDownGpt{} ($p=\extCdEqNoisePGpt$). The re-run
-used the same configuration about an hour after the original; independent samples would not drift
-in one direction, so the drift is unexplained and the ContraDoc noise floor is itself uncertain. A matched design, mining each original and its permutations together and repeatedly,
-would settle the question.
+re-mining \extCdEqNoiseUpGpt{} against \extCdEqNoiseDownGpt{} ($p=\extCdEqNoisePGpt$), although the
+re-run used the same configuration about an hour after the original.
+
+\paragraph{Matched design.} To settle the ContraDoc comparison, each of the 150 originals and its
+two permutations was mined twice more with GPT-6, all \extMtRecordsGpt{} documents in one
+interleaved run. Noise is now the change between two mines of the same text, and the permutation
+effect the change between a permutation and the original from the other repeat. Re-mining is
+balanced (\extMtEqNoiseUpGpt{} rises, \extMtEqNoiseDownGpt{} falls beyond $\tau$,
+$p=\extMtEqNoisePGpt$), so the earlier drift came from mining in separate runs. Permutation is not:
+it moves the score by $\extMtPermMeanGpt$ on average against $\extMtNoiseMeanGpt$ for re-mining, a
+difference of $\extMtEqDiffGpt$ with 90\% interval [\extMtEqLoGpt, \extMtEqHiGpt], and upwards
+more often than downwards (\extMtEqPermUpGpt{} against \extMtEqPermDownGpt, $p=\extMtEqPermPGpt$).
+On long documents the order of the paragraphs therefore changes what GPT-6 extracts, as it does for
+gpt-oss-120b; the score itself is order-free, but its extraction is not.
 
 % Flush the floats of K.1-K.3 before the essay subsection.
 \clearpage

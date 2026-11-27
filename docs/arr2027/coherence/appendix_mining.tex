@@ -79,6 +79,18 @@ the rating token's probabilities, which is why they almost never tie. The prompt
 \promptfile{prompts/JUDGE_GEVAL.txt}
 \promptfile{prompts/JUDGE_DIRECT.txt}
 
+\paragraph{Fairer judges.} Three further GPT-6 judges answer review concerns about the comparison:
+an absolute 1--5 rating given the claims marked TRUE or FALSE and our definition of logical
+coherence (three runs averaged); and a pairwise judge, asked which of two rungs is more coherent,
+in both orders, with and without the claims, verdicts and definition. A pair counts as a rise when
+the net preference over the two orders favours the declared rung, and as a tie when it is zero. The
+gateway cache was bypassed. The prompts follow verbatim; the essay grader of App.~\ref{app:asap}
+uses the last one.
+\promptfile{prompts/JUDGE_VERDICT_ABS.txt}
+\promptfile{prompts/JUDGE_PAIRWISE_VERDICTS.txt}
+\promptfile{prompts/JUDGE_PAIRWISE.txt}
+\promptfile{prompts/GRADER_ASAP_RUBRIC.txt}
+
 \paragraph{Other baselines.} DiscoScore uses \texttt{bert-base-uncased}. NLI contradiction and
 ROSCOE self-consistency use gpt-oss-120b as the NLI model and read only the claims, not the
 response; the claims are identical across a ladder's rungs, so both tie on every pair by

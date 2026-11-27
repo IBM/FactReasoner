@@ -61,9 +61,14 @@ cache; the gpt-oss judges' runs always varied.
 
 ## Evaluation choices
 
-As for the pilot: Increase pairs need a strict increase (> 1e-9 exact; > 1e-6 for baselines);
-invariance needs equality within the same tie; tolerant invariance and resolved increases use
-tau = 0.01 on each score's [0, 1] scale. Intervals in the figures are 95% percentile intervals
-from 2,000 bootstrap resamples of families. The dominance check (Figure "dominance") uses the
-exact sign of the change in Lambda; one pairwise-Llama pair whose graphs are ordered rises by
-4e-14 (a single weight differs by 1e-8), below the 1e-9 counting resolution.
+Every score (LCS, the signed baselines and every text baseline) is decided by one rule: an
+Increase pair needs a strict increase and an Invariance pair equality, up to a RELATIVE tie
+tolerance of 1e-10 (|a - b| <= 1e-10 * max(|a|, |b|); `REL_TIE` in scripts/arr_slot3_eval.py).
+Tolerant invariance and resolved increases use tau = 0.01 on each score's [0, 1] scale. Intervals
+in the figures are 95% percentile intervals from 2,000 bootstrap resamples of families. The
+dominance check compares the two rungs' graphs exactly (weight tolerance 1e-12) and, as a second
+reading, to a weight tolerance of 1e-3 (`dominance_tol3`); one pairwise-Llama pair whose graphs
+are ordered rises by 4e-14 (a single weight differs by 1e-8), a tie under the relative rule.
+The signed weight sum and signed count over the same graphs (keys `wsum`, `count`, and their
+`_assert` variants) were added on 2026-11-27 (review C1); the fairer judges are in
+`fair_judges/` (scripts/run_fair_judges.py).

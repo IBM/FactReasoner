@@ -36,7 +36,11 @@ if [[ $what == all || $what == mined || $what == arm ]]; then
   ARMS[graph_gptoss]="mined:gpt-oss-120b:graph:k5-tv2";         SHARDS[graph_gptoss]=6
   ARMS[pair_gptoss]="mined:gpt-oss-120b:windowed:slot3";        SHARDS[pair_gptoss]=6
   ARMS[pair_llama]="mined:llama-3.3-70b-instruct:windowed:slot3"; SHARDS[pair_llama]=4
+  # Review Phase 3.5: a graph-level miner from a vendor outside LoCoBench's generator and
+  # committee (run only on request: `arm graph_llama N`).
+  ARMS[graph_llama]="mined:llama-3.3-70b-instruct:graph:k5-tv2"; SHARDS[graph_llama]=4
   for g in ${(k)ARMS}; do
+    [[ $g == graph_llama && $what != arm ]] && continue
     if [[ $what == arm ]]; then [[ $g == $2 ]] || continue; SHARDS[$g]=${3:-${SHARDS[$g]}}; fi
     d=$ROOT/arms/$g; mkdir -p $d
     for ((k=0; k<${SHARDS[$g]}; k++)); do

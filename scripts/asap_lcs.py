@@ -494,6 +494,16 @@ def analyze(rows):
             return (partial_spearman(lcs(S), sc(S), W(S))
                     - partial_spearman([r["baselines"][J] for r in S], sc(S), W(S)))
         rob["diff_geval"] = {"value": dif(RJ), "ci": boot_ci(dif, RJ)}
+    # Beyond length AND a rubric-prompted grader (review Phase 3.7).
+    J2 = "judge_rubric@gpt-6-sol"
+    RR = [r for r in rows if J2 in r.get("baselines", {})]
+    if len(RR) >= 10:
+        ctl2 = lambda S: [[r["words"] for r in S], [r["baselines"][J2] for r in S]]  # noqa: E731
+        for k in ("lcs_asserted", "relations", "wsum_asserted"):
+            f = metrics[k]
+            v = partial_spearman([f(r) for r in RR], sc(RR), ctl2(RR))
+            lo, hi = boot_ci(lambda S: partial_spearman([f(r) for r in S], sc(S), ctl2(S)), RR)
+            out[k]["partial_wr"], out[k]["partial_wr_ci"] = v, (lo, hi)
     # Within length tertiles: does LCS still order essays by score at a similar length?
     W = sorted(r["words"] for r in rows)
     cuts = (W[len(W) // 3], W[2 * len(W) // 3])
@@ -612,6 +622,10 @@ def write_macros(path, tag, report, data):
             m("Pwj" + tag_, f2(c["partial_wj"]))
             m("Pwj" + tag_ + "Lo", f2(c["partial_wj_ci"][0]))
             m("Pwj" + tag_ + "Hi", f2(c["partial_wj_ci"][1]))
+        if "partial_wr" in c:
+            m("Pwr" + tag_, f2(c["partial_wr"]))
+            m("Pwr" + tag_ + "Lo", f2(c["partial_wr_ci"][0]))
+            m("Pwr" + tag_ + "Hi", f2(c["partial_wr_ci"][1]))
     for k, v in arm.get("robust", {}).items():
         tag_ = "".join(p.title() for p in k.split("_"))
         m("Rob" + tag_, f2(v["value"]))
