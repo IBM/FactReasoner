@@ -36,18 +36,18 @@
   con/.style={black!70,dashed},
   sup/.style={blue!65!black},
   cnf/.style={red!70!black},
-  prlab/.style={font=\tiny,inner sep=1pt,text=black!70},
-  wlab/.style={midway,font=\tiny,inner sep=1pt},
+  prlab/.style={font=\scriptsize,inner sep=1pt,text=black!70},
+  wlab/.style={midway,font=\scriptsize,inner sep=1pt},
   relw/.style={line width=\the\dimexpr 0.6pt + #1pt\relax},
   factor/.style={rectangle,draw=black!75,fill=black!70,minimum size=1.9mm,inner sep=0pt},
   unary/.style={factor,fill=black!35},
   flink/.style={black!55,line width=0.5pt},
   chg/.style={draw=orange!80!black,line width=0.6pt,dotted,rounded corners=0.8mm,
               inner sep=2mm},
-  chglab/.style={font=\tiny,text=orange!60!black,align=center,inner sep=0.5pt},
+  chglab/.style={font=\scriptsize,text=orange!60!black,align=center,inner sep=0.5pt},
   chgnum/.style={circle,draw=orange!80!black,fill=orange!12,line width=0.5pt,
-                 font=\tiny\bfseries,text=orange!55!black,inner sep=0.4pt,
-                 minimum size=2.7mm},
+                 font=\scriptsize\bfseries,text=orange!55!black,inner sep=0.4pt,
+                 minimum size=3.2mm},
   chglead/.style={orange!80!black,line width=0.5pt,dotted},
 }
 \newcommand{\claimref}[1]{\mbox{\textcolor{blue!55!black}{\scriptsize[$a_{#1}$]}}}
@@ -104,6 +104,9 @@
 \input{numbers_fairjudge}
 % Graph-level miner outside the generator's and committee's vendors: scripts/arr_slot3_subset.py.
 \input{numbers_subset}
+% Phase B of the second review (verdict noise, paired intervals): scripts/arr_phaseb.py.
+\input{numbers_phaseb_noise}
+\input{numbers_phaseb_paired}
 % ASAP 2.0 essays: scripts/asap_lcs.py (score --macros).
 \input{asap_numbers}
 \newcommand{\asapCI}[2]{\,{\scriptsize[#1,\,#2]}}
@@ -127,8 +130,9 @@
   relation graph.
   On LoCoBench, a benchmark that holds claims fixed while varying only
   their relational structure, LCS on GPT-6-mined graphs rises on \sThreeGraphGptLamIncPct\% of the
-  declared increases (\subLlamaLcsInc\% with a miner outside the benchmark's vendors), and a signed
-  sum of relation weights over the same graphs does slightly better. LLM judges rating one response
+  declared increases (\subLlamaLcsInc\% with a miner outside the benchmark's vendors); a signed
+  sum of relation weights over the same graphs does slightly better, but loses more when the
+  verdicts are wrong. LLM judges rating one response
   at a time rise and fall about equally often when the only edit is an added valid inference, while
   a judge comparing two responses, given their verdicts, is competitive with LCS. On existing
   human-labeled data, LCS is not a proxy for rated discourse coherence, falls when a detected

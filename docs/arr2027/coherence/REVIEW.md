@@ -506,3 +506,25 @@ The main text ends on p. 8 (last line); build clean. One new macro was computed:
 | N13 | done | Footnote 1 no longer promises costs; the Fig. 2 caption gives the judges' run counts; App. L gives the essay G-Eval run count (five). |
 | N14 | partly | The typo is fixed; Fig. 1 font size is still open. |
 | N15 | open (Phase B) | |
+
+---
+
+## 10. Changelog (2026-11-27): N4 disclosure, Phase B, Figure 1
+
+The main text ends on p. 8; build clean. New: `scripts/arr_phaseb.py` (`numbers_phaseb_noise.tex`,
+`numbers_phaseb_paired.tex`); cluster tests and McNemar in `ext_eval.py`; deduplicated sum and
+marker baseline in `arr_slot3_eval.py`. Every existing macro value is unchanged (checked by diff).
+
+| # | Status | What changed |
+|---|---|---|
+| N4 | done | App. L "Analyses fixed in advance" with Table `tab:ext-plan`: all twelve tests and thresholds fixed before mining, with outcomes for both miners. Four fail with GPT-6 (H1a, H1c, H2a′, H2b) and five with gpt-oss (also H3c). The two logged deviations and the list of later analyses are given. §3.2 points to it. |
+| N1 | done | Paired family-cluster CIs, LCS − sum on increases: GPT-6 −1.1 [−2.2, −0.2], gpt-oss −3.2 [−5.9, −0.4], pairwise arms ≈ 0. A deduplicated sum (one support and one conflict term per pair) gives identical decisions on every arm, since the ladders neither repeat nor split relations. **New: under verdict noise LCS beats the sum.** At 20% flipped verdicts, LCS keeps 74% vs 71% of increases ([+2.5, +4.6] points), and on `conflict` 73% vs 60% ([+11.4, +13.8]); `chain` costs [−2.8, −1.2]; `sign` is identical. This is the first data-based evidence that Z matters. It is in the §3.1 heading "A signed sum does slightly better, until the verdicts are wrong", the abstract, the Conclusion, Limitations, and App. H "Wrong verdicts". |
+| N9 | done | Fig. 2 shows resolved rates (rises > τ) as hollow markers on the LCS rows (pairwise arms 34% and 37%). The pairwise judge vs LCS paired CIs (increases +3.5 [+0.7, +6.7]; invariances −39 [−45, −34]) are in §3.1. |
+| N10 | partly | A discourse-marker baseline (inference minus incompatibility markers) replaces DiscoScore LC in Fig. 2. **It rises on 177/180 `conflict` pairs**: those ladders are solvable from surface cues; `chain` 57 and `sign` 12 are not. Stated in §3.1 and App. H. The non-sequitur control ladder (Phase C) is open. |
+| N12 | done | Cluster-level sign tests: ContraDoc 88 falls / 13 rises of 102 source documents; ChatProtect 22/7 of 31 topics (p = 0.008); consistent control 23 rises / 2 falls; ContraDoc verdict world 36/29 (p = 0.46); the direction of the matched ContraDoc permutations is not significant when clustered (p = 0.14). In App. L and §3.2. |
+| N15 | done | The ladders under verdict noise (see N1). |
+| N14 | done | Fig. 1 edge weights, committed values, callouts and Δ values go from `\tiny` to `\scriptsize`; the misleading A → B arrow is removed. |
+
+**Still open:** Phase C (rebuild the ContraDoc permutations keeping headers with their sections,
+then re-mine; a matched LoCoBench design; a G-Eval noise floor; a non-sequitur `chain` control; a
+real factuality pipeline's verdicts) and Phase D (the human study).

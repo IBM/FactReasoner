@@ -99,6 +99,18 @@ def mean_abs_diff_ci(A_, B_, n=BOOT, seed=SEED):
     return vals[int(0.05 * n)], vals[int(0.95 * n) - 1], vals[int(0.025 * n)], vals[int(0.975 * n) - 1]
 
 
+def cluster_sign(rows, cluster, diff):
+    """Sign test across clusters (review N12): each cluster's mean change counts once, so rows
+    that share a source document or topic are not treated as independent."""
+    by = defaultdict(list)
+    for r in rows:
+        by[cluster(r)].append(diff(r))
+    means = [st.mean(v) for v in by.values()]
+    dec = sum(m < -TIE for m in means)
+    inc = sum(m > TIE for m in means)
+    return {"clusters": len(means), "decrease": dec, "increase": inc, "p_sign": sign_test(dec, inc)}
+
+
 def mcnemar(rows, a, b):
     """Paired comparison of two binary outcomes on the same rows (exact two-sided McNemar):
     rows where only `a` holds against rows where only `b` holds."""
@@ -262,7 +274,9 @@ def check1(args):
         res[f"1a:{arm}"] = {"errors": err, "perm": invariance_block(perm, names),
                             "sent": invariance_block(sent, names),
                             "noise_floor": invariance_block(noise, ["lcs"]),
-                            "equivalence": order_equivalence(perm, noise) if noise else None}
+                            "equivalence": order_equivalence(perm, noise) if noise else None,
+                            "cluster_perm": cluster_sign(perm, lambda r: r["group"],
+                                                         lambda r: r["lcs"] - r["lcs_orig"])}
     # 1c: ContraDoc clean documents
     it = items("contradoc")
     base = baselines("contradoc")
@@ -327,6 +341,8 @@ def check1(args):
                     if (v, rp) in V and ("orig", ro) in V:
                         perm.append({"group": fam, "lcs": V[(v, rp)], "lcs_orig": V[("orig", ro)]})
         res[f"1e:{arm}"] = {"errors": err, "records": len(recs),
+                            "cluster_perm": cluster_sign(perm, lambda r: r["group"],
+                                                         lambda r: r["lcs"] - r["lcs_orig"]),
                             "perm": invariance_block(perm, ["lcs"]),
                             "noise_floor": invariance_block(noise, ["lcs"]),
                             "equivalence": order_equivalence(perm, noise) if noise and perm else None}
@@ -500,6 +516,10 @@ def check2(args):
                "asserted": counts(pairs, "asserted"), "verdict_all": counts(pairs, "verdict"),
                "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted"),
                "wsum": counts(pairs, "wsum"), "wsum_edge": counts(edge, "wsum"),
+               "cluster_asserted": cluster_sign(pairs, lambda r: r["group"].split("_")[0],
+                                                lambda r: r["asserted_b"] - r["asserted_a"]),
+               "cluster_verdict_edge": cluster_sign(edge, lambda r: r["group"].split("_")[0],
+                                                    lambda r: r["verdict_b"] - r["verdict_a"]),
                "mcnemar_falls": mcnemar([dict(r, lf=r["asserted_b"] < r["asserted_a"] - TIE,
                                               wf=r["wsum_b"] < r["wsum_a"] - TIE) for r in pairs], "lf", "wf"),
                "mcnemar_falls_edge": mcnemar([dict(r, lf=r["asserted_b"] < r["asserted_a"] - TIE,
@@ -594,7 +614,8 @@ def check3(args):
                         sweep_n += 1
                         sweep_ok += (d < -TIE) if violated else (d > TIE or (abs(d) <= TIE and r[3] <= 0))
             conflict = any(R[k][2] in CONFLICTISH for k in between)
-            row = {"group": pid, "label": d1["expected"]["label"], "conflict": conflict,
+            row = {"group": pid, "topic": d1["expected"].get("target"), "label": d1["expected"]["label"],
+                   "conflict": conflict,
                    "nonfactual": d1["expected"].get("nonfactual")}
             nfv = d1["expected"].get("nonfactual")
             if d0 and d0["id"] in recs and nfv in ("1", "2", "both"):
@@ -661,6 +682,8 @@ def check3(args):
         out["wsum_found"] = split([r for r in S if r["conflict"]], "w0", "w1")
         fl = lambda R: [dict(r, lf=r["d1"] < r["d0"] - TIE, wf=r["w1"] < r["w0"] - TIE) for r in R]  # noqa: E731
         out["mcnemar_falls"] = mcnemar(fl(S), "lf", "wf")
+        out["cluster_asserted"] = cluster_sign(S, lambda r: r["topic"], lambda r: r["d1"] - r["d0"])
+        out["cluster_control"] = cluster_sign(C, lambda r: r["topic"], lambda r: r["d1"] - r["d0"])
         out["mcnemar_falls_found"] = mcnemar(fl([r for r in S if r["conflict"]]), "lf", "wf")
         out["mcnemar_falls_notfound"] = mcnemar(fl([r for r in S if not r["conflict"]]), "lf", "wf")
         out["mcnemar_falls_control"] = mcnemar(fl(C), "lf", "wf")
@@ -941,6 +964,13 @@ def write_macros(ev, path):
                     m(f"{kt}Eq{k_.title().replace('_', '')}{tag}", e[k_])
                 m(f"{kt}EqPermP{tag}", pval(e["perm_p"]))
                 m(f"{kt}EqNoiseP{tag}", pval(e["noise_p"]))
+        for key, kt in (("1a", "Loco"), ("1e", "Mt")):
+            cl = (c1.get(f"{key}:{arm}") or {}).get("cluster_perm")
+            if cl:
+                m(f"{kt}ClPermN{tag}", cl["clusters"])
+                m(f"{kt}ClPermDec{tag}", cl["decrease"])
+                m(f"{kt}ClPermInc{tag}", cl["increase"])
+                m(f"{kt}ClPermP{tag}", pval(cl["p_sign"]))
         mt = c1.get(f"1e:{arm}")
         if mt:
             m(f"MtRecords{tag}", mt["records"])
@@ -964,6 +994,12 @@ def write_macros(ev, path):
                 m(f"Cd{kt}N{tag}", x[k_]["n"])
                 m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
             m(f"CdAssertTie{tag}", x["asserted"]["tie"])
+            for k_, kt in (("cluster_asserted", "ClAssert"), ("cluster_verdict_edge", "ClVerdEdge")):
+                if k_ in x:
+                    m(f"Cd{kt}N{tag}", x[k_]["clusters"])
+                    m(f"Cd{kt}Dec{tag}", x[k_]["decrease"])
+                    m(f"Cd{kt}Inc{tag}", x[k_]["increase"])
+                    m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
             for k_, kt in (("mcnemar_falls", "McAll"), ("mcnemar_falls_edge", "McFound")):
                 if k_ in x:
                     m(f"Cd{kt}OnlyLcs{tag}", x[k_]["only_a"])
@@ -984,6 +1020,12 @@ def write_macros(ev, path):
                 m(f"Cp{kt}N{tag}", y[k_]["n"])
                 m(f"Cp{kt}P{tag}", pval(y[k_]["p_sign"]))
             m(f"CpAssertTie{tag}", y["asserted"]["n"] - y["asserted"]["decrease"] - y["asserted"]["increase"])
+            for k_, kt in (("cluster_asserted", "ClAssert"), ("cluster_control", "ClCtl")):
+                if k_ in y:
+                    m(f"Cp{kt}N{tag}", y[k_]["clusters"])
+                    m(f"Cp{kt}Dec{tag}", y[k_]["decrease"])
+                    m(f"Cp{kt}Inc{tag}", y[k_]["increase"])
+                    m(f"Cp{kt}P{tag}", pval(y[k_]["p_sign"]))
             for k_, kt in (("mcnemar_falls", "McAll"), ("mcnemar_falls_found", "McFound"),
                            ("mcnemar_falls_notfound", "McNotFound"), ("mcnemar_falls_control", "McCtl")):
                 if k_ in y:

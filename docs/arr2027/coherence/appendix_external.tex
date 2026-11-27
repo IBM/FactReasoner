@@ -41,9 +41,60 @@ distributed, which matters because changes in $\LCS$ range from tiny to several 
 inserting a contradiction into a ContraDoc document lowers $\LCS$ on \extCdAssertDecGpt{} pairs and
 raises it on \extCdAssertIncGpt{} (Table~\ref{tab:ext-contradoc}); under the null, a split this
 uneven has probability below $\extCdAssertPGpt$. Tables report $p$ as such an upper bound, a power
-of ten, when it is very small. A small $p$ says that the direction of the effect is not a sampling
+of ten, when it is very small. Pairs that share a source document or topic are not independent, so the
+main effects are also tested with each cluster's mean change counted once: ContraDoc insertions
+lower $\LCS$ in \extCdClAssertDecGpt{} and raise it in \extCdClAssertIncGpt{} of \extCdClAssertNGpt{}
+source documents ($p<\extCdClAssertPGpt$); ChatProtect's contradicting sentences lower it in
+\extCpClAssertDecGpt{} and raise it in \extCpClAssertIncGpt{} of \extCpClAssertNGpt{} topics
+($p=\extCpClAssertPGpt$), and its consistent sentences raise it in \extCpClCtlIncGpt{} and lower it in
+\extCpClCtlDecGpt{} of \extCpClCtlNGpt{} ($p<\extCpClCtlPGpt$); at the verdict world, ContraDoc gives
+\extCdClVerdEdgeIncGpt{} rises and \extCdClVerdEdgeDecGpt{} falls ($p=\extCdClVerdEdgePGpt$). A small $p$ says that the direction of the effect is not a sampling
 accident. It says nothing about the effect's size, which the split itself conveys, and it does not
 cover systematic errors such as a biased miner, which the design and the Limitations address.
+
+\paragraph{Analyses fixed in advance.} Before any graph of these checks was mined, we fixed twelve
+tests, with their thresholds and the analysis code; Table~\ref{tab:ext-plan} lists them with their
+outcomes for both miners. Four of the twelve fail with GPT-6 (H1a, H1c, H2a$'$, H2b), and with
+gpt-oss-120b also H3c. The order
+tests H1a and H1c fail because the entity graph and DiscoScore, which barely react to any edit
+(Figure~\ref{fig:ladders}), are more stable than the mined $\LCS$. Two deviations were logged after
+the first results were read, and each adds an analysis without removing one. DiscoScore RC and LC
+count noun repetitions regardless of order, so H1a and H1c are also reported without them; they
+still fail. ContraDoc's clean documents were mined a second time to give a noise floor. Everything
+else in \S\ref{sec:exp-external} and in this appendix came afterwards: the signed sum, the
+consistent-sentence control, the effect sizes, the equivalence tests, the matched design, the
+restatement ablation, the ChatProtect verdict-world test and the essays.
+
+\begin{table*}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{6.6cm}>{\raggedright\arraybackslash}p{5.4cm}cc@{}}
+\toprule
+& & & \multicolumn{2}{c}{Outcome} \\
+\cmidrule(l){4-5}
+Test & Prediction, with its threshold & Result (GPT-6) & GPT-6 & gpt-oss \\
+\midrule
+H1a-gold & LoCoBench: gold-graph $\LCS$ is identical across a response and its two permutations & identical on every permutation & held & held \\
+H1a & LoCoBench: $\LCS$ stays within $\tau$ under permutation more often than every discourse baseline and the judge & $\LCS$ \extLocoPermInvGpt\%, entity graph \extLocoPermInvEntity\%, G-Eval \extLocoPermInvJudge\% & \extHOneAGpt & \extHOneAOss \\
+H1c & ContraDoc, clean documents: the same & $\LCS$ \extCdPermInvGpt\%, entity graph \extCdPermInvEntity\%, G-Eval \extCdPermInvJudge\% & \extHOneCGpt & \extHOneCOss \\
+H1d & SummEval: $|\rho(\LCS,\text{expert coherence})|<0.1$ & $\rho=\extSeRhoCohGpt$ & \extHOneDGpt & \extHOneDOss \\
+H2a & ContraDoc, every claim true: inserting a contradiction lowers $\LCS$ more often than it raises it (sign test, $p<0.05$) & falls \extCdAssertDecGpt, rises \extCdAssertIncGpt{} ($p<\extCdAssertPGpt$) & \extHTwoAAssertGpt & \extHTwoAAssertOss \\
+H2a$'$ & ContraDoc, inserted sentence false, contradiction found: $\LCS$ rises more often than it falls (sign test) & rises \extCdVerdEdgeIncGpt, falls \extCdVerdEdgeDecGpt{} ($p=\extCdVerdEdgePGpt$) & \extHTwoAVerdGpt & \extHTwoAVerdOss \\
+H2b & ContraDoc: recall within a sentence and for nearby sentences exceeds recall for distant ones & within \extCdRecallIntraGpt\%, local \extCdRecallLocalGpt\%, global \extCdRecallGlobalGpt\% & \extHTwoBGpt & \extHTwoBOss \\
+H3a & ChatProtect: each relation between the two sentences has the sign its violated cells predict, at all four truth assignments & \extCpSweepAgreeGpt\% of \extCpSweepNGpt{} cases & \extHThreeAGpt & \extHThreeAOss \\
+H3m & ChatProtect: the miner finds the contradiction more often in contradictory than in other pairs & \extCpConfStrongGpt\% against \extCpConfNoneGpt\% & \extHThreeMinerGpt & \extHThreeMinerOss \\
+H3c & ChatProtect, every claim true: the contradicting sentence lowers $\LCS$ more often than it raises it (sign test) & falls \extCpAssertDecGpt, rises \extCpAssertIncGpt{} ($p<\extCpAssertPGpt$) & \extHThreeCGpt & \extHThreeCOss \\
+H4b & GDTB: senses that compile to no coupling receive one less often than coupling senses receive theirs & \extGdNoneGpt\% against \extGdCorrectGpt\% & \extHFourBNoneGpt & \extHFourBNoneOss \\
+H4b$'$ & GDTB: recall of the gold coupling is higher for explicit than for implicit relations & \extGdExplicitGpt\% against \extGdImplicitGpt\% & \extHFourBExplicitGpt & \extHFourBExplicitOss \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{The twelve tests fixed before mining}, with their outcomes for both miners. Sign
+tests are two-sided at $\alpha=0.05$; ``within $\tau$'': $|\Delta|\le0.01$ on each score's own
+scale. H1a and H1c also fail with DiscoScore RC and LC excluded (\extHOneAExclGpt{} and
+\extHOneCExclGpt{} with GPT-6). The ContraDoc permutations behind H1c split section headers from
+their text (App.~\ref{app:ext-order}).}
+\label{tab:ext-plan}
+\end{table*}
 
 
 \begin{figure*}[t]
@@ -327,7 +378,9 @@ balanced (\extMtEqNoiseUpGpt{} rises, \extMtEqNoiseDownGpt{} falls beyond $\tau$
 $p=\extMtEqNoisePGpt$), so the earlier drift came from mining in separate runs. Permutation is not:
 it moves the score by $\extMtPermMeanGpt$ on average against $\extMtNoiseMeanGpt$ for re-mining, a
 difference of $\extMtEqDiffGpt$ with 90\% interval [\extMtEqLoGpt, \extMtEqHiGpt], and upwards
-more often than downwards (\extMtEqPermUpGpt{} against \extMtEqPermDownGpt, $p=\extMtEqPermPGpt$).
+more often than downwards (\extMtEqPermUpGpt{} against \extMtEqPermDownGpt, $p=\extMtEqPermPGpt$), though not
+significantly once each document counts once (\extMtClPermIncGpt{} against \extMtClPermDecGpt{} of
+\extMtClPermNGpt{} documents, $p=\extMtClPermPGpt$).
 This comparison is confounded, however. ContraDoc's documents are split into paragraphs at blank
 lines, so in its 94 Wikipedia documents every section header (``= = History = ='') is a paragraph and
 a claim of its own, and a permutation separates headers from their sections and can move the title

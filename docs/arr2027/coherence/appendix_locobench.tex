@@ -241,7 +241,12 @@ they tie on every pair: every invariance is kept and no increase is satisfied. T
 reads the entities the text mentions, which an edit almost never changes: it rises on
 \sThreeBDiscEGInc{} increases and keeps \sThreeBDiscEGInv{} invariances.
 Length and DiscoScore move with the surface of the edit and fall about as often as they rise
-(Figure~\ref{fig:ladders}, middle). Length rises with each added link and so passes
+(Figure~\ref{fig:ladders}, middle). A count of discourse markers (inference markers such as \emph{because} and \emph{as a result}
+minus incompatibility markers such as \emph{rules out} and \emph{cannot both}) rises on
+\sThreeBCtlMarkersConflict{} \cp{conflict} pairs, \sThreeBCtlMarkersChain{} \cp{chain} pairs and
+\sThreeBCtlMarkersSign{} \cp{sign} pairs, and falls on \sThreeBCtlMarkersIncFalls{} increases: the
+\cp{conflict} ladders are solvable from surface cues, the others are not.
+Length rises with each added link and so passes
 \sThreeBCtlLengthChain{} \cp{chain} pairs without reading any logic, the confound a length control
 exists to expose; it falls on \sThreeBCtlLengthConflictFalls{} \cp{conflict} pairs, because a
 filler that sets two claims against each other is longer than one that does not.
@@ -319,6 +324,45 @@ it can be raised by restating one constraint as two, or by repeating an inferenc
 deduplicated constraints (one term per pair of claims and set of violated cells) would pass the first
 two tests; only the third, which depends on how the rest of the graph bears on the premise, needs
 the model. On the ladders such edits do not occur, and there the sum does slightly better.
+
+\paragraph{Paired intervals and a deduplicated sum.} Paired family-cluster bootstrap intervals
+(2{,}000 resamples of families; a ladder's three pairs stay together) for the difference between
+$\LCS$ and the signed sum on increases: GPT-6 \pcLcsWsumIncGpt{} points
+\asapCI{\pcLcsWsumIncGptLo}{\pcLcsWsumIncGptHi}, gpt-oss-120b \pcLcsWsumIncOss{}
+\asapCI{\pcLcsWsumIncOssLo}{\pcLcsWsumIncOssHi}, pairwise gpt-oss-120b \pcLcsWsumIncPairOss{}
+\asapCI{\pcLcsWsumIncPairOssLo}{\pcLcsWsumIncPairOssHi} and pairwise Llama \pcLcsWsumIncPairLlama{}
+\asapCI{\pcLcsWsumIncPairLlamaLo}{\pcLcsWsumIncPairLlamaHi}. A sum with one support and one
+conflict term per pair of claims (the largest weight of each) gives exactly the same decisions on
+every arm (GPT-6: \sThreeGraphGptDsumIncPct\% of the increases), since the ladders neither repeat a
+relation nor split one. Against the pairwise judge with verdicts, $\LCS$ on GPT-6 graphs differs by
+\pcLcsPairVInc{} points \asapCI{\pcLcsPairVIncLo}{\pcLcsPairVIncHi} on increases and \pcLcsPairVInv{}
+\asapCI{\pcLcsPairVInvLo}{\pcLcsPairVInvHi} on invariances.
+
+\paragraph{Wrong verdicts.} Each gold verdict is flipped with probability $q$, independently per
+claim and identically on the three rungs of a ladder, which share their claims (20 draws per
+ladder); $\LCS$ and the signed sum are read on the gold graphs at the noisy world, and the declared
+order is the original one. Share of increases satisfied (\%), with the paired family-cluster
+interval of the difference:
+\begin{center}\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+& $q=0.05$ & $q=0.10$ & $q=0.20$ \\
+\midrule
+all, $\LCS$\,/\,sum & \vnLcsIncFive\,/\,\vnWsumIncFive & \vnLcsIncTen\,/\,\vnWsumIncTen & \vnLcsIncTwenty\,/\,\vnWsumIncTwenty \\
+\quad difference & [\vnDiffLoIncFive, \vnDiffHiIncFive] & [\vnDiffLoIncTen, \vnDiffHiIncTen] & [\vnDiffLoIncTwenty, \vnDiffHiIncTwenty] \\
+\cp{conflict} & \vnLcsConflictFive\,/\,\vnWsumConflictFive & \vnLcsConflictTen\,/\,\vnWsumConflictTen & \vnLcsConflictTwenty\,/\,\vnWsumConflictTwenty \\
+\cp{chain} & \vnLcsChainFive\,/\,\vnWsumChainFive & \vnLcsChainTen\,/\,\vnWsumChainTen & \vnLcsChainTwenty\,/\,\vnWsumChainTwenty \\
+\cp{sign} & \vnLcsSignFive\,/\,\vnWsumSignFive & \vnLcsSignTen\,/\,\vnWsumSignTen & \vnLcsSignTwenty\,/\,\vnWsumSignTwenty \\
+\bottomrule
+\end{tabular}
+\end{center}
+A wrong verdict flips the sign of the relations at that claim, so an edit that removes two conflicts
+may remove one conflict and one support at the noisy world. The order then leaves the pair
+unranked, and the two scores net the edit differently: $\LCS$ weighs each relation by how much the
+rest of the graph already constrains its claims, the sum by its weight alone. On \cp{conflict} this
+favours $\LCS$ by \asapCI{\vnDiffLoConflictTwenty}{\vnDiffHiConflictTwenty} points at $q=0.2$, on
+\cp{chain} it costs \asapCI{\vnDiffLoChainTwenty}{\vnDiffHiChainTwenty}; \cp{sign} pairs, whose edit
+involves the falsehood itself, are decided identically.
 
 \paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
 that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of

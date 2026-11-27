@@ -70,7 +70,7 @@ ROWS = [
     ("fair:absolute__gpt-6-sol", "LLM judge, 1–5 rating with verdicts, GPT-6", "other"),
     ("fair:pairwise_verdicts__gpt-6-sol", "LLM judge, pairwise with verdicts, GPT-6", "other"),
     ("base:discourse_rc", "DiscoScore RC", "other"),
-    ("base:discourse_lc", "DiscoScore LC", "other"),
+    ("base:control_markers", "discourse-marker count", "other"),
     ("base:discourse_entity_graph", "entity graph (DiscoScore)", "other"),
     ("base:control_length", "response length", "other"),
 ]
@@ -162,6 +162,13 @@ def fig_ladders(d, out):
             ax.plot([lo, hi], [y, y], color=col, lw=1.4, solid_capstyle="round", zorder=2)
             ax.scatter([p], [y], s=26, color="white" if hollow else col,
                        edgecolor=col if hollow else "white", linewidth=1.2, zorder=3)
+            if kind == "ours" and group == "inc" and okkey == "ok":
+                # Review N9: the share that rises by more than tau (a resolved increase), as a
+                # hollow marker beside the strict share.
+                rt = boot_share(rows_for(d, key, group), "ok_tol")
+                if rt is not None:
+                    ax.scatter([100 * rt[0]], [y], s=22, color="white", edgecolor=col,
+                               linewidth=1.1, zorder=4)
             if True:  # every point carries its value, in every panel
                 span = 62 if okkey == "falls" else 100
                 ax.text(hi + 0.02 * span, y, f"{p:.0f}", va="center", ha="left",

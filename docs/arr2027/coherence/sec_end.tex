@@ -9,13 +9,12 @@ argument's relations. $\LCS$, the weight of evidence that the coherence MRF lend
 world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
 committed world as the readout (App.~\ref{app:why}). On LoCoBench, a signed sum of relation weights
-does slightly better than $\LCS$, and a judge comparing two responses with their verdicts is
-competitive with it. On natural
+does slightly better than $\LCS$ with correct verdicts and worse with wrong ones, and a judge
+comparing two responses with their verdicts is competitive with it. On natural
 text the score is not a proxy for rated discourse coherence, falls under detected contradictions,
-and tracks essay quality beyond length. Its advantage over the signed sum is so far a matter of
-design (presentation invariance, saturation of repeated support) rather than of accuracy. What limits $\LCS$ is
-relation extraction (recall, above all for contradictions within a sentence, and calibrated
-weights) and the verdicts it is read against. Logical coherence is meant
+and tracks essay quality beyond length. Its advantage over the signed sum lies in design (presentation
+invariance, saturation of repeated support) and in robustness to wrong verdicts, not in accuracy. What limits $\LCS$ is
+relation extraction and the verdicts it is read against. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
 \section*{Limitations}\label{sec:limitations}
@@ -54,7 +53,8 @@ score as uninformative rather than as incoherent.
 wrong verdict can flip the sign of the relations at that claim. On LoCoBench's gold graphs, flipping
 one verdict of a claim with a relation moves $\LCS$ by a median of \flipMedian{} (more than $0.1$
 for \flipOverTenth\% of the \flipTouched{} such flips), and the change grows with the claim's
-degree. Verdicts are binary, so a claim the
+degree. Flipping each verdict with probability $0.2$, $\LCS$ still satisfies \vnLcsIncTwenty\% of
+LoCoBench's increases on gold graphs, against \vnWsumIncTwenty\% for the signed sum. Verdicts are binary, so a claim the
 evidence neither supports nor refutes is treated as false. On LoCoBench the verdicts are the
 generator's factuality labels, which model an error-free pipeline, so the effect of verdict errors
 is not measured.

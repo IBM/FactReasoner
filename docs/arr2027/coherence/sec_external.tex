@@ -37,7 +37,7 @@ ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParWsumAsserted & \asapParJu
 sum over the same graphs and the G-Eval judge. ``Contra.'': the added sentence contradicts; ``found'': the
 graph links it by a contradiction. ``Kept'': the share of paragraph permutations that move a score by at most $\tau$;
 in parentheses, the same share when the unchanged text is mined again. The entity graph and
-DiscoScore keep 87--100\% of permutations because they barely react to any edit
+DiscoScore keep 99--100\% of LoCoBench permutations because they barely react to any edit
 (Figure~\ref{fig:ladders}). Ties, intervals and gpt-oss-120b are in App.~\ref{app:external}.}
 \label{tab:external}
 \end{table}
@@ -47,12 +47,10 @@ on natural text labeled for related properties (Table~\ref{tab:external}). Claim
 (atomized claims for the essays) and relations come from the GPT-6 graph-level miner. Except where
 stated, $\LCS$ is read at the asserted world, where every inference is a support and every
 contradiction a conflict, so these tests exercise how the score combines mined relations; brackets
-give 95\% bootstrap intervals (App.~\ref{app:external}). Where verdicts exist the evidence is
-mixed: the \extCpVwFoundNGpt{} found ChatProtect contradictions with a false sentence all raise $\LCS$
-(a sign check; \extCpVwFoundBothFalseGpt{} involve two false sentences), but its \extCpVwAllNGpt{} pairs
-with verdicts give \extCpVwAllIncGpt{} rises and \extCpVwAllDecGpt{} falls and ContraDoc
-\extCdVerdEdgeIncGpt{} and \extCdVerdEdgeDecGpt{} ($p=\extCpVwAllPGpt$, $\extCdVerdEdgePGpt$), and
-source-checked verdicts weaken the essay result.
+give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. Where verdicts exist the evidence is
+mixed: ChatProtect's \extCpVwFoundNGpt{} found contradictions with a false sentence all raise $\LCS$,
+a sign check, but its \extCpVwAllNGpt{} pairs with verdicts and ContraDoc's show no significant
+direction ($p=\extCpVwAllPGpt$, $\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}).
 
 \paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only the relations that constrain
 truth values (App.~\ref{sec:notions}). On SummEval \citep{summeval} it correlates with expert
@@ -70,7 +68,8 @@ lowers $\Lambda$ (Lemma~\ref{lem:edit}), so where the miner finds one the fall c
 $\LCS$ falls on \extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs
 \citep{contradoc} and on all \extCpFoundFallGpt{} ChatProtect pairs \citep{mundler2024} (median
 change $\extCdEffFoundMedianGpt$ and $\extCpEffFoundMedianGpt$). Over all pairs it falls far more
-often than it rises (sign tests, $p<\extCdAssertPGpt$ and $p<\extCpAssertPGpt$), and adding a
+often than it rises, also counted by source document and by topic (\extCdClAssertDecGpt{} of
+\extCdClAssertNGpt{} documents, \extCpClAssertDecGpt{} of \extCpClAssertNGpt{} topics), and adding a
 consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
 contradictions barely move it, so recall bounds the result: the miner finds
 \extCdRecallInsertGpt\% of ContraDoc's and \extCpConfStrongGpt\% of ChatProtect's contradictions. The
@@ -78,16 +77,14 @@ signed sum behaves alike: paired, the two differ only on ContraDoc pairs whose c
 found (\extCdMcFoundOnlyLcsGpt{} pairs where only $\LCS$ falls, \extCdMcFoundOnlySumGpt{} where only the
 sum does; $p=\extCdMcFoundPGpt$). The judge falls too, never rising on ContraDoc.
 
-\paragraph{Order.} Permuting self-contained paragraphs changes neither claims, relations nor
-committed world, so gold-graph $\LCS$ is unchanged. On LoCoBench, mined $\LCS$ stays within
-$\tau=\sThreeTol$ on \extLocoPermInvGpt\% of permutations against \extLocoNoiseInvGpt\% when the
-unchanged text is mined again, but equivalence within $\tau$ is not established (90\% interval of
-the difference in mean change up to \extLocoEqHiGpt). The judge falls on \extLocoPermDecJudge\% of
-the permutations. ContraDoc's permutations separate section headers from their text, which
-confounds the order test there (App.~\ref{app:ext-order}).
+\paragraph{Order.} Gold-graph $\LCS$ is unchanged by permuting self-contained paragraphs. On
+LoCoBench, mined $\LCS$ stays within $\tau=\sThreeTol$ on \extLocoPermInvGpt\% of permutations
+against \extLocoNoiseInvGpt\% for re-mining, without establishing equivalence; the judge falls on
+\extLocoPermDecJudge\%. The ContraDoc permutations split section headers from their text, which
+confounds the test there (App.~\ref{app:ext-order}).
 
-\paragraph{Essay quality beyond length.} As a convergent-validity probe, we score \asapEssays{}
-ASAP~2.0 essays \citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
+\paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
+\citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
 Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correlation of
 \asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed
 (\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), the relation count

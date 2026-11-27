@@ -64,10 +64,11 @@ REL_TIE = 1e-10
 # probability-weighted over the rating token's logprobs and drift by 1e-13..1e-5, were affected.)
 DECIDE = {"lambda": (REL_TIE, True), "lambda_assert": (REL_TIE, True),
           "mean_marginal": (REL_TIE, True),
-          "wsum": (REL_TIE, True), "count": (REL_TIE, True),
+          "wsum": (REL_TIE, True), "count": (REL_TIE, True), "dsum": (REL_TIE, True),
           "wsum_assert": (REL_TIE, True), "count_assert": (REL_TIE, True)}
 #: The signed baselines over the same graphs, by readout key -> (macro tag, display name).
 SIGNED = {"wsum": ("Wsum", "signed weight sum"), "count": ("Count", "signed count"),
+          "dsum": ("Dsum", "deduplicated signed sum"),
           "wsum_assert": ("WsumA", "signed weight sum, asserted"),
           "count_assert": ("CountA", "signed count, asserted")}
 # Invariance within a tolerance, on each score's own [0, 1] scale (LCS for the MRF arms,
@@ -91,6 +92,7 @@ BASELINES = {
     "control_claim_count": ("CtlClaims", "claim count"),
     "control_length": ("CtlLength", "response length"),
     "control_edit_distance": ("CtlEdit", "edit distance"),
+    "control_markers": ("CtlMarkers", "marker count"),
     "discourse_rc": ("DiscRC", "DiscoScore RC"),
     "discourse_lc": ("DiscLC", "DiscoScore LC"),
     "discourse_entity_graph": ("DiscEG", "entity graph"),
@@ -161,7 +163,16 @@ def score_item(item, rels):
     def signed(x, weighted):
         return float(sum((r[3] if weighted else 1.0) * (1 if A.is_support(r, x) else -1)
                          for r in tup))
+    def dedup(x):
+        # Review N1: one support and one conflict term per unordered pair of claims (the largest
+        # weight of each), so a constraint stated as two halves or repeated counts once.
+        best = {}
+        for r in tup:
+            key = (frozenset((r[0], r[1])), A.is_support(r, x))
+            best[key] = max(best.get(key, 0.0), r[3])
+        return float(sum(p if sup else -p for (_pair, sup), p in best.items()))
     return {"lambda": lam, "lcs": A.lcs_flat(lam, n), "lambda_assert": lam_a,
+            "dsum": dedup(xv),
             "lcs_assert": A.lcs_flat(lam_a, n),
             "wsum": signed(xv, True), "count": signed(xv, False),
             "wsum_assert": signed(xa, True), "count_assert": signed(xa, False),
@@ -338,6 +349,20 @@ def spread(ladders, scores):
             "inc_median": float(np.median(inc)) if inc else None}
 
 
+#: Review N10: explicit discourse markers in the ladders' fillers. A lexical baseline that counts
+#: inference markers minus incompatibility markers in the response text.
+MARKERS_INF = ("because", "therefore", "thus", "hence", "as a result", "in consequence",
+               "consequently", "which shows", "shows that", "follows that", "so that", "since")
+MARKERS_INC = ("rules out", "cannot both", "cannot be squared", "contradicts", "inconsistent with",
+               "incompatible", "cannot have", "is false", "refutes", "but")
+
+
+def marker_score(text):
+    t = " " + text.lower() + " "
+    cnt = lambda ms: sum(len(re.findall(r"\b" + re.escape(m) + r"\b", t)) for m in ms)  # noqa: E731
+    return float(cnt(MARKERS_INF) - cnt(MARKERS_INC))
+
+
 def load_baselines():
     out = defaultdict(dict)
     for path in glob.glob(os.path.join(ROOT, "baselines", "*.jsonl")):
@@ -423,6 +448,7 @@ def main() -> int:
             res[arm]["mean_relations"] = float(np.mean([len(v) for v in arms[arm].values()]))
     res["gold"]["mean_relations"] = float(np.mean([len(v) for v in arms["gold"].values()]))
     base = load_baselines()
+    base["control_markers"] = {iid: {"score": marker_score(it["response"])} for iid, it in items.items()}
     bres = {}
     for name, rows in base.items():
         bres[name] = assess(ladders, lambda i, rows=rows: rows[i]["score"] if i in rows else None,
