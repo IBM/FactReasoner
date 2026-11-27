@@ -1,0 +1,124 @@
+%% ============================================================================
+\section{Properties of the Score}
+\label{app:props}
+%% ============================================================================
+
+Theorem~\ref{thm:mono} is the main result, and nothing in this section is needed to state or prove
+it. The section collects what else is true of the score: which of its choices the guarantee depends
+on (App.~\ref{app:why}), and the properties that make $\Lambda$ read as an amount of evidence
+(App.~\ref{app:further}). Proofs are in App.~\ref{app:proof-why} and App.~\ref{app:proof-props}.
+
+\subsection{Why This Score}
+\label{app:why}
+
+Theorem~\ref{thm:mono} rests on two choices, the relation tables and the world at which the MRF is
+read, and neither can be changed.
+
+\begin{theorem}[Sign-definiteness is necessary and sufficient]
+\label{thm:necessity}
+Fix the priors and $\xs$. Adding a positive table $\psi$ over a pair of claims $e$ never decreases
+(resp.\ increases) $\Lambda$, for every relation graph, if and only if $\psi(\xs_e)=\max\psi$
+(resp.\ $\min\psi$).
+\end{theorem}
+
+The tables of Eq.~\ref{eq:psi} take only the values $1$ and $1-p_r$, so they meet the condition at
+every $\xs$ (App.~\ref{app:signdef}); a table whose committed cell lies strictly between its
+extremes helps in some graphs and hurts in others.
+
+\paragraph{Row-stochastic tables.}
+\label{app:rowstoch}
+A natural alternative to Eq.~\ref{eq:psi} uses tables that are
+row-stochastic in the source, so that a false premise leaves its conclusion at the prior
+(App.~\ref{app:earlier}). Such tables fail Theorem~\ref{thm:necessity}'s test. At $\xs=\one$ they
+are sign-definite with the intended sign only for $p\ge\frac12$. Below it the committed cell of an
+entailment is the table's minimum, so a weak entailment lowers the score and a weak contradiction
+raises it. When the source is false at $\xs$, the committed cell holds the prior's value
+$\frac12$, which is neither the maximum nor the minimum, so they fail at every weight except
+$p=\frac12$, where the table is constant and has no effect. For weight changes,
+App.~\ref{app:proof-why} gives the analogue of Theorem~\ref{thm:necessity} as a sufficient
+condition.
+
+\begin{proposition}[No other readout world]
+\label{prop:unique}
+For $n\ge2$ and any world $x\neq\xs$, some elementary improvement strictly lowers
+$\log\PR(x)-\log\pi(x)$, for any priors and any $\R$.
+\end{proposition}
+
+The order and the readout must use the same world. Over \thmSteps{} random improving edits,
+Shogenji's measure, which ignores $\xs$, falls on \fallsPctShogenjiSigndef\% and $\Lambda$ on none
+(App.~\ref{app:verify}). So does the mean posterior marginal $\frac1n\sum_i\PR(a_i{=}1)$: deleting a
+contradiction that holds down a hub claim, which itself contradicts five others, lowers it from
+$\starFiveMMa$ to $\starFiveMMb$, and it falls on \fallsPctMmSigndef\% of the random edits.
+
+\paragraph{The readout world.} Proposition~\ref{prop:unique} does not say that $\xs$ is the right
+world; choosing it is the factuality pipeline's job. It says that the order and the readout must
+use the same world. It also does not exclude readouts that combine several worlds; of the five
+App.~\ref{app:earlier} examines, four are not monotone and the fifth violates A2.
+
+\paragraph{Why not count relations?} Monotonicity alone admits trivial scores: the signed weight sum
+$\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is monotone by construction. But a count credits every relation in
+full, whether or not it rules out anything plausible, so it depends on how an argument is presented
+rather than on what it rules out. Two entailments $a\Rightarrow b$ and $b\Rightarrow a$ of weight
+$p$ multiply to exactly the table of one equivalence of weight $p$, so they induce the same $\PR$
+and the same $\Lambda$, but they count $2p$ against $p$, which violates A2. Repeating a support
+likewise adds its weight each time, where $\Lambda$ saturates (Prop.~\ref{prop:props}(vii)).
+Averaging removes the dependence on the number of relations but breaks monotonicity, since a weak
+support lowers an average. $\Lambda$, by contrast, weighs each relation by what it rules out under
+the rest of the model.
+
+\paragraph{What is not forced.} These results fix the class of tables and the readout world; they
+do not make $\Lambda$ the unique score satisfying A1--A3. Any score that is strictly increasing in
+$\Lambda$ for a fixed prior and takes a prior-independent value at $\Lambda=0$ satisfies them too,
+which is how $\LCS$ does. And any reweighting $p\mapsto1-(1-p)^\beta$ with $\beta>0$ gives another
+monotone score of the same form, where different $\beta$ can rank incomparable graphs differently.
+We take $\beta=1$ because it makes $p_r$ the probability that a check catches a violation, so the
+check reading holds with the weights as estimated.
+
+\subsection{Further Properties}
+\label{app:further}
+
+\begin{proposition}[Further properties]
+\label{prop:props}
+\label{prop:basic}
+\label{prop:neg}
+\label{prop:sat}
+(i) $\Lambda(\varnothing)=0$ for every $\pi$. (ii) $\Lambda\ge0$ if $\R$ has only supports and
+$\Lambda\le0$ if only conflicts. (iii) If $\R_1$ and $\R_2$ have scopes in disjoint sets of claims,
+$\Lambda(\R_1\uplus\R_2)=\Lambda(\R_1)+\Lambda(\R_2)$. (iv) Replacing a claim by its negation,
+together with its verdict, its prior and every coupling at it, preserves every sign, $\Lambda$ and
+$\LCS$. (v) $\sum_{r\in\Rcon}\log(1-p_r)\le\Lambda(\R)\le-\log\pi(\xs)$. (vi) A support's gain is
+at most $-\log\bigl(1-p_r(1-\PR(\xs))\bigr)$. (vii) For $p_r>0$, a second copy of a support adds
+strictly less than the first.
+\end{proposition}
+
+$\Lambda$ is thus evidence, in nats, that adds across independent sub-arguments, and redundant
+support saturates. Item by item:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \emph{Neutrality} (i). With no relations $\PR=\pi$, so $\Lambda=0$ and $\LCS=\frac12$ whatever
+  the priors; this is A3.
+\item \emph{Pure graphs} (ii). An argument that draws only relations its committed world upholds
+  cannot score below neutral, and one that draws only relations it breaks cannot score above it.
+\item \emph{Additivity} (iii). Sub-arguments over disjoint claims contribute independently, so
+  $\Lambda$ is an amount of evidence in \emph{nats} (natural-log units: a change of $\Delta$ nats
+  multiplies $\PR(\xs)$ by $e^{\Delta}$) that adds across independent parts of an argument. $\LCS$ is
+  not additive (App.~\ref{app:lcs-lambda}).
+\item \emph{Negation invariance} (iv). Whether a decomposition records a denied claim as itself or
+  as its asserted negation does not matter, provided the verdict, the prior and the couplings are
+  rewritten consistently (App.~\ref{app:framework}, \emph{Claims and their negations}).
+\item \emph{Bounds} (v). Since every factor is at most $1$, $Z_\R\le1$ and $-\log Z_\R\ge0$, so the
+  conflicts alone set a floor: $\Lambda$ cannot fall below the sum of their $\log(1-p_r)$, whatever
+  the supports do. The ceiling comes from $\PR(\xs)\le1$; with weights below $1$ it is approached
+  only as the relations come close to forcing $\xs$. The floor tends to $-\infty$ as a conflict's
+  weight tends to $1$ (App.~\ref{app:weights}).
+\item \emph{Bounded gain} (vi). A support earns credit only for the probability it removes from
+  worlds other than $\xs$: in Lemma~\ref{lem:edit}, $q_r\le1-\PR(\xs)$. Once the relations nearly
+  force $\xs$, further support earns almost nothing.
+\item \emph{Saturation} (vii). A repeated relation earns less each time, and repeated copies
+  converge rather than accumulate (App.~\ref{app:proof-props}), unlike a count.
+\end{itemize}
+Each relation's leave-one-out contribution $\Delta_r=\Lambda(\R)-\Lambda(\R\setminus\{r\})$, the
+bars of Figure~\ref{fig:voyager}, is Lemma~\ref{lem:edit} applied to $\R\setminus\{r\}$, so it has a
+guaranteed sign: positive for a support and negative for a conflict, whenever $p_r>0$. The contributions are not
+additive and need not sum to $\Lambda$, since each is computed against the rest of the model.
+Weighted mini-bucket elimination \citep{wmb}, for graphs beyond exact inference, preserves the
+guarantees only up to the approximation.

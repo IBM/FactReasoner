@@ -100,8 +100,7 @@
 \input{asap_numbers}
 \newcommand{\asapCI}[2]{\,{\scriptsize[#1,\,#2]}}
 
-\title{Beyond Individual Claims: Probabilistic Logical Coherence\\
-       for Long-Form LLM Evaluation}
+\title{Probabilistic Logical Coherence for Long-Form LLM Evaluation}
 
 \author{Anonymous ACL submission}
 
@@ -109,25 +108,27 @@
 \maketitle
 
 \begin{abstract}
-Long-form factuality metrics verify claims one at a time, so they cannot tell whether a response's
-claims hold together as an argument. We define logical coherence by the relations a response draws
-between its claims, read against their truth values, and require that over a fixed set of claims
-any edit making the relations agree better with the facts raises the score, wherever it occurs.
-Natural readouts of a Markov random field over claim truth values violate this. Our logical
-coherence score (LCS), the weight of evidence that the relations lend to the truth values a
-factuality pipeline assigns, satisfies it: we prove it strictly monotone, show that sign-definite
-potentials are necessary and no other single world can be read, and compute it with one
-partition-function query. On LoCoBench, LCS satisfies every declared ordering on gold graphs, and on
-mined graphs its misses trace to extraction, while LLM judges miss about half of the declared
-increases. On five external datasets and student essays, mined LCS is unrelated to rated discourse
-coherence, falls under inserted contradictions, signs every tested relation as predicted, and tracks
-essay quality beyond length.
+  Long-form factuality metrics verify claims in isolation and therefore
+  cannot assess whether a response's claims collectively form a logically coherent argument.
+  We define \emph{logical coherence} as the degree to which the relations an argument
+  draws among its claims are supported by the claims' truth values. To quantify this property,
+  we encode these relations in a Markov random field over claim truth values and define the
+  \emph{Logical Coherence Score} (LCS), the weight of evidence that the relations lend to the truth
+  values a factuality pipeline assigns.
+  We prove that LCS is strictly monotone under every coherence-improving edit, for any priors and
+  relation graph.
+  On LoCoBench, a benchmark that holds claims fixed while varying only
+  their relational structure, LCS satisfies every gold coherence ordering, and on mined graphs
+  every error traces to relation extraction rather than scoring, while LLM judges are near chance
+  at recognizing an added valid inference. On natural text labelled by others, LCS is not a proxy
+  for rated discourse coherence, falls when a detected contradiction is added, is unaffected by the
+  order of paragraphs, and tracks the quality of student essays beyond their length.
 \end{abstract}
+
 
 \input{sec_intro}
 \input{sec_framework}
-\input{sec_locobench}
-\input{sec_external}
+\input{sec_eval}
 \input{sec_related}
 \input{sec_end}
 
@@ -136,6 +137,7 @@ essay quality beyond length.
 \appendix
 
 \input{appendix_framework}
+\input{appendix_props}
 \input{appendix_proofs}
 \input{appendix_lcslambda}
 \input{appendix_alternatives}

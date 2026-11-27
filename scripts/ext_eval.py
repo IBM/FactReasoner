@@ -260,8 +260,11 @@ def check1(args):
             if iid not in recs:
                 continue
             r = rels_of(recs[iid])
+            kinds = Counter(t for _, _, t, _ in r)
             rows.append({"group": x["expected"]["family_id"], "lcs": lcs_at(x["num_atoms"], r)[0],
-                         "empty": not r, **x["expected"]["expert"],
+                         "empty": not r, "n_ent": kinds["entailment"], "n_eqv": kinds["equivalence"],
+                         "n_con": sum(kinds[k] for k in CONFLICTISH), "n_rel": len(r),
+                         **x["expected"]["expert"],
                          "judge": base.get("judge_geval@gpt-6-sol", {}).get(iid)})
         groups = grouped(rows, "group")
         out = {"errors": err, "n": len(rows), "empty_share": share(rows, lambda r: r["empty"])}
@@ -272,6 +275,33 @@ def check1(args):
         J = [r for r in rows if r["judge"] is not None]
         if J:
             out["judge_rho_coherence"] = spearman([r["judge"] for r in J], [r["coherence"] for r in J])
+        # Summaries with at least one relation: on the rest LCS is exactly 1/2, so this checks that
+        # the null correlation is not an artefact of the score being constant there.
+        NE = [r for r in rows if not r["empty"]]
+        f = lambda S: spearman([r["lcs"] for r in S], [r["coherence"] for r in S])  # noqa: E731
+        out["nonempty_n"] = len(NE)
+        out["nonempty_rho_coherence"] = f(NE)
+        out["nonempty_rho_coherence_ci"] = boot(f, grouped(NE, "group"))
+        # Restatements (equivalences) are supports, so they raise LCS, while raters penalize the
+        # redundancy they signal; inferences alone, and the two relation counts, separate the effects.
+        INF = [r for r in NE if r["n_eqv"] == 0]
+        EQV = [r for r in NE if r["n_eqv"] > 0]
+        for key, S in (("inference_only", INF), ("restatement", EQV)):
+            out[f"{key}_n"] = len(S)
+            out[f"{key}_rho_coherence"] = f(S)
+            out[f"{key}_rho_coherence_ci"] = boot(f, grouped(S, "group"))
+        for key, col in (("restatements", "n_eqv"), ("inferences", "n_ent")):
+            g = lambda S, c=col: spearman([r[c] for r in S], [r["coherence"] for r in S])  # noqa: E731
+            out[f"count_{key}_rho_coherence"] = g(NE)
+            out[f"count_{key}_rho_coherence_ci"] = boot(g, grouped(NE, "group"))
+        out["relations_by_kind"] = {"inference": sum(r["n_ent"] for r in NE),
+                                    "restatement": sum(r["n_eqv"] for r in NE),
+                                    "conflict": sum(r["n_con"] for r in NE),
+                                    "all": sum(r["n_rel"] for r in NE)}
+        JNE = [r for r in NE if r["judge"] is not None]
+        if JNE:
+            out["nonempty_judge_rho_coherence"] = spearman([r["judge"] for r in JNE],
+                                                           [r["coherence"] for r in JNE])
         out["H1d_pass"] = abs(out["rho_coherence"]) < 0.1
         res[f"1d:{arm}"] = out
     # Pre-registered verdicts for H1a / H1c
@@ -643,6 +673,7 @@ def write_macros(ev, path):
         if c:
             P = c["perm"]
             m(f"CdPermInv{tag}", pct(P["lcs"]["invariant"]))
+            m(f"CdPermN{tag}", P["lcs"]["n"])
             m(f"CdPermMean{tag}", f"{P['lcs']['mean_abs']:.3f}")
             if c.get("noise_floor", {}).get("lcs"):
                 m(f"CdNoiseInv{tag}", pct(c["noise_floor"]["lcs"]["invariant"]))
@@ -665,6 +696,26 @@ def write_macros(ev, path):
             for k in ("consistency", "fluency", "relevance"):
                 m(f"SeRho{k.title()}{tag}", f2(d[f"rho_{k}"]))
             m(f"SeEmpty{tag}", pct(d["empty_share"]))
+            if "nonempty_rho_coherence" in d:
+                m(f"SeNonEmptyN{tag}", f"{d['nonempty_n']:,}".replace(",", "{,}"))
+                m(f"SeNonEmptyRhoCoh{tag}", f2(d["nonempty_rho_coherence"]))
+                m(f"SeNonEmptyRhoCoh{tag}Lo", f2(d["nonempty_rho_coherence_ci"][0]))
+                m(f"SeNonEmptyRhoCoh{tag}Hi", f2(d["nonempty_rho_coherence_ci"][1]))
+                if "nonempty_judge_rho_coherence" in d:
+                    m(f"SeNonEmptyJudgeRhoCoh{tag}", f2(d["nonempty_judge_rho_coherence"]))
+            for key, kt in (("inference_only", "InfOnly"), ("restatement", "Restate")):
+                if f"{key}_n" in d:
+                    m(f"Se{kt}N{tag}", d[f"{key}_n"])
+                    m(f"Se{kt}RhoCoh{tag}", f2(d[f"{key}_rho_coherence"]))
+                    m(f"Se{kt}RhoCoh{tag}Lo", f2(d[f"{key}_rho_coherence_ci"][0]))
+                    m(f"Se{kt}RhoCoh{tag}Hi", f2(d[f"{key}_rho_coherence_ci"][1]))
+            for key, kt in (("restatements", "CountRestate"), ("inferences", "CountInf")):
+                if f"count_{key}_rho_coherence" in d:
+                    m(f"Se{kt}RhoCoh{tag}", f2(d[f"count_{key}_rho_coherence"]))
+                    m(f"Se{kt}RhoCoh{tag}Lo", f2(d[f"count_{key}_rho_coherence_ci"][0]))
+                    m(f"Se{kt}RhoCoh{tag}Hi", f2(d[f"count_{key}_rho_coherence_ci"][1]))
+            for k_, v_ in d.get("relations_by_kind", {}).items():
+                m(f"SeRel{k_.title()}{tag}", f"{v_:,}".replace(",", "{,}"))
             m(f"HOneD{tag}", held(d["H1d_pass"]))
             if tag == "Gpt" and "judge_rho_coherence" in d:
                 m("SeJudgeRhoCoh", f2(d["judge_rho_coherence"]))
@@ -760,6 +811,20 @@ def write_macros(ev, path):
                 m(f"Gd{ct}Correct{tag}", pct(v["correct"]))
                 if tag == "Gpt":
                     m(f"Gd{ct}N", v["n"])
+    # Held counts per arm. The paper groups the advance predictions into six about the score
+    # (E1-E6: H1d; H1a and H1c together; H2a; H3c; H3a; H2a') and four about the miner alone
+    # (H4b-none, which is E7, H2b, H3-miner, H4b-explicit).
+    WORDS = "zero one two three four five six seven eight nine ten".split()  # counts, as prose
+    vals = {l.split("}{")[0].split("\\ext", 1)[1]: l.split("}{", 1)[1][:-1] for l in L[1:]}
+    for tag in ("Gpt", "Oss"):
+        ok = lambda k: vals.get(f"{k}{tag}") == "held"  # noqa: E731
+        score = [ok("HOneD"), ok("HOneA") and ok("HOneC"), ok("HTwoAAssert"), ok("HThreeC"),
+                 ok("HThreeA"), ok("HTwoAVerd")]
+        miner = [ok("HFourBNone"), ok("HTwoB"), ok("HThreeMiner"), ok("HFourBExplicit")]
+        m(f"ScoreHeld{tag}", WORDS[sum(score)])
+        m(f"MinerHeld{tag}", WORDS[sum(miner)])
+    m("ScoreN", WORDS[6])
+    m("MinerN", WORDS[4])
     names = [l.split("}{")[0] for l in L[1:]]
     dup = [k for k, n in Counter(names).items() if n > 1]
     assert not dup, f"duplicate macro names: {dup}"
@@ -768,7 +833,8 @@ def write_macros(ev, path):
     import re as _re
     defined = {n.split("\\ext", 1)[1] for n in names}
     used = set()
-    for tex in ("sec_external.tex", "appendix_external.tex"):
+    for tex in ("sec_external.tex", "appendix_external.tex", "sec_locobench.tex", "sec_intro.tex",
+                "sec_end.tex", "main.tex"):
         tp = os.path.join(os.path.dirname(path), tex)
         if os.path.exists(tp):
             used |= set(_re.findall(r"\\ext([A-Za-z]+)", open(tp).read()))

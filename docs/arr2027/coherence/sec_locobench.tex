@@ -1,39 +1,30 @@
-%% ============================================================================
-\section{Evaluation on LoCoBench}
+\subsection{Controlled Evaluation on LoCoBench}
 \label{sec:experiments}
 \label{sec-experiments}
 \label{sec-locobench}
-%% ============================================================================
 
-\paragraph{Data.} Testing the requirement needs responses that differ in argument structure over
-fixed claims, with gold relation graphs. LoCoBench \citep{anonlocobench} builds \emph{coherence ladders} for this purpose.
-Each of its \sThreeFamilies{} families is an expert answer written once, as a template with
-\emph{slots}. A slot joins two claims, and its alternative fillers draw no link, a support or a
-conflict between them. A ladder's three rungs $\rho_0,\rho_1,\rho_2$ splice different fillers into
-the template, so they share every other word, every claim and every verdict. Three ladder types
-are declared increasing: \cp{conflict} sets two true claims against each other at two slots, then
-one, then none; \cp{chain} draws none, one or both links of an entailment chain between true claims;
-\cp{sign} derives a false claim from a true one, leaves them unlinked, then refutes the falsehood.
-Two are declared invariant: \cp{order} permutes self-contained paragraphs, and \cp{control} words
-one entailment three ways. Gold relations are what a three-vendor model committee reads, pair by
-pair, without seeing the intended links. The dataset has \sThreeLadders{} ladders (\sThreeNConflict{} of each other type and
-\sThreeNControl{} \cp{control}) and \sThreeItems{} responses of 12--14 claims, two or three of them
-false. Factuality labels give the verdict world (an error-free pipeline); stance gives the
-asserted world, all-true except on the top \cp{sign} rung, where the falsehood is refuted
-(App.~\ref{sec-full-locobench}).
+\paragraph{Data.} LoCoBench \citep{anonlocobench} builds \emph{coherence ladders}: responses over
+fixed claims that differ only in argument structure, with gold relation graphs. Each of its
+\sThreeFamilies{} families is an expert answer written as a template with \emph{slots}; a slot
+joins two claims, and its fillers draw no link, a support or a conflict between them. A ladder's
+three rungs $\rho_0,\rho_1,\rho_2$ splice different fillers into the template, so they share every
+other word, every claim and every verdict. Three ladder types are declared increasing: \cp{conflict}
+removes conflicts between true claims, \cp{chain} adds entailments between them, and \cp{sign} goes
+from deriving a false claim, through no link, to refuting it. Two are declared invariant: \cp{order}
+permutes paragraphs and \cp{control} rewords one entailment. A three-vendor model committee reads
+the gold relations pair by pair. The \sThreeLadders{} ladders have \sThreeItems{} responses of
+12--14 claims, two or three of them false; factuality labels give the verdict world and stance the
+asserted world (App.~\ref{sec-full-locobench}).
 
-\paragraph{Setup.} The ladders give \sThreeNIncPairs{} \emph{Increase} and \sThreeNInvPairs{}
-\emph{Invariance} rung pairs, satisfied by a strict increase and by equality, decided on $\Lambda$
-in exact arithmetic at $10^{-9}$ (App.~\ref{app:setup-details}). Mined graphs are re-estimated per
-rung, so we also count invariance within $\tau=\sThreeTol$ on each score's $[0,1]$ scale, and call
-an increase \emph{resolved} when the score rises by more than $\tau$; $\tau$ was fixed on
-development families outside the dataset. An \emph{arm} fixes the graph: \cp{gold} (band
-midpoints); the graph-level miner with GPT-6, which is neither the generator nor on the committee,
-and with gpt-oss-120b; and the pairwise miner (window $4$) with gpt-oss-120b and Llama-3.3-70B.
-Each graph is scored with flat priors at the verdict world (ours) and the asserted world. The
-baselines are claim count, length, DiscoScore's RC, LC and entity graph \citep{discoscore}, NLI
-contradiction, ROSCOE self-consistency \citep{roscoe}, and two LLM judges (G-Eval \citep{geval} and a
-1--5 rating, five runs each, with GPT-6 and gpt-oss-120b). Intervals are 95\% family bootstraps.
+\paragraph{Setup.} The ladders induce \sThreeNIncPairs{} \emph{Increase} and \sThreeNInvPairs{}
+\emph{Invariance} comparisons. Every score must rise on an Increase pair and stay equal on an
+Invariance pair, up to a relative tie tolerance of $\sThreeRelTie$ (App.~\ref{app:setup-details}).
+An \emph{arm} fixes the graph source: the \cp{gold} relations or one of four mining
+configurations, each read at the verdict world (our default) and at the asserted world. Baselines
+are claim count, length, DiscoScore (RC, LC, entity graph) \citep{discoscore}, NLI contradiction,
+ROSCOE self-consistency \citep{roscoe}, and judges using G-Eval \citep{geval} and direct 1--5
+ratings, averaged over five runs with GPT-6 and gpt-oss-120b. Error bars are 95\%
+percentile-bootstrap intervals over families.
 
 \begin{figure*}[t]
 \centering
@@ -42,11 +33,12 @@ contradiction, ROSCOE self-consistency \citep{roscoe}, and two LLM judges (G-Eva
 \sThreeNInvPairs{} declared invariances.} \emph{Left:} share of Increase pairs on which the score
 rises strictly; \emph{middle:} share on which it falls (the rest are ties). A score that ignores the
 edits gets $0\%$ in both, a random one about $50\%$ in both. \emph{Right:} share of Invariance
-pairs kept within $\tau=\sThreeTol$, which is informative only next to the left panel. \emph{Blue:}
+pairs on which the score stays equal. \emph{Blue:}
 $\LCS$ at the verdict world, on gold and mined graphs. \emph{Gray:} $\LCS$ at the asserted world
-and the baselines. Hollow markers flag invariances kept for another reason: the pairwise arms pin
-$\LCS$ near $0$ on both rungs, and claim-level baselines never change within a family. Lines are 95\%
-intervals; counts are in App.~\ref{app:results}.}
+and the baselines. Hollow markers flag invariances kept trivially: claim-level baselines never change within a
+family. The entity graph reads the text but scores only nouns shared by nearby sentences, so it too
+almost never moves. Lines are 95\%
+intervals.}%; counts are in App.~\ref{app:results}.}
 \label{fig:ladders}
 \end{figure*}
 
@@ -55,49 +47,58 @@ intervals; counts are in App.~\ref{app:results}.}
 \includegraphics[width=\columnwidth]{figures/fig_dominance.pdf}
 \caption{\textbf{On mined graphs, $\LCS$ follows the extracted graphs wherever the coherence order
 ranks them.} Each arm's Increase pairs, split by how the two rungs' extracted graphs compare in the
-order (Def.~\ref{def:order}). Ordered as declared: $\LCS$ rises (blue), except one tie of
-$4\times10^{-14}$. Equal or reversed: it ties or falls, as the theorem requires (gray).
+order (Def.~\ref{def:order}). Ordered as declared: $\LCS$ rises (blue), except one numerical
+tie (a relative step of $4\times10^{-14}$). Equal or reversed: it ties or falls, as the theorem requires (gray).
 Incomparable: no prediction; $\LCS$ rises on most (green) and misses on the rest (orange). Counts
 are in Table~\ref{tab:dominance}.}
 \label{fig:dominance}
 \end{figure}
 
-\subsection{Results}
+
 \label{sec:exp-gold}
 \label{sec:exp-mined}
 \label{sec:exp-polarity}
 \label{sec:exp-baselines}
 
 \paragraph{Gold graphs: every declared order holds.} On gold graphs $\LCS$ satisfies all
-\sThreeGoldLamInc{} Increase and all \sThreeGoldLamInv{} Invariance pairs
-(Figure~\ref{fig:ladders}), as Theorem~\ref{thm:mono} and A2 predict. Every gold transition is an
-improvement or leaves the graph unchanged, so this checks the theory and the implementation. Gold
-$\LCS$ resolves \sThreeGoldLamIncTol{} increases; the rest lie near $0$ or $1$, where the logistic
-compresses a step below $\tau$. At the
-asserted world the score fails exactly where it should: it satisfies only \sThreeGoldLamASign{}
-\cp{sign} pairs, since at the response's own stance deriving the falsehood is an upheld entailment,
-and every \cp{conflict} and \cp{chain} pair (App.~Fig.~\ref{fig:sign}).
+\sThreeNIncPairs{} Increase and all \sThreeNInvPairs{} Invariance pairs (Figure~\ref{fig:ladders},
+top row), as the theory guarantees: every Increase transition is a coherence-improving edit
+(Theorem~\ref{thm:mono}), and every Invariance transition leaves the gold graph unchanged (A2).
 
-\paragraph{Mined graphs: the misses trace to extraction.} A miner may change relations in both
-directions between rungs, but we can ask whether its two graphs are ordered as declared
-(Figure~\ref{fig:dominance}). Where they are, $\LCS$ rises on every pair but one, whose graphs
-differ in one weight by $10^{-8}$; where they are reversed it falls, and where equal it ties. Every
-other miss is on a pair whose edit the miner reversed, erased or left incomparable.
+\paragraph{The verdicts are needed.} Read at the \emph{asserted} world, which takes every claim as
+the response states it, the same gold graphs still satisfy every \cp{conflict} and \cp{chain}
+pair, whose edits join true claims, but only \sThreeGoldLamASign{} \cp{sign} pairs. There the
+response asserts a falsehood, so its derivation counts as a support: removing it lowers the score
+(\sThreeGoldLamASignABFall{} ladders), and deriving and refuting the falsehood tie on
+\sThreeGoldLamASignACTie. Only the verdicts tell the two apart (App.~\ref{app:asserted-sign}).
 
-The graph-level miner with GPT-6 orders \sThreeGraphGptDomForward{} of the \sThreeNIncPairs{}
-pairs as declared, and $\LCS$ rises on \sThreeGraphGptDomIncomparableOk{} of the
-\sThreeGraphGptDomIncomparable{} it leaves incomparable. The pairwise arms order only \sThreePairOssDomForward{} pairs each. Their weights are
-products of near-certain token probabilities ($\ge0.99$ for \sThreePairOssWHard{} of gpt-oss-120b's
-relations), which turn soft checks into hard constraints: $\LCS<0.01$ on \sThreePairOssSat{} of its
-responses, and only \sThreePairOssLamIncTol{} increases are resolved (GPT-6:
-\sThreeGraphGptLamIncTol). Invariance on mined graphs measures the miner's stability.
+\paragraph{Mined graphs: every miss traces to extraction.} With mined graphs $\LCS$ rises on
+\sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\% (pairwise
+Llama) of the increases, but also falls on some (Figure~\ref{fig:ladders}). Theorem~\ref{thm:mono}
+predicts a direction only when one rung's extracted graph improves on the other's, so
+Figure~\ref{fig:dominance} sorts the Increase pairs by how the two extracted graphs compare. Where
+the miner recovered the edit, $\LCS$ rises on every pair (one numerical tie); where it erased or
+reversed the edit, $\LCS$ ties or falls, as predicted; where it changed relations in both
+directions, the theorem is silent, and $\LCS$ still rises on most
+(\sThreeGraphGptDomIncomparableOk{} of \sThreeGraphGptDomIncomparable{} with GPT-6). Every fall is
+therefore on a pair whose edit the miner reversed or left incomparable. The arms differ in how
+often they recover the edit: GPT-6 on \sThreeGraphGptDomForward{} of the \sThreeNIncPairs{} pairs,
+gpt-oss-120b on \sThreeGraphOssDomForward, each pairwise arm on only \sThreePairOssDomForward; the
+pairwise arms' near-certain weights also saturate the score (App.~\ref{app:results}). Invariance on
+mined graphs measures the miner's stability, not the score's: GPT-6 keeps
+\sThreeGraphGptLamInvPct\% of the invariances, the other miners at most \sThreeGraphOssLamInvPct\%.
 
-\paragraph{Judges read contradictions, not inferences.} The claim-level baselines tie on every
-pair, the entity graph barely moves, and length and DiscoScore fall about as often as they rise.
-With GPT-6 the LLM judges rise on \sThreeBGevalGptIncPct\% (G-Eval) and
-\sThreeBDirectGptIncPct\% (rating) of the increases. They do well on \cp{conflict}, where the text
-contradicts itself (G-Eval rises on \sThreeBGevalGptConflict), but are near chance on \cp{chain},
-where an inference is added (\sThreeBGevalGptChain{} rise, \sThreeBGevalGptChainFalls{} fall), and
-G-Eval keeps only \sThreeBGevalGptInvTolUPct\% of the invariances within $\tau$ but \sThreeBGevalGptInvTol{}
-within its own five-run spread, so most of its movement there is run-to-run noise. From the same text, $\LCS$ on the GPT-6 graphs rises on
-\sThreeGraphGptLamIncPct\% of the increases.
+\paragraph{Text baselines do not track the edits.} Claim count, NLI contradiction and ROSCOE read
+only the claims, which every rung shares, so they tie on every pair. Length and DiscoScore move
+with the surface of the edit and fall about as often as they rise (Figure~\ref{fig:ladders},
+middle; App.~\ref{app:results}).
+
+\paragraph{LLM judges read contradictions, not inferences.} With GPT-6, G-Eval and the 1--5 rating
+rise on \sThreeBGevalGptIncPct\% and \sThreeBDirectGptIncPct\% of the increases and fall on
+\sThreeBGevalGptIncFallsPct\% and \sThreeBDirectGptIncFallsPct\%. By ladder type
+(Table~\ref{tab:baselines}), G-Eval notices text that contradicts itself, rising on
+\sThreeBGevalGptConflict{} \cp{conflict} pairs, but is near chance when a valid inference is added:
+it rises on \sThreeBGevalGptChain{} \cp{chain} pairs and falls on \sThreeBGevalGptChainFalls, while
+$\LCS$ on GPT-6 graphs from the same text rises on \sThreeGraphGptLamChain. The gpt-oss-120b judges
+move on almost every pair and are closer to a coin flip, and most of the judges' movement on
+invariances is run-to-run noise (App.~\ref{app:results}).

@@ -4,9 +4,11 @@ Three static vector figures, one job each, emphasis form (our score in the accen
 other score in the de-emphasis gray), 95% intervals from a family-level bootstrap:
 
 * ``fig_ladders.pdf``  -- per score, the share of declared increases on which it rises and on
-  which it falls, and of invariances it keeps (within tau): the headline comparison.
-LCS is the score; its rises and falls are decided on Lambda, its log-ratio form (the same
-order, without the logistic's compression near 0 and 1), so ``rows["dl"]`` is a Lambda step.
+  which it falls, and of invariances it keeps (exactly, up to its tie tolerance): the
+  headline comparison.
+LCS is the score, and its rises, falls and ties are decided on LCS itself, with the relative
+tie tolerance of ``arr_slot3_eval.REL_TIE``; ``rows["dlcs"]`` is the LCS step and
+``rows["dl"]`` the same step in nats (descriptive only).
 
 * ``fig_dominance.pdf`` -- per mined arm, its Increase pairs split by how the two extracted
   graphs compare in the coherence order: no error falls on a correctly ordered pair.
@@ -65,14 +67,17 @@ ROWS = [
     ("base:judge_geval@gpt-oss-120b", "LLM judge, G-Eval, gpt-oss-120b", "other"),
     ("base:judge_direct@gpt-oss-120b", "LLM judge, 1–5 rating, gpt-oss-120b", "other"),
     ("base:discourse_rc", "DiscoScore RC", "other"),
+    ("base:discourse_lc", "DiscoScore LC", "other"),
+    ("base:discourse_entity_graph", "entity graph (DiscoScore)", "other"),
     ("base:control_length", "response length", "other"),
+    ("base:control_claim_count", "claim count (claims)", "other"),
     ("base:nli_contradiction", "NLI contradiction (claims)", "other"),
     ("base:roscoe_sc", "ROSCOE self-consistency (claims)", "other"),
 ]
 
 
 #: Baselines that read only the claims, which are identical across a family's rungs.
-TRIVIAL = {"base:nli_contradiction", "base:roscoe_sc"}
+TRIVIAL = {"base:control_claim_count", "base:nli_contradiction", "base:roscoe_sc"}
 
 
 def _flag(r, key):
@@ -136,7 +141,7 @@ def fig_ladders(d, out):
                              gridspec_kw={"wspace": 0.10, "width_ratios": [1.0, 0.62, 1.0]})
     panels = [("inc", "ok", "Declared increases: score rises (%)"),
               ("inc", "falls", "… score falls (%)"),
-              ("inv", "ok_tol", "Invariances kept, within τ (%)")]
+              ("inv", "ok", "Invariances kept (%)")]
     for ax, (group, okkey, title) in zip(axes, panels):
         for y, (key, label, kind) in enumerate(rows):
             if key == "header":
@@ -146,15 +151,14 @@ def fig_ladders(d, out):
                 continue
             p, lo, hi = (100 * v for v in st)
             col = BLUE if kind == "ours" else GRAY
-            # Hollow: invariance "kept" for a reason that is not the score's: the pairwise
-            # arms' LCS is pinned near 0 on both rungs (near-certain weights saturate it), and
-            # the claims-only baselines never move at all.
-            hollow = group == "inv" and (key.startswith("arm:pair_") or key in TRIVIAL)
+            # Hollow: invariance kept trivially -- the claims-only baselines never move at all.
+            # (Invariance is exact, up to each score's tie tolerance, as in the paper.)
+            hollow = group == "inv" and key in TRIVIAL
             hi = min(hi, 100)
             ax.plot([lo, hi], [y, y], color=col, lw=1.4, solid_capstyle="round", zorder=2)
             ax.scatter([p], [y], s=26, color="white" if hollow else col,
                        edgecolor=col if hollow else "white", linewidth=1.2, zorder=3)
-            if kind == "ours" or group == "inc" or hollow:
+            if True:  # every point carries its value, in every panel
                 span = 62 if okkey == "falls" else 100
                 ax.text(hi + 0.02 * span, y, f"{p:.0f}", va="center", ha="left",
                         fontsize=6.5, color=INK2)
@@ -205,17 +209,17 @@ def fig_dominance(d, out):
         for r in rows:
             if r["kind"] == "forward":
                 c["ordered"] += 1
-                # The theorem: a strictly better graph strictly raises Λ (exact sign; a rise
-                # below the 1e-9 counting resolution still counts as a rise here) ...
-                assert r.get("dl", 1.0) > 0, f"{arm}: Λ did not rise on an ordered pair"
+                # The theorem: a strictly better graph strictly raises LCS (exact sign; a
+                # rise below the tie tolerance still counts as a rise here) ...
+                assert r.get("dlcs", 1.0) > 0, f"{arm}: LCS did not rise on an ordered pair"
             elif r["kind"] == "incomparable":
                 c["incomp_ok" if r["rises"] else "incomp_bad"] += 1
             else:
                 c["backward"] += 1
                 # ... an identical graph leaves it unchanged and a worse one lowers it.
-                ok = (abs(r.get("dl", 0.0)) <= 1e-9 if r["kind"] == "equal"
-                      else r.get("dl", -1.0) < 0)
-                assert ok, f"{arm}: Λ moved against the order on a {r['kind']} pair"
+                ok = (not r["rises"] and not r["falls"] if r["kind"] == "equal"
+                      else r.get("dlcs", -1.0) < 0)
+                assert ok, f"{arm}: LCS moved against the order on a {r['kind']} pair"
         total = sum(c.values()) or 1
         left = 0.0
         for key, col, _lab in segs:

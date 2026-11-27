@@ -4,53 +4,63 @@
 \label{sec:voyager}
 %% ============================================================================
 
-The dominant way to assess long-form generation is decompose-then-verify: split a response into
-atomic claims, check each against evidence, and aggregate
-\citep{factscore,safe,veriscore,factreasoner}. Treating claims independently discards what makes a
-response an argument. Figure~\ref{fig:voyager} shows two answers about Voyager~1 that state the
-same five claims with the same stance, so they receive the same verdicts. A derives its conclusion
-from its evidence and uses both to refute two misconceptions. B sets two of its own truths against
+The dominant paradigm for evaluating the factuality of long-form generation is \emph{decompose-then-verify}: 
+a response is decomposed into atomic claims, each claim is verified against retrieved evidence, 
+and the resulting verdicts are aggregated into a final score
+\citep{factscore,safe,veriscore,factreasoner}. Although highly effective and now standard, this framework 
+implicitly assumes that claims can be evaluated in isolation. In doing so, it discards the relational 
+structure that transforms a collection of statements into a logically coherent argument. 
+
+For example, Figure~\ref{fig:voyager} shows two answers about Voyager~1 that state the
+same five claims with the same stance, so they receive the same verdicts. Response A derives its conclusion
+from its evidence and uses both to refute two misconceptions. Response B sets two of its own truths against
 each other and derives a falsehood from a truth. No per-claim check separates them, and
 \citet{lorefact} show that factuality pipelines miss such errors.
 
-The difference is not discourse coherence, which concerns how a text is organized, ignores whether
-its claims are true, and is lost when the text is shuffled \citep{grosz1995,barzilay}.
-\emph{Logical} coherence is a property of the argument: the truth-functional relations a response
-draws among a fixed set of claims, read against which claims are true. Reordering paragraphs leaves
-it unchanged, a contrast constrains no truth value, deriving a falsehood from a truth is well-formed
-discourse but a logical conflict, and an added inference raises it where a consistency check sees
-nothing (App.~\ref{sec:notions}).
-
-A score for it must guarantee one thing: over a fixed set of claims with fixed truth values, any
-change that makes the relations agree better with those values (a new or stronger relation they
-uphold, a weaker or deleted one they break) must raise the score, wherever it occurs. The natural
-model is a Markov random field (MRF) over claim truth values with one factor per relation
-\citep{factreasoner}, but its natural readouts violate this requirement (App.~\ref{app:earlier}),
-and Shogenji's coherence measure \citep{shogenji1999} falls on \fallsPctShogenjiSigndef\% of random
-coherence-improving edits.
-
-We read the score off what a factuality pipeline already provides. Its verdicts fix a
-\emph{committed world}, the truth value of each claim, and we score a response by the weight of
-evidence \citep{good1950} that its relations lend to that world. Whether a relation helps or hurts
-then follows from that world: refuting a falsehood counts as support, deriving a falsehood from a
-truth as conflict. The score measures how well the relations agree with the facts, not whether the
-claims are true, so it complements a factuality score. Its guarantee concerns responses over one
-claim set, as when candidate answers to one query are compared.
+The distinction is not captured by discourse coherence, which concerns how a text is organized, 
+largely ignores the truth of its claims, and can be disrupted by reordering sentences or 
+paragraphs \citep{grosz1995,barzilay}. By contrast, \emph{logical coherence} is a property of 
+an argument: the extent to which the truth-functional relations it draws among a fixed set of 
+claims are supported by the truth values of those claims. As a result, logical coherence is 
+invariant to reordering and captures aspects of reasoning that discourse coherence does not. 
+A contradiction may be rhetorically well integrated yet logically incoherent; a false 
+conclusion may follow from a well-structured argument; and adding a valid inference
+can improve logical coherence even when consistency and discourse structure remain unchanged.
 
 \input{figures/voyager-pair}
 
-\noindent Our contributions are:
+To quantify this property, we represent an argument as a Markov random field (MRF) whose 
+variables correspond to claims and whose factors encode the relations expressed between 
+them. A factuality pipeline supplies the claims' truth values, defining a \emph{committed world} 
+against which the argument is evaluated. We then define the \emph{Logical Coherence Score} (LCS) 
+as the weight of evidence \citep{good1950} that the relation graph provides for that world. 
+Intuitively, relations contribute positively when they are supported by the committed world and 
+negatively when they are violated: refuting a falsehood increases coherence, whereas deriving a 
+falsehood from a truth decreases it. Because LCS evaluates whether an argument's relational structure 
+accords with the facts, rather than whether the claims themselves are true, it complements existing 
+factuality metrics. %We further show that LCS is strictly monotone under every coherence-improving edit. 
+In summary, our contributions are:
+
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \textbf{A coherence score with a guarantee} (\S\ref{sec:framework}). $\LCS$ is strictly
-  monotone in every coherence-improving edit, for any priors and relation graph, and works with any
-  factuality pipeline. A pairwise relation's addition is monotone in every context exactly when its
-  table is sign-definite, and no readout at another single world is monotone in the same order.
-\item \textbf{An evaluation on LoCoBench} (\S\ref{sec:experiments}). On \sThreeLadders{} coherence
-  ladders, every declared ordering and invariance holds on gold graphs, and on mined graphs the
-  score follows the extracted graphs wherever the order ranks them, which separates extraction
-  errors from scoring errors. LLM judges are near chance on added inferences.
-\item \textbf{An external evaluation} (\S\ref{sec:exp-external}). On five datasets, with predictions
-  fixed in advance, and on rated student essays, the mined score is unrelated to discourse
-  coherence, falls under self-contradiction, signs every tested relation as predicted, and tracks
-  essay quality beyond length. Relation recall is the binding constraint.
+\item \textbf{A principled coherence score with theoretical guarantees} (\S\ref{sec:framework}). We introduce LCS, a coherence 
+metric that is strictly monotone under every coherence-improving edit, for any prior distribution, 
+relation graph, and factuality pipeline, and show that this requirement pins down the class of
+relation tables and the world at which the model is read (App.~\ref{app:why}). 
+% We further characterize the class of relation factors that 
+% admit this guarantee and show that no readout based on a different single world satisfies the same coherence 
+% order.
+
+\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). We show that on the benchmark's coherence ladders, 
+LCS satisfies every prescribed ordering and invariance when using gold graphs. On automatically mined graphs, 
+it falls only on pairs whose edit the miner reversed or left incomparable, so every failure traces to
+relation extraction rather than to the scoring function. In contrast, strong LLM judges 
+are near chance at recognizing coherence gains introduced solely by additional valid inferences.
+
+\item \textbf{An external evaluation on natural text} (\S\ref{sec:exp-external}). On data labelled
+by others, none of which rates logical coherence, LCS shows four properties the framework implies.
+It is not a proxy for rated discourse coherence, and where the two diverge it is for a principled
+reason: restating a claim is consistent but redundant. It falls when a detected contradiction is
+added, and almost every rise traces to a contradiction the miner missed. Permuting paragraphs moves it
+no more than mining the same text again, while an LLM judge treats reordering as incoherence.
+On rated student essays, it tracks quality beyond length.
 \end{itemize}

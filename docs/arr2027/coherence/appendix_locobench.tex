@@ -57,31 +57,43 @@ differences arise in practice.
 \subsection{Setup Details}
 \label{app:setup-details}
 
-\paragraph{One score, two scales.} The score under evaluation is $\LCS$ (Def.~\ref{def:score}),
-and ``LCS'' in every figure and table is that score. Its log-ratio form
-$\Lambda=\log\PR(\xs)/\pi(\xs)$ (Eq.~\ref{eq:lambda}), in which the theorems are stated, is not a
-second score but the same one on an unbounded scale: the rungs of a ladder share their claims and
-flat priors, so $\pi(\xs)=2^{-n}$ on every rung, for the verdict world and the asserted world
-alike, and $\LCS$ is a strictly increasing function of $\Lambda$ (App.~\ref{app:lcs-lambda}
-plots the two scales side by side). The two therefore rank every rung pair identically, and
-every count below of satisfied orderings, kept invariances and dominance classes holds for both.
-Across all arms and both polarities the two never move in opposite directions
-(\sThreeLamLcsSignDis{} of \sThreeLamLcsPairs{} rung pairs).
+\paragraph{Arms.} The \cp{gold} arm weights each of LoCoBench's gold relations by the midpoint of its
+annotated strength band ($0.925$, $0.72$ or $0.47$), as the graph-level miner does. The four mining
+configurations are the graph-level miner with GPT-6 and with gpt-oss-120b, and the pairwise miner
+(window size $4$) with gpt-oss-120b and with Llama-3.3-70B.
 
-We use each scale for what it shows best. \emph{Whether} the score moves is decided on
-$\Lambda$, in exact arithmetic with a resolution of $10^{-9}$. Near $0$ the logistic compresses
-even large steps beyond any fixed resolution: on one pairwise-miner ladder the lowest rung has
-$\LCS\approx10^{-17}$, and a step of $13$ nats in $\Lambda$ from it moves $\LCS$ by
-$5\times10^{-12}$.
-Taking the same decision on $\LCS$ would change nothing on gold graphs or on either graph-level
-arm's graphs (\sThreeGoldLamLcsDis, \sThreeGraphGptLamLcsDis{} and \sThreeGraphOssLamLcsDis{}
-rung pairs) but would turn
-\sThreePairOssLamLcsDis{} and \sThreePairLlamaLamLcsDis{} of the pairwise arms' rung pairs into
-ties. \emph{How far} the score moves, the tolerance $\tau$, resolved increases, saturation and
-every plotted value, is read on $\LCS$'s $[0,1]$ scale, the scale a user of the score sees. Step
-sizes quoted in nats are steps in $\Lambda$: a step of $\Delta$ nats multiplies the probability of
-the committed world by $e^{\Delta}$, so $0.5$ nats is a factor of $1.65$ and $13$ nats a factor of
-about $440{,}000$.
+\paragraph{Deciding on the score.} The score under evaluation is $\LCS$ (Def.~\ref{def:score}),
+and ``LCS'' in every figure and table is that score. Every decision in \S\ref{sec:experiments} is
+taken on it: an Increase pair needs $\LCS$ to rise and an Invariance pair needs it to stay equal, up
+to a tie tolerance that absorbs the floating-point noise of exact inference. The tolerance is
+relative: two values tie when $|a-b|\le\sThreeRelTie\cdot\max(a,b)$, that is, when they agree to
+ten significant digits. An absolute tolerance would not do. Near-certain mined weights pin $\LCS$
+near $0$, where real steps are tiny in absolute terms: on one pairwise-miner ladder the lowest rung
+has $\LCS\approx10^{-17}$, and a step that multiplies the probability of the committed world by
+about $440{,}000$ moves $\LCS$ by $5\times10^{-12}$. An absolute tolerance of $10^{-9}$ would change
+nothing on gold graphs or on either graph-level arm's graphs (\sThreeGoldLcsAbsDis,
+\sThreeGraphGptLcsAbsDis{} and \sThreeGraphOssLcsAbsDis{} rung pairs), but would turn
+\sThreePairOssLcsAbsDis{} and \sThreePairLlamaLcsAbsDis{} of the pairwise arms' rung pairs into
+ties. The baselines are compared with the same rule. It matters only for the two gpt-oss-120b
+judges, whose ratings are probability-weighted over the rating token's log-probabilities and so
+drift slightly between rungs; like the pairwise miners' token probabilities, that drift counts as
+movement. The other baselines take the same decisions with or without a tolerance. Every plotted
+value is read on $\LCS$ as well. The appendix also reports two supplementary
+effect-size counts, which no result in \S\ref{sec:experiments} uses. With the tolerance
+$\tau=\sThreeTol$ of \S\ref{sec:exp-external}, an increase is \emph{resolved} when $\LCS$ rises by
+more than $\tau$, and an invariance is kept \emph{within $\tau$} when $\LCS$ moves by at most
+$\tau$.
+
+\paragraph{Robustness of the rule.} The rungs of a ladder share their claims and flat priors, so
+$\pi(\xs)=2^{-n}$ on every rung, for the verdict world and the asserted world alike, and $\LCS$ is a
+strictly increasing function of $\Lambda=\log\PR(\xs)/\pi(\xs)$ (Eq.~\ref{eq:lambda};
+App.~\ref{app:lcs-lambda} plots the two side by side), which does not compress near $0$ or $1$.
+Deciding on $\Lambda$ with an absolute tolerance of $10^{-9}$ instead changes
+\sThreeLcsRuleLamDis{} of the \sThreeLcsRulePairs{} rung pairs (every arm, both worlds), and relative
+tolerances from $10^{-11}$ to $10^{-13}$ change at most \sThreeLcsRuleAltMaxDis. We fixed the
+relative tolerance after this comparison, at the value where the two rules coincide. Step sizes quoted in nats are
+steps in $\Lambda$: a step of $\Delta$ nats multiplies the probability of the committed world by
+$e^{\Delta}$, so $0.5$ nats is a factor of $1.65$ and $13$ nats a factor of about $440{,}000$.
 
 \subsection{Full Results}
 
@@ -113,8 +125,8 @@ pairwise, Llama-3.3-70B & \sThreePairLlamaCoupF
 \bottomrule
 \end{tabular}
 \caption{Declared orders satisfied on LoCoBench, in \% of the \sThreeNIncPairs{} Increase
-and \sThreeNInvPairs{} Invariance pairs, per arm and readout. Inv.: equality within $10^{-9}$;
-Inv.$_\tau$: within $\tau=\sThreeTol$ on the readout's $[0,1]$ scale. F1:
+and \sThreeNInvPairs{} Invariance pairs, per arm and readout. Inv.: equality up to the relative tie tolerance $\sThreeRelTie$;
+Inv.$_\tau$ (supplementary): within $\tau=\sThreeTol$ on the readout's $[0,1]$ scale. F1:
 coupling-level extraction F1 against gold. Counts per ladder type are in Table~\ref{tab:bytype}.}
 \label{tab:ladders}
 \end{table*}
@@ -122,32 +134,33 @@ coupling-level extraction F1 against gold. Counts per ladder type are in Table~\
 \begin{table}[t]
 \centering\small
 \setlength{\tabcolsep}{2.6pt}
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lcccccc@{}}
 \toprule
-& \multicolumn{4}{c}{Increase satisfied (\%)} & Inv.$_\tau$ \\
+& \multicolumn{4}{c}{Increase satisfied (\%)} & Inv. & Inv.$_\tau$ \\
 \cmidrule(lr){2-5}
-Score & all & \cp{conf.} & \cp{chain} & \cp{sign} & (\%) \\
+Score & all & \cp{conf.} & \cp{chain} & \cp{sign} & (\%) & (\%) \\
 \midrule
-claim count & \sThreeBCtlClaimsIncPct & \sThreeBCtlClaimsConflictPct & \sThreeBCtlClaimsChainPct & \sThreeBCtlClaimsSignPct & \sThreeBCtlClaimsInvTolUPct \\
-length & \sThreeBCtlLengthIncPct & \sThreeBCtlLengthConflictPct & \sThreeBCtlLengthChainPct & \sThreeBCtlLengthSignPct & \sThreeBCtlLengthInvTolUPct \\
-DiscoScore RC & \sThreeBDiscRCIncPct & \sThreeBDiscRCConflictPct & \sThreeBDiscRCChainPct & \sThreeBDiscRCSignPct & \sThreeBDiscRCInvTolUPct \\
-DiscoScore LC & \sThreeBDiscLCIncPct & \sThreeBDiscLCConflictPct & \sThreeBDiscLCChainPct & \sThreeBDiscLCSignPct & \sThreeBDiscLCInvTolUPct \\
-entity graph & \sThreeBDiscEGIncPct & \sThreeBDiscEGConflictPct & \sThreeBDiscEGChainPct & \sThreeBDiscEGSignPct & \sThreeBDiscEGInvTolUPct \\
-NLI contradiction & \sThreeBNliContraIncPct & \sThreeBNliContraConflictPct & \sThreeBNliContraChainPct & \sThreeBNliContraSignPct & \sThreeBNliContraInvTolUPct \\
-ROSCOE SC & \sThreeBRoscoeMaxIncPct & \sThreeBRoscoeMaxConflictPct & \sThreeBRoscoeMaxChainPct & \sThreeBRoscoeMaxSignPct & \sThreeBRoscoeMaxInvTolUPct \\
-G-Eval, GPT-6 & \sThreeBGevalGptIncPct & \sThreeBGevalGptConflictPct & \sThreeBGevalGptChainPct & \sThreeBGevalGptSignPct & \sThreeBGevalGptInvTolUPct \\
-G-Eval, gpt-oss & \sThreeBGevalOssIncPct & \sThreeBGevalOssConflictPct & \sThreeBGevalOssChainPct & \sThreeBGevalOssSignPct & \sThreeBGevalOssInvTolUPct \\
-rating, GPT-6 & \sThreeBDirectGptIncPct & \sThreeBDirectGptConflictPct & \sThreeBDirectGptChainPct & \sThreeBDirectGptSignPct & \sThreeBDirectGptInvTolUPct \\
-rating, gpt-oss & \sThreeBDirectOssIncPct & \sThreeBDirectOssConflictPct & \sThreeBDirectOssChainPct & \sThreeBDirectOssSignPct & \sThreeBDirectOssInvTolUPct \\
+claim count & \sThreeBCtlClaimsIncPct & \sThreeBCtlClaimsConflictPct & \sThreeBCtlClaimsChainPct & \sThreeBCtlClaimsSignPct & \sThreeBCtlClaimsInvPct & \sThreeBCtlClaimsInvTolUPct \\
+length & \sThreeBCtlLengthIncPct & \sThreeBCtlLengthConflictPct & \sThreeBCtlLengthChainPct & \sThreeBCtlLengthSignPct & \sThreeBCtlLengthInvPct & \sThreeBCtlLengthInvTolUPct \\
+DiscoScore RC & \sThreeBDiscRCIncPct & \sThreeBDiscRCConflictPct & \sThreeBDiscRCChainPct & \sThreeBDiscRCSignPct & \sThreeBDiscRCInvPct & \sThreeBDiscRCInvTolUPct \\
+DiscoScore LC & \sThreeBDiscLCIncPct & \sThreeBDiscLCConflictPct & \sThreeBDiscLCChainPct & \sThreeBDiscLCSignPct & \sThreeBDiscLCInvPct & \sThreeBDiscLCInvTolUPct \\
+entity graph & \sThreeBDiscEGIncPct & \sThreeBDiscEGConflictPct & \sThreeBDiscEGChainPct & \sThreeBDiscEGSignPct & \sThreeBDiscEGInvPct & \sThreeBDiscEGInvTolUPct \\
+NLI contradiction & \sThreeBNliContraIncPct & \sThreeBNliContraConflictPct & \sThreeBNliContraChainPct & \sThreeBNliContraSignPct & \sThreeBNliContraInvPct & \sThreeBNliContraInvTolUPct \\
+ROSCOE SC & \sThreeBRoscoeMaxIncPct & \sThreeBRoscoeMaxConflictPct & \sThreeBRoscoeMaxChainPct & \sThreeBRoscoeMaxSignPct & \sThreeBRoscoeMaxInvPct & \sThreeBRoscoeMaxInvTolUPct \\
+G-Eval, GPT-6 & \sThreeBGevalGptIncPct & \sThreeBGevalGptConflictPct & \sThreeBGevalGptChainPct & \sThreeBGevalGptSignPct & \sThreeBGevalGptInvPct & \sThreeBGevalGptInvTolUPct \\
+G-Eval, gpt-oss & \sThreeBGevalOssIncPct & \sThreeBGevalOssConflictPct & \sThreeBGevalOssChainPct & \sThreeBGevalOssSignPct & \sThreeBGevalOssInvPct & \sThreeBGevalOssInvTolUPct \\
+rating, GPT-6 & \sThreeBDirectGptIncPct & \sThreeBDirectGptConflictPct & \sThreeBDirectGptChainPct & \sThreeBDirectGptSignPct & \sThreeBDirectGptInvPct & \sThreeBDirectGptInvTolUPct \\
+rating, gpt-oss & \sThreeBDirectOssIncPct & \sThreeBDirectOssConflictPct & \sThreeBDirectOssChainPct & \sThreeBDirectOssSignPct & \sThreeBDirectOssInvPct & \sThreeBDirectOssInvTolUPct \\
 \midrule
-$\LCS$, gold & \sThreeGoldLamIncPct & \sThreeGoldLamConflictPct & \sThreeGoldLamChainPct & \sThreeGoldLamSignPct & \sThreeGoldLamInvTolPct \\
-$\LCS$, graph GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptLamConflictPct & \sThreeGraphGptLamChainPct & \sThreeGraphGptLamSignPct & \sThreeGraphGptLamInvTolPct \\
+$\LCS$, gold & \sThreeGoldLamIncPct & \sThreeGoldLamConflictPct & \sThreeGoldLamChainPct & \sThreeGoldLamSignPct & \sThreeGoldLamInvPct & \sThreeGoldLamInvTolPct \\
+$\LCS$, graph GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptLamConflictPct & \sThreeGraphGptLamChainPct & \sThreeGraphGptLamSignPct & \sThreeGraphGptLamInvPct & \sThreeGraphGptLamInvTolPct \\
 \bottomrule
 \end{tabular}
 \caption{Baselines on LoCoBench: Increase pairs satisfied, in \% of \sThreeNIncPairs{}
-(\sThreeNConflict{} ladders, 180 pairs, per type), and Invariance pairs within $\tau=\sThreeTol$ on
-each score's $[0,1]$ scale, in \% of \sThreeNInvPairs. Judges are averaged over five independent
-runs.}
+(\sThreeNConflict{} ladders, 180 pairs, per type), and Invariance pairs kept, in \% of
+\sThreeNInvPairs: exactly (Inv., up to the common tie tolerance, as in Figure~\ref{fig:ladders})
+and, as a supplementary effect-size view, within $\tau=\sThreeTol$ on each score's $[0,1]$ scale
+(Inv.$_\tau$). Judges are averaged over five independent runs.}
 \label{tab:baselines}
 \end{table}
 
@@ -164,6 +177,38 @@ $\rho_0<\rho_1<\rho_2$, a line rising left to right. Each panel has its own vert
 \paragraph{Resolution on gold graphs.} Gold $\LCS$ resolves \sThreeGoldLamIncTol{} of the increases. The 17 it does not resolve all lie where
 $\LCS$ is below $0.06$ or above $0.9$, where the logistic compresses a step of $0.07$--$0.53$
 nats in $\Lambda$ below $\tau$.
+
+\paragraph{The asserted world on \cp{sign} ladders.}
+\label{app:asserted-sign}
+Write $T$ for the true premise and $F$ for the falsehood. Rung $\rho_0$ derives $F$ from $T$ and so
+asserts both, $\rho_1$ states both without a link, and $\rho_2$ refutes $F$ and so denies it. The
+verdict world fixes $T=1$ and $F=0$ on every rung. There the derivation $T\Rightarrow F$ is a
+conflict (it fails at $(1,0)$), the refutation $T\con F$ is a support, and the score rises at each
+step, as Theorem~\ref{thm:mono} requires. The asserted world follows the response's stance instead:
+$T=F=1$ on $\rho_0$ and $\rho_1$, and $F=0$ only on $\rho_2$. Each rung pair then behaves
+differently (Figure~\ref{fig:sign}).
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item $\rho_0\to\rho_1$ \emph{falls} on \sThreeGoldLamASignABFall{} ladders. At $T=F=1$ the
+  derivation holds, so it is a support, and removing a support lowers the score. Both rungs share
+  the committed world, so this is Theorem~\ref{thm:mono} applied to the wrong world: the score
+  follows the order that the asserted world induces, which here runs against the declared one.
+\item $\rho_1\to\rho_2$ \emph{rises} on \sThreeGoldLamASignBCRise{} ladders. The refutation holds at
+  $(T,F)=(1,0)$ and is a support. The pair also changes the committed world, since $F$ is denied
+  only on $\rho_2$, so no ordering is guaranteed; the rise comes from the added support.
+\item $\rho_0\to\rho_2$ \emph{ties} on \sThreeGoldLamASignACTie{} ladders and rises on
+  \sThreeGoldLamASignACRise. The two rungs are mirror images: $\rho_0$ has the support
+  $T\Rightarrow F$ with $F$ committed true, and $\rho_2$ the support $T\con F$ with $F$ committed
+  false. Replacing $F$ by its negation maps one onto the other ($T\Rightarrow F$ is $T\con\neg F$),
+  so with flat priors and equal weights the two scores coincide (Prop.~\ref{prop:props}(iv)). The
+  ladders that rise are exactly those in which the response also contradicts $F$ elsewhere, with
+  a true claim. Asserting $F$ on $\rho_0$ makes that contradiction a conflict, and denying it on
+  $\rho_2$ makes it a support, so $\rho_2$ scores higher.
+\end{itemize}
+The three counts add up to the \sThreeGoldLamASign{} \cp{sign} pairs satisfied. Read at the
+response's own stance, deriving a falsehood and refuting it are rated alike, and only the verdicts
+tell them apart. On \cp{conflict} and \cp{chain} ladders the asserted world is the same on every
+rung and agrees with the verdict world on every edited relation, since the edits join true claims,
+so both readouts satisfy every pair.
 
 \paragraph{Weights and saturation.} The two miners differ most in their weights. The graph-level miner weighs a link by its vote share
 times a band midpoint, at most $0.925$, and resolves most increases: \sThreeGraphGptLamIncTol{}
@@ -236,8 +281,8 @@ Arm & Readout & \cp{conflict} & \cp{chain} & \cp{sign} & resolved & \cp{order} &
  & $\LCS$, verdict (ours) & \sThreePairLlamaLamConflict & \sThreePairLlamaLamChain & \sThreePairLlamaLamSign & \sThreePairLlamaLamIncTol & \sThreePairLlamaLamOrder & \sThreePairLlamaLamControl \\
 \bottomrule
 \end{tabular}
-\caption{Ladder assertions on LoCoBench by type (pairs satisfied / pairs). ``Resolved'':
-Increase pairs whose $[0,1]$-scale score rises by more than
+\caption{Ladder assertions on LoCoBench by type (pairs satisfied / pairs). ``Resolved''
+(supplementary): Increase pairs whose $[0,1]$-scale score rises by more than
 $\tau=\sThreeTol$, out of \sThreeNIncPairs.}
 \label{tab:bytype}
 \end{table*}
@@ -271,8 +316,8 @@ pair., Llama & \sThreePairLlamaCoupF & \sThreePairLlamaDomForwardPos/\sThreePair
 \caption{Increase pairs by how the two rungs' extracted graphs compare in the coherence order at
 the verdicts (the counts behind Figure~\ref{fig:dominance}). Ordered: pairs on which $\LCS$ rises / pairs,
 by the exact sign of the change, as the theorem states it (on one pairwise-Llama pair the rise is
-$4\times10^{-14}$ in $\Lambda$, below the $10^{-9}$ at which Table~\ref{tab:ladders} counts an
-increase; \S\ref{sec:exp-mined}). Incomparable: pairs on which it rises by more than $10^{-9}$ /
+a relative $4\times10^{-14}$, below the tie tolerance at which Table~\ref{tab:ladders} counts an
+increase; \S\ref{sec:exp-mined}). Incomparable: pairs on which it rises beyond the tie tolerance /
 pairs. Equal: pairs on which it ties; backward: pairs on which it falls,
 as the theorem requires. F1: coupling-level extraction F1.}
 \label{tab:dominance}
@@ -294,6 +339,19 @@ Llama-3.3-70B); coupling-level F1 is \sThreeGraphGptCoupF, \sThreeGraphOssCoupF,
 and \sThreePairLlamaCoupF. The arms average \sThreeGraphGptRels, \sThreeGraphOssRels,
 \sThreePairOssRels{} and \sThreePairLlamaRels{} factor-bearing relations per response, against
 \sThreeGoldRels{} in gold.
+
+\paragraph{Judges by ladder type and model.} With GPT-6, G-Eval rises on \sThreeBGevalGptConflict{}
+\cp{conflict} pairs, where a contradiction between two true claims is removed; on \cp{chain}, where a
+valid inference is added, it rises on \sThreeBGevalGptChain{} pairs and falls on
+\sThreeBGevalGptChainFalls; on \cp{sign}, where a falsehood is refuted instead of derived, it rises on
+\sThreeBGevalGptSign{} and falls on \sThreeBGevalGptSignFalls. $\LCS$ on GPT-6 graphs of the same
+texts rises on \sThreeGraphGptLamConflict, \sThreeGraphGptLamChain{} and \sThreeGraphGptLamSign{}
+of these pairs. The gpt-oss-120b judges rise more often than the GPT-6 ones
+(\sThreeBGevalOssIncPct\% for G-Eval and \sThreeBDirectOssIncPct\% for the rating) but also fall
+more often (\sThreeBGevalOssIncFallsPct\% and \sThreeBDirectOssIncFallsPct\%): their
+probability-weighted ratings move on almost every pair, so they are closer to a coin flip. On
+invariances, the GPT-6 judges stay equal on only \sThreeBGevalGptInvPct\% and
+\sThreeBDirectGptInvPct\% of the pairs.
 
 \paragraph{Judges within their own spread.} Counting an invariance pair as satisfied when the two
 means differ by no more than the larger of their five-run standard deviations, the judges reach

@@ -3,9 +3,10 @@
 Arms: ``gold`` (the items' labelled relations, band-midpoint weights) and every mined arm
 under ``results/arr2027_slot3/arms/<arm>/records``. Readouts, all exact by enumeration:
 
-* ``lambda``        Lambda at verdict polarity (x* = the claims' factuality labels), flat
-                    priors -- the paper's score (LCS orders identically within a ladder);
-* ``lambda_assert`` Lambda at assertion polarity, x* = each item's own STANCE on each claim
+* ``lambda``        the paper's score, LCS, at verdict polarity (x* = the claims' factuality
+                    labels), flat priors. The key keeps its historical name (and the macro tag
+                    ``Lam``); every decision is taken on LCS (see REL_TIE);
+* ``lambda_assert`` the same score at assertion polarity, x* = each item's own STANCE on each claim
                     (1 asserted, 0 denied): SIGN's top rung denies the false claim it
                     refutes, so its committed world differs from the lower rungs';
 * ``mean_marginal`` the mean posterior marginal over the row-stochastic tables, with priors
@@ -14,8 +15,8 @@ under ``results/arr2027_slot3/arms/<arm>/records``. Readouts, all exact by enume
 Baselines are read from ``results/arr2027_slot3/baselines/*.jsonl`` (one score per item).
 
 Every ladder contributes its three rung pairs. Increase ladders (CONFLICT, CHAIN, SIGN)
-need a strict increase (> 1e-9 for exact readouts, > 1e-6 for baselines); invariance
-ladders (ORDER, CONTROL) need equality within the same tolerance.
+need a strict increase and invariance ladders (ORDER, CONTROL) equality, up to one tie
+tolerance for every score: relative REL_TIE.
 
 Run::
 
@@ -52,7 +53,17 @@ INCREASE = ("CONFLICT", "CHAIN", "SIGN")
 INVARIANCE = ("ORDER", "CONTROL")
 TYPES = INCREASE + INVARIANCE
 TIE = 1e-9
-TIE_BASELINE = 1e-6
+# Ties on LCS are relative: two values are tied when |a - b| <= REL_TIE * max(|a|, |b|), i.e.
+# when they agree to ten significant digits. An absolute tolerance fails where LCS is pinned
+# near 0 (near-certain mined weights), since a real step there moves LCS by far less than any
+# fixed resolution. On the test split this rule takes the same decision on every rung pair as
+# deciding on Lambda at TIE (checked and reported in ``lcs_rule``).
+REL_TIE = 1e-10
+# One tie rule for every score -- LCS, the mean marginal and every baseline: relative REL_TIE.
+# (The baselines used an absolute 1e-6 before; only the gpt-oss-120b judges, whose ratings are
+# probability-weighted over the rating token's logprobs and drift by 1e-13..1e-5, were affected.)
+DECIDE = {"lambda": (REL_TIE, True), "lambda_assert": (REL_TIE, True),
+          "mean_marginal": (REL_TIE, True)}
 # Invariance within a tolerance, on each score's own [0, 1] scale (LCS for the MRF arms,
 # the mean marginal, each baseline's score). Exact equality is unattainable for a mined
 # graph: a pairwise miner's weights are token log-probabilities, which move by ~1e-8 when
@@ -141,13 +152,19 @@ def score_item(item, rels):
             "mean_marginal": mm, "n": n, "graph": tup, "xv": xv, "xa": xa}
 
 
-def pair_ok(kind, a, b, tie):
+def _thr(a, b, tie, rel):
+    """The tie threshold for a pair: absolute ``tie``, or relative to the larger value."""
+    return tie * max(abs(a), abs(b)) if rel else tie
+
+
+def pair_ok(kind, a, b, tie, rel=False):
+    t = _thr(a, b, tie, rel)
     if kind in INCREASE:
-        return b - a > tie
-    return abs(b - a) <= tie
+        return b - a > t
+    return abs(b - a) <= t
 
 
-def assess(ladders, value, tie, tol_value=None):
+def assess(ladders, value, tie, tol_value=None, rel=False):
     """value(item_id) -> float or None. Returns counts per ladder type and overall.
 
     ``tol_value`` (default ``value``) is the [0, 1]-scale score the tolerant invariance
@@ -160,7 +177,7 @@ def assess(ladders, value, tie, tol_value=None):
         vals = [value(i) for i in lad["item_ids"]]
         if any(v is None for v in vals):
             continue
-        oks = [pair_ok(kind, vals[i], vals[j], tie)
+        oks = [pair_ok(kind, vals[i], vals[j], tie, rel)
                for i, j in itertools.combinations(range(3), 2)]
         group = "inc" if kind in INCREASE else "inv"
         for ok in oks:
@@ -192,7 +209,7 @@ def assess(ladders, value, tie, tol_value=None):
     return {k: tuple(v) for k, v in c.items()}
 
 
-def pair_rows(ladders, value, tie, tol_value=None):
+def pair_rows(ladders, value, tie, tol_value=None, rel=False):
     """Every rung pair's outcome, for family-level bootstrap intervals and the figures."""
     tol_value = tol_value or value
     rows = []
@@ -207,9 +224,9 @@ def pair_rows(ladders, value, tie, tol_value=None):
             rows.append({
                 "family": lad["family_id"], "ladder": lad["ladder_id"], "type": kind,
                 "pair": [i, j],
-                "ok": bool(pair_ok(kind, vals[i], vals[j], tie)),
+                "ok": bool(pair_ok(kind, vals[i], vals[j], tie, rel)),
                 "ok_tol": bool(dt > TOL) if kind in INCREASE else bool(abs(dt) <= TOL),
-                "tie": bool(abs(d) <= tie),
+                "tie": bool(abs(d) <= _thr(vals[i], vals[j], tie, rel)),
             })
     return rows
 
@@ -226,15 +243,17 @@ def dominance_rows(ladders, scores):
             rev = A.dominates(lo["graph"], hi["graph"], hi["xv"])
             kind = ("forward" if g == "strict" else "equal" if g == "equal" else
                     "backward" if rev == "strict" else "incomparable")
-            dl = hi["lambda"] - lo["lambda"]
+            dl = hi["lambda"] - lo["lambda"]  # descriptive: the step in nats
+            dc, t = hi["lcs"] - lo["lcs"], _thr(hi["lcs"], lo["lcs"], REL_TIE, True)
             rows.append({"family": lad["family_id"], "type": lad["type"], "kind": kind,
-                         "rises": bool(dl > TIE), "falls": bool(dl < -TIE), "dl": float(dl)})
+                         "rises": bool(dc > t), "falls": bool(dc < -t), "dl": float(dl),
+                         "dlcs": float(dc)})
     return rows
 
 
 def dominance(ladders, scores):
     """Increase pairs by how the two graphs compare in the coherence order at x*."""
-    # rises (> TIE), n, falls (< -TIE), ties (|dl| <= TIE), rises exactly (dl > 0)
+    # On LCS: rises (> tie), n, falls (< -tie), ties (|d| <= tie), rises exactly (d > 0)
     d = defaultdict(lambda: [0, 0, 0, 0, 0])
     for lad in ladders:
         if lad["type"] not in INCREASE:
@@ -248,12 +267,12 @@ def dominance(ladders, scores):
             rev = A.dominates(lo["graph"], hi["graph"], hi["xv"])
             kind = ("forward" if g == "strict" else "equal" if g == "equal" else
                     "backward" if rev == "strict" else "incomparable")
-            dl = hi["lambda"] - lo["lambda"]
-            d[kind][0] += dl > TIE
+            dc, t = hi["lcs"] - lo["lcs"], _thr(hi["lcs"], lo["lcs"], REL_TIE, True)
+            d[kind][0] += dc > t
             d[kind][1] += 1
-            d[kind][2] += dl < -TIE
-            d[kind][3] += abs(dl) <= TIE
-            d[kind][4] += dl > 0
+            d[kind][2] += dc < -t
+            d[kind][3] += abs(dc) <= t
+            d[kind][4] += dc > 0
     return {k: tuple(v) for k, v in d.items()}
 
 
@@ -323,7 +342,7 @@ def judge_tol_invariance(ladders, rows):
             a, b = rows[ids[i]], rows[ids[j]]
             sd = max(float((a.get("diagnostics") or {}).get("sd") or 0),
                      float((b.get("diagnostics") or {}).get("sd") or 0))
-            ok += abs(b["score"] - a["score"]) <= sd + TIE_BASELINE
+            ok += abs(b["score"] - a["score"]) <= sd + _thr(a["score"], b["score"], REL_TIE, True)
             n += 1
     return ok, n
 
@@ -351,9 +370,12 @@ def main() -> int:
     for arm, sc in scores.items():
         unit = {"lambda": "lcs", "lambda_assert": "lcs_assert", "mean_marginal":
                 "mean_marginal"}
+        # LCS readouts are decided on LCS itself (relative tie); the mean marginal on its own
+        # value (absolute tie).
         res[arm] = {
-            ro: assess(ladders, lambda i, ro=ro, sc=sc: sc[i][ro] if i in sc else None, TIE,
-                       lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None)
+            ro: assess(ladders, lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None,
+                       DECIDE[ro][0], rel=DECIDE[ro][1],
+                       tol_value=lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None)
             for ro in ("lambda", "lambda_assert", "mean_marginal")
         }
         res[arm]["dominance"] = dominance(ladders, sc)
@@ -378,7 +400,7 @@ def main() -> int:
     bres = {}
     for name, rows in base.items():
         bres[name] = assess(ladders, lambda i, rows=rows: rows[i]["score"] if i in rows else None,
-                            TIE_BASELINE)
+                            REL_TIE, rel=True)
         bres[name]["n_items"] = len(rows)
         if name.startswith("judge_"):
             bres[name]["inv_seed_tol"] = judge_tol_invariance(ladders, rows)
@@ -394,37 +416,49 @@ def main() -> int:
                        for k in range(3)],
         }
     unit = {"lambda": "lcs", "lambda_assert": "lcs_assert", "mean_marginal": "mean_marginal"}
-    pairs = {arm: {ro: pair_rows(ladders, lambda i, ro=ro, sc=sc: sc[i][ro] if i in sc else None,
-                                 TIE, lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None)
+    pairs = {arm: {ro: pair_rows(ladders, lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc
+                                 else None, DECIDE[ro][0],
+                                 lambda i, ro=ro, sc=sc: sc[i][unit[ro]] if i in sc else None,
+                                 rel=DECIDE[ro][1])
                    for ro in unit} for arm, sc in scores.items()}
     pairs_base = {name: pair_rows(ladders, lambda i, rows=rows: rows[i]["score"] if i in rows
-                                  else None, TIE_BASELINE)
+                                  else None, REL_TIE, rel=True)
                   for name, rows in base.items()}
     dom_rows = {arm: dominance_rows(ladders, sc) for arm, sc in scores.items() if arm != "gold"}
     # The SIGN ladder rung by rung on gold graphs, under each readout (Figure: polarity).
     sign = {ro: [[scores["gold"][l["item_ids"][k]][ro] for k in range(3)]
                  for l in ladders if l["type"] == "SIGN"]
             for ro in ("lcs", "lcs_assert", "mean_marginal")}
-    # Lambda vs LCS: the same score on two scales (LCS is increasing in Lambda for a fixed claim
-    # set and prior). Count rung pairs whose direction differs, and pairs whose "moved by more
-    # than TIE" decision would change if it were taken on LCS instead of Lambda.
-    lam_lcs = {}
+    # The LCS tie rule, checked against two alternatives on every rung pair of every arm and
+    # both polarities: (a) deciding on Lambda at TIE, the log-ratio scale the theorems use,
+    # where no compression occurs -- the rule should agree everywhere; (b) nearby relative
+    # tolerances; and (c) an absolute tolerance TIE on LCS, which fails near LCS = 0.
+    def cls(d, t):
+        return 1 if d > t else (-1 if d < -t else 0)
+    alts = (1e-11, 1e-12, 1e-13)
+    rule = {"pairs": 0, "dis_lambda": 0, "dis_alt": {str(a): 0 for a in alts},
+            "dis_abs": {}}
     for arm, sc in scores.items():
+        n_abs = 0
         for ro, lo in (("lambda", "lcs"), ("lambda_assert", "lcs_assert")):
-            n = dis = rev = 0
             for lad in ladders:
                 ids = lad["item_ids"]
                 if any(i not in sc for i in ids):
                     continue
                 for i, j in itertools.combinations(range(3), 2):
-                    dl = sc[ids[j]][ro] - sc[ids[i]][ro]
-                    dc = sc[ids[j]][lo] - sc[ids[i]][lo]
-                    n += 1
-                    dis += (abs(dl) > TIE) != (abs(dc) > TIE)
-                    rev += (dl > TIE and dc < 0) or (dl < -TIE and dc > 0)
-            lam_lcs[f"{arm}:{ro}"] = (n, dis, rev)
-    out = {"arms": res, "baselines": bres, "gold_shape": gold_shape, "lambda_vs_lcs": lam_lcs,
+                    a, b = sc[ids[i]][lo], sc[ids[j]][lo]
+                    ours = cls(b - a, _thr(a, b, REL_TIE, True))
+                    rule["pairs"] += 1
+                    rule["dis_lambda"] += ours != cls(sc[ids[j]][ro] - sc[ids[i]][ro], TIE)
+                    for al in alts:
+                        rule["dis_alt"][str(al)] += ours != cls(b - a, _thr(a, b, al, True))
+                    if ro == "lambda":
+                        n_abs += ours != cls(b - a, TIE)
+        rule["dis_abs"][arm] = n_abs
+    rule["pairs_per_arm"] = 3 * len(ladders)
+    out = {"arms": res, "baselines": bres, "gold_shape": gold_shape, 
            "pairs": pairs, "pairs_baseline": pairs_base, "dominance_rows": dom_rows,
+           "lcs_rule": rule,
            "sign_rungs": sign,
            "n_families": len(fams), "n_ladders": len(ladders), "n_items": len(items),
            "ladders_by_type": {t: sum(l["type"] == t for l in ladders) for t in TYPES}}
@@ -503,12 +537,13 @@ def write_macros(path, out):
             m(f"sThree{tg}PairR", f"{e['pair'][1]:.2f}")
             m(f"sThree{tg}PairF", f"{e['pair'][2]:.2f}")
             m(f"sThree{tg}CoupF", f"{e['coupling'][2]:.2f}")
-    ll = out["lambda_vs_lcs"]
-    m("sThreeLamLcsSignDis", sum(v[2] for v in ll.values()))
-    m("sThreeLamLcsPairs", f"{sum(v[0] for v in ll.values()):,}".replace(",", "{,}"))
-    for arm in out["arms"]:
-        n, dis, _sg = ll[f"{arm}:lambda"]
-        m(f"sThree{tags[arm]}LamLcsDis", f"{dis}/{n}")
+    rl = out["lcs_rule"]
+    m("sThreeRelTie", f"10^{{{round(math.log10(REL_TIE))}}}")
+    m("sThreeLcsRulePairs", f"{rl['pairs']:,}".replace(",", "{,}"))
+    m("sThreeLcsRuleLamDis", rl["dis_lambda"])
+    m("sThreeLcsRuleAltMaxDis", max(rl["dis_alt"].values()))
+    for arm, k in rl["dis_abs"].items():
+        m(f"sThree{tags[arm]}LcsAbsDis", f"{k}/{rl['pairs_per_arm']}")
     for name, (tg, _disp) in BASELINES.items():
         c = out["baselines"].get(name)
         if not c:
@@ -534,6 +569,15 @@ def write_macros(path, out):
     for t, g in out["gold_shape"].items():
         for k in range(3):
             m(f"sThreeGold{t.title()}Lcs{'ABC'[k]}", f"{g['lcs'][k]:.3f}")
+    # Gold SIGN ladders at the asserted world, by rung pair (AB = rho0->rho1, BC = rho1->rho2,
+    # AC = rho0->rho2): how the stance-based readout rises, ties or falls on each step.
+    sp = [r for r in out["pairs"]["gold"]["lambda_assert"] if r["type"] == "SIGN"]
+    for (i, j), tag in (((0, 1), "AB"), ((1, 2), "BC"), ((0, 2), "AC")):
+        pr = [r for r in sp if tuple(r["pair"]) == (i, j)]
+        m(f"sThreeGoldLamASign{tag}Rise", f"{sum(r['ok'] for r in pr)}/{len(pr)}")
+        m(f"sThreeGoldLamASign{tag}Tie", f"{sum(r['tie'] for r in pr)}/{len(pr)}")
+        m(f"sThreeGoldLamASign{tag}Fall",
+          f"{sum(not r['ok'] and not r['tie'] for r in pr)}/{len(pr)}")
     open(path, "w").write("\n".join(L) + "\n")
 
 

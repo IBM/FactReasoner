@@ -49,6 +49,45 @@ of couplings is closed under negating an endpoint: negating the target of \ent{}
 negating its source gives \cnc{}, negating both reverses it, and negating one end of \eqv{} gives
 \exc{}.
 
+\paragraph{Why weights stay below $1$.}
+\label{app:weights}
+At $p_r=1$ the factor of Eq.~\ref{eq:psi} gives weight $0$ to the assignments the relation rules
+out, so the relation becomes a hard constraint: in the check reading of
+App.~\ref{app:framework-mrf}, the check never misses. The results of \S\ref{sec:framework} assume
+instead that every world has positive mass under every $\PR$ (App.~\ref{app:proofs}), and the bound
+$p_r<1$ is what guarantees it, since $Z_\R\ge\prod_{r\in\R}(1-p_r)>0$ and every world keeps at least
+$\pi(x)\prod_{r}(1-p_r)/Z_\R>0$. Admitting $p_r=1$ breaks this in four ways.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \emph{One conflict fixes the score.} A conflict of weight $1$ has $\psi_r(\xs_{e_r})=0$, so
+  $\PR(\xs)=0$, $\Lambda=-\infty$ and $\LCS=0$, and $\operatorname{logit}\PR(\xs)$ in
+  Eq.~\ref{eq:lcs} is undefined. No other edit can then move the score: deleting another conflict
+  or adding a support leaves $\Lambda$ at $-\infty$, so the strict half of
+  Theorem~\ref{thm:mono} fails. A single miner error at full weight would erase the rest of the
+  graph.
+\item \emph{The model can vanish.} Hard constraints can jointly rule out every world. An
+  equivalence and an exclusion on the same pair (a \sense{Restatement} and an exhaustive
+  \sense{Alternative}), both at weight $1$, leave no assignment of the pair, so $Z_\R=0$ and
+  Eq.~\ref{eq:mrf} is undefined.
+\item \emph{Edits can earn nothing.} Lemma~\ref{lem:edit} needs $q_r\in(0,1)$. If hard constraints
+  have already eliminated the assignments that a support rules out, then $q_r=0$ and its gain
+  $-\log(1-p_rq_r)$ is $0$; a second copy of a support of weight $1$, for instance, adds nothing.
+  At the other end, supports can force $\xs$. For two true claims, an equivalence and a
+  co-necessity at weight $1$ leave only $(1,1)$, so $\PR(\xs)=1$, $\Lambda$ reaches the bound
+  $-\log\pi(\xs)$ that is strict in Prop.~\ref{prop:lcs-lambda}(i), $\LCS=1$, and no further
+  support can raise it. Either way an improving edit fails to raise the score strictly.
+\item \emph{The proofs need the open end.} In the proof of Theorem~\ref{thm:mono},
+  $g^-(p)=\log(1-p)-\log(1-pq)$ tends to $-\infty$ as $p\to1$, and its derivative has $1-p$ in the
+  denominator; both are finite only on $[0,1)$. Theorem~\ref{thm:necessity} is stated for positive
+  tables, and a table with an entry $1-p_r=0$ is not positive.
+\end{itemize}
+The bound costs nothing in practice. Hard constraints remain available as the limit $p_r\to1$,
+which the scores approach continuously. It also matches what a weight is: $p_r=c_r g_r$ is a
+miner's estimate, and even when every sample agrees ($c_r=1$) the estimate does not justify
+certainty. The graph-level miner's top band, $0.925$, already keeps its weights below $1$; token
+probabilities can reach $1$ in floating point, which is why the product is clipped below $1$
+(Eq.~\ref{eq:decomp}). One could instead admit $p_r=1$ and work in the extended reals, but only
+the weak half of Theorem~\ref{thm:mono} would survive, and only for graphs with $Z_\R>0$.
+
 \paragraph{The compile map.} It makes three deliberate commitments.
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item Five senses collapse onto \ent{}, because a pairwise potential over truth values cannot tell
@@ -96,6 +135,7 @@ Theorem~\ref{thm:necessity}, whereas the product keeps every factor two-valued.
 App.~\ref{app:estimation} details both miners.
 
 \subsection{The Coherence MRF (\S\ref{sec:mrf})}
+\label{app:framework-mrf}
 
 \input{figures/mrf-response-a}
 
@@ -127,6 +167,45 @@ none of them, and its probability rises from $\pi(\xs)=2^{-5}\approx\vyAPiX$ to 
 Under B's relations the same world falls to $P_B(\xs)=\vyBPX$, because it violates both of B's
 conflicts.
 
+\paragraph{Sign-definiteness.}
+\label{app:signdef}
+The table of Eq.~\ref{eq:psi} takes two values: $1$, its maximum, on the assignments the relation
+allows, and $1-p_r$, its minimum, on those it rules out. Wherever the committed world places the
+two claims, the committed cell $\xs_{e_r}$ is therefore an extreme of the table, and we call a
+factor \emph{sign-definite} at $\xs$ when it is. For a support, $\psi_r(\xs_{e_r})=1=\max\psi_r$,
+so the committed pair is a most-preferred cell of the factor; for a conflict,
+$\psi_r(\xs_{e_r})=1-p_r=\min\psi_r$, a least-preferred one. Which extreme applies depends only on
+whether $\xs_{e_r}\in V(\kappa_r)$, which is the split of Definition~\ref{def:sign}. Nothing about
+$\xs$ is special here: the two-valued shape puts every world at an extreme of every factor. Two
+readings should be avoided. The statement is local to one factor on one pair, and the extreme is
+usually shared: for an entailment, $\xs$ ties for the maximum with two other cells, and for an
+exclusion conflict it ties for the minimum with one other. Nor does it make $\xs$ the most
+probable world of $\PR$.
+
+Monotonicity needs this property because of Lemma~\ref{lem:edit}: adding $r$ changes $\Lambda$ by
+$\log\psi_r(\xs_{e_r})-\log\E_{\PR}[\psi_r]$. The second term is the factor's average under the
+current model, which depends on the priors and on every other relation in the graph, and an
+average lies between the table's minimum and maximum. If $\psi_r(\xs_{e_r})$ is the maximum, the
+change is non-negative whatever the rest of the graph is; if it is the minimum, it is
+non-positive. It is strict when $p_r>0$ and the cells the relation rules out carry a share
+$q_r\in(0,1)$ of the mass, which positive priors and weights below $1$ guarantee
+(App.~\ref{app:weights}). The context sets how much a relation counts, through $q_r$, but never
+the direction, and that is what Theorem~\ref{thm:mono} needs, since an elementary improvement may
+sit anywhere in an arbitrary graph.
+
+A table whose committed cell lies strictly between its extremes has no fixed direction. At
+$\xs=(1,1)$, take $\psi=1$ at $(0,0)$, $0.1$ at $(0,1)$ and $(1,0)$, and $0.5$ at $(1,1)$. With
+priors $\pi_s=0.05$ and $\pi_t=0.95$, the pair sits at $(0,1)$ with probability $0.90$, the
+factor's average is $0.16$, and adding $\psi$ raises $\Lambda$ by $\log(0.5/0.16)\approx1.13$. With
+$\pi_s=\pi_t=0.05$, the pair sits at $(0,0)$ with probability $0.90$, the average is $0.91$, and
+the same factor lowers $\Lambda$ by $0.60$. Other relations can move the pair's mass in the same
+way, so the same relation helps in one graph and hurts in another, and no score built on such
+tables is monotone. Theorem~\ref{thm:necessity} shows that this is the only way to fail: a
+positive table moves $\Lambda$ in one direction for every relation graph if and only if its
+committed cell is its maximum or its minimum. The row-stochastic tables discussed in
+App.~\ref{app:rowstoch} fail for this reason. The two-valued tables of Eq.~\ref{eq:psi} meet the
+condition at every $\xs$, by construction.
+
 \subsection{The Order and the Score (\S\ref{sec:score})}
 
 \paragraph{The order.} Given the committed world, the order is deliberately minimal. It ranks only
@@ -156,62 +235,43 @@ claims with flat priors stay below $\LCS=1-2^{-n}$, which is $31/32\approx0.97$ 
 
 \input{figures/lcs-range}
 
-\paragraph{Two measures of confirmation.} The weight of evidence is also known as the
-log-likelihood-ratio measure of confirmation \citep{fitelson1999}. In the check model, $\Lambda$ is
-the log-ratio measure $\log P(\xs\mid E)/P(\xs)$ \citep{milne1996}, a different measure in general
-\citep{fitelson1999}. Since $\PR(\xs)=\pi(\xs)e^{\Lambda}$, however, $\LCS$ is a strictly
-increasing function of $\Lambda$ for a fixed claim set and prior (App.~\ref{app:lcs-lambda}). The
-two differ in one respect. $\LCS$ depends on $\pi(\xs)$ and so on the whole claim set: adding a
+\paragraph{The weight of evidence.}
+\label{app:woe}
+Good's weight of evidence that evidence $E$ lends a hypothesis $H$ is the logarithm of the
+likelihood ratio, $W(H:E)=\log\frac{P(E\mid H)}{P(E\mid\neg H)}$ \citep{good1950}. Bayes' rule in
+odds form,
+\begin{equation*}
+\frac{P(H\mid E)}{P(\neg H\mid E)}=\frac{P(E\mid H)}{P(E\mid\neg H)}\cdot\frac{P(H)}{P(\neg H)},
+\end{equation*}
+turns it into a difference of log-odds,
+\begin{equation*}
+W(H:E)=\operatorname{logit}P(H\mid E)-\operatorname{logit}P(H),
+\end{equation*}
+the amount by which $E$ moves the log-odds of $H$: positive when $E$ confirms $H$, negative when
+it disconfirms it, and $0$ when it is irrelevant. Good often used base-$10$ logarithms (bans and
+decibans); we use natural logarithms, so $W$ is in nats. In the check reading
+(App.~\ref{app:framework-mrf}), the hypothesis is that the world is $\xs$ and the evidence is that
+it passes every check, so $P(H)=\pi(\xs)$, $P(H\mid E)=\PR(\xs)$, and the argument of $\sigma$ in
+Eq.~\ref{eq:lcs} is $W$. Hence $\LCS=\sigma(W)$, the posterior of $\xs$ for a reader who started
+from even prior odds. Both likelihoods are explicit. Only conflicts can raise an alarm at $\xs$, so
+$P(E\mid\xs)=\prod_{r\in\Rcon}(1-p_r)$; and since $P(E)=Z_\R$, averaging the pass probability over
+the other worlds gives
+$P(E\mid\neg\xs)=\bigl(Z_\R-\pi(\xs)\,P(E\mid\xs)\bigr)/\bigl(1-\pi(\xs)\bigr)$.
+
+\paragraph{Two measures of confirmation.} $W$ is also known as the log-likelihood-ratio measure of
+confirmation \citep{fitelson1999}. $\Lambda=\log\frac{\PR(\xs)}{\pi(\xs)}=\log\frac{P(E\mid\xs)}{P(E)}$
+is instead the log-ratio measure \citep{milne1996}: it compares the likelihood under $\xs$ with the
+overall pass probability $Z_\R$ rather than with the likelihood under $\neg\xs$. The two are not
+ordinally equivalent in general \citep{fitelson1999}. With $u=\PR(\xs)$ and $u_0=\pi(\xs)$ they are
+linked by $W=\Lambda-\log\frac{1-u}{1-u_0}$ (Prop.~\ref{prop:lcs-lambda}(ii)), and since
+$u=u_0e^{\Lambda}$, $W$ and hence $\LCS$ are strictly increasing functions of $\Lambda$ for a fixed
+claim set and prior (Prop.~\ref{prop:lcs-lambda}(iii)). $\LCS$ and $\Lambda$ differ in one
+respect. $\LCS$ depends on $\pi(\xs)$ and so on the whole claim set: adding a
 claim that no relation touches leaves $\Lambda$ unchanged but moves $\LCS$ slightly towards
 $\sigma(\Lambda)$. The additivity and bounds of Prop.~\ref{prop:props} are therefore properties of
 $\Lambda$, not of $\LCS$. We nonetheless report $\LCS$: it is bounded, it reads as a probability,
 with $\frac12$ as the uninformative point, and it stays informative when a pipeline's posteriors
 are confident, where $\Lambda$ tends to $0$ for every graph (App.~\ref{app:twostage}).
-
-\subsection{Why This Score (\S\ref{sec:why})}
-
-\paragraph{Row-stochastic tables.} A natural alternative to Eq.~\ref{eq:psi} uses tables that are
-row-stochastic in the source, so that a false premise leaves its conclusion at the prior
-(App.~\ref{app:earlier}). Such tables fail Theorem~\ref{thm:necessity}'s test. At $\xs=\one$ they
-are sign-definite with the intended sign only for $p\ge\frac12$. Below it the committed cell of an
-entailment is the table's minimum, so a weak entailment lowers the score and a weak contradiction
-raises it. When the source is false at $\xs$, the committed cell holds the prior's value
-$\frac12$, which is neither the maximum nor the minimum, so they fail at every weight except
-$p=\frac12$, where the table is constant and has no effect. For weight changes,
-App.~\ref{app:proof-why} gives the analogue of Theorem~\ref{thm:necessity} as a sufficient
-condition.
-
-\paragraph{The readout world.} Proposition~\ref{prop:unique} does not say that $\xs$ is the right
-world; choosing it is the factuality pipeline's job. It says that the order and the readout must
-use the same world. It also does not exclude readouts that combine several worlds; of the five
-App.~\ref{app:earlier} examines, four are not monotone and the fifth violates A2.
-
-\paragraph{What is not forced.} These results fix the class of tables and the readout world; they
-do not make $\Lambda$ the unique score satisfying A1--A4. Any score that is strictly increasing in
-$\Lambda$ for a fixed prior and takes a prior-independent value at $\Lambda=0$ satisfies them too,
-which is how $\LCS$ does. And any reweighting $p\mapsto1-(1-p)^\beta$ with $\beta>0$ gives another
-monotone score of the same form, where different $\beta$ can rank incomparable graphs differently.
-We take $\beta=1$ because it makes $p_r$ the probability that a check catches a violation, so the
-check reading holds with the weights as estimated.
-
-\paragraph{Why not count relations?} Monotonicity alone admits trivial scores: the signed weight sum
-$\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is monotone by construction. But a count credits every relation in
-full, whether or not it rules out anything plausible, so it depends on how an argument is presented
-rather than on what it rules out. Two entailments $a\Rightarrow b$ and $b\Rightarrow a$ of weight
-$p$ multiply to exactly the table of one equivalence of weight $p$, so they induce the same $\PR$
-and the same $\Lambda$, but they count $2p$ against $p$, which violates A2. Repeating a support
-likewise adds its weight each time, where $\Lambda$ saturates (Prop.~\ref{prop:props}(vii)).
-Averaging removes the dependence on the number of relations but breaks monotonicity, since a weak
-support lowers an average.
-
-\paragraph{Properties.} Additivity makes $\Lambda$ an amount of evidence, in \emph{nats}
-(natural-log units: a change of $\Delta$ nats multiplies $\PR(\xs)$ by $e^{\Delta}$), that adds
-across independent parts of an argument; $\LCS$ is not additive. A support earns credit only for
-the probability it removes from worlds other than $\xs$, so once the relations force $\xs$, further
-support earns almost nothing, and repeated copies of one relation converge rather than accumulate
-(App.~\ref{app:proof-props}). The leave-one-out contributions $\Delta_r$ are not additive and need
-not sum to $\Lambda$. Weighted mini-bucket elimination \citep{wmb}, for graphs beyond exact
-inference, preserves the guarantees only up to the approximation.
 
 \subsection{Logical Coherence and Other Notions of Coherence}
 \label{sec:notions}

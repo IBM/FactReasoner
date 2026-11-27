@@ -1,111 +1,95 @@
 % External evaluation on data others built and labelled. Numbers: numbers_ext.tex (scripts/ext_eval.py,
 % macros with suffixes Gpt and Oss) and asap_numbers.tex (scripts/asap_lcs.py); figure:
-% scripts/ext_figures.py. The advance predictions E1-E7 are the hypotheses H1d, H1a+H1c, H2a, H3c,
-% H3a, H2a', H4b of results/ext/PREREG.md (mapping in App. K); the ASAP essays are not in it.
+% scripts/ext_figures.py. The section tests four properties of the score; every other analysis
+% (sign sweep, verdict world, miner recall, QT30, GDTB) and the gpt-oss-120b arm are in App. app:external.
+% Table tab:external is below; Figure fig:external is in appendix_external.tex.
 
-%% ============================================================================
-\section{External Evaluation}
+\subsection{Evaluation on Natural Text}
 \label{sec:exp-external}
-%% ============================================================================
 
-LoCoBench is synthetic, so we also tested the score on natural text that others built and labelled:
-ContraDoc \citep{contradoc} (documents with an inserted self-contradiction), SummEval
-\citep{summeval} (summaries with expert coherence ratings), ChatProtect \citep{mundler2024} (LLM
-self-contradictions), QT30 \citep{qt30} (debates annotated with inference and conflict) and GDTB
-\citep{gdtb} (PDTB-style discourse relations), with paragraph-shuffled LoCoBench responses for the
-order check. Claims are sentences (QT30: propositions; GDTB: relation arguments). Relations come
-from the graph-level miner with GPT-6 and with gpt-oss-120b, and $\LCS$ uses flat priors and,
-unless stated, the asserted world. We test seven \emph{advance predictions} about the score, each
-written down with its test and threshold before any graph of these checks was mined
-(App.~\ref{app:external}). Table~\ref{tab:external} reports all seven, held or not. Other numbers
-in this section are diagnostics computed afterwards to explain the outcomes, and the essay study at
-the end goes beyond the advance predictions.
-
-\begin{table*}[t]
+\begin{table}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{5.0cm}l>{\raggedright\arraybackslash}p{5.6cm}cc@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}llr@{}}
 \toprule
-& Advance prediction & Data & Result (GPT-6 arm) & GPT-6 & oss \\
+Data ($n$) & $\LCS$ (GPT-6 miner) & G-Eval \\
 \midrule
-E1 & $\LCS$ is unrelated to rated discourse coherence: $|\rho|<0.1$ & SummEval
-  & $\rho=\extSeRhoCohGpt$ (gpt-oss: $\extSeRhoCohOss$; G-Eval: $\extSeJudgeRhoCoh$) & \extHOneDGpt & \extHOneDOss \\
-E2 & under paragraph permutation, $\LCS$ stays within $\tau$ more often than every baseline and the judge
-  & \begin{tabular}[t]{@{}l@{}}LoCoBench\\ContraDoc\end{tabular}
-  & \begin{tabular}[t]{@{}l@{}}$\LCS$ \extLocoPermInvGpt\%, entity graph \extLocoPermInvEntity\%, G-Eval \extLocoPermInvJudge\%\\$\LCS$ \extCdPermInvGpt\%, entity graph \extCdPermInvEntity\%, G-Eval \extCdPermInvJudge\%\end{tabular}
-  & \begin{tabular}[t]{@{}c@{}}\extHOneAGpt\\\extHOneCGpt\end{tabular} & \begin{tabular}[t]{@{}c@{}}\extHOneAOss\\\extHOneCOss\end{tabular} \\
-E3 & inserting a contradiction lowers $\LCS$ (every claim true) & ContraDoc
-  & falls \extCdAssertDecGpt, rises \extCdAssertIncGpt{} of \extCdPairs{} ($p<\extCdAssertPGpt$) & \extHTwoAAssertGpt & \extHTwoAAssertOss \\
-E4 & adding a self-contradicting sentence lowers $\LCS$ & ChatProtect
-  & falls \extCpAssertDecGpt, rises \extCpAssertIncGpt{} of \extCpAssertNGpt{} ($p<\extCpAssertPGpt$) & \extHThreeCGpt & \extHThreeCOss \\
-E5 & each mined relation's contribution has the sign its violated cells predict, at all four truth assignments & ChatProtect
-  & \extCpSweepAgreeGpt\% of \extCpSweepNGpt{} cases & \extHThreeAGpt & \extHThreeAOss \\
-E6 & with the inserted sentence false and its contradiction found, $\LCS$ rises more often than it falls & ContraDoc
-  & rises \extCdVerdEdgeIncGpt, falls \extCdVerdEdgeDecGpt{} of \extCdVerdEdgeNGpt{} ($p=\extCdVerdEdgePGpt$) & \extHTwoAVerdGpt & \extHTwoAVerdOss \\
-E7 & senses that compile to none get a coupling less often than other senses get their correct one & GDTB
-  & \extGdNoneGpt\% against \extGdCorrectGpt\% & \extHFourBNoneGpt & \extHFourBNoneOss \\
+\multicolumn{3}{@{}l}{\textit{Not a proxy for discourse coherence}: $\rho$ with ratings} \\
+SummEval (\extSeN) & $\extSeRhoCohGpt$ & $\extSeJudgeRhoCoh$ \\
+\quad with a relation (\extSeNonEmptyNGpt) & $\extSeNonEmptyRhoCohGpt$ & $\extSeNonEmptyJudgeRhoCohGpt$ \\
+\quad inferences only (\extSeInfOnlyNGpt) & $\extSeInfOnlyRhoCohGpt$ & \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Detected conflicts lower the score}: falls\,/\,rises} \\
+ContraDoc (\extCdPairs) & \extCdAssertDecGpt\,/\,\extCdAssertIncGpt; found \extCdAssertEdgeDecGpt\,/\,\extCdAssertEdgeIncGpt & \extCdJudgeDec\,/\,\extCdJudgeInc \\
+ChatProtect (\extCpAssertNGpt) & \extCpAssertDecGpt\,/\,\extCpAssertIncGpt; found \extCpFoundFallGpt\,/\,\extCpFoundRiseGpt & -- \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Order leaves the score unchanged}: \% kept within $\tau$} \\
+LoCoBench (\extLocoPermNGpt) & \extLocoPermInvGpt{} (re-mined \extLocoNoiseInvGpt) & \extLocoPermInvJudge \\
+\quad gold graphs & 100 & \\
+ContraDoc (\extCdPermNGpt) & \extCdPermInvGpt{} (re-mined \extCdNoiseInvGpt) & \extCdPermInvJudge \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Essay quality beyond length}: partial $\rho$ with the score} \\
+ASAP~2.0 (\asapEssays) & \asapParLcsAsserted{} (\asapPwjLcsAsserted) & \asapParJudgeGevalGptSixSol \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{The seven advance predictions about the score}, each fixed with its test and
-threshold before mining, with the GPT-6 result and the outcome for both arms. ``Within $\tau$'':
-share of permutations that move a score by at most $0.01$. $p$: two-sided sign test at
-$\alpha=0.05$ (App.~\ref{app:external}). Three further advance predictions, about the miner alone,
-are in Table~\ref{tab:ext-hyp}.}
+\caption{\textbf{Four properties of $\LCS$ on natural text}, every claim true, next to the G-Eval
+judge. ``Found'': the pairs whose graph links the added sentence by a contradiction. ``Kept'': the
+share of paragraph permutations that move a score by at most $\tau$; ``re-mined'': the same share
+when the unchanged text is mined again. Partial $\rho$: length removed (in parentheses, G-Eval
+as well). Intervals are in the text and App.~\ref{app:external}.}
 \label{tab:external}
-\end{table*}
+\end{table}
 
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_external.pdf}
-\caption{\textbf{External evaluation, GPT-6 arm.} (a) Share of paragraph permutations that keep a
-score within $\tau$, next to the share an unchanged text keeps when mined again. The mined $\LCS$
-moves about as much under permutation as under re-mining, while the judge moves on most
-permutations. (b) Share of ContraDoc's contradicted documents whose graph links the inserted or
-replaced sentence by a contradiction. (c) ASAP essays: $\LCS$ with every claim true, with essay
-length removed (rank residual on word count, as a share of the sample), one dot per essay and the
-median per score level.}
-\label{fig:external}
-\end{figure*}
+LoCoBench is synthetic, and no corpus rates the logical coherence of a response, so we test four
+properties the framework implies on natural text that others labelled for a related property
+(Table~\ref{tab:external}). Claims are sentences (atomized claims for the essays), relations come
+from the GPT-6 graph-level miner, and $\LCS$ is read at the asserted world, where every claim is
+true: these datasets give no per-claim verdicts, and at that world every detected contradiction is
+a conflict. Brackets give 95\% bootstrap intervals. App.~\ref{app:external}
+has the data, a figure, the gpt-oss-120b arm and further analyses.
 
-\paragraph{What held.} Five of the seven predictions hold with GPT-6 and four with gpt-oss-120b.
-$\LCS$ is uncorrelated with SummEval's expert coherence ratings, which G-Eval tracks (E1). An
-inserted or self-contradicting sentence lowers it (E3, E4), and where the miner finds the
-contradiction it falls on \extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs and on
-all \extCpFoundFallGpt{} ChatProtect pairs, so almost every rise comes from a missed contradiction. On
-ContraDoc's clean documents, \extCdFpGpt\% of graphs contain a contradiction. Every relation's
-contribution takes the sign the theory predicts (E5). At ChatProtect's real verdicts, the
-contradictions found are \extCpRealSupportGpt{} supports (a sentence of the pair is false) and
-\extCpRealConflictGpt{} conflicts, all of which a contradiction count would charge. On GDTB,
-contrast, concession and temporal relations rarely receive a coupling, as the compile map requires
-(E7).
+\paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only the relations that constrain
+the claims' truth values (App.~\ref{sec:notions}), not their order or fluency. On SummEval
+\citep{summeval} its correlation with the experts' coherence ratings is $\extSeRhoCohGpt$
+\asapCI{\extSeRhoCohGptLo}{\extSeRhoCohGptHi}, against $\extSeJudgeRhoCoh$ for G-Eval, but
+\extSeEmptyGpt\% of the summaries have no relation and score exactly $\frac12$. On the
+\extSeNonEmptyNGpt{} that have one, it is $\extSeNonEmptyRhoCohGpt$
+\asapCI{\extSeNonEmptyRhoCohGptLo}{\extSeNonEmptyRhoCohGptHi}, and the two notions part for a
+principled reason: a restatement of an asserted claim is consistent and counts as a support, but
+raters penalize the redundancy it signals (the number of restatements correlates with rated
+coherence at $\extSeCountRestateRhoCohGpt$). On graphs with inferences only, $\LCS$ correlates
+weakly and positively with rated coherence ($\extSeInfOnlyRhoCohGpt$
+\asapCI{\extSeInfOnlyRhoCohGptLo}{\extSeInfOnlyRhoCohGptHi}), as two related notions should.
 
-\paragraph{What failed, and why.} E2 failed with both arms, because the baselines that win are
-deterministic functions of the text, while the miner samples. Gold-graph $\LCS$ is identical under
-every permutation, and the GPT-6 score moves no more under permutation than when the unchanged text
-is mined again (\extLocoPermInvGpt\% against \extLocoNoiseInvGpt\% within $\tau$ on LoCoBench,
-\extCdPermInvGpt\% against \extCdNoiseInvGpt\% on ContraDoc; Figure~\ref{fig:external}a). The judge,
-by contrast, falls on \extLocoPermDecJudge\% and \extCdPermDecJudge\% of the permutations, as if
-reordering were incoherence. For gpt-oss-120b, order matters somewhat beyond its noise. E6 failed
-with both arms: the score rises more often than it falls, as predicted, but not significantly. The
-two versions of a document are mined separately, and none of the \extCdVerdFallsGpt{} falls has a
-conflict on the inserted sentence, while all \extCdEvSupGpt{} relations drawn to it are supports.
-E4 also fails with gpt-oss-120b, which finds only \extCpConfStrongOss\% of ChatProtect's
-contradictions. Of three further predictions about the miner alone (App.~\ref{app:external}), two
-held, and the third, that recall falls with the distance between the two sentences, failed: GPT-6
-finds \extCdRecallIntraGpt\% of contradictions within one sentence, which no relation between two
-claims can represent. Throughout, the binding constraint is relation recall. GPT-6 finds the
-contradiction in \extCdRecallGpt\% of ContraDoc's contradicted documents (gpt-oss-120b:
-\extCdRecallOss\%), and on QT30 it recovers \extQtRecEntailmentGpt\% of the annotated inferences but
-only \extQtRecContradictionGpt\% of the conflicts.
+\paragraph{Detected conflicts lower the score.} With every claim true, adding a contradiction
+lowers $\Lambda$ (Lemma~\ref{lem:edit}); the added sentence is also a new claim, so this is a
+prediction rather than the theorem (App.~\ref{app:ext-contra}). ContraDoc \citep{contradoc} inserts
+a contradicting sentence into a document, and ChatProtect \citep{mundler2024} extends an LLM's
+sentence with a self-contradicting one. Where the miner finds the contradiction, $\LCS$ falls on
+\extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs and on all \extCpFoundFallGpt{}
+ChatProtect pairs. Over all pairs it falls far more often than it rises (sign tests,
+$p<\extCdAssertPGpt$ and $p<\extCpAssertPGpt$), and almost every rise is a contradiction the miner
+missed: detection, not scoring, is the bottleneck. The miner finds \extCdRecallInsertGpt\% of ContraDoc's
+inserted contradictions and \extCpConfStrongGpt\% of ChatProtect's. The judge falls too, so contradiction detection
+alone does not separate $\LCS$ from a judge; order and LoCoBench do.
 
-\paragraph{Essay quality.} Beyond the advance predictions, we asked whether $\LCS$ tracks the
-quality of natural arguments, on \asapEssays{} persuasive essays from ASAP~2.0
-\citep{crossley2025asap} scored 1--6 by trained raters. The full pipeline runs, from atomizing to
-mining (GPT-6), outside the guarantee, since every essay has its own claims. $\LCS$ keeps a partial
-correlation of $\asapParLcsAsserted$ [\asapParLcsAssertedLo, \asapParLcsAssertedHi] with the score
-once length is removed, about as much as G-Eval ($\asapParJudgeGevalGptSixSol$), and
-$\asapPwjLcsAsserted$ once G-Eval is removed as well (Figure~\ref{fig:external}c). The signal is the
-density of supported reasoning: the relation count carries most of it ($\asapParRelations$ after
-length), and the miner finds only \asapConfAsserted{} conflicts in \asapConfEssaysAsserted{} of the
-essays. Counting claims absent from the source article as false lowers the partial correlation to
-$\asapParLcsStrict$ (App.~\ref{app:asap}).
+\paragraph{Order leaves the score unchanged.} Permuting self-contained paragraphs changes neither
+the claims, nor their relations, nor the committed world, so gold-graph $\LCS$ is identical under
+every permutation of LoCoBench responses. A mined score also carries the miner's sampling noise,
+and permuting moves it no more than mining the unchanged text again: it stays within
+$\tau=\sThreeTol$ on \extLocoPermInvGpt\% of LoCoBench permutations against \extLocoNoiseInvGpt\%
+for re-mining, and on \extCdPermInvGpt\% of ContraDoc's long documents against \extCdNoiseInvGpt\%.
+The judge treats reordering as incoherence, falling on \extLocoPermDecJudge\% and
+\extCdPermDecJudge\% of the permutations. With gpt-oss-120b, permutation moves the score beyond
+its noise floor on ContraDoc, so this property is shown for GPT-6 (App.~\ref{app:ext-order}).
+
+\paragraph{Essay quality beyond length.} On \asapEssays{} persuasive essays from ASAP~2.0
+\citep{crossley2025asap}, scored 1--6 by trained raters, the full pipeline runs, from claim
+extraction to mining, and the guarantee does not apply, since every essay has its own claims.
+Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correlation of
+\asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is
+removed, against \asapParJudgeGevalGptSixSol{} for G-Eval, and \asapPwjLcsAsserted{} once G-Eval
+is removed too. The signal is the density of supported reasoning (the number of relations keeps
+\asapParRelations{} after length), not conflicts, which the miner finds in only
+\asapConfEssaysAsserted{} essays. The essays answer one prompt and were mined with one model, so
+the result is indicative (App.~\ref{app:asap}).

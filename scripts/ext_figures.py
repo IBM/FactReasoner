@@ -3,13 +3,15 @@
     uv run --with matplotlib python scripts/ext_figures.py \\
         --eval results/ext/eval.json --out docs/arr2027/coherence/figures/fig_external.pdf
 
-(a) Order: share of cases a score keeps within tau when paragraphs are permuted, next to the
+(a) Conflicts: how LCS (every claim true) moves when a contradicting sentence is added, on
+    ContraDoc insertion pairs and ChatProtect contradictory pairs, split by whether the miner
+    found the contradiction (falls / ties / rises, as shares of the pairs).
+(b) Order: share of cases a score keeps within tau when paragraphs are permuted, next to the
     share an unchanged text keeps when mined again (the miner's noise floor).
-(b) ContraDoc: recall of the inserted or replaced contradiction, by scope and by edit.
 (c) ASAP 2.0 essays: LCS (every claim true) with length removed, by human score level; the
     GDTB breakdown is a table in the appendix.
-Palette: the validated categorical slots 1-4 (blue, orange, aqua, yellow); every bar carries a
-value label (two slots are below 3:1 against the surface).
+Palette: the validated categorical slots 1-4 (blue, orange, aqua, yellow) plus a neutral gray for
+ties; every bar carries a value label (two slots are below 3:1 against the surface).
 """
 
 from __future__ import annotations
@@ -33,13 +35,13 @@ def main() -> int:
     import matplotlib.pyplot as plt
 
     ev = json.load(open(args.eval))
-    c1, c2 = ev["check1"], ev["check2"][f"2:{args.arm}"]
+    c1, c2, c3 = ev["check1"], ev["check2"][f"2:{args.arm}"], ev["check3"][f"3:{args.arm}"]
     plt.rcParams.update({"font.family": "serif", "font.size": 7.5, "axes.edgecolor": MUTED,
                          "axes.labelcolor": INK, "xtick.color": INK, "ytick.color": INK,
                          "axes.spines.top": False, "axes.spines.right": False,
                          "axes.linewidth": 0.6})
     fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.0), constrained_layout=True,
-                             gridspec_kw={"width_ratios": [1.15, 1.0, 1.05]})
+                             gridspec_kw={"width_ratios": [1.2, 1.05, 0.95]})
 
     def label(ax, bars, horizontal=False):
         for b in bars:
@@ -51,8 +53,41 @@ def main() -> int:
                 ax.text(b.get_x() + b.get_width() / 2, v + 1.5, f"{v:.0f}", ha="center",
                         va="bottom", fontsize=6.3, color=INK)
 
-    # (a) order
+    # (a) conflicts: falls / ties / rises of LCS when the contradicting sentence is added
     ax = axes[0]
+    cd_all, cd_edge = c2["asserted"], c2["asserted_edge"]
+    cd_found = (cd_edge["decrease"], cd_edge["tie"], cd_edge["increase"])
+    cd_miss = tuple(cd_all[k] - cd_edge[k] for k in ("decrease", "tie", "increase"))
+    bf, cp_all = c3["asserted_by_found"], c3["asserted"]
+    cp_found = (bf["found_fall"], 0, bf["found_rise"])
+    cp_miss = (bf["notfound_fall"], cp_all["n"] - sum(cp_found) - bf["notfound_fall"]
+               - bf["notfound_rise"], bf["notfound_rise"])
+    rows_ = [("ContraDoc, found", cd_found), ("ContraDoc, missed", cd_miss),
+             ("ChatProtect, found", cp_found), ("ChatProtect, missed", cp_miss)]
+    ys = [3.6, 2.6, 1.0, 0.0]
+    for y, (name, cnt) in zip(ys, rows_):
+        n = sum(cnt)
+        left = 0.0
+        for v, color, lab in zip(cnt, (BLUE, GRID, ORANGE), ("falls", "ties", "rises")):
+            wv = 100 * v / n
+            ax.barh(y, wv, left=left, height=0.72, color=color, edgecolor="white", lw=1.0,
+                    label=lab if y == ys[0] else None, zorder=2)
+            if wv >= 9:
+                ax.text(left + wv / 2, y, f"{v}", ha="center", va="center", fontsize=6.0,
+                        color="white" if color == BLUE else INK, zorder=3)
+            left += wv
+    ax.set_yticks(ys, [f"{nm} ({sum(c)})" for nm, c in rows_], fontsize=6.2)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-0.6, 4.75)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xlabel("share of pairs (%)")
+    ax.tick_params(axis="y", length=0)
+    ax.set_title("(a) conflicts", fontsize=7.5, color=INK, loc="left")
+    ax.legend(fontsize=5.8, frameon=False, loc="upper center", ncol=3, handlelength=1.0,
+              borderaxespad=0.0, columnspacing=0.9, bbox_to_anchor=(0.5, 1.02))
+
+    # (b) order
+    ax = axes[1]
     series = [("LCS, permuted", BLUE, lambda r: r["perm"]["lcs"]["invariant"]),
               ("LCS, re-mined", AQUA, lambda r: r["noise_floor"]["lcs"]["invariant"]),
               ("entity graph", YELLOW,
@@ -75,25 +110,9 @@ def main() -> int:
     ax.set_yticks([0, 20, 40, 60, 80, 100])
     ax.set_ylabel(r"kept within $\tau$ (%)")
     ax.yaxis.grid(True, color=GRID, lw=0.5, zorder=0)
-    ax.set_title("(a) order", fontsize=7.5, color=INK, loc="left")
+    ax.set_title("(b) order", fontsize=7.5, color=INK, loc="left")
     ax.legend(fontsize=5.6, frameon=False, loc="upper left", ncol=2, handlelength=1.0,
               borderaxespad=0.1, labelspacing=0.25, columnspacing=0.8)
-
-    # (b) ContraDoc recall
-    ax = axes[1]
-    R = c2["recall"]
-    cats = [("within\nsent.", "scope=intra"), ("local", "scope=local"), ("global", "scope=global"),
-            ("insert", "plug=Insert"), ("replace", "plug=Replace")]
-    xs = [0, 1.35, 2.7, 4.25, 5.75]
-    bars = ax.bar(xs, [100 * R[k]["recall"] for _, k in cats], width=0.7, color=BLUE, zorder=2)
-    label(ax, bars)
-    ax.set_xticks(xs, [c for c, _ in cats], fontsize=6.2)
-    ax.set_ylim(0, 75)
-    ax.set_ylabel("contradiction found (%)")
-    ax.yaxis.grid(True, color=GRID, lw=0.5, zorder=0)
-    ax.text(1.35, 70, "scope", ha="center", fontsize=6.5, color=MUTED)
-    ax.text(5.0, 70, "edit", ha="center", fontsize=6.5, color=MUTED)
-    ax.set_title("(b) ContraDoc recall", fontsize=7.5, color=INK, loc="left")
 
     # (c) ASAP 2.0 essays: LCS with every claim true, length removed (rank residual on word
     # count, as a share of the sample), one dot per essay and a median bar per score level.

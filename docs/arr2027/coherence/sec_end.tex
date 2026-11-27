@@ -3,46 +3,64 @@
 \label{sec:discussion}
 %% ============================================================================
 
-We reduced logical coherence to one requirement, monotonicity in the coherence order over a fixed
-claim set, and derived the score that meets it: the weight of evidence that the coherence MRF lends
-to the committed world, with sign-definite potentials and that world forced. On LoCoBench it
-holds exactly on gold graphs and every misranking on mined graphs traces to extraction.
-On natural text the score separates logical from discourse coherence, falls under
-self-contradiction and tracks essay quality beyond length. What limits it is relation extraction: recall, above all for contradictions
-within a sentence, and calibrated weights. Logical coherence is meant to be reported beside
-factuality and discourse coherence, not instead of them.
+We asked what a score of logical coherence must satisfy, and answered with one requirement: for a
+fixed set of claims and their verdicts, it must rise under every coherence-improving edit of the
+argument's relations. $\LCS$, the weight of evidence that the coherence MRF lends to the committed
+world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and the requirement
+pins down the class of relation tables and the world at which the model is read
+(App.~\ref{app:why}). On LoCoBench, $\LCS$ satisfies every declared order on gold graphs, and on
+mined graphs it falls only on pairs whose edit the miner reversed or left incomparable; LLM judges,
+by contrast, are near chance when the only change is an added valid inference. On natural text,
+where no human ratings of logical coherence exist, the score is not a proxy for rated discourse
+coherence, falls when a detected contradiction is added, moves no more under paragraph permutation
+than under re-mining, and tracks essay quality beyond length. What limits $\LCS$ is relation extraction: recall,
+above all for contradictions within a sentence, and calibrated weights. Logical coherence is meant
+to be reported beside factuality and discourse coherence, not instead of them.
 
 \section*{Limitations}\label{sec:limitations}
 
-\textbf{Data.} LoCoBench's responses were written by a single generator (Claude Opus~5) and admitted
-by a single committee, so results may reflect one model's writing style. Gold relations are what
-the committee read. The ladders are diagnostic, not a sample of how real responses argue: rungs
-differ in one or two spliced sentences with explicit markers, and claims are given rather than
-extracted. Mined-graph results on LoCoBench are therefore upper bounds on extraction from natural
-text. The external evaluation uses natural text with human labels (rated coherence, contradiction
-labels, discourse and argument relations, essay scores), but none of these labels rates the
-logical coherence of a response, so agreement with human judgements of logical coherence remains
-to be established. The essays come from one prompt, were mined with one model, use truth values
-from a model committee, and were not among the advance predictions.
-\textbf{Selection.} The committee and the miners share vendors, and explicit fillers favour any
-extractor that reads connectives, so mined results on LoCoBench are optimistic.
-\textbf{Tolerance.} The tolerant counts depend on $\tau$, fixed at $\sThreeTol$ on development
-families; the exact counts do not.
-\textbf{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a fixed
-committed world. When an extractor changes relations in both directions, the score nets them and no
-ordering is guaranteed. The score does not compare responses with different claim sets, where
-$\LCS$ is a reading on a common scale rather than a guaranteed order. The necessity results fix the
-tables and the readout world but not the functional form of the score. Relations on one pair that
-contradict each other cancel, so they score as uninformative rather than as incoherent.
-\textbf{Polarity.} Verdict polarity inherits the factuality pipeline's errors: a wrong verdict can
-flip the sign of the relations at that claim. Verdicts are binary, so a claim the evidence neither
-supports nor refutes is treated as false. On LoCoBench the verdicts are the generator's factuality
-labels, which model an error-free pipeline, so the effect of verdict errors is not measured.
-\textbf{Modelling.} No relation weight is calibrated, and the pairwise miner's weights saturate the
-score. Only \sense{Refutation} compiles to \con{}, so an incompatibility conveyed without being
-asserted produces no factor. Couplings are material constraints, so relevance of premise to
-conclusion is not modelled. Saturation bounds redundant support but cannot stop a miner from
-hallucinating new support, so the score inherits the extractor's precision.
+\paragraph{Data.} LoCoBench's responses were written by a single generator (Claude Opus~5) and
+admitted by a single committee, so results may reflect one model's writing style. Its gold relations
+are the committee's reading of each response, not human annotations. The ladders are diagnostic, not
+a sample of how real responses argue: rungs differ in one or two spliced sentences with explicit
+markers, and claims are given rather than extracted. The committee and the miners share vendors, and
+explicit markers favour any extractor that reads connectives, so mined-graph results on LoCoBench
+are optimistic, an upper bound on extraction from natural text.
+
+\paragraph{External evaluation.} The natural-text datasets carry human labels (rated coherence,
+contradictions, discourse and argument relations, essay scores), but none rates the logical
+coherence of a response, so agreement with human judgements of logical coherence remains to be
+established. The order check depends on the tolerance $\tau=\sThreeTol$ of
+\S\ref{sec:experiments}, and order invariance of the mined score is shown for GPT-6 only. The essays
+come from one prompt and were mined with one model.
+
+\paragraph{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a
+fixed committed world. When an extractor changes relations in both directions, the score nets them
+and no ordering is guaranteed. The score does not compare responses with different claim sets,
+where $\LCS$ is a reading on a common scale rather than a guaranteed order. The necessity results
+(App.~\ref{app:why}) fix the relation tables and the world at which the model is read, but not the
+functional form of the score. Relations on one pair that contradict each other cancel, so they
+score as uninformative rather than as incoherent.
+
+\paragraph{Verdicts.} At the verdict world the score inherits the factuality pipeline's errors: a
+wrong verdict can flip the sign of the relations at that claim. Verdicts are binary, so a claim the
+evidence neither supports nor refutes is treated as false. On LoCoBench the verdicts are the
+generator's factuality labels, which model an error-free pipeline, so the effect of verdict errors
+is not measured.
+
+\paragraph{Modelling.} Relations join two claims, so a contradiction within a single claim cannot
+be represented; on ContraDoc this is where recall is lowest. No relation weight is calibrated, and
+the pairwise miner's weights saturate the score. Only \sense{Refutation} compiles to \con{}, so an
+incompatibility conveyed without being asserted produces no factor. Couplings are material
+constraints, so relevance of premise to conclusion is not modelled. Saturation bounds redundant
+support but cannot stop a miner from hallucinating new support, so the score inherits the
+extractor's precision.
+
+\paragraph{Computation and reproducibility.} The score needs the partition function $Z_\R$, which
+is \#P-hard in general; it is exact here because the graphs are small, and approximate inference
+preserves the guarantees only up to the approximation (App.~\ref{app:further}). The strongest miner
+and judge, GPT-6, are proprietary models served through an API, so their outputs may not be
+reproducible over time.
 
 \section*{Ethics Statement}
 
