@@ -180,8 +180,18 @@ grader prompted with the six-point holistic rubric (GPT-6, three runs averaged) 
 score at \asapRhoJudgeRubricGptSixSol{} and at \asapParJudgeRubricGptSixSol{} after length, more than
 $\LCS$; with length and the grader both removed, $\LCS$ keeps \asapPwrLcsAsserted{}
 \asapCI{\asapPwrLcsAssertedLo}{\asapPwrLcsAssertedHi}, the signed sum \asapPwrWsumAsserted{} and
-the relation count \asapPwrRelations, so the score carries information that a rubric grader
-does not. Sampling
+the relation count \asapPwrRelations. That grader's scale is compressed (no essay gets 6 and half get
+4), which can leave length-related variation within its ties, so a second grader gives a 0--100
+score under the same rubric (three runs averaged). It correlates with the score at
+\asapRhoJudgeRubricOneZeroZeroGptSixSol{} and at \asapParJudgeRubricOneZeroZeroGptSixSol{} after length;
+with length and this grader removed, $\LCS$ keeps \asapPwrhLcsAsserted{}
+\asapCI{\asapPwrhLcsAssertedLo}{\asapPwrhLcsAssertedHi}, the relation count \asapPwrhRelations{} and
+the signed sum \asapPwrhWsumAsserted. The difference between the partial correlations of $\LCS$ and of
+the relation count after length is \asapRobDiffRelations{}
+\asapCI{\asapRobDiffRelationsLo}{\asapRobDiffRelationsHi}, and between $\LCS$ and the 0--100 grader
+\asapRobDiffRubricOneZeroZero{} \asapCI{\asapRobDiffRubricOneZeroZeroLo}{\asapRobDiffRubricOneZeroZeroHi}:
+the mined relations carry information the grader does not, and $\LCS$ carries no more than their
+count. Sampling
 \asapPerLevel{} essays per level weights the extreme scores more than the natural score
 distribution does, which inflates every correlation in the table.
 

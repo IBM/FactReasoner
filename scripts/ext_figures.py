@@ -6,8 +6,8 @@
 (a) Conflicts: how LCS (every claim true) moves when a contradicting sentence is added, on
     ContraDoc insertion pairs and ChatProtect contradictory pairs, split by whether the miner
     found the contradiction (falls / ties / rises, as shares of the pairs).
-(b) Order: share of cases a score keeps within tau when paragraphs are permuted, next to the
-    share an unchanged text keeps when mined again (the miner's noise floor).
+(b) Order, matched designs: share of permutations that keep a score within tau, next to the share
+    an unchanged text keeps when mined (LCS) or judged (G-Eval) again in the same run.
 (c) ASAP 2.0 essays: LCS (every claim true) with length removed, by human score level; the
     GDTB breakdown is a table in the appendix.
 Palette: the validated categorical slots 1-4 (blue, orange, aqua, yellow) plus a neutral gray for
@@ -88,13 +88,15 @@ def main() -> int:
 
     # (b) order
     ax = axes[1]
+    # Matched designs (each text mined, and judged, twice in one run): 1g LoCoBench, 1f ContraDoc
+    # documents permuted by whole sections (third review).
     series = [("LCS, permuted", BLUE, lambda r: r["perm"]["lcs"]["invariant"]),
               ("LCS, re-mined", AQUA, lambda r: r["noise_floor"]["lcs"]["invariant"]),
-              ("entity graph", YELLOW,
-               lambda r: r["perm"].get("discourse_entity_graph", {}).get("invariant")),
-              ("G-Eval (GPT-6)", ORANGE,
-               lambda r: r["perm"].get("judge_geval@gpt-6-sol", {}).get("invariant"))]
-    groups = [("LoCoBench", c1[f"1a:{args.arm}"]), ("ContraDoc", c1[f"1c:{args.arm}"])]
+              ("G-Eval, permuted", ORANGE,
+               lambda r: r.get("judge_perm", {}).get("lcs", {}).get("invariant")),
+              ("G-Eval, re-judged", YELLOW,
+               lambda r: r.get("judge_noise", {}).get("lcs", {}).get("invariant"))]
+    groups = [("LoCoBench", c1[f"1g:{args.arm}"]), ("ContraDoc", c1[f"1f:{args.arm}"])]
     w = 0.19
     for k, (name, color, f) in enumerate(series):
         xs, ys = [], []

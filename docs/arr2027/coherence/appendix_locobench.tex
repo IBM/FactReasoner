@@ -382,16 +382,21 @@ difference is [\vfOssGoldDiffloInc, \vfOssGoldDiffhiInc] points (\vfOssGoldLcsIn
 and costs where it discounts supports.
 
 \paragraph{A non-sequitur control.} For the rung-0 response of each increasing family, a sentence
-asserting that one true claim follows from another, with no gold relation between them, from
-different paragraphs and sharing almost no words, is appended (``That this is so follows from the
-fact that \ldots''); the claims are unchanged, and both versions were mined in one run. Couplings
-are material, so an extracted inference between two true claims is a support and must raise
-$\LCS$. The GPT-6 miner extracts the planted inference in only \nsExtracted\% of the \nsPairs{}
-responses, and otherwise $\LCS$ rises on \nsLcsRise\% and falls on \nsLcsFall\% of them, the
-re-mining noise of an unrelated edit. The pairwise judge with verdicts prefers the response without
-the non-sequitur on \nsJudgeOrig\% of the pairs and with it on \nsJudgeNonseq\%. Relevance is
-therefore enforced by the extractor, which declines to read an irrelevant inference as one, not by
-the score, which would credit it.
+naming two true claims that no gold relation joins, from different paragraphs and sharing almost no
+words, is inserted directly after the second (``That $\langle$conclusion$\rangle$ follows from the
+fact that $\langle$premise$\rangle$.''); the claims are unchanged, and both versions were mined in one
+run. As a positive control, the same template states, in rung 0 of each \cp{chain} family, an
+entailment that the ladder's top rung adds (a valid inference by design). Couplings are material,
+so an extracted inference between two true claims is a support whether or not it is valid. The GPT-6
+miner extracts the planted non-sequitur in \nsExtracted\% of the \nsPairs{} responses and the valid
+inference in \nvExtracted\% of \nvPairs; $\LCS$ rises on \nsLcsRise\% and \nvLcsRise\% of them, the
+signed sum on \nsWsumRise\% and \nvWsumRise\%. Neither the extractor nor the score tells a valid
+inference from a non-sequitur. The pairwise judge with verdicts does in part: it prefers the version
+with the valid inference on \nvJudgeEdited\% of the pairs (the original on \nvJudgeOrig\%), but the
+version with the non-sequitur on only \nsJudgeEdited\% (the original on \nsJudgeOrig\%, ties
+\nsJudgeTie\%). An earlier version of this control, whose inserted sentence (``That this is so
+follows from \ldots'') did not name the conclusion, was extracted in only 2\% of responses; that
+figure reflected the ambiguous reference, not relevance.
 
 \paragraph{Dominance with a weight tolerance.} The pairwise miners' weights are token probabilities
 that drift by about $10^{-8}$ whenever any sentence changes, so an exact comparison leaves most of

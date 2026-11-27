@@ -66,39 +66,36 @@ support there (App.~\ref{app:asserted-sign}).
 
 \paragraph{Mined graphs: extraction sets the rate.} With mined graphs $\LCS$ rises on
 \sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\% (pairwise Llama)
-of the increases, and by more than $\tau$ on \sThreeGraphGptLamIncTolPct\% to \sThreePairOssLamIncTolPct\%.
-As Theorem~\ref{thm:mono} requires, it falls only where the miner erased, reversed or mixed the
-edit (Figure~\ref{fig:dominance}), so the rates measure extraction. A graph-level miner from outside the
-vendors of the benchmark's committee (Llama-3.3-70B, \subLadders{} ladders) reaches a
-pair-level F1 of \subLlamaPairF{} against \subGptPairF{} for GPT-6, and $\LCS$ falls on
-\subLlamaLcsFalls\% of its increases, so the GPT-6 results are an upper bound. 
+of the increases, and by more than $\tau=\sThreeTol$ on \sThreeGraphGptLamIncTolPct\% to
+\sThreePairOssLamIncTolPct\%. Theorem~\ref{thm:mono} covers only pairs whose extracted graphs are
+ordered as declared (\sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6, \sThreePairOssDomForward{}
+with each pairwise miner), where $\LCS$ always rises (Figure~\ref{fig:dominance}). A weaker
+graph-level miner from outside the committee's vendors (Llama-3.3-70B, \subLadders{} ladders) reaches
+pair-level F1 \subLlamaPairF{} against \subGptPairF{} for GPT-6, and $\LCS$ rises on \subLlamaLcsInc\%
+of its increases against \subGptLcsInc\%: results depend on the miner.
 
-\paragraph{A signed sum does slightly better, until the verdicts are wrong.} The signed weight sum
-over the same graphs rises on \sThreeGraphGptWsumIncPct\% of the increases with GPT-6 ($\LCS$:
-\sThreeGraphGptLamIncPct\%; paired difference \pcLcsWsumIncGpt{} points
-\asapCI{\pcLcsWsumIncGptLo}{\pcLcsWsumIncGptHi}) and matches or exceeds $\LCS$ on the increases of
-every arm (Table~\ref{tab:signed}): with correct verdicts the ladders test the sign each relation
-takes, which the two scores share. With wrong verdicts they differ. Flipping each gold verdict with
-probability $0.2$, $\LCS$ on gold graphs keeps \vnLcsIncTwenty\% of the increases and the sum
-\vnWsumIncTwenty\% (difference \asapCI{\vnDiffLoIncTwenty}{\vnDiffHiIncTwenty} points), almost
-all of it on \cp{conflict} (\vnLcsConflictTwenty\% against \vnWsumConflictTwenty\%). A closed-book GPT-6 verifier's verdicts (\vfGptAcc\%
-accurate) give \vfGptGoldLcsInc\% against \vfGptGoldWsumInc\% (App.~\ref{app:results}). What $Z_\R$ adds is a matter of design (App.~\ref{app:results}): $\LCS$
-scores a constraint the same whether it is stated whole or as two halves, credits a repeated
-inference less than distinct ones, and credits an inference less when its premise is contested; a
-sum over deduplicated constraints would match the first two, but not the third.
+\paragraph{A signed sum does slightly better.} The signed weight sum over the same graphs rises on
+\sThreeGraphGptWsumIncPct\% of the increases with GPT-6 (paired difference \pcLcsWsumIncGpt{} points
+\asapCI{\pcLcsWsumIncGptLo}{\pcLcsWsumIncGptHi}) and matches or exceeds $\LCS$ on every arm
+(Table~\ref{tab:signed}): with correct verdicts the ladders test each relation's sign, which the two
+share. On gold graphs read at wrong verdicts $\LCS$ degrades less (flipping each with probability
+$0.2$: \vnLcsIncTwenty\% against \vnWsumIncTwenty\%, \asapCI{\vnDiffLoIncTwenty}{\vnDiffHiIncTwenty}
+points, all on \cp{conflict}), but with mined graphs and a closed-book GPT-6 verifier (\vfGptAcc\%
+accurate) the two are indistinguishable (\asapCI{\vfGptMinedDiffloInc}{\vfGptMinedDiffhiInc}). What
+$Z_\R$ adds is otherwise design: a constraint scores the same stated whole or as two halves, a
+repeated inference counts less than distinct ones, and an inference from a contested premise less
+(App.~\ref{app:results}).
 
-\paragraph{Text baselines and LLM judges.} Length and DiscoScore fall about as often as they rise
-(Figure~\ref{fig:ladders}). A count of discourse markers rises on \sThreeBCtlMarkersConflict{}
-\cp{conflict} pairs, which surface cues therefore solve, but on only \sThreeBCtlMarkersChain{}
-\cp{chain} and \sThreeBCtlMarkersSign{} \cp{sign} pairs. Judges rating one response at a time miss added inferences: on
-\cp{chain}, G-Eval with GPT-6 rises on \sThreeBGevalGptChain{} pairs and falls on
-\sThreeBGevalGptChainFalls{} ($\LCS$ on GPT-6 graphs rises on \sThreeGraphGptLamChain), and given the
-claims, their verdicts and our definition it still does not separate them (rise\,/\,fall\,/\,tie
-\fjAbsChainCounts). Asked instead which of two rungs is more coherent, in both orders and with the
-claims, verdicts and definition, GPT-6 prefers the declared rung on \fjPairVIncRise\% of the
-increases (\cp{chain}: \fjPairVChainRise\%) and calls \fjPairVInvTie\% of the invariance pairs equal;
-without them it prefers fewer inferences on \cp{chain} (\fjPairChainCounts). This judge is
-competitive with $\LCS$ on GPT-6 graphs (\sThreeGraphGptLamIncPct\% and \sThreeGraphGptLamInvPct\%;
-paired differences \asapCI{\pcLcsPairVIncLo}{\pcLcsPairVIncHi} and
-\asapCI{\pcLcsPairVInvLo}{\pcLcsPairVInvHi} points);
-$\LCS$ scores each response on its own, with a guarantee and attribution (App.~\ref{app:results}).
+\paragraph{Text baselines and LLM judges.} Surface cues solve two of the three increasing types:
+length rises on \sThreeBCtlLengthChain{} \cp{chain} pairs and a discourse-marker count on
+\sThreeBCtlMarkersConflict{} \cp{conflict} pairs; only verdicts decide \cp{sign}. Judges rating one
+response at a time do not separate \cp{chain} rungs: G-Eval with GPT-6 rises on
+\sThreeBGevalGptChain{} pairs and falls on \sThreeBGevalGptChainFalls{} ($\LCS$:
+\sThreeGraphGptLamChain), even given the claims, verdicts and our definition (rise\,/\,fall\,/\,tie
+\fjAbsChainCounts). Asked which of two rungs is more coherent, in both orders and with the claims,
+verdicts and definition, GPT-6 prefers the declared rung on \fjPairVIncRise\% of the increases and
+calls \fjPairVInvTie\% of the invariance pairs equal: it matches $\LCS$ on increases
+(\asapCI{\pcLcsPairVIncLo}{\pcLcsPairVIncHi} points) and keeps far more invariances
+(\sThreeGraphGptLamInvPct\% for $\LCS$; \asapCI{\pcLcsPairVInvLo}{\pcLcsPairVInvHi}). $\LCS$ instead
+scores each response on its own, with a guarantee and attribution, but rises on \nsLcsRise\% of
+planted non-sequiturs, as on valid inferences, which the judge partly separates (App.~\ref{app:results}).

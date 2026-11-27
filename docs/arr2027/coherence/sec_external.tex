@@ -48,10 +48,11 @@ on natural text labeled for related properties (Table~\ref{tab:external}). Claim
 (atomized claims for the essays) and relations come from the GPT-6 graph-level miner. Except where
 stated, $\LCS$ is read at the asserted world, where every inference is a support and every
 contradiction a conflict, so these tests exercise how the score combines mined relations; brackets
-give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. Where verdicts exist the evidence is
-mixed: ChatProtect's \extCpVwFoundNGpt{} found contradictions with a false sentence all raise $\LCS$,
-a sign check, but its \extCpVwAllNGpt{} pairs with verdicts and ContraDoc's show no significant
-direction ($p=\extCpVwAllPGpt$, $\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}).
+give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. Where verdicts exist, the sign rule holds once
+mining noise is controlled: holding the clean document's graph fixed and adding only the inserted
+sentence's relations, a found contradiction with ContraDoc's false insertion raises $\LCS$ on all
+\extCdPvEdgeNGpt{} pairs (falls at the asserted world on all), while mining the two versions
+separately hides this ($p=\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}).
 
 \paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only the relations that constrain
 truth values (App.~\ref{sec:notions}). On SummEval \citep{summeval} it correlates with expert
@@ -73,17 +74,18 @@ often than it rises, also counted by source document and by topic (\extCdClAsser
 \extCdClAssertNGpt{} documents, \extCpClAssertDecGpt{} of \extCpClAssertNGpt{} topics), and adding a
 consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
 contradictions barely move it, so recall bounds the result: the miner finds
-\extCdRecallInsertGpt\% of ContraDoc's and \extCpConfStrongGpt\% of ChatProtect's contradictions. The
-signed sum behaves alike: paired, the two differ only on ContraDoc pairs whose contradiction is
-found (\extCdMcFoundOnlyLcsGpt{} pairs where only $\LCS$ falls, \extCdMcFoundOnlySumGpt{} where only the
-sum does; $p=\extCdMcFoundPGpt$). The judge falls too, never rising on ContraDoc.
+\extCdRecallInsertGpt\% of ContraDoc's inserted contradictions (\extCdRecallGpt\% over all edits) and
+\extCpConfStrongGpt\% of ChatProtect's. The signed sum behaves alike: no paired difference that could
+reflect contradictions survives a Holm correction (App.~\ref{app:ext-contra}). The judge falls too,
+never rising on ContraDoc.
 
-\paragraph{Order.} Gold-graph $\LCS$ ignores the order of self-contained paragraphs; mined $\LCS$,
-with each text mined twice in one run, moves slightly more than re-mining on LoCoBench (difference
-in mean change \extLmEqLoGpt{} to \extLmEqHiGpt) and not detectably more on ContraDoc documents
-permuted by section (App.~\ref{app:ext-order}). The judge falls on \extLmJudgePermDec\% and
+\paragraph{Order.} Mined twice per text in one run, $\LCS$ moves slightly more under paragraph
+permutation than under re-mining (90\% intervals of the difference in mean change: LoCoBench
+\extLmEqLoGpt{} to \extLmEqHiGpt, ContraDoc by section \extSecEqLoGpt{} to \extSecEqHiGpt), with
+test-retest ICC \extLmIccLcsAllGpt{} and \extSecIccLcsAllGpt{} (judge \extLmIccJudgeAll{} and
+\extSecIccJudgeAll; App.~\ref{app:ext-order}). The judge falls on \extLmJudgePermDec\% and
 \extSecJudgePermDec\% of permutations, against \extLmJudgeNoiseDec\% and \extSecJudgeNoiseDec\% when
-the same text is judged again.
+re-judged.
 
 \paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
 \citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
@@ -91,7 +93,7 @@ Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correl
 \asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed
 (\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), the relation count
 \asapParRelations, the signed sum \asapParWsumAsserted{} and G-Eval \asapParJudgeGevalGptSixSol, with no
-difference resolved. A rubric-prompted grader does better
-(\asapParJudgeRubricGptSixSol), yet after length and the grader $\LCS$ keeps \asapPwrLcsAsserted{}
-\asapCI{\asapPwrLcsAssertedLo}{\asapPwrLcsAssertedHi} and the relation count \asapPwrRelations{}
-(one prompt, one miner; App.~\ref{app:asap}).
+difference resolved. A grader prompted with the rubric on a 0--100
+scale does better (\asapParJudgeRubricOneZeroZeroGptSixSol), yet $\LCS$ keeps \asapPwrhLcsAsserted{}
+\asapCI{\asapPwrhLcsAssertedLo}{\asapPwrhLcsAssertedHi} after length and the grader; it is not
+resolvably better than the bare relation count (one prompt, one miner; App.~\ref{app:asap}).

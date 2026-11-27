@@ -117,6 +117,12 @@ Essay:
 
 Reason briefly, then give your score as a single digit in square brackets, for example [3]."""
 
+RUBRIC100 = RUBRIC.replace(
+    "Reason briefly, then give your score as a single digit in square brackets, for example [3].",
+    "Reason briefly, then place the essay on a finer scale: give a score from 0 to 100, where 0-16 "
+    "corresponds to level 1, 17-33 to level 2, 34-50 to level 3, 51-67 to level 4, 68-84 to level "
+    "5 and 85-100 to level 6, as a number in square brackets, for example [58].")
+_NUM = re.compile(r"\[\s*(\d{1,3})\s*\]")
 _DIGIT = re.compile(r"\[\s*([1-6])\s*\]")
 _CHOICE = re.compile(r"\[\s*(A|B|=)\s*\]")
 _LOCK = threading.Lock()
@@ -214,12 +220,13 @@ def cmd_rubric(args):
     items = {r["id"]: r for r in jsonl(os.path.join(ASAP, "items.jsonl"))}
     gen = make_generate(args.model)
     jobs = [{"key": [iid, s], "iid": iid} for iid in sorted(items) for s in range(args.seeds)]
-    raw = os.path.join(ASAP_OUT, "raw", f"rubric__{args.model}.jsonl")
+    tag = "rubric100" if args.fine else "rubric"
+    raw = os.path.join(ASAP_OUT, "raw", f"{tag}__{args.model}.jsonl")
 
     def worker(job):
-        text = gen(RUBRIC.format(response=items[job["iid"]]["response"].strip()))
-        m = _DIGIT.findall(text)
-        r = int(m[-1]) if m else None
+        text = gen((RUBRIC100 if args.fine else RUBRIC).format(response=items[job["iid"]]["response"].strip()))
+        m = (_NUM if args.fine else _DIGIT).findall(text)
+        r = int(m[-1]) if m and (not args.fine or int(m[-1]) <= 100) else None
         return {"key": job["key"], "ok": r is not None, "rating": r, "tail": text[-300:]}
 
     run_jobs(jobs, raw, worker, args.workers)
@@ -227,9 +234,9 @@ def cmd_rubric(args):
     for r in jsonl(raw):
         if r.get("ok"):
             by[r["key"][0]].append(r["rating"])
-    with open(os.path.join(ASAP_OUT, f"judge__{args.model}__rubric.jsonl"), "w") as f:
+    with open(os.path.join(ASAP_OUT, f"judge__{args.model}__{tag}.jsonl"), "w") as f:
         for iid, v in sorted(by.items()):
-            f.write(json.dumps({"item_id": iid, "name": f"judge_rubric@{args.model}",
+            f.write(json.dumps({"item_id": iid, "name": f"judge_{tag}@{args.model}",
                                 "score": st.mean(v), "diagnostics": {"runs": v}}) + "\n")
     print(f"wrote rubric scores for {len(by)} essays")
     return 0
@@ -348,6 +355,8 @@ def main() -> int:
         s.add_argument("--workers", type=int, default=12)
         if name == "pairwise":
             s.add_argument("--verdicts", action="store_true")
+        if name == "rubric":
+            s.add_argument("--fine", action="store_true", help="0-100 score instead of 1-6")
     e = sub.add_parser("eval")
     e.add_argument("--macros", default=None)
     args = ap.parse_args()

@@ -9,11 +9,11 @@ argument's relations. $\LCS$, the weight of evidence that the coherence MRF lend
 world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
 committed world as the readout (App.~\ref{app:why}). On LoCoBench, a signed sum of relation weights
-does slightly better than $\LCS$ with correct verdicts and worse with wrong ones, and a judge
-comparing two responses with their verdicts is competitive with it. On natural
+does slightly better than $\LCS$, except on gold graphs read at wrong verdicts, and a judge comparing
+two responses with their verdicts matches it on increases and is more stable on invariances. On natural
 text the score is not a proxy for rated discourse coherence, falls under detected contradictions,
 and tracks essay quality beyond length. Its advantage over the signed sum lies in design (presentation
-invariance, saturation of repeated support) and in robustness to wrong verdicts, not in accuracy. What limits $\LCS$ is
+invariance, saturation of repeated support), not yet in accuracy. What limits $\LCS$ is
 relation extraction and the verdicts it is read against. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
@@ -55,18 +55,18 @@ for \flipOverTenth\% of the \flipTouched{} such flips), and the change grows wit
 degree. Flipping each verdict with probability $0.2$, $\LCS$ still satisfies \vnLcsIncTwenty\% of
 LoCoBench's increases on gold graphs, against \vnWsumIncTwenty\% for the signed sum, and with a
 closed-book GPT-6 verifier (\vfGptAcc\% accurate) it satisfies \vfGptGoldLcsInc\% against
-\vfGptGoldWsumInc\%. Verdicts are binary, so a claim the
+\vfGptGoldWsumInc\%; on mined graphs the two are indistinguishable. Verdicts are binary, so a claim the
 evidence neither supports nor refutes is treated as false. On LoCoBench the verdicts are the
-generator's factuality labels, which model an error-free pipeline, so the effect of verdict errors
-is not measured.
+generator's factuality labels, an error-free pipeline; App.~\ref{app:results} measures injected and
+verifier errors.
 
 \paragraph{Modeling.} Relations join two claims, so a contradiction within a single claim cannot
 be represented; on ContraDoc this is where recall is lowest. No relation weight is calibrated, and
 the pairwise miner's weights saturate the score. Only \sense{Refutation} compiles to \con{}, so an
 incompatibility conveyed without being asserted produces no factor. Couplings are material
-constraints, so relevance of premise to conclusion is not modeled; a planted non-sequitur between
-two true claims is extracted in only \nsExtracted\% of LoCoBench responses, so relevance is left to
-the extractor. Saturation bounds redundant
+constraints, so relevance of premise to conclusion is not modeled: a non-sequitur between two true
+claims, stated explicitly, is extracted in \nsExtracted\% of LoCoBench responses and raises $\LCS$ in
+\nsLcsRise\%, about as often as a valid inference does (\nvLcsRise\%). Saturation bounds redundant
 support but cannot stop a miner from hallucinating new support, so the score inherits the
 extractor's precision.
 

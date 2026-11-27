@@ -612,3 +612,23 @@ data-based role for Z. Framing is mostly honest.
   - The paired ContraDoc verdict-world design (N24).
   - A finer ASAP grader (expected score from log-probabilities) (N23).
 - **F. The human study** (N25, N21, M7), designed in `HUMAN_STUDY.md`.
+
+---
+
+## 13. Changelog (2026-11-28): fixes from the third review
+
+The main text ends on p. 8; build clean.
+
+| # | Status | What changed |
+|---|---|---|
+| N16 | **re-run, conclusion reversed** | `ext_build_nonseq.py` now names the conclusion and inserts the sentence right after it, with a positive control: the CHAIN top rung's valid entailment stated in rung 0 with the same template. The GPT-6 miner extracts the non-sequitur in **99%** (146 families) and the valid inference in 88%; LCS rises on 92% and 95%. **Neither extractor nor score separates them**; the pairwise judge partly does (prefers the edited version on 72% of valid insertions vs 29% of non-sequiturs). "Relevance is left to the extractor" is withdrawn, and the v1 result is explained as an artefact (App. H, Limitations, §3.1). v1 results are archived in `results/ext/loco-nonseq-v1/`. |
+| N17 | done | `mean_abs_diff_ci` is paired (families resampled jointly). The order effect on extraction is now significant on both matched designs: LoCoBench [+0.003, +0.010], ContraDoc sections [+0.005, +0.021] (90%). §3.2, App. L.3 and Fig. 8b (matched designs, with the judge's re-run floor) are updated. The old cross-run LoCoBench design now shows equivalence ([0.000, 0.007]), stated as such. |
+| N18 | done | "Robust to wrong verdicts" is limited to gold graphs (abstract, §3.1 heading "A signed sum does slightly better", Conclusion); the mined/verifier null ([−3.3, +0.2]) is in the main text; the contradictory Limitations sentence is removed. |
+| N19 | done | Test-retest ICC(A,1): LCS 0.99 LoCoBench / 0.84 ContraDoc (by length tercile 0.77/0.83/0.93); judge 0.91 / 0.96. In §3.2 and App. L.3. The abstract states the judge's invariance (91% vs 52%). |
+| N20 | done | Holm over the six McNemar tests: the ContraDoc found-pair difference becomes p = 0.16; only the u₀-explained ChatProtect differences survive. §3.2 says no difference that could reflect contradictions survives. |
+| N21 | done | §3.1: length solves `chain` (163/180), markers solve `conflict` (177/180), only verdicts decide `sign`; the judges "do not separate" `chain` rather than "miss inferences". |
+| N22 | done | Coverage of the guarantee in §3.1 and the intro (393/540 GPT-6; 38 for each pairwise arm). Llama on matched denominators (69% vs 95% for GPT-6 on the same ladders), "results depend on the miner"; the "upper bound" inference is withdrawn. |
+| N23 | done | A 0–100 rubric grader (three runs; its prompt is printed in App. D): ρ 0.89, partial 0.66; LCS keeps +0.36 [0.22, 0.51] after length and it. LCS − relation count +0.06 [−0.04, +0.15]; LCS − grader −0.16 [−0.31, +0.01]. §3.2 says LCS is not resolvably better than the relation count. |
+| N24 | done | Paired ContraDoc verdict-world design (no new mining): with the clean graph fixed, a found contradiction with the false insertion raises LCS on 97/97 at the verdicts and lowers it on 97/97 at the asserted world; all pairs 102 rises / 18 falls. Called a check of the sign rule (§3.2 opening, App. L.5). |
+| N26 | mostly done | H1d caveat in the Table 14 caption; 90% intervals labeled; overall recall (25%) in §3.2; τ defined at first use in §3.1; Fig. 1 callouts set apart; PDTB, Xiong and ASAP bibliography entries. |
+| N25 | open | Human study (`HUMAN_STUDY.md`). The fixed non-sequitur template there now matches N16. |

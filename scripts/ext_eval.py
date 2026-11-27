@@ -88,15 +88,34 @@ def signed_sum(n, rels, x=None, weighted=True):
 
 
 def mean_abs_diff_ci(A_, B_, n=BOOT, seed=SEED):
-    """Group bootstrap of mean|d|(A) - mean|d|(B), with A and B lists of groups of |d|."""
+    """PAIRED group bootstrap of mean|d|(A) - mean|d|(B): A_ and B_ map each family to its |d|
+    values, and families are resampled jointly, since permutation and noise comparisons share
+    documents (third review, N17; the first version resampled the two sets independently)."""
+    fams = sorted(set(A_) & set(B_))
     rng = random.Random(seed)
     vals = []
     for _ in range(n):
-        a = [v for g in (rng.choice(A_) for _ in A_) for v in g]
-        b = [v for g in (rng.choice(B_) for _ in B_) for v in g]
+        smp = [rng.choice(fams) for _ in fams]
+        a = [v for f in smp for v in A_[f]]
+        b = [v for f in smp for v in B_[f]]
         vals.append(st.mean(a) - st.mean(b))
     vals.sort()
     return vals[int(0.05 * n)], vals[int(0.95 * n) - 1], vals[int(0.025 * n)], vals[int(0.975 * n) - 1]
+
+
+def icc_a1(x, y):
+    """Two-way random, absolute-agreement, single-measure ICC(A,1) for two measurements per target."""
+    n = len(x)
+    if n < 3:
+        return float("nan")
+    M = [(a + b) / 2 for a, b in zip(x, y)]
+    gm = st.mean(M)
+    mx, my = st.mean(x), st.mean(y)
+    msr = 2 * sum((m - gm) ** 2 for m in M) / (n - 1)
+    msc = n * ((mx - gm) ** 2 + (my - gm) ** 2)
+    sse = sum((a - m - mx + gm) ** 2 + (b - m - my + gm) ** 2 for a, b, m in zip(x, y, M))
+    mse = sse / (n - 1)
+    return (msr - mse) / (msr + mse + 2 * (msc - mse) / n)
 
 
 def cluster_sign(rows, cluster, diff):
@@ -127,7 +146,7 @@ def order_equivalence(perm, noise):
         G = defaultdict(list)
         for r in R:
             G[r["group"]].append(abs(r["lcs"] - r["lcs_orig"]))
-        return list(G.values())
+        return dict(G)
     lo90, hi90, lo95, hi95 = mean_abs_diff_ci(groups(perm), groups(noise))
     up = lambda R: sum(r["lcs"] > r["lcs_orig"] + TOL for r in R)  # noqa: E731
     dn = lambda R: sum(r["lcs"] < r["lcs_orig"] - TOL for r in R)  # noqa: E731
@@ -389,6 +408,28 @@ def check1(args):
             if jn and jp:
                 out["judge_perm"] = invariance_block(jp, ["lcs"])
                 out["judge_noise"] = invariance_block(jn, ["lcs"])
+            # Test-retest reliability (third review, N19): ICC(A,1) of two mines (or two judge
+            # runs) of the same text, overall and by length tercile (number of claims).
+            ncl = {}
+            for iid, x in mi.items():
+                ncl[(x["expected"]["family_id"], x["expected"]["variant"])] = x["num_atoms"]
+            def pairs_of(Lx):
+                return [(V[(v, "r1")], V[(v, "r2")], ncl.get((fam, v), 0)) for fam, V in Lx.items()
+                        for v in ("orig", "p1", "p2") if (v, "r1") in V and (v, "r2") in V]
+            rel = {}
+            for nm, Lx in (("lcs", L), ("judge", JL)):
+                P = pairs_of(Lx)
+                if len(P) < 9:
+                    continue
+                cuts = sorted(p[2] for p in P)
+                c1_, c2_ = cuts[len(cuts) // 3], cuts[2 * len(cuts) // 3]
+                rel[nm] = {"all": icc_a1([p[0] for p in P], [p[1] for p in P])}
+                for b_, f_ in (("short", lambda k: k < c1_), ("mid", lambda k: c1_ <= k < c2_),
+                               ("long", lambda k: k >= c2_)):
+                    Q = [p for p in P if f_(p[2])]
+                    rel[nm][b_] = icc_a1([p[0] for p in Q], [p[1] for p in Q])
+                rel[nm]["claims_terciles"] = (c1_, c2_)
+            out["reliability"] = rel
             res[f"{key}:{arm}"] = out
     # 1d: SummEval
     it = items("summeval")
@@ -526,6 +567,12 @@ def check2(args):
             evi = {int(e[1:]) for e in ev}
             rb, ra = rels_of(recs[b["id"]]), rels_of(recs[a["id"]])
             xb = [0 if k in evi else 1 for k in range(b["num_atoms"])]
+            # Paired design (third review, E2): a's claims are b's minus the evidence claims, in
+            # order, so a's graph maps into b's indices; add only b's relations on the evidence.
+            keep_idx = [k for k in range(b["num_atoms"]) if k not in evi]
+            mp = {i: keep_idx[i] for i in range(min(a["num_atoms"], len(keep_idx)))}
+            rp = [(mp[s_], mp[t_], ty_, p_) for s_, t_, ty_, p_ in ra if s_ in mp and t_ in mp] + \
+                 [r for r in rb if r[0] in evi or r[1] in evi]
             on_ev = [r for r in rb if r[2] in CONFLICTISH and (r[0] in evi or r[1] in evi)]
             touch = [r for r in rb if r[0] in evi or r[1] in evi]
             row = {"group": fam, "scope": b["expected"]["scope"], "doc_type": b["expected"]["doc_type"],
@@ -533,6 +580,8 @@ def check2(args):
                    "verdict_a": lcs_at(a["num_atoms"], ra)[0],  # a has no evidence claim: x* = 1
                    "verdict_b": lcs_at(b["num_atoms"], rb, xb)[0], "edge_on_evidence": bool(on_ev),
                    "wsum_a": signed_sum(a["num_atoms"], ra), "wsum_b": signed_sum(b["num_atoms"], rb),
+                   "paired_verdict_b": lcs_at(b["num_atoms"], rp, xb)[0],
+                   "paired_asserted_b": lcs_at(b["num_atoms"], rp)[0],
                    "spot": (spot.get(a["id"]) or {}).get("majority"),
                    # Exploratory: sign, at the verdict world, of every relation on the evidence.
                    "ev_supports": sum((xb[r[0]], xb[r[1]]) not in VIOLATED[r[2]] for r in touch),
@@ -560,6 +609,9 @@ def check2(args):
                "asserted": counts(pairs, "asserted"), "verdict_all": counts(pairs, "verdict"),
                "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted"),
                "wsum": counts(pairs, "wsum"), "wsum_edge": counts(edge, "wsum"),
+               "paired_verdict_edge": counts([dict(r, pv_a=r["verdict_a"], pv_b=r["paired_verdict_b"]) for r in edge], "pv"),
+               "paired_asserted_edge": counts([dict(r, pa_a=r["asserted_a"], pa_b=r["paired_asserted_b"]) for r in edge], "pa"),
+               "paired_verdict_all": counts([dict(r, pv_a=r["verdict_a"], pv_b=r["paired_verdict_b"]) for r in pairs], "pv"),
                "cluster_asserted": cluster_sign(pairs, lambda r: r["group"].split("_")[0],
                                                 lambda r: r["asserted_b"] - r["asserted_a"]),
                "cluster_verdict_edge": cluster_sign(edge, lambda r: r["group"].split("_")[0],
@@ -1029,6 +1081,11 @@ def write_macros(ev, path):
                 m(f"{kt}ClPermInc{tag}", z["cluster_perm"]["increase"])
                 m(f"{kt}ClPermN{tag}", z["cluster_perm"]["clusters"])
                 m(f"{kt}ClPermP{tag}", pval(z["cluster_perm"]["p_sign"]))
+            for nm, nt in (("lcs", "Lcs"), ("judge", "Judge")):
+                r_ = z.get("reliability", {}).get(nm)
+                if r_ and (nm == "lcs" or tag == "Gpt"):
+                    for b_, bt in (("all", "All"), ("short", "Short"), ("mid", "Mid"), ("long", "Long")):
+                        m(f"{kt}Icc{nt}{bt}{tag if nm == 'lcs' else ''}", f"{r_[b_]:.2f}")
             if z.get("judge_perm") and tag == "Gpt":
                 m(f"{kt}JudgePermInv", pct(z["judge_perm"]["lcs"]["invariant"]))
                 m(f"{kt}JudgeNoiseInv", pct(z["judge_noise"]["lcs"]["invariant"]))
@@ -1059,6 +1116,14 @@ def write_macros(ev, path):
                 m(f"Cd{kt}N{tag}", x[k_]["n"])
                 m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
             m(f"CdAssertTie{tag}", x["asserted"]["tie"])
+            for k_, kt in (("paired_verdict_edge", "PvEdge"), ("paired_asserted_edge", "PaEdge"),
+                           ("paired_verdict_all", "PvAll")):
+                if k_ in x:
+                    m(f"Cd{kt}Dec{tag}", x[k_]["decrease"])
+                    m(f"Cd{kt}Inc{tag}", x[k_]["increase"])
+                    m(f"Cd{kt}Tie{tag}", x[k_]["tie"])
+                    m(f"Cd{kt}N{tag}", x[k_]["n"])
+                    m(f"Cd{kt}P{tag}", pval(x[k_]["p_sign"]))
             for k_, kt in (("cluster_asserted", "ClAssert"), ("cluster_verdict_edge", "ClVerdEdge")):
                 if k_ in x:
                     m(f"Cd{kt}N{tag}", x[k_]["clusters"])
@@ -1144,6 +1209,20 @@ def write_macros(ev, path):
                 m(f"Gd{ct}Correct{tag}", pct(v["correct"]))
                 if tag == "Gpt":
                     m(f"Gd{ct}N", v["n"])
+    # Holm adjustment of the six paired LCS-vs-sum McNemar tests (third review, N20).
+    for arm, tag in (("graph_gpt6", "Gpt"), ("graph_gptoss", "Oss")):
+        x, y = c2.get(f"2:{arm}") or {}, c3.get(f"3:{arm}") or {}
+        fam = [("CdMcAll", x.get("mcnemar_falls")), ("CdMcFound", x.get("mcnemar_falls_edge")),
+               ("CpMcAll", y.get("mcnemar_falls")), ("CpMcFound", y.get("mcnemar_falls_found")),
+               ("CpMcNotFound", y.get("mcnemar_falls_notfound")), ("CpMcCtl", y.get("mcnemar_falls_control"))]
+        fam = [(k, v["p"]) for k, v in fam if v]
+        order = sorted(fam, key=lambda kv: kv[1])
+        adj, run = {}, 0.0
+        for i, (k, pv) in enumerate(order):
+            run = max(run, min(1.0, (len(order) - i) * pv))
+            adj[k] = run
+        for k, v in adj.items():
+            m(f"{k}PHolm{tag}", pval(v))
     # Held counts per arm. The paper groups the advance predictions into six about the score
     # (E1-E6: H1d; H1a and H1c together; H2a; H3c; H3a; H2a') and four about the miner alone
     # (H4b-none, which is E7, H2b, H3-miner, H4b-explicit).

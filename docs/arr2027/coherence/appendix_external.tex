@@ -90,7 +90,9 @@ H4b$'$ & GDTB: recall of the gold coupling is higher for explicit than for impli
 \end{tabular}
 \caption{\textbf{The twelve tests fixed before mining}, with their outcomes for both miners. Sign
 tests are two-sided at $\alpha=0.05$; ``within $\tau$'': $|\Delta|\le0.01$ on each score's own
-scale. H1a and H1c also fail with DiscoScore RC and LC excluded (\extHOneAExclGpt{} and
+scale. H1d is judged by its point estimate, as fixed; its 95\% interval
+[\extSeRhoCohGptLo, \extSeRhoCohGptHi] crosses $-0.1$, so equivalence to zero is not shown. H1a and
+H1c also fail with DiscoScore RC and LC excluded (\extHOneAExclGpt{} and
 \extHOneCExclGpt{} with GPT-6). The ContraDoc permutations behind H1c split section headers from
 their text (App.~\ref{app:ext-order}).}
 \label{tab:ext-plan}
@@ -101,10 +103,10 @@ their text (App.~\ref{app:ext-order}).}
 \centering
 \includegraphics[width=\textwidth]{figures/fig_external.pdf}
 \caption{\textbf{Natural text, GPT-6 miner} (\S\ref{sec:exp-external}). (a) How $\LCS$ moves when a contradicting sentence
-is added, split by whether the miner found the contradiction (counts in the bars). (b) Share of
-paragraph permutations that keep a score within $\tau$, next to the share an unchanged text keeps
-when mined again: the mined $\LCS$ moves about as much under permutation as under re-mining, while
-the judge moves on most permutations. (c) ASAP essays: $\LCS$ with length removed (rank residual
+is added, split by whether the miner found the contradiction (counts in the bars). (b) Matched designs (each text mined, and judged, twice in one run; ContraDoc permuted by whole
+sections): share of permutations that keep a score within $\tau$, next to the share an unchanged text
+keeps when mined or judged again. The mined $\LCS$ moves slightly more under permutation than under
+re-mining; the judge moves far more under permutation than under re-judging. (c) ASAP essays: $\LCS$ with length removed (rank residual
 on word count, as a share of the sample), one dot per essay and the median per score level.}
 \label{fig:external}
 \end{figure*}
@@ -273,7 +275,9 @@ only $\LCS$ falls against \extCdMcFoundOnlySumGpt{}, $p=\extCdMcFoundPGpt$; over
 alone on \extCpMcAllOnlyLcsGpt{} pairs and the sum on \extCpMcAllOnlySumGpt{} ($p<\extCpMcAllPGpt$), but
 \extCpMcNotFoundOnlyLcsGpt{} of those are pairs with no detected contradiction, and on the consistent
 control $\LCS$ falls alone at the same rate (\extCpMcCtlOnlyLcsGpt{} of \extCpCtlNGpt{} pairs, against
-\extCpMcCtlOnlySumGpt{} for the sum; $p=\extCpMcCtlPGpt$). The difference is therefore not sensitivity
+\extCpMcCtlOnlySumGpt{} for the sum; $p=\extCpMcCtlPGpt$). Holm-adjusted over these six tests, the
+ContraDoc found-pair difference gives $p=\extCdMcFoundPHolmGpt$, and only the ChatProtect differences
+that the control explains survive ($p=\extCpMcAllPHolmGpt$). The difference is therefore not sensitivity
 to contradictions: the added sentence is also a new claim, which moves $\LCS$ slightly through
 $u_0$ (App.~\ref{app:lcs-lambda}) and leaves the sum unchanged.
 
@@ -359,10 +363,12 @@ declared increases (Figure~\ref{fig:ladders}).
 
 \paragraph{Equivalence and drift.} We test whether permutation moves $\LCS$ no more than
 re-mining does by two one-sided tests at $\alpha=0.05$ with margin $\tau$ on the difference in mean
-absolute change, using a 90\% group-bootstrap interval. On LoCoBench the difference is
-$\extLocoEqDiffGpt$ with interval [\extLocoEqLoGpt, \extLocoEqHiGpt]; on ContraDoc it is
-$\extCdEqDiffGpt$ with [\extCdEqLoGpt, \extCdEqHiGpt]. Neither interval lies inside $(-\tau,\tau)$,
-so equivalence is not established, narrowly on LoCoBench. The direction of the changes beyond
+absolute change, using a 90\% bootstrap interval that resamples families jointly, since the
+permutation and re-mining comparisons share documents. On LoCoBench the difference is
+$\extLocoEqDiffGpt$ with interval [\extLocoEqLoGpt, \extLocoEqHiGpt], inside $(-\tau,\tau)$; on
+ContraDoc it is $\extCdEqDiffGpt$ with [\extCdEqLoGpt, \extCdEqHiGpt], so equivalence is established
+on LoCoBench in this design but not on ContraDoc. These two comparisons draw the noise floor from a
+separate run; the matched designs below do not. The direction of the changes beyond
 $\tau$ matters as well. On LoCoBench, re-mining is balanced (\extLocoEqNoiseUpGpt{} rises,
 \extLocoEqNoiseDownGpt{} falls, $p=\extLocoEqNoisePGpt$), and permutation leans down
 (\extLocoEqPermUpGpt{} and \extLocoEqPermDownGpt, $p=\extLocoEqPermPGpt$). On ContraDoc both lean
@@ -409,9 +415,14 @@ judged twice by G-Eval (three runs each):
   \extLmJudgePermDec\% and \extSecJudgePermDec\% of permutations against \extLmJudgeNoiseDec\% and
   \extSecJudgeNoiseDec\% of re-judgements.
 \end{itemize}
-With clean permutations the large ContraDoc effect of the first design disappears: it came from the
-damaged texts. On LoCoBench a small order effect on extraction remains, below $\tau$ on average but
-not equivalent to zero. The judge's response to reordering is not its run-to-run noise.
+With clean permutations the ContraDoc effect shrinks (from [\extMtEqLoGpt, \extMtEqHiGpt] in the first
+matched design to [\extSecEqLoGpt, \extSecEqHiGpt]) and loses its direction, so the damaged texts
+inflated it, but a small order effect on extraction remains on both corpora (intervals of the
+paired difference, 90\%). Test-retest reliability of the mined score, as ICC(A,1) of the two mines of
+each text, is \extLmIccLcsAllGpt{} on LoCoBench (G-Eval \extLmIccJudgeAll) and \extSecIccLcsAllGpt{} on
+ContraDoc (G-Eval \extSecIccJudgeAll), rising with length on ContraDoc (\extSecIccLcsShortGpt,
+\extSecIccLcsMidGpt{} and \extSecIccLcsLongGpt{} by length tercile). The judge's response to
+reordering is not its run-to-run noise.
 
 % Flush the floats of K.1-K.3 before the essay subsection.
 \clearpage
@@ -437,6 +448,16 @@ On the subset whose false side the annotators recorded, the contradictions found
 self-contradiction between two false sentences, or between a true and a false one, is a support
 at the verdict world. Counting contradictions would treat all of them as defects.
 
+
+\paragraph{ContraDoc at the verdict world, paired.} Mining the two versions of a document separately
+adds the miner's noise on the rest of the graph to the effect of the insertion. Holding the clean
+document's mined graph fixed (its claims are the inserted document's minus the inserted one, so it
+maps into the inserted document's indices) and adding only the inserted document's relations on the
+inserted claim, a found contradiction raises $\LCS$ at the verdict world on \extCdPvEdgeIncGpt{} of
+\extCdPvEdgeNGpt{} pairs and lowers it at the asserted world on \extCdPaEdgeDecGpt; over all
+\extCdPvAllNGpt{} pairs, the verdict world gives \extCdPvAllIncGpt{} rises and \extCdPvAllDecGpt{}
+falls ($p<\extCdPvAllPGpt$). With the rest of the graph fixed this is the sign rule at work, a check
+rather than a validation; the unpaired test below is the one fixed before mining.
 
 \paragraph{ContraDoc at the verdict world.} With the inserted sentence false and its
 contradiction found, $\LCS$ rises on \extCdVerdEdgeIncGpt{} and falls on \extCdVerdEdgeDecGpt{} of
