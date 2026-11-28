@@ -53,6 +53,10 @@ def wsum(rels, x):
     return sum(p * (1 if A.is_support((s, t, ty, p), x) else -1) for s, t, ty, p in rels)
 
 
+def indep(n, rels, x):
+    return A.independent_evidence(np.full(n, 0.5), rels, x)
+
+
 def same(a, b):
     return abs(a - b) <= EQ * max(1.0, abs(a), abs(b))
 
@@ -85,13 +89,15 @@ def main() -> int:
             s, t = free_tt[0]
             g1 = g + [(s, t, "equivalence", P)]
             g2 = g + [(s, t, "entailment", P), (t, s, "entailment", P)]
-            res["A1"].append((same(lam(n, g1, x), lam(n, g2, x)), same(wsum(g1, x), wsum(g2, x))))
+            res["A1"].append((same(lam(n, g1, x), lam(n, g2, x)), same(wsum(g1, x), wsum(g2, x)),
+                              same(indep(n, g1, x), indep(n, g2, x))))
         # A2: exclusion vs contradiction + co-necessity, between a true and a false claim
         if free_tf:
             s, t = free_tf[0]
             g1 = g + [(s, t, "exclusive", P)]
             g2 = g + [(s, t, "contradiction", P), (s, t, "co_necessity", P)]
-            res["A2"].append((same(lam(n, g1, x), lam(n, g2, x)), same(wsum(g1, x), wsum(g2, x))))
+            res["A2"].append((same(lam(n, g1, x), lam(n, g2, x)), same(wsum(g1, x), wsum(g2, x)),
+                              same(indep(n, g1, x), indep(n, g2, x))))
         # B: one inference three times vs three distinct inferences (disjoint new pairs)
         disjoint = []
         for pr in free_tt:
@@ -105,7 +111,8 @@ def main() -> int:
             new = g + [(a, b, "entailment", P) for a, b in disjoint]
             lr, ln = lam(n, rep, x), lam(n, new, x)
             res["B"].append((ln > lr and not same(ln, lr), wsum(new, x) > wsum(rep, x) + 1e-12,
-                             ln - base_l, lr - base_l))
+                             ln - base_l, lr - base_l,
+                             indep(n, new, x) > indep(n, rep, x) + 1e-12))
         # C: an inference from a contested premise vs from an uncontested one
         for s in T:
             others = [u for u in T if u != s and frozenset((s, u)) not in touched]
@@ -118,13 +125,17 @@ def main() -> int:
             gain_plain = lam(n, g + [r], x) - base_l
             gd = g + [(s, w, "contradiction", P)]
             gain_doubt = lam(n, gd + [r], x) - lam(n, gd, x)
+            ig_plain = indep(n, g + [r], x) - indep(n, g, x)
+            ig_doubt = indep(n, gd + [r], x) - indep(n, gd, x)
             res["C"].append((gain_doubt < gain_plain and not same(gain_doubt, gain_plain),
-                             False, gain_plain, gain_doubt))
+                             False, gain_plain, gain_doubt,
+                             ig_doubt < ig_plain and not same(ig_doubt, ig_plain)))
             break
     out = {}
     for k, R in res.items():
         out[k] = {"n": len(R), "lcs": sum(r[0] for r in R) / len(R),
-                  "sum": sum(r[1] for r in R) / len(R)}
+                  "sum": sum(r[1] for r in R) / len(R),
+                  "indep": sum(r[-1] for r in R) / len(R)}
     out["B"]["gain_new"] = st.median(r[2] for r in res["B"])
     out["B"]["gain_rep"] = st.median(r[3] for r in res["B"])
     out["C"]["gain_plain"] = st.median(r[2] for r in res["C"])
@@ -138,6 +149,7 @@ def main() -> int:
             m(f"{name}N", f"{out[k]['n']:,}".replace(",", "{,}"))
             m(f"{name}Lcs", f"{100 * out[k]['lcs']:.0f}")
             m(f"{name}Sum", f"{100 * out[k]['sum']:.0f}")
+            m(f"{name}Indep", f"{100 * out[k]['indep']:.0f}")
         m("RepGainNew", f"{out['B']['gain_new']:.3f}")
         m("RepGainRep", f"{out['B']['gain_rep']:.3f}")
         m("DoubtGainPlain", f"{out['C']['gain_plain']:.3f}")

@@ -632,3 +632,55 @@ The main text ends on p. 8; build clean.
 | N24 | done | Paired ContraDoc verdict-world design (no new mining): with the clean graph fixed, a found contradiction with the false insertion raises LCS on 97/97 at the verdicts and lowers it on 97/97 at the asserted world; all pairs 102 rises / 18 falls. Called a check of the sign rule (§3.2 opening, App. L.5). |
 | N26 | mostly done | H1d caveat in the Table 14 caption; 90% intervals labeled; overall recall (25%) in §3.2; τ defined at first use in §3.1; Fig. 1 callouts set apart; PDTB, Xiong and ASAP bibliography entries. |
 | N25 | open | Human study (`HUMAN_STUDY.md`). The fixed non-sequitur template there now matches N16. |
+
+## 14. Changelog (2026-11-28): LCS beside its two simplifications
+
+The signed sum is no longer a baseline that "does slightly better". It is now derived from the
+model and set beside LCS, and the paper says exactly where the two differ.
+
+- **Proposition (Decomposition), new §2 subsection "Per-Relation Evidence and Interaction".**
+  - **Statement.** Λ = Σ_r λ_r − I_R: λ_r = Λ({r}) has a closed form, and
+    I_R = log Z_R − Σ log Z_{r} is a sum over the connected components of the relation graph, so it
+    is 0 when no two relations share a claim.
+  - **Sequential form.** I_R = Σ_k (λ_k − Δ_k), with each term log((1 − p q_k)/(1 − p v_k)). It is
+    positive (a discount) for a repeated relation and for an inference from a contested premise.
+    It is negative (amplification) for an inference from a supported claim and for the second half
+    of a constraint stated in two halves.
+  - **Proof.** In the proofs appendix.
+- **Two simplifications.**
+  - The independent evidence Λ⊥ = Σλ_r drops I_R.
+  - The signed weight sum W is, up to a factor of 2, Λ⊥'s first-order expansion with every
+    v_r = 1/2. It loses the support/violation asymmetry: at p = 0.925, a violation costs 8.8× what a
+    satisfied ent/con/cnc earns, 3.2× for eqv/exc.
+- **New table in §3.1 (`tab:three`), side by side.** Properties: range, unit, axioms, asymmetry, interaction, cost.
+  Constructed edits: Λ⊥ fails all three, as W does. LoCoBench results, and ρ with relation count on
+  156 ExpertQA answers: W 0.59, Λ⊥ 0.03, LCS −0.02.
+- **Attribution (new).**
+  - **Wrong verdicts.** LCS's advantage over W is entirely the weights: Λ⊥ = LCS, with a paired
+    difference of [+0.0, +0.0] at q = 0.2.
+  - **GPT-6 graphs.** 8 of 540 disagreements: W right on 7 (4 interaction, 3 weights), LCS on 1
+    (weights).
+  - **Paired intervals, GPT-6.** LCS − Λ⊥ = −0.7 [−1.5, −0.2]: the interaction costs LCS a
+    little on mined graphs. Λ⊥ − W = −0.4 [−1.1, +0.4].
+  - **Paired intervals, other arms.** Pairwise Llama, LCS − Λ⊥ = −2.2 [−4.1, −0.2]. gpt-oss graph,
+    Λ⊥ − W = −3.7 [−6.3, −1.1] (there the weights cost).
+  - **Overall.** The interaction decides no LoCoBench pair in LCS's favour and costs a little on
+    mined graphs. Its value is design (A2, repetition, contested premise), and this is what the
+    human study's H1–H3 test.
+- **Examples (chosen by a fixed rule).**
+  - f076-CHAIN: a spurious violated contradiction (p = 0.555, −0.66 nats) outweighs the added
+    support (+0.26), so W rises and LCS falls.
+  - f205-CHAIN: equal total weight, so W ties; LCS rises through the convexity of λ_r and a linked
+    chain (I_R −0.02 → −0.25).
+- **Corrected explanation.** App. H's wrong-verdict and verifier paragraphs had credited LCS's edge
+  to "context weighting" (the interaction). It is the per-relation weights.
+- **Scripts.**
+  - `arr_coherence_eval.relation_evidence` / `independent_evidence` (closed form, checked against
+    enumeration on 300 random cases).
+  - The `indep` readout in `arr_slot3_eval.py`.
+  - Λ⊥ added to `arr_phaseb.py` (noise, with LCS−Λ⊥ and Λ⊥−W intervals; paired),
+    `run_claim_verifier.py` and `arr_z_stress.py`.
+  - New `arr_decomp.py` writes `numbers_decomp.tex`.
+  - Every existing macro value is unchanged (checked by diff).
+- **Abstract, introduction, conclusion and Limitations** updated. Page limit relaxed by the
+  authors: the main text may run about half a column onto page 9.

@@ -50,7 +50,7 @@ screens or revisit them.
 
 When you finish a task, open the project, click *Export*, choose **JSON**, and save the file as
 `task1.json` (task 1) or `task2.json` (task 2). Send both files to the coordinator, who puts them
-under `data/locobench-study/exports/annotator_<k>/`. Do not edit them.
+under `docs/arr2027/locobench/study/locobench-study/exports/annotator_<k>/`. Do not edit them.
 
 ## Troubleshooting
 

@@ -151,6 +151,24 @@ def logsumexp(v):
     return m + math.log(np.exp(v - m).sum())
 
 
+def relation_evidence(pri, rel, x):
+    """lambda_r = Lambda({r}): the weight of evidence of one relation on its own, in closed form.
+
+    With q0 = pi(V_r), the prior mass of the cells r forbids, Z_{r} = 1 - p q0, so lambda_r is
+    -log(1 - p q0) if x satisfies r and log(1 - p) - log(1 - p q0) if it violates it."""
+    s, t, ty, p = rel
+    p = _clamp(p)
+    ps, pt = float(pri[s]), float(pri[t])
+    q0 = sum((ps if a else 1 - ps) * (pt if b else 1 - pt) for a, b in VIOLATED[ty])
+    lz = math.log(1.0 - p * q0)
+    return -lz if is_support(rel, x) else math.log(1.0 - p) - lz
+
+
+def independent_evidence(pri, rels, x):
+    """The interaction-free part of Lambda: sum of lambda_r (Lambda = this - I_R)."""
+    return float(sum(relation_evidence(pri, r, x) for r in rels))
+
+
 def confirmation(pri, rels, x=None):
     """Lambda = log P_R(x*) - log pi(x*) under the sign-definite MRF (x* = 1 if None)."""
     n = len(pri)

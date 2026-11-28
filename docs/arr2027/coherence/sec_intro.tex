@@ -47,7 +47,9 @@ metric that is strictly monotone under every coherence-improving edit of a coher
 define, for any priors and relation graph, relative to the committed world a factuality pipeline
 supplies. Within product MRFs read by
 a single-world log-ratio, this requirement forces two-valued relation tables and the committed
-world as the readout (App.~\ref{app:why}). 
+world as the readout (App.~\ref{app:why}). LCS splits into per-relation evidence and an
+interaction term, of which a signed sum of relation weights is the linear, interaction-free
+approximation (\S\ref{sec:decomp}). 
 % We further characterize the class of relation factors that 
 % admit this guarantee and show that no readout based on a different single world satisfies the same coherence 
 % order.
@@ -55,8 +57,9 @@ world as the readout (App.~\ref{app:why}).
 \item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On GPT-6-mined
 graphs LCS rises on \sThreeGraphGptLamIncPct\% of the declared increases, and on \subLlamaLcsInc\% with a
 weaker miner outside the benchmark's vendors; the theorem covers the pairs whose extracted graphs are
-ordered as declared, \sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6. A signed sum of
-relation weights does slightly better. LLM judges rating one response at a time rise and fall about
+ordered as declared, \sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6. The signed sum
+does slightly better on mined graphs and worse at wrong verdicts, a difference the decomposition
+traces to the per-relation weights. LLM judges rating one response at a time rise and fall about
 equally often when the only edit is an added valid inference; a judge comparing two responses, given
 the verdicts and our definition, matches LCS on increases and keeps far more invariances.
 

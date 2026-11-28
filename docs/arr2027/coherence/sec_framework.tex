@@ -249,6 +249,41 @@ $a_2\con a_4$, and it scores $\LCS=\vyALCS$ against $\vyBLCS$. The shared refuta
 adds $\vyADFour$ nats (natural-log units) to $\Lambda$ in A but only $\vyBDFour$ in B, where $a_2\con a_3$ has already made $a_3$
 less probable.
 
+\subsection{Per-Relation Evidence and Interaction}
+\label{sec:decomp}
+
+$\Lambda$ separates into what each relation contributes alone and what the relations contribute
+together. Let $v_r=\pi(x_{e_r}\in V(\kappa_r))$ be the prior mass of the assignments $r$ forbids
+($\frac14$ for \ent, \con, \cnc{} and $\frac12$ for \eqv, \exc{} under flat priors).
+
+\begin{proposition}[Decomposition]
+\label{prop:decomp}
+For any $\R$ and priors, $\Lambda(\R)=\sum_{r\in\R}\lambda_r-I_\R$, where $\lambda_r=\Lambda(\{r\})$
+equals $-\log(1-p_rv_r)$ for a support and $\log\frac{1-p_r}{1-p_rv_r}$ for a conflict, and
+$I_\R=\log Z_\R-\sum_r\log(1-p_rv_r)$. $I_\R$ is a sum over the connected components of the
+relation graph, so it vanishes when no two relations share a claim.
+\end{proposition}
+
+$\lambda_r$ is Lemma~\ref{lem:edit} with no other relation present ($q_r=v_r$), so $I_\R$ is what
+the rest of the argument changes about each relation (App.~\ref{app:proof-score}). It is positive,
+a discount, when the rest has already made what $r$ forbids less probable: a repeated relation, or
+an inference from a premise the argument contests. It is negative, an amplification, when the rest
+has made it more probable: an inference from a claim that other relations support, or the second
+half of a constraint stated in two halves.
+
+\paragraph{Two simpler scores.} Dropping $I_\R$ gives the \emph{independent evidence}
+$\Lambda^{\perp}=\sum_r\lambda_r$, which treats every relation as separate evidence, as naive Bayes
+does. To first order in the weights, $\lambda_r$ is $p_rv_r$ for a support and $-p_r(1-v_r)$ for a
+conflict, and with $v_r=\frac12$ throughout this is half the \emph{signed weight sum}
+$W=\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$. Both satisfy A1 and A3 but not A2, and both cost $O(|\R|)$.
+$W$ loses the asymmetry and curvature of $\lambda_r$: at $p_r=\dcP$, a satisfied \ent{} adds
+$\dcGainOne$ nats while a violated one costs $\dcCostOne$, $\dcRatioOne$ times as much
+($\dcRatioTwo$ for \eqv, \exc), and the cost of a conflict grows without bound as $p_r\to1$.
+$\Lambda^{\perp}$ keeps these and loses the interaction. $\LCS$ alone has a unit,
+$\LCS=B/(1+B)$ with $B$ the factor by which the relations multiply the odds of $\xs$, a bounded
+range with strict monotonicity (App.~\ref{app:further}), and A2. Table~\ref{tab:three} sets the
+three side by side.
+
 % App.~\ref{app:props} shows that the result rests on two choices that cannot be changed,
 % sign-definite tables and the committed world as the readout, and collects further properties of
 % the score: additivity across independent sub-arguments, bounds, and saturation of redundant

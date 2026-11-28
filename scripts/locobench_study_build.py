@@ -10,7 +10,7 @@ judged by three of them (balanced over the ten possible triples):
 * **Task 2, rung comparison** (aspect 2): every rung pair of the primary and CONTROL ladders of
   30 families (10 CONFLICT, 10 CHAIN, 10 SIGN): which response is more logically coherent.
 
-Outputs, under ``--out`` (default ``data/locobench-study``):
+Outputs, under ``--out`` (default ``docs/arr2027/locobench/study/locobench-study``):
 
 * ``bundles/annotator_<k>/`` -- what annotator k receives and nothing else: the two task files
   (Label Studio JSON), the practice files, the two labeling configs, the brief.
@@ -603,7 +603,7 @@ def check_no_leak(d):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=20261120)
-    ap.add_argument("--out", default="data/locobench-study")
+    ap.add_argument("--out", default="docs/arr2027/locobench/study/locobench-study")
     ap.add_argument("--reduced", action="store_true",
                     help="The pre-registered timing fallback: Task 1 with 100 fillers (7+3).")
     args = ap.parse_args()

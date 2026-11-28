@@ -1,0 +1,32 @@
+<View>
+  <Header value="$question" size="5"/>
+  <View style="background:#f4f4f2;padding:0.5em 0.8em;margin:0.4em 0">
+    <Header value="Claim X" size="6"/>
+    <Text name="x" value="$claim_x"/>
+    <Header value="Claim Y" size="6"/>
+    <Text name="y" value="$claim_y"/>
+    <Header value="Proposed reading" size="6"/>
+    <Text name="reading" value="$reading"/>
+  </View>
+  <HyperText name="ans" value="$answer_html" inline="true"/>
+  <Header value="1. Does the answer draw a connection between X and Y like the proposed reading?" size="5"/>
+  <Choices name="asserted" toName="ans" choice="single-radio" required="true" showInline="true">
+    <Choice value="Yes"/>
+    <Choice value="Partly"/>
+    <Choice value="No"/>
+  </Choices>
+  <View visibleWhen="choice-selected" whenTagName="asserted" whenChoiceValue="Yes,Partly">
+    <Header value="2. Which connection does the answer draw between X and Y?" size="5"/>
+  <Choices name="kind" toName="ans" choice="single-radio">
+    <Choice value="Support: one is given as a reason or evidence for the other"/>
+    <Choice value="Conflict: they are presented as unable to hold together"/>
+    <Choice value="Neither: contrast, sequence, or some other connection"/>
+  </Choices>
+  </View>
+  <Header value="How sure are you?" size="5"/>
+  <Choices name="confidence" toName="ans" choice="single-radio" required="true" showInline="true">
+    <Choice value="1 (unsure)"/>
+    <Choice value="2"/>
+    <Choice value="3 (sure)"/>
+  </Choices>
+</View>

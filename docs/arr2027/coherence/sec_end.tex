@@ -8,12 +8,18 @@ fixed set of claims and their verdicts, it must rise under every coherence-impro
 argument's relations. $\LCS$, the weight of evidence that the coherence MRF lends to the committed
 world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
-committed world as the readout (App.~\ref{app:why}). On LoCoBench, a signed sum of relation weights
-does slightly better than $\LCS$, except on gold graphs read at wrong verdicts, and a judge comparing
-two responses with their verdicts matches it on increases and is more stable on invariances. On natural
-text the score is not a proxy for rated discourse coherence, falls under detected contradictions,
-and tracks essay quality beyond length. Its advantage over the signed sum lies in design (presentation
-invariance, saturation of repeated support), not yet in accuracy. What limits $\LCS$ is
+committed world as the readout (App.~\ref{app:why}).
+
+$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}), which
+places the signed weight sum as its linear, interaction-free approximation. The per-relation
+weights, under which a violation costs several times what a satisfied relation earns, make $\LCS$
+more robust to wrong verdicts and keep it from counting relations, at the price of sensitivity to a
+spurious violated relation. The interaction gives presentation invariance and discounts repeated
+inferences and contested premises; on LoCoBench it helps on no pair and costs a little on mined
+graphs, and whether people share its principles is an empirical question.
+A judge comparing two responses with their verdicts matches $\LCS$ on increases and is more stable
+on invariances. On natural text the score is not a proxy for rated discourse coherence, falls under
+detected contradictions, and tracks essay quality beyond length. What limits $\LCS$ is
 relation extraction and the verdicts it is read against. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
@@ -72,7 +78,10 @@ extractor's precision.
 
 \paragraph{Computation and reproducibility.} The score needs the partition function $Z_\R$, which
 is \#P-hard in general; it is exact here because the graphs are small, and approximate inference
-preserves the guarantees only up to the approximation (App.~\ref{app:further}). The strongest miner
+preserves the guarantees only up to the approximation (App.~\ref{app:further}). Where $Z_\R$ is out
+of reach, the independent evidence $\Lambda^{\perp}$ costs $O(|\R|)$ and keeps the per-relation
+weights, which account for every LoCoBench difference from the signed sum, but it loses the
+interaction and with it A2 (\S\ref{sec:decomp}). The strongest miner
 and judge, GPT-6, are proprietary models served through an API, so their outputs may not be
 reproducible over time.
 

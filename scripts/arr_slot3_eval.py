@@ -65,10 +65,12 @@ REL_TIE = 1e-10
 DECIDE = {"lambda": (REL_TIE, True), "lambda_assert": (REL_TIE, True),
           "mean_marginal": (REL_TIE, True),
           "wsum": (REL_TIE, True), "count": (REL_TIE, True), "dsum": (REL_TIE, True),
-          "wsum_assert": (REL_TIE, True), "count_assert": (REL_TIE, True)}
+          "wsum_assert": (REL_TIE, True), "count_assert": (REL_TIE, True),
+          "indep": (REL_TIE, True)}
 #: The signed baselines over the same graphs, by readout key -> (macro tag, display name).
 SIGNED = {"wsum": ("Wsum", "signed weight sum"), "count": ("Count", "signed count"),
           "dsum": ("Dsum", "deduplicated signed sum"),
+          "indep": ("Indep", "independent evidence (sum of lambda_r)"),
           "wsum_assert": ("WsumA", "signed weight sum, asserted"),
           "count_assert": ("CountA", "signed count, asserted")}
 # Invariance within a tolerance, on each score's own [0, 1] scale (LCS for the MRF arms,
@@ -173,6 +175,9 @@ def score_item(item, rels):
         return float(sum(p if sup else -p for (_pair, sup), p in best.items()))
     return {"lambda": lam, "lcs": A.lcs_flat(lam, n), "lambda_assert": lam_a,
             "dsum": dedup(xv),
+            # Lambda without its interaction term: each relation's evidence on its own (the
+            # decomposition Lambda = sum_r lambda_r - I_R of the coherence paper, Sec. 2.4).
+            "indep": A.independent_evidence(pu, tup, xv),
             "lcs_assert": A.lcs_flat(lam_a, n),
             "wsum": signed(xv, True), "count": signed(xv, False),
             "wsum_assert": signed(xa, True), "count_assert": signed(xa, False),

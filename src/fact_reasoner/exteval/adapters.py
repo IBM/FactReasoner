@@ -481,6 +481,64 @@ def gdtb(raw: str, per_category: int = 170) -> list[dict]:
     return out
 
 
+# ----------------------------------------------------------------------------- ExpertQA
+
+EQA_TRUE = ("Definitely correct", "Probably correct")
+EQA_FALSE = ("Definitely incorrect", "Likely incorrect")
+_CITE = re.compile(r"\s*\[\d+\](?:\s*\[\d+\])*")
+
+
+def _eqa_clean(t: str) -> str:
+    """Drop citation markers ``[3] [4]`` and markdown bold; keep paragraph breaks."""
+    t = _CITE.sub("", t or "").replace("**", "")
+    return "\n\n".join(re.sub(r"[ \t]+", " ", p).strip() for p in re.split(r"\n\s*\n", t) if p.strip())
+
+
+def expertqa(raw: str, min_words: int = 150, min_claims: int = 6) -> list[dict]:
+    """Human study, Block B: ExpertQA (Malaviya et al., NAACL 2024) long-form answers whose
+    sentence-level claims carry expert correctness labels.
+
+    Pool: answers of at least ``min_words`` words and ``min_claims`` claims with at least one
+    claim labelled incorrect. A claim is TRUE (``factual``) when labelled definitely or probably
+    correct; incorrect, unsure and unlabelled claims are not established and count as false (the
+    paper's verdict polarity). Citation markers and markdown bold are removed from answers and
+    claims; an answer is skipped if some cleaned claim cannot be located in its cleaned text.
+    """
+    out = []
+    for qi, line in enumerate(open(os.path.join(raw, "r2_compiled_anon.jsonl"))):
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        for system, a in sorted(r["answers"].items()):
+            claims = a.get("claims") or []
+            text = a.get("answer_string") or ""
+            if (len(text.split()) < min_words or len(claims) < min_claims
+                    or not any(c.get("correctness") in EQA_FALSE for c in claims)):
+                continue
+            resp = _eqa_clean(text)
+            flat = re.sub(r"\s+", " ", resp)
+            cl = [_eqa_clean(c["claim_string"]).replace("\n\n", " ") for c in claims]
+            pos, ok = 0, True
+            for c in cl:
+                k = flat.find(c, pos)
+                if k < 0:
+                    ok = False
+                    break
+                pos = k + len(c)
+            if not ok or any(not c for c in cl):
+                continue
+            iid = f"eqa-{qi:04d}-{system}"
+            it = item(iid, resp, cl, dataset="expertqa", check="expertqa", group=iid,
+                      question=r["question"], field=r["metadata"].get("field"), system=system,
+                      words=len(resp.split()),
+                      labels=[c.get("correctness") for c in claims],
+                      meta={"question_index": qi, "annotator_id": r.get("annotator_id")})
+            for at, c in zip(it["atoms"], claims):
+                at["factual"] = c.get("correctness") in EQA_TRUE
+            out.append(it)
+    return out
+
+
 def summary(items: list[dict]) -> dict:
     c = Counter((it["expected"]["check"], it["expected"].get("variant")) for it in items)
     n = [it["num_atoms"] for it in items]

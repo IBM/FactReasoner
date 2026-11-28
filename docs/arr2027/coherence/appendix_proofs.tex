@@ -41,6 +41,36 @@ $\LCS$. Nothing in the argument uses $|e|=2$, and $\xs$
 enters only through which relations are supports, that is, through $\psi_r(\xs)\in\{1,1-p_r\}$.
 $\square$
 
+\paragraph{Proposition~\ref{prop:decomp}.} For one relation, $\psi_r=1-p_r\ind{x_{e_r}\in V(\kappa_r)}$,
+so $Z_{\{r\}}=\E_\pi[\psi_r]=1-p_rv_r$ and $\lambda_r=\log\psi_r(\xs_{e_r})-\log Z_{\{r\}}$, which is
+the case split stated. By \eqref{eq:lambda}, $\Lambda(\R)=\sum_r\log\psi_r(\xs_{e_r})-\log Z_\R$, and
+subtracting $\sum_r\lambda_r$ leaves $-\log Z_\R+\sum_r\log Z_{\{r\}}=-I_\R$.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \emph{Components.} The prior is a product, so $Z_\R$ factorizes over the connected components
+  of the graph whose vertices are the claims and whose edges are the relations' scopes; claims in
+  no scope sum to $1$. Hence $I_\R$ is a sum over components, and a component with a single
+  relation contributes $0$.
+\item \emph{The sequential form.} Order the relations $r_1,\dots,r_m$ and let $\R_k=\{r_1,\dots,r_k\}$.
+  Then $\Lambda(\R)=\sum_k\Delta_k$ with $\Delta_k=\Lambda(\R_k)-\Lambda(\R_{k-1})$, which is
+  Lemma~\ref{lem:edit} at $q_k=P_{\R_{k-1}}(x_{e_{r_k}}\in V(\kappa_{r_k}))$, while $\lambda_{r_k}$ is
+  the same expression at $q=v_{r_k}$. So $I_\R=\sum_k(\lambda_{r_k}-\Delta_k)$, and each term is
+  $\log\frac{1-p q_k}{1-p v_{r_k}}$ with $p=p_{r_k}$, for a support and for a conflict alike. It is
+  positive exactly when $q_k<v_{r_k}$, that is, when the relations before $r_k$ have made the
+  assignments $r_k$ forbids less probable. The terms depend on the order, their sum does not.
+\item \emph{The expansion.} $-\log(1-pv)=pv+O(p^2)$ and $\log(1-p)-\log(1-pv)=-p(1-v)+O(p^2)$, so to
+  first order $\Lambda^{\perp}=\sum_{\Rsup}p_rv_r-\sum_{\Rcon}p_r(1-v_r)$. With $v_r=\frac12$ for
+  every relation this is $W/2$.
+\item \emph{Curvature.} $\frac{d^2}{dp^2}\bigl(-\log(1-pv)\bigr)=\frac{v^2}{(1-pv)^2}>0$, and the
+  cost of a conflict, $\log\frac{1-pv}{1-p}$, has second derivative
+  $\frac{1}{(1-p)^2}-\frac{v^2}{(1-pv)^2}>0$, so both grow faster than linearly in $p$, and the cost
+  without bound as $p\to1$.
+\item \emph{Axioms.} Each $\lambda_r$ is increasing in $p_r$ for a support and decreasing for a
+  conflict, positive and negative respectively, and $\Lambda^{\perp}(\varnothing)=0$, so
+  $\Lambda^{\perp}$ satisfies A1 and A3. It is not a functional of $\PR$: two entailments
+  $a\Rightarrow b$, $b\Rightarrow a$ and one equivalence of the same weight induce the same $\PR$,
+  but at $\xs=\one$ with flat priors they give $-2\log(1-p/4)\neq-\log(1-p/2)$.
+\end{itemize}
+
 \paragraph{A three-claim example by hand.} Take three claims, all verified true, at $\pi_i=\frac12$ (so $\xs=\one$
 under either polarity), with $a_1\Rightarrow a_2$ and $a_2\Rightarrow a_3$ at weight $0.9$ and a
 contradiction between $a_1$ and $a_3$ at $0.8$ (Table~\ref{tab:worked}). With only the chain, the

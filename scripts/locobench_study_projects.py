@@ -1,7 +1,7 @@
 """Create one annotator's Label Studio projects from their bundle (local Label Studio).
 
 Creates four projects -- practice task 1, practice task 2, task 1 (fillers), task 2 (pairs) --
-with the bundle's labeling configs, sequential task order, no skipping and one annotation per
+or, if the bundle has a ``projects.json`` (a list of [title, config, tasks file]), those, with the bundle's labeling configs, sequential task order, no skipping and one annotation per
 task, and imports the tasks. Uses the REST API, so it works with any Label Studio 1.x.
 
 Authentication: Label Studio shows the token under *Account & Settings*. A legacy token is sent
@@ -68,7 +68,10 @@ def main() -> int:
     url = args.url.rstrip("/")
     h = auth_header(url, args.token, args.scheme)
     who = os.path.basename(os.path.normpath(args.bundle))
-    for title, cfg, tasks in PROJECTS:
+    # A bundle may list its own projects (the coherence study's bundles do); else the default.
+    pj = os.path.join(args.bundle, "projects.json")
+    projects = json.load(open(pj)) if os.path.exists(pj) else PROJECTS
+    for title, cfg, tasks in projects:
         config = open(os.path.join(args.bundle, cfg)).read()
         proj = request(f"{url}/api/projects", "POST", {
             "title": f"{title} ({who})", "label_config": config,

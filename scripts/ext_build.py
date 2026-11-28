@@ -34,6 +34,8 @@ SOURCES = {
     "gdtb": ("GDTB (PDTB-3 relations of GUM), Liu et al., EMNLP 2024, via UD_English-GUM "
              "en_gum-ud-{dev,test}.conllu (commit 8e168382a2)", "CC BY-NC-SA 4.0 (GUM; "
              "Reddit documents excluded)", "raw"),
+    "expertqa": ("ExpertQA, Malaviya et al., NAACL 2024 -- https://github.com/chaitanyamalaviya/"
+                 "ExpertQA (data/r2_compiled_anon.jsonl); human study Block B pool", "MIT", "raw"),
 }
 
 
@@ -50,7 +52,7 @@ def build(name: str) -> list[dict]:
     if name == "loco-shuffle":
         return AD.loco_shuffles(REPO)
     return {"contradoc": AD.contradoc, "summeval": AD.summeval, "chatprotect": AD.chatprotect,
-            "qt30": AD.qt30, "gdtb": AD.gdtb}[name](raw)
+            "qt30": AD.qt30, "gdtb": AD.gdtb, "expertqa": AD.expertqa}[name](raw)
 
 
 def main() -> int:

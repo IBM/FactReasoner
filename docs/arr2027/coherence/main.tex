@@ -109,6 +109,8 @@
 \input{numbers_phaseb_paired}
 % Phase C: a closed-book verifier's verdicts, the non-sequitur control: scripts/run_claim_verifier.py, scripts/arr_phasec.py.
 \input{numbers_verifier}
+% Decomposition of Lambda (per-relation evidence and interaction): scripts/arr_decomp.py.
+\input{numbers_decomp}
 \input{numbers_nonseq}
 % ASAP 2.0 essays: scripts/asap_lcs.py (score --macros).
 \input{asap_numbers}
@@ -130,12 +132,13 @@
   \emph{Logical Coherence Score} (LCS), the weight of evidence that the relations lend to the truth
   values a factuality pipeline assigns.
   We prove that LCS is strictly monotone under every coherence-improving edit, for any priors and
-  relation graph.
+  relation graph, and that it splits into per-relation evidence and an interaction term, of which a
+  signed sum of relation weights is the linear, interaction-free approximation.
   On LoCoBench, a benchmark that holds claims fixed while varying only
   their relational structure, LCS on GPT-6-mined graphs rises on \sThreeGraphGptLamIncPct\% of the
-  declared increases (\subLlamaLcsInc\% with a weaker miner outside the benchmark's vendors); a
-  signed sum of relation weights over the same graphs does slightly better, and degrades more than
-  LCS only when gold graphs are read at wrong verdicts. LLM judges rating one response
+  declared increases (\subLlamaLcsInc\% with a weaker miner outside the benchmark's vendors). The
+  signed sum does slightly better there and worse at wrong verdicts, where LCS gains from its
+  per-relation weights: a violation costs several times what a satisfied relation earns. LLM judges rating one response
   at a time rise and fall about equally often when the only edit is an added valid inference, while
   a judge comparing two responses, given their verdicts, matches LCS on increases and keeps far
   more of the invariances (\fjPairVInvTie\% against \sThreeGraphGptLamInvPct\%). On existing

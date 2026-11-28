@@ -1,7 +1,7 @@
 """Analyze the LoCoBench human validation study (pre-registered in
 ``docs/arr2027/locobench/study/preregistration.md``).
 
-Inputs: the gold key (``data/locobench-study/key/key.json``, checked against its committed
+Inputs: the gold key (``docs/arr2027/locobench/study/locobench-study/key/key.json``, checked against its committed
 SHA-256) and each annotator's Label Studio JSON exports, one file per task:
 ``<exports>/annotator_<k>/task1.json`` and ``task2.json``.
 
@@ -24,7 +24,7 @@ Outputs: a Markdown report, LaTeX macros (prefix ``\\hs``) and a JSON file with 
 
 ``--simulate`` writes synthetic exports from the key (for testing this script end to end).
 
-    .venv/bin/python scripts/locobench_study_analyze.py --exports data/locobench-study/exports
+    .venv/bin/python scripts/locobench_study_analyze.py --exports docs/arr2027/locobench/study/locobench-study/exports
 """
 
 from __future__ import annotations
@@ -423,10 +423,10 @@ def simulate(key, bundles, out, seed=1):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--key", default="data/locobench-study/key/key.json")
-    ap.add_argument("--exports", default="data/locobench-study/exports")
-    ap.add_argument("--bundles", default="data/locobench-study/bundles")
-    ap.add_argument("--out", default="data/locobench-study/results")
+    ap.add_argument("--key", default="docs/arr2027/locobench/study/locobench-study/key/key.json")
+    ap.add_argument("--exports", default="docs/arr2027/locobench/study/locobench-study/exports")
+    ap.add_argument("--bundles", default="docs/arr2027/locobench/study/locobench-study/bundles")
+    ap.add_argument("--out", default="docs/arr2027/locobench/study/locobench-study/results")
     ap.add_argument("--exclude", type=int, nargs="*", default=[])
     ap.add_argument("--simulate", action="store_true")
     args = ap.parse_args()

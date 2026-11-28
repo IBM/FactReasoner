@@ -62,7 +62,7 @@ All items come from the **test split**. Practice and attention-check items come 
 - **Attention checks per annotator.** 4 development-split fillers whose three committee readings
   were unanimous on the first attempt; 2 identical-response pairs, whose only right answer is
   "about equal".
-- **Gold key.** `data/locobench-study/key/key.json`, never imported into Label Studio. It is
+- **Gold key.** `docs/arr2027/locobench/study/locobench-study/key/key.json`, never imported into Label Studio. It is
   committed by hash before annotation: **SHA-256**
   `c60bb4d404b4c54c6c2b9b6e940d3c350e51a5d935578f7570a166e01ff64d7e`. The analysis refuses to
   run on a key that does not match this hash.
@@ -143,7 +143,7 @@ majority on the non-tied Increase pairs.
 ## 9. Analysis code
 
 `scripts/locobench_study_analyze.py`, tested end to end on simulated exports (`--simulate`)
-before annotation; results go to `data/locobench-study/results/`.
+before annotation; results go to `docs/arr2027/locobench/study/locobench-study/results/`.
 
 ## Deviations
 
