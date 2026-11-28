@@ -861,3 +861,25 @@ an observed case (§3.1, Limitations).
 
 Every existing macro value is unchanged (checked by diff for numbers_slot3, phaseb_noise,
 phaseb_paired, verifier, zstress, ext and asap).
+
+## 17. Changelog (2026-11-28): trimming pass
+
+The main text now ends half-way down page 9's first column, the authors' allowance; it ended at
+the top of page 11. Nothing was dropped: every cut either removes a repetition or moves detail
+to the appendix, where it already is.
+
+- **§2.6** is prose instead of bullet lists; the odds reading stays in §2.5.
+- **§3.1:**
+  - "Where the four scores differ" is one paragraph; the three mechanism examples live in App. H.
+  - "Gold graphs" and "The verdicts are needed" are merged.
+  - The judges paragraph and the Figure 2 caption are shorter.
+- **Figure 2:** only the GPT-6 graphs for the three simplifications (every arm is in the appendix
+  table); the asserted-world row is gone (it is in the text and App. H).
+- **Table 1** (formerly Table 2) loses the range/unit row and the ExpertQA block, both stated in
+  the text.
+- **The taxonomy table** (`tab:couplings`) moves to the framework appendix; Definition 1 and the
+  sign rule stay in §2.
+- **Text:** the passage after Equation 3 is tightened. The abstract, introduction contributions,
+  conclusion and §3.2 caveats are condensed. Two related-work sentences are merged.
+- **Error found while trimming:** a condensed §3.2 sentence briefly attributed the Holm result to
+  the judge; it now correctly refers to the signed sum.

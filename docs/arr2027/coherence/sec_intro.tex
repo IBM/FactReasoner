@@ -17,15 +17,12 @@ from its evidence and uses both to refute two misconceptions. Response B sets tw
 each other and derives a falsehood from a truth. No per-claim check separates them, and
 \citet{lorefact} show that factuality pipelines miss such errors.
 
-The distinction is not captured by discourse coherence, which concerns how a text is organized, 
-largely ignores the truth of its claims, and can be disrupted by reordering sentences or 
-paragraphs \citep{grosz1995,barzilay}. By contrast, \emph{logical coherence} is a property of 
-an argument: the extent to which the truth-functional relations it draws among a fixed set of 
-claims are supported by the truth values of those claims. As a result, logical coherence is 
-invariant to reordering (a mined score inherits its extractor's sensitivity to order) and captures aspects of reasoning that discourse coherence does not. 
-A contradiction may be rhetorically well integrated yet logically incoherent; a false 
-conclusion may follow from a well-structured argument; and adding a valid inference
-can improve logical coherence even when consistency and discourse structure remain unchanged.
+Discourse coherence does not capture the distinction: it concerns how a text is organized, largely
+ignores the truth of its claims, and changes when sentences are reordered \citep{grosz1995,barzilay}.
+\emph{Logical coherence} is instead a property of an argument: the extent to which the
+truth-functional relations it draws among a fixed set of claims are supported by their truth values.
+It is invariant to reordering, and a contradiction can be rhetorically well integrated yet logically
+incoherent.
 
 \input{figures/voyager-pair}
 
@@ -34,39 +31,26 @@ variables correspond to claims and whose factors encode the relations expressed 
 them. A factuality pipeline supplies the claims' truth values, defining a \emph{committed world} 
 against which the argument is evaluated. We then define the \emph{Logical Coherence Score} (LCS) 
 as the weight of evidence \citep{good1950} that the relation graph provides for that world. 
-Intuitively, relations contribute positively when they are supported by the committed world and 
-negatively when they are violated: refuting a falsehood increases coherence, whereas deriving a 
-falsehood from a truth decreases it. Because LCS evaluates whether an argument's relational structure 
-accords with the facts, rather than whether the claims themselves are true, it complements existing 
+Relations the committed world supports raise it and relations it violates lower it: refuting a
+falsehood increases coherence, deriving a falsehood from a truth decreases it. LCS asks whether the
+argument's relations accord with the facts, not whether the claims are true, so it complements
 factuality metrics. %We further show that LCS is strictly monotone under every coherence-improving edit. 
 In summary, our contributions are:
 
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \textbf{A principled coherence score with theoretical guarantees} (\S\ref{sec:framework}). We introduce LCS, a coherence 
-metric that is strictly monotone under every coherence-improving edit of a coherence order we
-define, for any priors and relation graph, relative to the committed world a factuality pipeline
-supplies. Within product MRFs read by
-a single-world log-ratio, this requirement forces two-valued relation tables and the committed
-world as the readout (App.~\ref{app:why}). LCS splits exactly into per-relation evidence and an
-interaction term. To first order it is a linear score in which a violation costs several times what
-a support earns, and a signed sum of relation weights is that score without the asymmetry
-(\S\ref{sec:decomp}). 
-% We further characterize the class of relation factors that 
-% admit this guarantee and show that no readout based on a different single world satisfies the same coherence 
-% order.
-
-\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). On GPT-6-mined
-graphs LCS rises on \sThreeGraphGptLamIncPct\% of the declared increases, and on \subLlamaLcsInc\% with a
-weaker miner outside the benchmark's vendors; the theorem covers the pairs whose extracted graphs are
-ordered as declared, \sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6. The signed sum
-does as well or slightly better on mined graphs and worse with injected verdict errors, where the
-first-order asymmetry alone accounts for the difference; neither the curvature of the per-relation evidence nor the interaction is significantly better on any mined arm, and the curvature is significantly worse on one. LLM judges rating one response at a time rise and fall about
-equally often when the only edit is an added valid inference; a judge comparing two responses, given
-the verdicts and our definition, trails LCS slightly on increases and keeps far more invariances.
-
-\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). On existing
-human-labeled data, none of which rates logical coherence, scores of mined relations, LCS among
-them, do not track rated discourse coherence, fall when a detected contradiction is added and rise
-when a consistent sentence is. On student essays they track quality beyond length about as well as a
-bare count of relations.
+\item \textbf{A score with guarantees} (\S\ref{sec:framework}). LCS is strictly monotone under every
+coherence-improving edit, for any priors and relation graph; within product MRFs read by a
+single-world log-ratio this forces two-valued tables and the committed world as the readout
+(App.~\ref{app:why}). It splits into per-relation evidence and an interaction term, and to first
+order it is a linear score that charges violations more than it credits supports
+(\S\ref{sec:decomp}).
+\item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). LCS rises on
+\sThreeGraphGptLamIncPct\% of the declared increases with GPT-6-mined graphs and on
+\subLlamaLcsInc\% with a weaker miner. A signed sum does as well or slightly better on mined graphs
+and worse with injected verdict errors, entirely through the first-order asymmetry. Judges rating
+one response at a time do not see added valid inferences; a pairwise judge given the verdicts trails
+LCS slightly on increases and keeps far more invariances.
+\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). Scores of mined relations do
+not track rated discourse coherence, fall when a detected contradiction is added, and track essay
+quality beyond length about as well as a relation count.
 \end{itemize}

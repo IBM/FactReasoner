@@ -64,36 +64,11 @@ $x_e=(x_s,x_t)$ for the values (or projection) of a world on a scope.
 % (App.~\ref{app:weights}).
 
 Relations are annotated with a discourse \emph{sense} from PDTB~3.0 and RST \citep{pdtb,mann},
-which a deterministic \emph{compile map} associates with a coupling (Table~\ref{tab:couplings}). Only
+which a deterministic \emph{compile map} associates with a coupling (Table~\ref{tab:couplings},
+App.~\ref{app:framework}). Only
 \sense{Refutation}, an asserted incompatibility, compiles to \con{}. Furthermore, \sense{Contrast} and
 \sense{Concession}, whose arguments are typically both true (``sales rose, but profits fell''),
 compile to \emph{none}, as do the temporal senses.
-
-\begin{table*}[t]
-\centering\small
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{@{}p{62mm}llcccc@{}}
-\toprule
-& & & \multicolumn{4}{c}{Sign at $(\xs_s,\xs_t)$} \\
-\cmidrule(l){4-7}
-Discourse senses & Coupling & $V(\kappa)$ & $(0,0)$ & $(0,1)$ & $(1,0)$ & $(1,1)$ \\
-\midrule
-\sense{Cause-Effect}, \sense{Effect-Cause}, \sense{Evidence}, \sense{Condition}, \sense{Instantiation}
-  & \ent{} ($a_s\Rightarrow a_t$) & $\{(1,0)\}$ & $+$ & $+$ & $-$ & $+$ \\
-\sense{Restatement} & \eqv{} ($a_s\Leftrightarrow a_t$) & $\{(0,1),(1,0)\}$ & $+$ & $-$ & $-$ & $+$ \\
-\sense{Disjunction} & \cnc{} (at least one) & $\{(0,0)\}$ & $-$ & $+$ & $+$ & $+$ \\
-\sense{Refutation} & \con{} (not both) & $\{(1,1)\}$ & $+$ & $+$ & $+$ & $-$ \\
-\sense{Alternative} (exhaustive) & \exc{} (exactly one) & $\{(0,0),(1,1)\}$ & $-$ & $+$ & $+$ & $-$ \\
-\sense{Contrast}, \sense{Concession}, \sense{Precedence}, \sense{Succession} & none & $\varnothing$ & \multicolumn{4}{c}{no factor} \\
-\bottomrule
-\end{tabular}
-\caption{The two-level relation taxonomy. Discourse senses compile to couplings, each defined by
-the joint assignments $V(\kappa)$ it rules out; only \ent{} is directed. The right block gives the
-sign a relation takes from the committed values of its endpoints (Def.~\ref{def:sign}; $+$ support,
-$-$ conflict). App.~\ref{app:senses} gives a prose example of every sense and its closest
-PDTB~3.0 and RST labels.}
-\label{tab:couplings}
-\end{table*}
 
 \begin{definition}[Support and conflict]
 \label{def:sign}
@@ -103,7 +78,6 @@ multisets $\Rsup$ and $\Rcon$, with $\R=\Rsup\uplus\Rcon$. Relations with $V=\va
 factor and are dropped.
 \end{definition}
 
-Table~\ref{tab:couplings} gives the signs of the relation based on the committed values of the endpoints. 
 A contradiction between two truths is a conflict,
 but between a truth and a falsehood it is a support ($+$), since it refutes the falsehood. An entailment
 from a truth to a falsehood is a conflict ($-$). For example, Response~B in Figure~\ref{fig:voyager} has $\Rsup=\{a_1\Rightarrow a_2,\
@@ -201,12 +175,10 @@ with $\sigma$ the logistic function and $\operatorname{logit}u=\log\frac{u}{1-u}
 \end{definition}
 
 The log-odds difference in \eqref{eq:lcs} is Good's \emph{weight of evidence} \citep{good1950} that 
-the relations contribute in favor of the complete truth assignment $\xs$. The logistic 
-function converts this evidence into an interpretable score: $\LCS(\R)$ is the probability 
-of $\xs$ for a reader who starts from even odds and updates using the evidence supplied by the 
-relations. Consequently, $\LCS(\R)=\tfrac12$ when the relations neither confirm nor disconfirm it (as with no relations), tends to $0$ 
-when they rule out $\xs$, and tends to $1$ when they force it. It measures an amount of evidence,
-not an average, so it grows with the number of supports.
+the relations contribute in favor of the complete truth assignment $\xs$. $\LCS(\R)$ is the probability of $\xs$ for a reader who starts from even odds and updates on the
+relations: $\frac12$ when they neither confirm nor disconfirm it (as with no relations), tending to $0$
+when they rule out $\xs$ and to $1$ when they force it. It measures an amount of evidence, not an
+average.
 
 
 The results are easier to understand in terms of:
@@ -214,12 +186,8 @@ The results are easier to understand in terms of:
 \Lambda=\log\frac{\PR(\xs)}{\pi(\xs)}=\sum_{r\in\Rcon}\log(1-p_r)-\log Z_\R,
 \label{eq:lambda}
 \end{equation}
-where the second equality holds because $\psi_r(\xs_{e_r})=1$ for a supporting relation and
-$\psi_r(\xs_{e_r})=1-p_r$ for a conflicting relation. Thus $\Lambda$ is simply the total log-evidence contributed by conflicts, 
-offset by the normalization term $\log Z_\R$. For a fixed claim set and prior, $\LCS$ is a strictly 
-increasing function of $\Lambda$ (App.~\ref{app:lcs-lambda}), so any ordering of relation sets 
-induced by $\Lambda$ is preserved by $\LCS$. 
-Computing either quantity requires evaluating  $Z_\R$ which 
+since $\psi_r(\xs_{e_r})$ is $1$ for a support and $1-p_r$ for a conflict. For a fixed claim set and
+prior, $\LCS$ is strictly increasing in $\Lambda$ (App.~\ref{app:lcs-lambda}), and both need $Z_\R$, which
 is \#P-hard in general \cite{koller2009probabilistic}.
 
 
@@ -266,45 +234,29 @@ relation graph, so it vanishes when no two relations share a claim.
 \end{proposition}
 
 $\lambda_r$ is Lemma~\ref{lem:edit} with no other relation present ($q_r=v_r$). $I_\R$ depends only
-on the priors and the graph, not on $\xs$: it measures how the assignments that different relations
-forbid co-occur under the prior. For two relations its sign is that of
-$\pi(V_1\cap V_2)-v_1v_2$ (App.~\ref{app:proof-score}).
-\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \emph{Positive}, a discount, when the forbidden assignments go together: a repeated relation, or
-  an inference $a\Rightarrow b$ next to a relation that also forbids $a=1$, such as $a\con w$.
-\item \emph{Negative}, an amplification, when they exclude each other: an inference from a claim
-  that another relation supports ($c\Rightarrow a$, $a\Rightarrow b$), or the two halves
-  $a\Rightarrow b$, $b\Rightarrow a$ of an equivalence.
-\end{itemize}
-Because the verdicts do not enter $I_\R$, the discount does not distinguish a conflict that
-contests $a$ from one that refutes a falsehood by citing $a$ ($a\con c$ with $c$ false). Refuting a
-falsehood therefore lowers the credit of the other inferences drawn from the same claim, a design
-consequence that we do not defend (\S\ref{sec:limitations}).
+on the priors and the graph, not on $\xs$; for two relations its sign is that of
+$\pi(V_1\cap V_2)-v_1v_2$ (App.~\ref{app:proof-score}). It discounts relations whose forbidden
+assignments go together (a repeated relation; $a\Rightarrow b$ beside $a\con w$, which also forbids
+$a=1$) and amplifies those that exclude each other (a chain $c\Rightarrow a\Rightarrow b$; the two
+halves of an equivalence). Since the verdicts do not enter it, refuting a falsehood by citing $a$
+($a\con c$, $c$ false) also discounts the other inferences drawn from $a$ (\S\ref{sec:limitations}).
 
-\paragraph{A hierarchy of simpler scores.} To first order in the weights, $\lambda_r$ is $p_rv_r$ for a
-support and $-p_r(1-v_r)$ for a conflict, and the interaction is of second order, so
+\paragraph{A hierarchy of simpler scores.} To first order in the weights the interaction vanishes and
+$\lambda_r$ is $p_rv_r$ for a support and $-p_r(1-v_r)$ for a conflict, so
 \begin{equation}
 \Lambda\approx\Llin=\sum_{r\in\Rsup}p_rv_r-\sum_{r\in\Rcon}p_r(1-v_r).
 \label{eq:llin}
 \end{equation}
-Three simpler scores each drop one ingredient of $\Lambda$, and all satisfy A1 and A3 at cost
-$O(|\R|)$:
-\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \textbf{The independent evidence} $\Lambda^{\perp}=\sum_r\lambda_r$ drops the interaction and
-  treats every relation as separate evidence, as naive Bayes does.
-\item \textbf{The linear evidence} $\Llin$ also drops the curvature of $\lambda_r$, but keeps the
-  asymmetry: a violated \ent{} costs $(1-v_r)/v_r=3$ times what a satisfied one earns, and at
-  $p_r=\dcP$ the exact ratio is $\dcRatioOne$ ($\dcRatioTwo$ for \eqv, \exc).
-\item \textbf{The signed weight sum} $\Ssum=\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ is $2\Llin$ with every
-  $v_r=\frac12$, so it also drops the asymmetry.
-\end{itemize}
-The interaction is what A2 needs. $\Llin$ is linear in the factor tables, so a constraint split into
-two halves of the same weight scores as the whole, but it counts a repeated relation in full and
-ignores contested premises. $\Lambda^{\perp}$, whose $\lambda_r$ are not linear, loses even the
-first property. $\LCS$ reads the odds of $\xs$ ($\LCS=B/(1+B)$, with $B$ the factor by which the
-relations multiply them) and is bounded and strictly monotone; a logistic map of any simplification
-would be too, so what separates $\LCS$ from them is A2. Table~\ref{tab:three} sets the four side by
-side, and Figure~\ref{fig:decomp} (App.~\ref{app:decomp}) illustrates them.
+Three $O(|\R|)$ scores, all satisfying A1 and A3, each drop one ingredient of $\Lambda$: the
+\emph{independent evidence} $\Lambda^{\perp}=\sum_r\lambda_r$ drops the interaction (it treats
+relations as separate evidence, as naive Bayes does); the \emph{linear evidence} $\Llin$ also drops
+the curvature of $\lambda_r$ but keeps the asymmetry (a violated \ent{} costs $(1-v_r)/v_r=3$ times
+what a satisfied one earns, $\dcRatioOne$ times exactly at $p_r=\dcP$); and the \emph{signed weight
+sum} $\Ssum=\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$, which is $2\Llin$ with every $v_r=\frac12$, also drops
+the asymmetry. $\Llin$ is linear in the factor tables, so a constraint split into two halves of equal
+weight scores as the whole, but it counts a repeated relation in full and ignores contested premises;
+only $\Lambda$ satisfies A2. Table~\ref{tab:three} sets the four side by side and
+Figure~\ref{fig:decomp} (App.~\ref{app:decomp}) illustrates them.
 
 % App.~\ref{app:props} shows that the result rests on two choices that cannot be changed,
 % sign-definite tables and the committed world as the readout, and collects further properties of

@@ -50,13 +50,7 @@ on natural text labeled for related properties (Table~\ref{tab:external}). Claim
 (atomized claims for the essays) and relations come from the GPT-6 graph-level miner. Except where
 stated, $\LCS$ is read at the asserted world, where every inference is a support and every
 contradiction a conflict, so these tests exercise how the score combines mined relations; brackets
-give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. $\LCS$'s
-three simplifications behave like it on every row. At the verdict world, the preregistered ContraDoc
-test failed: mining the two versions separately, the score does not rise more often than it falls
-when a found contradiction refutes the false insertion ($p=\extCdVerdEdgePGpt$). Holding the clean
-document's graph fixed, it rises on all \extCdPvEdgeNGpt{} pairs, but that is Lemma~\ref{lem:edit}
-applied to a satisfied conflict, a check of the implementation rather than evidence
-(App.~\ref{app:ext-further}).
+give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. $\LCS$'s three simplifications behave like it on every row. At the verdict world, ContraDoc's test fixed in advance failed ($p=\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}).
 
 \paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only the relations that constrain
 truth values (App.~\ref{sec:notions}). This is a discriminant check, which a constant score would
@@ -75,16 +69,12 @@ lowers $\Lambda$ (Lemma~\ref{lem:edit}), so where the miner finds one the fall i
 checks the lemma end to end:
 $\LCS$ falls on \extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs
 \citep{contradoc} and on all \extCpFoundFallGpt{} ChatProtect pairs \citep{mundler2024} (median
-change $\extCdEffFoundMedianGpt$ and $\extCpEffFoundMedianGpt$). Over all pairs it falls far more
-often than it rises, also counted by source document and by topic (\extCdClAssertDecGpt{} of
-\extCdClAssertNGpt{} documents, \extCpClAssertDecGpt{} of \extCpClAssertNGpt{} topics), and adding a
-consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
+change $\extCdEffFoundMedianGpt$ and $\extCpEffFoundMedianGpt$). Over all pairs it falls far more often than it rises, also by document and topic (App.~\ref{app:ext-contra}), and a consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
 contradictions barely move it (on ContraDoc \extCdAssertNotFoundDecGpt{} falls against
 \extCdAssertNotFoundIncGpt{} rises), so recall bounds the result: the miner finds
 \extCdRecallInsertGpt\% of ContraDoc's inserted contradictions (\extCdRecallGpt\% over all edits) and
-\extCpConfStrongGpt\% of ChatProtect's. The simplifications behave alike: no paired difference with the signed sum survives a Holm
-correction (App.~\ref{app:ext-contra}), which is an absence of evidence, not an equivalence. The judge falls too,
-never rising on ContraDoc.
+\extCpConfStrongGpt\% of ChatProtect's. The simplifications behave alike (no paired difference with the signed sum survives Holm, an
+absence of evidence rather than an equivalence), and the judge falls too.
 
 \paragraph{Order.} Mined twice per text in one run, $\LCS$ moves slightly more under paragraph
 permutation than under re-mining (90\% intervals of the difference in mean change: LoCoBench
@@ -92,11 +82,7 @@ permutation than under re-mining (90\% intervals of the difference in mean chang
 test-retest ICC \extLmIccLcsAllGpt{} and \extSecIccLcsAllGpt{} (judge \extLmIccJudgeAll{} and
 \extSecIccJudgeAll; App.~\ref{app:ext-order}). The judge falls on \extLmJudgePermDec\% and
 \extSecJudgePermDec\% of permutations, against \extLmJudgeNoiseDec\% and \extSecJudgeNoiseDec\% when
-re-judged. Those falls are not instability: G-Eval rates discourse coherence, which permuting
-paragraphs is meant to damage, and its three averaged 1--5 ratings move in steps of $1/12$ on the
-unit scale, so for it ``kept within $\tau$'' means an unchanged rating. The tests fixed in advance
-for order failed for $\LCS$ too (Table~\ref{tab:ext-plan}): on ContraDoc the 90\% interval of the difference
-extends beyond $\tau$, and there its test-retest ICC is below the judge's.
+re-judged. Those falls need not be instability: G-Eval rates discourse coherence, which permuting paragraphs is meant to damage. The order tests fixed in advance failed for $\LCS$ too (Table~\ref{tab:ext-plan}; App.~\ref{app:ext-order}).
 
 \paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
 \citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
