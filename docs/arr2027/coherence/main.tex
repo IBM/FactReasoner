@@ -136,19 +136,22 @@
   \emph{Logical Coherence Score} (LCS), the weight of evidence that the relations lend to the truth
   values a factuality pipeline assigns.
   We prove that LCS is strictly monotone under every coherence-improving edit, for any priors and
-  relation graph, and that it splits exactly into per-relation evidence and an interaction term; to
-  first order it is a linear score in which a violation costs several times what a support earns.
-  On LoCoBench, a benchmark that holds claims fixed while varying only their relational structure,
-  LCS on GPT-6-mined graphs rises on \sThreeGraphGptLamIncPct\% of the declared increases
-  (\subLlamaLcsInc\% with a weaker miner outside the benchmark's vendors). A signed sum of relation
-  weights does as well or slightly better on mined graphs and worse with injected verdict errors,
-  a difference due entirely to the first-order asymmetry; beyond it, no ingredient of LCS is
-  significantly better on any mined arm. LLM judges rating one response at a time rise and fall
-  about equally often when the only edit is an added valid inference, while a judge comparing two
-  responses with their verdicts trails LCS slightly on increases and keeps far more invariances
-  (\fjPairVInvTie\% against \sThreeGraphGptLamInvPct\%). On human-labeled data, scores of mined
-  relations, LCS among them, do not track rated discourse coherence, fall when a detected
-  contradiction is added, and track essay quality beyond length about as well as a relation count.
+  relation graph, and that it splits exactly into per-relation evidence and an interaction term. Its
+  first-order expansion, the \emph{linear evidence}, is a closed-form score in which a violation
+  costs several times what a support earns. On LoCoBench, a benchmark that holds claims fixed while
+  varying only their relational structure, LCS on GPT-6-mined graphs rises on
+  \sThreeGraphGptLamIncPct\% of the declared increases (\sThreeGraphGptLamIncTolPct\% by more than a
+  tolerance; \subLlamaLcsInc\% with a weaker miner outside the benchmark's vendors, on ladders where
+  GPT-6 reaches \subGptLcsInc\%). The linear evidence is at least as accurate on every mined arm; a signed sum without its asymmetry
+  is worse with injected verdict errors, and the curvature and interaction of the full model are never
+  significantly better (the curvature is worse on one arm). We therefore recommend the linear evidence
+  in practice, with LCS as the model it approximates. LLM judges rating one response at a time rise
+  and fall about equally often when the only edit is an added valid inference, while a judge
+  comparing two responses with their verdicts trails LCS slightly on increases and keeps far more
+  invariances (\fjPairVInvTie\% against \sThreeGraphGptLamInvTolPct\% within the tolerance). On
+  human-labeled data, read with every claim taken as asserted, scores of mined relations do not
+  track rated discourse coherence, fall when a detected contradiction is added, and track essay
+  quality beyond length about as well as a relation count.
 \end{abstract}
 
 

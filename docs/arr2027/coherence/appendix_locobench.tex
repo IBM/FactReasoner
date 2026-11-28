@@ -331,7 +331,8 @@ the normalization gives $\LCS$:
 These are consequences of A2 and of saturation rather than findings, and they are deterministic,
 so the 100\% against 0\% says nothing about accuracy. They show what a plain signed sum gives up:
 it can be raised by restating one constraint as two, or by repeating an inference. A sum over
-deduplicated constraints (one term per pair of claims and set of violated cells) would pass the first
+deduplicated constraints (one support and one conflict term per pair of claims, the largest weight of
+each, as in \texttt{arr\_slot3\_eval.py}) would pass the first
 two tests; only the third, which depends on how the rest of the graph bears on the premise, needs
 the model. The independent evidence $\Lambda^{\perp}$ (\S\ref{sec:decomp}), which has $\LCS$'s
 per-relation weights but no interaction, fails all three as the sum does (\zsEqvIndep\%,
@@ -403,7 +404,13 @@ $I_\R$ (proof in App.~\ref{app:proof-score}); Figure~\ref{fig:decomp} illustrate
   simpler wrong, against the reverse), exact two-sided McNemar $p$, and Holm over the
   \mcFamily{} tests (Table~\ref{tab:mcnemar}).
   The family-cluster bootstrap intervals elsewhere are anti-conservative when discordant pairs are
-  this few; the exact tests are the ones to read.
+  this few; the exact tests are the ones to read. The one step that survives Holm, the curvature loss on
+  gpt-oss graphs, also holds by family (\mcCurvOssFamB{} families against \mcCurvOssFamC,
+  $p=\mcCurvOssFamP$). The gpt-oss graph miner weighs relations by a few strength bands, and a
+  spurious conflict whose band rises between rungs costs far more under the convex $\lambda_r$ than
+  under its tangent, so the curvature amplifies the miner's weight noise. At these weights
+  $\Lambda\approx\Llin$ is a poor numerical approximation (Eq.~\ref{eq:llin} is a small-weight expansion);
+  the two agree on most decisions because the ladders' edits are small.
 \item \textbf{Examples.} The rule is symmetric: for each score that wins and each step at which a win
   turns, the disagreement whose two graphs differ in the fewest relations. Each is described by the
   change in $\Lambda$ along the chain: $\Delta\Llin$, then the curvature $\Delta\Lambda^{\perp}-\Delta\Llin$,
@@ -441,9 +448,8 @@ $I_\R$ (proof in App.~\ref{app:proof-score}); Figure~\ref{fig:decomp} illustrate
     \asapCI{\dcCountDiffLo}{\dcCountDiffHi}; with length $\dcCountWsumWords$, $\dcCountLinWords$,
     $\dcCountIndepWords$, $\dcCountLcsWords$. $\LCS$ correlates with the number of violated
     relations at $\dcCountLcsViol$.
-  \item \emph{Sensitivity.} With unsure claims counted true, $\LCS$ and $\Ssum$ correlate with the
-    count at $\dcCountUnsureTrueLcsNrel$ and $\dcCountUnsureTrueWsumNrel$. Dropping the answers
-    with an unsure claim (\dcCountDropN{} left) gives $\dcCountDropLcsNrel$ and
+  \item \emph{Sensitivity.} With unsure and unlabelled claims counted true, $\LCS$ and $\Ssum$ correlate with the
+    count at $\dcCountUnsureTrueLcsNrel$ and $\dcCountUnsureTrueWsumNrel$. Dropping the answers with such a claim (\dcCountDropN{} left) gives $\dcCountDropLcsNrel$ and
     $\dcCountDropWsumNrel$, and the asserted world (every claim true) gives
     $\dcCountAssertedLcsNrel$ and $\dcCountAssertedWsumNrel$.
   \end{itemize}
@@ -517,11 +523,12 @@ is still ahead on \cp{conflict} ([\vfGptMinedDiffloConflict, \vfGptMinedDiffhiCo
 \cp{chain} ([\vfGptMinedDiffloChain, \vfGptMinedDiffhiChain]) and \cp{sign}
 ([\vfGptMinedDiffloSign, \vfGptMinedDiffhiSign]). With gpt-oss-120b as the verifier (\vfOssAcc\% accurate) the gold-graph
 difference is [\vfOssGoldDiffloInc, \vfOssGoldDiffhiInc] points (\vfOssGoldLcsInc\% against
-\vfOssGoldWsumInc\%). Real verdict errors thus reproduce the pattern of the injected ones: the asymmetric weights of
-$\LCS$ help where flipped signs mix conflicts and supports, and cost where a violation outweighs the
-supports an edit adds. $\Lambda^{\perp}$ again gives $\LCS$'s rates (\vfGptGoldIndepInc\% on gold
-graphs and \vfGptMinedIndepInc\% on mined ones), and $\Llin$ gives \vfGptGoldLinInc\% and
-\vfGptMinedLinInc\%.
+\vfOssGoldWsumInc\%). Real verdict errors resemble the injected ones on \cp{conflict} and \cp{chain}, where the asymmetric
+weights help when flipped signs mix conflicts and supports and cost when a violation outweighs the
+supports an edit adds, but unlike them they also cost on \cp{sign}, and the offsetting per-type
+effects net to a small overall difference. $\Lambda^{\perp}$ gives $\LCS$'s rates (\vfGptGoldIndepInc\%
+on gold graphs and \vfGptMinedIndepInc\% on mined ones), and $\Llin$ gives \vfGptGoldLinInc\% and
+\vfGptMinedLinInc\%, the best of the four on mined graphs.
 
 \paragraph{A non-sequitur control.} For the rung-0 response of each increasing family, a sentence
 naming two true claims that no gold relation joins, from different paragraphs and sharing almost no

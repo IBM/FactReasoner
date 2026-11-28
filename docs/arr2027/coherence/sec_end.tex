@@ -3,23 +3,23 @@
 \label{sec:discussion}
 %% ============================================================================
 
-We asked what a score of logical coherence must satisfy, and answered with one requirement: for a
-fixed set of claims and their verdicts, it must rise under every coherence-improving edit of the
-argument's relations. $\LCS$, the weight of evidence that the coherence MRF lends to the committed
-world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), and within
-product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
-committed world as the readout (App.~\ref{app:why}).
+We required a score of logical coherence to rise under every coherence-improving edit of an
+argument's relations, for fixed claims and verdicts. $\LCS$, the weight of evidence that the coherence
+MRF lends to the committed world, meets this for any priors and relation graph (Theorem~\ref{thm:mono}),
+and within product MRFs read at one world it forces sign-definite tables and the committed world as
+the readout (App.~\ref{app:why}).
 
-$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}). On our
-data only its first-order asymmetry helps: it makes the score more robust than a signed sum to
-injected verdict errors and more sensitive to a spurious violated relation. The interaction, which
-gives presentation invariance and discounts repetition and contested premises, is not
-significantly better on any mined arm, ignores the verdicts, and needs human judgments to justify it.
+$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}). Its
+first-order expansion, the linear evidence, is the score we recommend: its asymmetry is the only
+ingredient that helped on our data, while the curvature and the interaction were never significantly
+better. The full model is where presentation invariance and the treatment of redundant and contested
+evidence hold exactly; its interaction ignores the verdicts and compounds repeated conflicts, and
+needs human judgments to justify it.
 A judge comparing two responses with their verdicts trails $\LCS$ slightly on increases and is more stable
-on invariances. On natural text, scores of mined relations do not track rated discourse coherence,
+on invariances. On natural text, read with every claim asserted, scores of mined relations do not track rated discourse coherence,
 fall under detected contradictions, and track essay quality beyond length about as well as a bare
-relation count. What limits $\LCS$ is
-relation extraction and the verdicts it is read against. Logical coherence is meant
+relation count. What limits the score is relation extraction, the verdicts it is read against, and two design
+choices: restating a claim earns credit, and relevance is not modeled. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
 \section*{Limitations}\label{sec:limitations}
@@ -28,7 +28,9 @@ to be reported beside factuality and discourse coherence, not instead of them.
 admitted by a single committee, so results may reflect one model's writing style. Its gold relations
 are the committee's reading of each response, not human annotations. The ladders are diagnostic, not
 a sample of how real responses argue: rungs differ in one or two spliced sentences with explicit
-markers, and claims are given rather than extracted. The committee and the miners share vendors, and
+markers, and claims are given rather than extracted. The admission gate is defined in $\Lambda$, so gold-graph results hold by construction and favor any
+score monotone in the coherence order. The committee and the miners share vendors (GPT-6.1 sits on the
+committee and GPT-6 mines), and
 explicit markers favor any extractor that reads connectives, so mined-graph results on LoCoBench
 are optimistic, an upper bound on extraction from natural text. A graph-level miner from outside
 those vendors (Llama-3.3-70B, on \subLadders{} ladders) reaches a pair-level F1 of \subLlamaPairF{}
@@ -41,17 +43,19 @@ coherence of a response, so agreement with human judgments of logical coherence 
 established, and no human study checks that people rank LoCoBench's rungs as declared. Most
 natural-text tests read the asserted world. Where the verdict world was tested on natural text, it
 did not help: ContraDoc's preregistered verdict-world test failed (App.~\ref{app:external}), and on
-essays the strict world lowers the partial correlation (App.~\ref{app:asap}). The ExpertQA analysis
-uses expert labels, each from a single expert, with unsure claims counted false.
-$\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The score is
+essays the strict world lowers the partial correlation (App.~\ref{app:asap}). The ExpertQA analysis uses one expert's labels per answer, counts unsure and unlabelled claims as
+false, and uses answers selected to contain an incorrect claim, which all raise the number of
+violations.
+At first order a restatement, an equivalence, earns twice the credit of an inference, so the score
+rewards restating a claim, which raters penalize. The score is
 order-free, but its extraction is only nearly so: on LoCoBench, permuting paragraphs moves the mined
 score slightly beyond the miner's re-mining noise. The essays come from one prompt, sampled uniformly over score
 levels, and were mined with one model.
 
 \paragraph{Scope of the guarantee.} Monotonicity holds with respect to the relation graph, for a
 fixed committed world. When an extractor changes relations in both directions, the score nets them
-and no ordering is guaranteed. The score does not compare responses with different claim sets,
-where $\LCS$ is a reading on a common scale rather than a guaranteed order. The necessity results
+and no ordering is guaranteed. The guarantee does not cover responses with different claim sets: there, as in \S\ref{sec:exp-external},
+$\LCS$ is a reading on a common scale rather than a guaranteed order. The necessity results
 (App.~\ref{app:why}) fix the relation tables and the world at which the model is read, but not the
 functional form of the score. Relations on one pair that contradict each other cancel, so they
 score as uninformative rather than as incoherent.
@@ -83,8 +87,9 @@ extractor's precision.
 
 \paragraph{Computation and reproducibility.} The score needs the partition function $Z_\R$, which
 is \#P-hard in general; it is exact here because the graphs are small, and approximate inference
-preserves the guarantees only up to the approximation (App.~\ref{app:further}). Where $Z_\R$ is out
-of reach, the linear evidence $\Llin$ costs $O(|\R|)$ and keeps the asymmetry, the only ingredient that helped on our data, but it loses the interaction and with it most of A2 (\S\ref{sec:decomp}). The strongest miner
+preserves the guarantees only up to the approximation (App.~\ref{app:further}). The recommended linear evidence $\Llin$ needs no $Z_\R$ and costs $O(|\R|)$; it keeps the asymmetry,
+the only ingredient that helped on our data, and loses the interaction and with it part of A2
+(\S\ref{sec:decomp}). The strongest miner
 and judge, GPT-6, are proprietary models served through an API, so their outputs may not be
 reproducible over time.
 
@@ -101,6 +106,7 @@ research only; QT30 states no license, so we use it for research only and redist
 it. The ASAP~2.0 essays were written by school students in grades 6--10 and are released under CC BY
 4.0, which permits this use; we use their text and scores only, no demographic metadata; the text was sent to commercial
 model APIs for claim extraction, relation mining and source checking. We do not redistribute the
-copyrighted source article, which was transcribed only for the source check. LLMs were used to generate the benchmark
+copyrighted source article, which was transcribed only for the source check and, like the texts of
+every external dataset, sent to the same model APIs. LLMs were used to generate the benchmark
 responses, to validate them, to extract claims and relations and as judges, as described. They
 were also used for editing assistance in preparing this paper.

@@ -6,29 +6,24 @@
 \paragraph{Data.} LoCoBench \citep{anonlocobench} builds \emph{coherence ladders}: responses over
 fixed claims that differ only in argument structure, with gold relation graphs. Each of its
 \sThreeFamilies{} families is an expert answer written as a template with \emph{slots}; a slot
-joins two claims, and its fillers draw no link, a support or a conflict between them. A ladder's
-three rungs $\rho_0,\rho_1,\rho_2$ splice different fillers into the template, so they share every
-other word, every claim and every verdict. Three ladder types are declared increasing: \cp{conflict}
+joins two claims, and its fillers draw no link, a support or a conflict between them. A ladder's three rungs splice different fillers into the template, sharing every other word, claim and
+verdict. Three ladder types are declared increasing: \cp{conflict}
 removes conflicts between true claims, \cp{chain} adds entailments between them, and \cp{sign} goes
 from deriving a false claim, through no link, to refuting it. Two are declared invariant: \cp{order}
 permutes paragraphs and \cp{control} rewords one entailment. A three-vendor model committee reads
 the gold relations pair by pair, and a ladder is admitted only if its gold graphs are ordered as
 declared, by at least $0.05$ nats in $\Lambda$. The \sThreeLadders{} ladders have \sThreeItems{}
-responses of 12--14 claims, two or three of them false; factuality labels give the verdict world and
-stance the asserted world. Each ladder gives three rung pairs, so the \sThreeNConflict{} ladders of
-each increasing type give $180$ pairs (App.~\ref{sec-full-locobench} and supplementary materials).
+distinct responses (ladders share rungs) of 12--14 claims, two or three of them false; factuality labels give the verdict world and
+stance the asserted world. Each ladder gives three rung pairs (App.~\ref{sec-full-locobench}).
 
 \paragraph{Setup.} The ladders induce \sThreeNIncPairs{} \emph{Increase} and \sThreeNInvPairs{}
-\emph{Invariance} comparisons. Every score must rise on an Increase pair and stay equal on an
-Invariance pair, up to a relative tie tolerance of $\sThreeRelTie$ (App.~\ref{app:setup-details}).
-An \emph{arm} fixes the graph source: the \cp{gold} relations or one of four mining
-configurations, each read at the verdict world (our default) and at the asserted world. On every
-arm we also score $\LCS$'s three simplifications over the same graphs (\S\ref{sec:decomp}): the
-signed weight sum $\Ssum$, the linear evidence $\Llin$ and the independent evidence $\Lambda^{\perp}$. Text baselines are length, DiscoScore (RC, LC, entity graph)
-\citep{discoscore}, and judges using G-Eval \citep{geval} and a direct 1--5 rating of logical
-coherence, averaged over five runs with GPT-6 and gpt-oss-120b; the judges see the response only.
-Baselines that read only the claims tie on every pair (App.~\ref{app:results}). Error bars are 95\%
-percentile-bootstrap intervals over families.
+\emph{Invariance} comparisons. A score must rise on an Increase pair and stay equal on an Invariance pair, up to a
+relative tie tolerance of $\sThreeRelTie$ (App.~\ref{app:setup-details}). An \emph{arm} fixes the graph
+source: the \cp{gold} relations or one of four mining configurations, read at the verdict world. On
+every arm we also score $\LCS$'s three simplifications (\S\ref{sec:decomp}). Text baselines are length,
+DiscoScore \citep{discoscore}, and judges using G-Eval \citep{geval} and a direct 1--5 rating, five runs
+with GPT-6 and gpt-oss-120b, seeing the response only. Error bars are 95\% bootstrap intervals over
+families.
 
 \begin{figure*}[t]
 \centering
@@ -56,15 +51,13 @@ verdicts are needed: at the \emph{asserted} world, which takes claims as stated,
 only \sThreeGoldLamASign{} \cp{sign} pairs, as any signed score does, because a derived falsehood
 counts as a support there (App.~\ref{app:asserted-sign}).
 
-\paragraph{Mined graphs: extraction sets the rate.} With mined graphs $\LCS$ rises on
-\sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\% (pairwise Llama)
-of the increases, and by more than $\tau=\sThreeTol$ on \sThreeGraphGptLamIncTolPct\% to
+\paragraph{Mined graphs: extraction sets the rate.} $\LCS$ rises on \sThreeGraphGptLamIncPct\% (GPT-6 graph-level miner) to \sThreePairLlamaLamIncPct\%
+(pairwise Llama) of the increases, by more than $\tau=\sThreeTol$ on \sThreeGraphGptLamIncTolPct\% to
 \sThreePairOssLamIncTolPct\%. Theorem~\ref{thm:mono} covers only pairs whose extracted graphs are
 ordered as declared (\sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6, \sThreePairOssDomForward{}
-with each pairwise miner), where $\LCS$ always rises (Figure~\ref{fig:dominance}). A weaker
-graph-level miner from outside the committee's vendors (Llama-3.3-70B, \subLadders{} ladders) reaches
-pair-level F1 \subLlamaPairF{} against \subGptPairF{} for GPT-6, and $\LCS$ rises on \subLlamaLcsInc\%
-of its increases against \subGptLcsInc\%: results depend on the miner.
+with each pairwise miner), where $\LCS$ always rises (Figure~\ref{fig:dominance}). A graph-level miner outside the committee's vendors (Llama-3.3-70B, \subLadders{} ladders) reaches
+F1 \subLlamaPairF{} against \subGptPairF{}, and $\LCS$ rises on \subLlamaLcsInc\% of its increases
+against \subGptLcsInc\% for GPT-6 there: results depend on the miner.
 
 \begin{table}[t]
 \centering\footnotesize
@@ -80,7 +73,7 @@ Relations interact (A2) & -- & -- & -- & \checkmark \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{By construction} (\% of gold graphs; App.~\ref{app:results})}\\
 Two halves score as the whole & \zsEqvSum & \zsEqvLin & \zsEqvIndep & \zsEqvLcs \\
-Repetition counts less & \zsRepSum & \zsRepLin & \zsRepIndep & \zsRepLcs \\
+Repeated support counts less & \zsRepSum & \zsRepLin & \zsRepIndep & \zsRepLcs \\
 Contested premise counts less & \zsDoubtSum & \zsDoubtLin & \zsDoubtIndep & \zsDoubtLcs \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{LoCoBench increases satisfied} (\%)}\\
@@ -94,26 +87,27 @@ GPT-6, verifier's verdicts & \vfGptMinedWsumInc & \vfGptMinedLinInc & \vfGptMine
 right, each column adds one ingredient: the support/violation asymmetry ($\Llin$), the curvature of
 the per-relation evidence $\lambda_r$ ($\Lambda^{\perp}=\sum_r\lambda_r$), and the interaction
 $I_\R$ ($\LCS$). All four satisfy A1 and A3. The constructed edits hold or fail by definition; they
-show what each score encodes, not how accurate it is (\zsEqvN{} gold graphs, \zsDoubtN{} for the
-contested premise). Rows are read at the verdict world.}
+show what each score encodes, not how accurate it is (a repeated \emph{conflict} costs more each time
+under $\LCS$, \S\ref{sec:decomp}) (\zsEqvN{} gold graphs, \zsDoubtN{} for the
+contested premise). Rows are read at the verdict world; the GPT-6 row has one decimal to separate close values.}
 \label{tab:three}
 \end{table}
 
 \paragraph{Where the four scores differ.} With correct verdicts all four satisfy every gold
-increase (Table~\ref{tab:three}): each rung changes one relation's sign, and the interaction is
-small on these graphs (median $|I_\R|=\dcIGoldAbsMedian$ nats against $\dcLamGoldAbsMedian$ for
-$|\Lambda|$). \emph{The asymmetry decides the wrong-verdict case, at first order:} with 20\% of the
-verdicts flipped, $\Llin$, $\Lambda^{\perp}$ and $\LCS$ keep exactly the same increases, and $\Llin$
-beats $\Ssum$ by\asapCI{\vnDiffLWLoIncTwenty}{\vnDiffLWHiIncTwenty} points, a gain on \cp{conflict}
-and a cost on \cp{chain} (App.~\ref{app:results}); with a closed-book verifier's verdicts the four
-are within two points. \emph{On mined graphs no step helps:} exact McNemar tests of the three steps
-on the four mined arms, Holm-adjusted, find none at which the richer score is significantly better,
-and the only significant step is a loss, the curvature on gpt-oss graphs (\mcCurvOssB{} pairs
-against \mcCurvOssC, Holm $p=\mcCurvOssHolm$), where violations of high weight cost without bound.
-The interaction costs nominally on pairwise Llama (\mcInterPairLlamaB{} against
-\mcInterPairLlamaC); App.~\ref{app:decomp} traces cases, including a new refutation that the
-interaction discounts because it overlaps an inference from the same claim. \emph{On natural answers}, read at ExpertQA's expert verdicts
-\citep{expertqa}, the correlation with the number of mined relations falls along the chain
+increase (Table~\ref{tab:three}). Rung pairs differ by one or two relations, so any cost/support ratio
+between the linear 3 and the exact $\dcRatioOne$ signs the edits alike: the ladders exercise the
+asymmetry but hardly the curvature or the interaction, which is small on these graphs (median
+$|I_\R|=\dcIGoldAbsMedian$ nats against $\dcLamGoldAbsMedian$ for $|\Lambda|$). \emph{With injected
+verdict errors the asymmetry decides:} at 20\% flipped, $\Llin$, $\Lambda^{\perp}$ and $\LCS$ keep the
+same increases, and $\Llin$ beats $\Ssum$ by\asapCI{\vnDiffLWLoIncTwenty}{\vnDiffLWHiIncTwenty} points
+(a gain on \cp{conflict}, a cost on \cp{chain}). With a closed-book verifier's verdicts on mined graphs
+the four are within two points, with offsetting effects by type. \emph{On mined graphs no step is
+significantly better:} exact McNemar tests of the three steps on the four mined arms, Holm-adjusted,
+find none at which the richer score wins, and the only significant step is a loss. On gpt-oss graphs the
+curvature costs (\mcCurvOssB{} pairs against \mcCurvOssC, Holm $p=\mcCurvOssHolm$; by family
+\mcCurvOssFamB{} against \mcCurvOssFamC), because the convex cost turns a spurious conflict whose weight
+band drifts upward between rungs into a large loss (App.~\ref{app:decomp}). \emph{On ExpertQA's expert
+verdicts} \citep{expertqa}, the correlation with the number of mined relations falls along the chain
 ($\dcCountWsumNrel$, $\dcCountLinNrel$, $\dcCountIndepNrel$, $\dcCountLcsNrel$) because violations
 dominate; at the asserted world $\LCS$ correlates with the count at $\dcCountAssertedLcsNrel$.
 

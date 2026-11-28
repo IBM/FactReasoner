@@ -883,3 +883,147 @@ to the appendix, where it already is.
   conclusion and §3.2 caveats are condensed. Two related-work sentences are merged.
 - **Error found while trimming:** a condensed §3.2 sentence briefly attributed the Holm result to
   the judge; it now correctly refers to the signed sum.
+
+## 18. Fifth review (2026-11-28, after the trimming pass)
+
+Three fresh, independent reviewers on commit `cc2dccc2` (rendered pages provided), with no access to
+this file, HUMAN_STUDY.md, PREREG.md or `.claude/`; plus my checks. Length was excluded.
+- **Theory.** The theory reviewer re-verified every formal claim numerically: Prop. 1 on 3,000
+  random graphs (max error 2e-15); x*-independence of I_R; the two-relation sign rule (2,453 cases);
+  first-order expansion and second-order interaction; presentation invariance of Λ^lin for equal
+  halves; A2 holding only for Λ; all 12 McNemar and Holm values.
+- **Numbers.** The holistic reviewer recomputed the Voyager example by brute force. Every number any
+  reviewer checked matches its macro.
+
+### Scores
+
+| | Holistic | Theory and LoCoBench reviewer | Natural-text reviewer | **Mine** (4th review → now) |
+|---|---|---|---|---|
+| Soundness | 3 | 4 | 3.5 | 3 → **3** |
+| Excitement | 2.5 | – | – | 2.5 → **2.5** |
+| Overall | 2.5 (borderline Findings) | – | – | 2.5 → **2.5** (3 after A–B; 3–3.5 with C) |
+| Confidence | 4 | – | – | **4** |
+| Reproducibility | 3 | – | – | **3** |
+
+**What improved.**
+- The theory is now fully verified.
+- The attribution uses exact tests, and the chain makes the scores' differences explicit.
+- The reviewers call the reporting unusually candid.
+
+**Why the rating holds at 2.5.**
+- **Framing (critical, holistic).** The paper's own results favour Λ^lin over LCS on every mined
+  arm and end to end, yet the framing centres the MRF.
+- **New prose errors.** My rewrite and trimming introduced new errors (N42, N43, N45).
+- **Natural text.** The positive results are all at the asserted world, where LCS behaves like a
+  relation count.
+
+### New findings
+
+| # | Severity | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| N42 | **major (my error)** | **The I_R prose is wrong for conflicts.** I_R does not depend on x\*, so a positive I_R lowers Λ whatever the signs: overlapping *conflicts compound*. Repeated copies of a violated contradiction cost −2.33, −2.57, −2.59, −2.59 nats, without bound, while repeated supports saturate (+0.26, +0.02, +0.002). This affects §2.6 ("discounts relations whose forbidden assignments go together"), App. props "Saturation" (stated for supports in Prop. (vii), overgeneralized in the prose), the Conclusion ("discounts repetition") and Table 1's "Repetition counts less" row (supports only). For conflicts, LCS is *more* repetition-sensitive than Σ±. | theory reviewer | me |
+| N43 | **major (my error, trimming)** | **Two false §3.2 sentences.** (1) "The three simplifications behave like it on every row": on SummEval with a relation, Σ± is +0.00 [−0.08, +0.08] against LCS and Λ^lin at −0.18; the ChatProtect control is 11 against 3 falls. (2) "No paired difference with the signed sum survives Holm": ChatProtect 50:5, Holm p ≈ 1e-8. The original wording, "no difference *that could reflect contradictions*", is the u₀ artefact, and trimming dropped the qualifier. | natural-text reviewer | me |
+| N44 | major | **The SummEval mechanism is misattributed.** Λ^lin = −0.18 equals LCS and Σ± = +0.00, so the negative correlation comes from the first-order v-weighting (a satisfied equivalence, v = ½, earns twice an entailment), not from "counting a restatement as support", which Σ± does too. "Rewards repetition" (restatements between distinct claims) and "discounts repetition" (copies of one relation) must be separated. | natural-text reviewer | me (macros) |
+| N45 | **major (my error)** | **Wrong mechanism for the gpt-oss curvature loss.** The text says "violations of high weight cost without bound", but gpt-oss weights are bands ≤ 0.925. The cause is band drift of spurious conflicts between rungs (0.72 → 0.925), which the convex cost amplifies: Λ⊥ +1.25 nats against Λ^lin +0.15. The result survives family clustering (22 against 5 families, sign p = 0.0015). | theory reviewer | rev |
+| N46 | major | **Omissions in the abstract and Conclusion.** They omit the one Holm-significant result (the curvature loss). "Due entirely to the first-order asymmetry" holds only for injected errors; on GPT-6 graphs, 4 of the 7 Σ± wins turn at the interaction. "No step helps" is non-significance at tiny power on GPT-6 (the smallest attainable p is 0.5, 1, 0.125). The Llama asymmetry is 23:11, p = 0.058, bootstrap [0.0, 4.4]. | theory reviewer | me (macros) |
+| N47 | major | **"At first order" is close to guaranteed by the ladder design.** Every rung pair's gold graphs differ by 1–2 relations with three weights. At operating weights Λ ≈ Λ^lin is quantitatively poor (f076: Λ^lin +0.463 against Λ −2.102). Label it a small-weight expansion and say the ladders do not exercise curvature. | theory reviewer | rev |
+| N48 | major | **"The fall is guaranteed and checks the lemma end to end" overclaims.** LCS rises on 2 of the 97 found pairs: the versions are mined separately and u₀ moves (App. L.2 calls it a prediction, not an instance). The main text omits the false-alarm rate (12% of clean graphs), and "the judge falls too" undersells G-Eval (117 falls, 0 rises). | natural-text reviewer | rev |
+| N49 | major | **The world of the natural-text results is not stated.** The abstract, Intro and Conclusion don't say that every positive natural-text result is at the asserted world, where LCS ≈ relation count (ExpertQA ρ 0.83; ASAP LCS and count both +0.85 with the score). Every verdict-world reading failed or lacks a criterion. "What limits LCS is relation extraction and the verdicts" ignores the design limits (restatement credit, non-sequiturs). | natural-text reviewer | rev |
+| N50 | **critical (framing)** | **The paper's own results favour Λ^lin.** It is at least as good as LCS on every mined arm (98/86/81/78 against 97/84/79/75), ties on gold and noise, and wins end to end (91 vs 89); on incomparable pairs Σ± ≥ LCS. Λ^lin satisfies A1 and A3 and the first-order part of A2. The title and contributions still centre the MRF. **This is the authors' decision:** (a) recommend Λ^lin as the practical score, with Λ as its principled origin and the place where A2 lives; or (b) obtain human evidence for the interaction (Block A). | holistic reviewer | me (macros) |
+| N51 | major | **Guarantee coverage and invariance.** The theorem covers 393/120/38/38 of 540 pairs. Exact invariance is 52/5/1/1%. The abstract's 91 vs 52 sets a judge allowed "equal" against an exact tie (70% within τ). The 97% falls to 92% above τ. | holistic reviewer | macros |
+| N52 | major | **LoCoBench is close to the method.** The gate is defined in Λ; GPT-6.1 sits on the committee and GPT-6 mines. The abstract's 69% is on a 96-ladder subset where GPT-6 gets 95%. | holistic reviewer | macros |
+| N53 | minor (my errors) | **Contradictions with the paper's own results.** (1) Limitations "does not compare responses with different claim sets" contradicts §3.2's cross-response correlations. (2) The Conclusion credits presentation invariance to the interaction, though Λ^lin has it (the curvature breaks it and the interaction restores it), so "each column adds one ingredient" is not nested in properties. (3) The f124 example is cited right after the Llama result but comes from GPT-6. | holistic + theory reviewers | me |
+| N54 | minor | **"Within two points" (verifier) hides offsetting per-type effects** (mined: conflict +[0.6, 5.6], chain −[8.9, 1.1], sign −[5.6, 0.6]). "Real verdict errors reproduce the pattern of the injected ones" is too strong. | theory reviewer | macros |
+| N55 | minor | **Smaller items.** (1) "Forces two-valued tables": at a fixed x\* the result gives sign-definite tables. (2) 1,192 responses vs 476×3 is unexplained (rungs are shared). (3) §2.6 introduces the scores in a different order from Table 1, and 0.925 is not explained. (4) Write A2 as "depends on R only through P_R". (5) The dedup-sum description does not match the code. (6) The ExpertQA sensitivity text omits unlabelled claims, and Limitations omits the selection. (7) Ethics: the source article was also sent to APIs. (8) SummEval may be confounded between systems (16 systems). (9) ASAP: "full pipeline" wording, stratified sampling inflates correlations, and the analysis is not marked exploratory. (10) Fig. 2 and Table 1 use different decimals. | all | partly |
+
+### Fix plan
+
+- **A. Correct my errors (N42, N43, N45, N53).**
+  - I_R: state it as "discounts overlapping supports, compounds overlapping conflicts".
+  - Table 1 row: "repeated support counts less" (and add a "repeated conflict" row).
+  - Restore the two §3.2 sentences, with the ChatProtect u₀ caveat.
+  - Correct the curvature mechanism and add the family-clustered result.
+  - Fix the Conclusion's presentation-invariance and repetition sentences, and the Limitations
+    "claim sets" sentence.
+  - Move the f124 pointer.
+- **B. Claims (N44, N46–N49, N51, N54).**
+  - SummEval mechanism: first-order v-weighting.
+  - Abstract and Conclusion: mention the curvature loss, scope "entirely" to injected errors, write
+    "not significant" instead of "no step helps", and state the world of the natural-text results.
+  - Label the expansion and the ladder-design caveat.
+  - The contradiction-test caveat, false alarms and G-Eval counts.
+  - Abstract: the τ-robust figures and the 95% on the subset.
+  - Per-type verifier effects.
+- **C. Framing (N50, N52). The authors' decision.**
+  - (a) Present Λ^lin as the practical score and LCS as the principled model in which A2 holds.
+    The title stays, and the contributions say what the data support.
+  - (b) Keep LCS central and make the human study's Block A the test of the interaction. Block A
+    should then also include a repeated-conflict item.
+- **D. Minor (N55).**
+- **E. The human study**, as before.
+
+## 19. Changelog (2026-11-28): fixes from the fifth review (A, B, D; C option a)
+
+**A. My errors.**
+- **N42.** I_R is stated correctly in §2.6: overlapping supports earn less and overlapping conflicts
+  cost more, so repeated support saturates and a repeated violation compounds. The App. props
+  saturation item is corrected; Table 1's row reads "repeated support counts less", with a caption
+  note; the Conclusion says the interaction "compounds repeated conflicts".
+- **N43.** The §3.2 sentences are corrected: "behave like LCS on most rows; exceptions noted", and
+  the Holm sentence is restored ("that could reflect the contradictions"), with the ChatProtect
+  50:5 u₀ caveat.
+- **N45.** The curvature-loss mechanism is now the drift of weight bands under convex cost, with a
+  new family-clustered sign test (`arr_phaseb.py paired`, macros `mc*Fam*`): 5 against 22
+  families, p = 0.002.
+- **N53.** The Conclusion no longer credits presentation invariance to the interaction. The
+  Limitations "claim sets" sentence is reworded as the guarantee's scope. The f124 pointer is
+  placed with the GPT-6 discussion.
+
+**B. Claims.**
+- **N44.** SummEval is attributed to the first-order v-weighting (Λ^lin −0.18 = LCS; Σ± +0.00);
+  "rewards restating a claim".
+- **N46.**
+  - The abstract and Conclusion mention the curvature loss.
+  - "Due entirely" is scoped to injected errors, and the headline is "no step is significantly
+    better".
+  - The GPT-6 power caveat is moved to App. H.
+- **N47.**
+  - The ladder-design caveat is in §3.1 ("exercise the asymmetry, hardly the curvature or the
+    interaction").
+  - Eq. 6 is labelled Λ = Λ^lin + O(p²); App. H says the expansion is numerically poor at the
+    operating weights.
+- **N48.** The fall is "predicted rather than guaranteed", with the false-alarm rate (12%) and
+  G-Eval 117/0.
+- **N49.** The world of the natural-text results is stated in the abstract, Intro, §3.2 and
+  Conclusion. "What limits the score" now includes the restatement credit and the absence of a
+  relevance model.
+- **N51.** The abstract reports 92% beyond τ and invariance 91% against 70% within τ.
+- **N52.** The abstract gives 69% on the subset where GPT-6 gets 95%. Limitations: the gate is
+  defined in Λ, and GPT-6.1 sits on the committee while GPT-6 mines.
+- **N54.** Per-type verifier effects; "resemble the injected errors on conflict and chain, but
+  also cost on sign".
+
+**C, option (a).**
+- **§2.6** ends with the recommendation: Λ^lin is the practical score, and LCS is the model it
+  approximates, where A2 holds.
+- **Abstract, Intro bullets 1–2 and Conclusion** recommend Λ^lin in practice. The title is
+  unchanged.
+- **Limitations, Computation:** "the recommended linear evidence needs no Z_R".
+
+**D. Minor.**
+- "Forces sign-definite tables (two-valued if it must hold whatever the verdicts)".
+- "Distinct responses (ladders share rungs)".
+- §2.6 introduces the scores in Table 1's order and explains 0.925 (the strong band).
+- A2 reads "depending on R only through P_R and π".
+- The dedup description matches the code.
+- ExpertQA: unlabelled claims in the sensitivity text; the selection is in Limitations.
+- Ethics: the source article and the external texts were sent to model APIs.
+- ASAP: the world, the stratified-sampling inflation and "exploratory" are stated.
+- Table 1's decimals are explained.
+- Not done: the SummEval between-system check (N55-8), which needs a new analysis.
+
+**Length.** The fixes added text; a second trimming pass brings the end of the main text back to
+half-way down page 9's first column:
+- §2.1, §2.3, §2.5 and the Lemma, Theorem and MRF prose are condensed;
+- the §3.1 setup, data and mined paragraphs, and related work, are tightened.
+The build is clean.

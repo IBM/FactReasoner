@@ -25,11 +25,10 @@ $\xs_i$ is the response's own stance: $1$ if it asserts claim $i$, $0$ if it den
 two the \emph{verdict world} and the \emph{asserted world}, respectively.
 \end{definition}
 
-Any decompose-then-verify pipeline can supply verdict polarity: the labels of FActScore
-\citep{factscore}, SAFE \citep{safe} or VeriScore \citep{veriscore}, or FactReasoner's posteriors
-\citep{factreasoner} thresholded at $\frac12$. All responses over the same claims are then judged
-against one world. The two polarities coincide when a response asserts exactly the supported claims
-and denies the rest, as both Voyager responses do in Figure~\ref{fig:voyager}, namely: $\xs=(1,1,1,0,0)$.
+Any decompose-then-verify pipeline can supply verdict polarity \citep{factscore,safe,veriscore}, or
+FactReasoner's posteriors \citep{factreasoner} thresholded at $\frac12$, so responses over the same
+claims are judged against one world. The polarities coincide when a response asserts exactly the
+supported claims, as both Voyager responses do ($\xs=(1,1,1,0,0)$).
 
 We further assume that every claim $a_i$ has a prior probability $\pi_i\in(0,1)$, with
 $\pi(x)=\prod_i\pi_i^{x_i}(1-\pi_i)^{1-x_i}$. Label-only factuality pipelines give flat or uniform priors,
@@ -78,9 +77,9 @@ multisets $\Rsup$ and $\Rcon$, with $\R=\Rsup\uplus\Rcon$. Relations with $V=\va
 factor and are dropped.
 \end{definition}
 
-A contradiction between two truths is a conflict,
-but between a truth and a falsehood it is a support ($+$), since it refutes the falsehood. An entailment
-from a truth to a falsehood is a conflict ($-$). For example, Response~B in Figure~\ref{fig:voyager} has $\Rsup=\{a_1\Rightarrow a_2,\
+A contradiction between two truths is a conflict, but between a truth and a falsehood a support,
+since it refutes the falsehood; an entailment from a truth to a falsehood is a conflict. Response~B in
+Figure~\ref{fig:voyager} has $\Rsup=\{a_1\Rightarrow a_2,\
 a_3\con a_5\}$ and $\Rcon=\{a_2\con a_3,\ a_1\Rightarrow a_4\}$, while all of Response~A's relations are supports.
 The sign depends only on the verdicts, so an inference between two false claims counts as a
 support: whether premises are true is the factuality score's job.
@@ -94,13 +93,12 @@ In practice, the relations are estimated from the response. A relation's weight 
 p_r=c_r\cdot g_r,\qquad c_r,g_r\in[0,1],
 \label{eq:decomp}
 \end{equation}
-clipped to at most $1-10^{-6}$. For our purpose, we develop two relation miners. A \emph{pairwise} miner evaluates candidate
-claim pairs within a local window, estimating $c_r$ from label-token probabilities and $g_r$ from 
-a \texttt{Yes}/\texttt{No} judgment \citep{kadavath}. Alternatively, a \emph{graph-level} miner extracts 
-all relations expressed in a response, together with their sense, direction, and strength, in a single call. 
-Using $k=5$ samples, it retains relations identified by a strict majority; $c_r$ is the corresponding vote share, 
-and $g_r$ is obtained from the predicted strength band. Both miners aim to recover only relations 
-explicitly asserted by the response (see App.~\ref{app:estimation} for details).
+clipped to at most $1-10^{-6}$. A \emph{pairwise} miner scores claim pairs within a local window, with $c_r$ from label-token
+probabilities and $g_r$ from a \texttt{Yes}/\texttt{No} judgment \citep{kadavath}; a \emph{graph-level}
+miner extracts all relations, with sense, direction and strength, in one call. 
+Over $k=5$ samples it keeps relations found by a strict majority, with $c_r$ the vote share and $g_r$
+from the strength band. Both miners recover only relations the response asserts
+(App.~\ref{app:estimation}).
 
 
 
@@ -127,10 +125,8 @@ The resulting distribution over worlds is:
 where $Z_\R=\sum_{x\in\{0,1\}^n}\pi(x)\prod_{r\in\R}\psi_r(x_{e_r})$ is the partition function
 that normalizes the distribution, a sum over all $2^n$ worlds that equals the prior expectation
 $\E_\pi\bigl[\prod_{r\in\R}\psi_r\bigr]$.
-Intuitively, each relation acts as an independent constraint on a candidate world. 
-If the world satisfies the relation, the relation leaves its probability unchanged; 
-if the world violates the relation, its probability is reduced by a factor of $1-p_r$. 
-Consequently, worlds that satisfy more of the argument's stated relations receive greater probability mass.
+Each relation leaves a world that satisfies it unchanged and multiplies the probability of one that
+violates it by $1-p_r$.
 
 % Keep it commented out for rebuttal (reviewers may ask for it, but it is not needed in the main text).
 % This construction also gives the key property needed for our monotonicity results.
@@ -156,7 +152,7 @@ amount, counting an addition or a deletion as a change from or to weight $0$.
 % Edits that improve one part of an argument and degrade another stay unranked. 
 
 For a fixed $\xs$, we require a score $S(\R;\pi)$ to be \textbf{(A1) monotone},
-$\R'\scoh\R\Rightarrow S(\R')>S(\R)$ for every $\pi$; \textbf{(A2) MRF-grounded}, a functional of
+$\R'\scoh\R\Rightarrow S(\R')>S(\R)$ for every $\pi$; \textbf{(A2) MRF-grounded}, depending on $\R$ only through
 $\PR$ and $\pi$; and \textbf{(A3) neutral}, with $S(\varnothing;\pi)$ independent of $\pi$. A1
 and A3 alone admit simpler scores such as a signed sum of weights; A2, a modeling choice, makes
 relations interact through $Z_\R$ (App.~\ref{app:why}).
@@ -201,9 +197,8 @@ $\log\frac{1-p_r}{1-p_rq_r}<0$ for a conflict, strictly when $p_r>0$.
 \end{lemma}
 
 The lemma is the virtual-evidence update \citep{pearl1988,chan2005}, and the MRF a Markov logic
-network \citep{mln} with clause weights $-\log(1-p_r)$; what is new is the reading at $\xs$. A relation's effect
-depends on the context in magnitude, through $q_r$, but not in sign. Every elementary improvement
-is one addition, deletion or weight change, so the main result follows.
+network \citep{mln} with clause weights $-\log(1-p_r)$; what is new is the reading at $\xs$. A relation's effect depends on the context in magnitude, through $q_r$, but not in sign, so the main
+result follows.
 
 \begin{theorem}[Monotonicity]
 \label{thm:mono}
@@ -212,10 +207,9 @@ if $\R'\coh\R$ then $\LCS(\R')\ge\LCS(\R)$, and if $\R'\scoh\R$ then $\LCS(\R')>
 same holds for $\Lambda$.
 \end{theorem}
 
-The proof does not use the fact that scopes are pairs. The theorem ranks the Voyager pair: A is
-reached from B by deleting B's two conflicts and adding the supports $a_2\Rightarrow a_3$ and
-$a_2\con a_4$, and it scores $\LCS=\vyALCS$ against $\vyBLCS$. The shared refutation $a_3\con a_5$
-adds $\vyADFour$ nats (natural-log units) to $\Lambda$ in A but only $\vyBDFour$ in B, where $a_2\con a_3$ has already made $a_3$
+The proof does not use the fact that scopes are pairs. It ranks the Voyager pair (A is reached from B
+by elementary improvements; $\LCS=\vyALCS$ against $\vyBLCS$), and the shared refutation $a_3\con a_5$
+adds $\vyADFour$ nats to $\Lambda$ in A but only $\vyBDFour$ in B, where $a_2\con a_3$ has made $a_3$
 less probable.
 
 \subsection{Per-Relation Evidence and Interaction}
@@ -233,30 +227,31 @@ $I_\R=\log Z_\R-\sum_r\log(1-p_rv_r)$. $I_\R$ is a sum over the connected compon
 relation graph, so it vanishes when no two relations share a claim.
 \end{proposition}
 
-$\lambda_r$ is Lemma~\ref{lem:edit} with no other relation present ($q_r=v_r$). $I_\R$ depends only
-on the priors and the graph, not on $\xs$; for two relations its sign is that of
-$\pi(V_1\cap V_2)-v_1v_2$ (App.~\ref{app:proof-score}). It discounts relations whose forbidden
-assignments go together (a repeated relation; $a\Rightarrow b$ beside $a\con w$, which also forbids
-$a=1$) and amplifies those that exclude each other (a chain $c\Rightarrow a\Rightarrow b$; the two
-halves of an equivalence). Since the verdicts do not enter it, refuting a falsehood by citing $a$
-($a\con c$, $c$ false) also discounts the other inferences drawn from $a$ (\S\ref{sec:limitations}).
+$\lambda_r$ is Lemma~\ref{lem:edit} with no other relation present. $I_\R$ depends only on the priors
+and the graph, not on $\xs$; for two relations its sign is that of $\pi(V_1\cap V_2)-v_1v_2$
+(App.~\ref{app:proof-score}). When the forbidden assignments go together (a repeated relation;
+$a\Rightarrow b$ beside $a\con w$) $I_\R>0$, so supports earn less, a repeated support saturating, and
+conflicts cost more, a repeated violation compounding; when they exclude each other (a chain; the two
+halves of an equivalence) the reverse holds. Since the verdicts do not enter it, refuting a
+falsehood by citing $a$ also discounts the inferences drawn from $a$ (\S\ref{sec:limitations}).
 
-\paragraph{A hierarchy of simpler scores.} To first order in the weights the interaction vanishes and
-$\lambda_r$ is $p_rv_r$ for a support and $-p_r(1-v_r)$ for a conflict, so
+\paragraph{A hierarchy of simpler scores.} For small weights the interaction vanishes and
+$\lambda_r$ is $p_rv_r$ for a support and $-p_r(1-v_r)$ for a conflict, so $\Lambda=\Llin+O(p^2)$ with
 \begin{equation}
-\Lambda\approx\Llin=\sum_{r\in\Rsup}p_rv_r-\sum_{r\in\Rcon}p_r(1-v_r).
+\Llin=\sum_{r\in\Rsup}p_rv_r-\sum_{r\in\Rcon}p_r(1-v_r).
 \label{eq:llin}
 \end{equation}
-Three $O(|\R|)$ scores, all satisfying A1 and A3, each drop one ingredient of $\Lambda$: the
-\emph{independent evidence} $\Lambda^{\perp}=\sum_r\lambda_r$ drops the interaction (it treats
-relations as separate evidence, as naive Bayes does); the \emph{linear evidence} $\Llin$ also drops
-the curvature of $\lambda_r$ but keeps the asymmetry (a violated \ent{} costs $(1-v_r)/v_r=3$ times
-what a satisfied one earns, $\dcRatioOne$ times exactly at $p_r=\dcP$); and the \emph{signed weight
-sum} $\Ssum=\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$, which is $2\Llin$ with every $v_r=\frac12$, also drops
-the asymmetry. $\Llin$ is linear in the factor tables, so a constraint split into two halves of equal
-weight scores as the whole, but it counts a repeated relation in full and ignores contested premises;
-only $\Lambda$ satisfies A2. Table~\ref{tab:three} sets the four side by side and
-Figure~\ref{fig:decomp} (App.~\ref{app:decomp}) illustrates them.
+Three $O(|\R|)$ scores satisfying A1 and A3 add the ingredients of $\Lambda$ one at a time: the
+\emph{signed weight sum} $\Ssum=\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ ($2\Llin$ with every $v_r=\frac12$) has
+none; the \emph{linear evidence} $\Llin$ adds the asymmetry (a violated \ent{} costs three times what a
+satisfied one earns); and the \emph{independent evidence} $\Lambda^{\perp}=\sum_r\lambda_r$ adds the
+curvature (the ratio is $\dcRatioOne$ at $p_r=\dcP$, the strong band), treating relations as separate
+evidence as naive Bayes does. $\Llin$ scores a constraint split into halves of equal weight as the
+whole; the curvature breaks this and the interaction restores it, and only $\Lambda$ satisfies A2. On
+LoCoBench $\Llin$ is at least as accurate as $\LCS$ on every arm and on natural text the two cannot be
+told apart (\S\ref{sec:experiments}), so we recommend $\Llin$ in practice; $\LCS$ is the model it
+approximates, in which A2 holds and redundant and contested evidence are treated exactly
+(Table~\ref{tab:three}; Figure~\ref{fig:decomp}, App.~\ref{app:decomp}).
 
 % App.~\ref{app:props} shows that the result rests on two choices that cannot be changed,
 % sign-definite tables and the committed world as the readout, and collects further properties of

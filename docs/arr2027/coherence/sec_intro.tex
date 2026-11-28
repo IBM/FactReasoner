@@ -38,19 +38,19 @@ factuality metrics. %We further show that LCS is strictly monotone under every c
 In summary, our contributions are:
 
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
-\item \textbf{A score with guarantees} (\S\ref{sec:framework}). LCS is strictly monotone under every
-coherence-improving edit, for any priors and relation graph; within product MRFs read by a
-single-world log-ratio this forces two-valued tables and the committed world as the readout
-(App.~\ref{app:why}). It splits into per-relation evidence and an interaction term, and to first
-order it is a linear score that charges violations more than it credits supports
-(\S\ref{sec:decomp}).
+\item \textbf{A score with guarantees, and its linearization} (\S\ref{sec:framework}). LCS is strictly
+monotone under every coherence-improving edit, for any priors and relation graph; within product MRFs
+read by a single-world log-ratio this forces sign-definite tables, two-valued if the guarantee must
+hold whatever the verdicts, and the committed world as the readout (App.~\ref{app:why}). It splits
+into per-relation evidence and an interaction term, and its first-order expansion, the linear
+evidence, charges violations more than it credits supports (\S\ref{sec:decomp}).
 \item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). LCS rises on
-\sThreeGraphGptLamIncPct\% of the declared increases with GPT-6-mined graphs and on
-\subLlamaLcsInc\% with a weaker miner. A signed sum does as well or slightly better on mined graphs
-and worse with injected verdict errors, entirely through the first-order asymmetry. Judges rating
-one response at a time do not see added valid inferences; a pairwise judge given the verdicts trails
-LCS slightly on increases and keeps far more invariances.
-\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). Scores of mined relations do
-not track rated discourse coherence, fall when a detected contradiction is added, and track essay
-quality beyond length about as well as a relation count.
+\sThreeGraphGptLamIncPct\% of the declared increases with GPT-6-mined graphs. The linear evidence is at
+least as accurate on every mined arm, and neither the curvature nor the interaction of the full model
+is significantly better anywhere, so we recommend the linear evidence in practice. Judges rating one
+response at a time do not see added valid inferences; a pairwise judge given the verdicts trails LCS
+slightly on increases and keeps far more invariances.
+\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). Read with every claim taken as
+asserted, scores of mined relations do not track rated discourse coherence, fall when a detected
+contradiction is added, and track essay quality beyond length about as well as a relation count.
 \end{itemize}

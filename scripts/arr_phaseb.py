@@ -142,6 +142,21 @@ def mcnemar_exact(A_, B_, group):
     return b, c, p
 
 
+def family_sign(A_, B_, group):
+    """Family-clustered sign test: families whose net discordance favours A, favours B, exact p."""
+    import math
+    from collections import defaultdict as dd
+    keys = [k for k in A_ if k in B_ and (group is None or A_[k]["type"] in group)]
+    net = dd(int)
+    for k in keys:
+        net[A_[k]["family"]] += int(bool(A_[k]["ok"]) and not B_[k]["ok"]) - int(bool(B_[k]["ok"]) and not A_[k]["ok"])
+    b = sum(v > 0 for v in net.values())
+    c = sum(v < 0 for v in net.values())
+    n = b + c
+    p = min(1.0, 2 * sum(math.comb(n, i) for i in range(min(b, c) + 1)) / 2 ** n) if n else 1.0
+    return b, c, p
+
+
 def pfmt(p):
     """A p-value for running text and tables: three decimals, or m x 10^-k below 0.001."""
     if p >= 1e-3:
@@ -156,6 +171,7 @@ def cmd_paired(args):
     inc, inv = set(E.INCREASE), set(E.INVARIANCE)
     out = {}
     mc = {}
+    fs = {}
     for arm, tag in (("graph_gpt6", "Gpt"), ("graph_gptoss", "Oss"), ("pair_gptoss", "PairOss"),
                      ("pair_llama", "PairLlama")):
         L, W = _rows(d, arm, "lambda"), _rows(d, arm, "wsum")
@@ -174,6 +190,7 @@ def cmd_paired(args):
             for name, (X_, Y_) in (("Asym", (Ln, W)), ("Curv", (I, Ln)), ("Inter", (L, I)),
                                    ("Total", (L, W))):
                 mc[(name, tag)] = mcnemar_exact(X_, Y_, inc)
+                fs[(name, tag)] = family_sign(X_, Y_, inc)
         if Dd:
             out[f"LcsDsumInc{tag}"] = paired_ci(L, Dd, inc)
     L = _rows(d, "graph_gpt6", "lambda")
@@ -206,6 +223,10 @@ def cmd_paired(args):
             if (name, tag) in holm:
                 Lm.append(f"\\newcommand{{\\mc{name}{tag}Holm}}{{{pfmt(holm[(name, tag)])}}}")
         Lm.append(f"\\newcommand{{\\mcFamily}}{{{m}}}")
+        for (name, tag), (b, c, pv) in fs.items():
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}FamB}}{{{b}}}")
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}FamC}}{{{c}}}")
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}FamP}}{{{pfmt(pv)}}}")
         open(args.macros, "w").write("\n".join(Lm) + "\n")
         print(f"wrote {args.macros}")
     return 0

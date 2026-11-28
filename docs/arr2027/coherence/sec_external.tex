@@ -50,31 +50,36 @@ on natural text labeled for related properties (Table~\ref{tab:external}). Claim
 (atomized claims for the essays) and relations come from the GPT-6 graph-level miner. Except where
 stated, $\LCS$ is read at the asserted world, where every inference is a support and every
 contradiction a conflict, so these tests exercise how the score combines mined relations; brackets
-give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. $\LCS$'s three simplifications behave like it on every row. At the verdict world, ContraDoc's test fixed in advance failed ($p=\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}).
+give 95\% bootstrap intervals, and the tests fixed before mining are in Table~\ref{tab:ext-plan}. Every positive result below is at the asserted world, where $\LCS$ behaves much like a count of
+mined relations; at the verdict world, ContraDoc's test fixed in advance failed
+($p=\extCdVerdEdgePGpt$; App.~\ref{app:ext-further}). The simplifications behave like $\LCS$ on most
+rows (Table~\ref{tab:external}); the exceptions are noted below.
 
-\paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only the relations that constrain
-truth values (App.~\ref{sec:notions}). This is a discriminant check, which a constant score would
-also pass; it shows only what the score is not. On SummEval \citep{summeval} it correlates with expert
+\paragraph{Not a proxy for discourse coherence.} $\LCS$ reads only relations that constrain truth values (App.~\ref{sec:notions}); this discriminant
+check, which a constant would pass, shows only what the score is not. On SummEval \citep{summeval} it correlates with expert
 coherence ratings at $\extSeRhoCohGpt$ \asapCI{\extSeRhoCohGptLo}{\extSeRhoCohGptHi}, against
 $\extSeJudgeRhoCoh$ for G-Eval; \extSeEmptyGpt\% of these three-sentence summaries have no relation,
 and on the rest the correlation is negative, $\extSeNonEmptyRhoCohGpt$
-\asapCI{\extSeNonEmptyRhoCohGptLo}{\extSeNonEmptyRhoCohGptHi}. Restatements drive it (exploratory): a
-restatement is consistent, so $\LCS$ counts it as support, but raters penalize the redundancy, and
-their number correlates with rated coherence at $\extSeCountRestateRhoCohGpt$. Without them $\LCS$
-correlates at $\extSeNoRestateNonEmptyRhoCohGpt$, no more than the number of inferences
-($\extSeCountInfRhoCohGpt$). $\LCS$ thus rewards repetition.
+\asapCI{\extSeNonEmptyRhoCohGptLo}{\extSeNonEmptyRhoCohGptHi}. Restatements drive it (exploratory): raters penalize the redundancy (their number correlates with
+rated coherence at $\extSeCountRestateRhoCohGpt$), while a restatement is an equivalence, which the
+first-order weights credit twice an inference ($v_r=\frac12$ against $\frac14$). $\Llin$ shows the same
+$\extSeLinNonEmptyRhoCohGpt$ and the signed sum, which credits both alike, $\extSeWsumNonEmptyRhoCohGpt$.
+Without restatements $\LCS$ correlates at $\extSeNoRestateNonEmptyRhoCohGpt$, no more than the number of
+inferences ($\extSeCountInfRhoCohGpt$). $\LCS$ thus rewards restating a claim.
 
-\paragraph{Detected conflicts lower the score.} With every claim true, adding a contradiction
-lowers $\Lambda$ (Lemma~\ref{lem:edit}), so where the miner finds one the fall is guaranteed and
-checks the lemma end to end:
+\paragraph{Detected conflicts lower the score.} With every claim true, adding a contradiction lowers $\Lambda$ (Lemma~\ref{lem:edit}); the two versions
+are mined separately, so the fall is predicted rather than guaranteed:
 $\LCS$ falls on \extCdAssertEdgeDecGpt{} of \extCdAssertEdgeNGpt{} ContraDoc pairs
 \citep{contradoc} and on all \extCpFoundFallGpt{} ChatProtect pairs \citep{mundler2024} (median
 change $\extCdEffFoundMedianGpt$ and $\extCpEffFoundMedianGpt$). Over all pairs it falls far more often than it rises, also by document and topic (App.~\ref{app:ext-contra}), and a consistent sentence raises it (\extCpCtlIncGpt{} rises, \extCpCtlDecGpt{} falls). Missed
 contradictions barely move it (on ContraDoc \extCdAssertNotFoundDecGpt{} falls against
 \extCdAssertNotFoundIncGpt{} rises), so recall bounds the result: the miner finds
 \extCdRecallInsertGpt\% of ContraDoc's inserted contradictions (\extCdRecallGpt\% over all edits) and
-\extCpConfStrongGpt\% of ChatProtect's. The simplifications behave alike (no paired difference with the signed sum survives Holm, an
-absence of evidence rather than an equivalence), and the judge falls too.
+\extCpConfStrongGpt\% of ChatProtect's, and \extCdFpGpt\% of clean ContraDoc graphs contain a
+contradiction. No paired difference with the signed sum that could reflect the contradictions survives Holm; on
+ChatProtect $\LCS$ falls alone more often (\extCpMcAllOnlyLcsGpt{} against \extCpMcAllOnlySumGpt) because
+the added claim changes the prior of the committed world (App.~\ref{app:ext-contra}). G-Eval falls on
+\extCdJudgeDec{} ContraDoc pairs and never rises.
 
 \paragraph{Order.} Mined twice per text in one run, $\LCS$ moves slightly more under paragraph
 permutation than under re-mining (90\% intervals of the difference in mean change: LoCoBench
@@ -85,13 +90,13 @@ test-retest ICC \extLmIccLcsAllGpt{} and \extSecIccLcsAllGpt{} (judge \extLmIccJ
 re-judged. Those falls need not be instability: G-Eval rates discourse coherence, which permuting paragraphs is meant to damage. The order tests fixed in advance failed for $\LCS$ too (Table~\ref{tab:ext-plan}; App.~\ref{app:ext-order}).
 
 \paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
-\citep{crossley2025asap}, rated 1--6 by trained raters, with the full pipeline.
+\citep{crossley2025asap}, rated 1--6 by trained raters, from atomized claims and mined relations at the asserted world;
+sampling 20 essays per score level inflates every correlation, and the analysis is exploratory.
 Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correlation of
 \asapParLcsAsserted{} \asapCI{\asapParLcsAssertedLo}{\asapParLcsAssertedHi} once length is removed
 (\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), the relation count
 \asapParRelations, the signed sum \asapParWsumAsserted{} and G-Eval \asapParJudgeGevalGptSixSol, with no
 difference resolved: the essay signal is carried by mined relations in general, not by how
-$\LCS$ combines them. A grader prompted with the rubric on a 0--100
-scale does better (\asapParJudgeRubricOneZeroZeroGptSixSol), yet $\LCS$ keeps \asapPwrhLcsAsserted{}
-\asapCI{\asapPwrhLcsAssertedLo}{\asapPwrhLcsAssertedHi} after length and the grader; it is not
-resolvably better than the bare relation count (one prompt, one miner; App.~\ref{app:asap}).
+$\LCS$ combines them. A rubric-prompted 0--100 grader does better (\asapParJudgeRubricOneZeroZeroGptSixSol); $\LCS$ keeps
+\asapPwrhLcsAsserted{} after length and the grader, not resolvably more than the relation count
+(App.~\ref{app:asap}).
