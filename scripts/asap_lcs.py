@@ -434,6 +434,7 @@ def score_rows(tag, arm):
                       "wsum": float(wsum),
                       # Lambda without its interaction term (coherence paper Sec. 2.6)
                       "indep": A.independent_evidence([0.5] * n, rels, X[w]),
+                      "lin": A.linear_evidence([0.5] * n, rels, X[w]),
                       "conflicts": len(rels) - sup, "width": ex["max_induced_width"],
                       "largest": max(ex["component_sizes"] or [0])}
         for name, sc in base.items():
@@ -455,6 +456,7 @@ def analyze(rows):
         metrics[f"conflicts_{w}"] = (lambda w: lambda r: r[w]["conflicts"])(w)
         metrics[f"wsum_{w}"] = (lambda w: lambda r: r[w].get("wsum", float("nan")))(w)
         metrics[f"indep_{w}"] = (lambda w: lambda r: r[w].get("indep", float("nan")))(w)
+        metrics[f"lin_{w}"] = (lambda w: lambda r: r[w].get("lin", float("nan")))(w)
     names = sorted({k for r in rows for k in r.get("baselines", {})})
     for b in names:
         metrics[b] = (lambda b: lambda r: r.get("baselines", {}).get(b, float("nan")))(b)
@@ -516,7 +518,7 @@ def analyze(rows):
         if len(RR) < 10:
             continue
         ctl2 = lambda S, J2=J2: [[r["words"] for r in S], [r["baselines"][J2] for r in S]]  # noqa: E731
-        for k in ("lcs_asserted", "relations", "wsum_asserted", "indep_asserted"):
+        for k in ("lcs_asserted", "relations", "wsum_asserted", "indep_asserted", "lin_asserted"):
             f = metrics[k]
             v = partial_spearman([f(r) for r in RR], sc(RR), ctl2(RR))
             lo, hi = boot_ci(lambda S, f=f, ctl2=ctl2: partial_spearman([f(r) for r in S], sc(S), ctl2(S)), RR)

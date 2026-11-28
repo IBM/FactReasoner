@@ -698,3 +698,166 @@ model and set beside LCS, and the paper says exactly where the two differ.
     ±p_r/2 terms of Σ±; (b) I_R for every LoCoBench response; (c) Λ⊥ against Σ±, whose bands are
     the number of violated relations.
   - **Macros:** signed `\dc` macros are now `\ensuremath`, so minus signs print correctly in text.
+
+## 15. Fourth review (2026-11-28, after the decomposition)
+
+Three fresh, independent reviewers on commit `bfc451b5`, with no access to this file,
+HUMAN_STUDY.md, PREREG.md or `.claude/`; plus my own checks. The page limit was excluded by the
+authors' instruction. The theory reviewer re-checked Prop. 1 numerically on 400 random graphs with
+random priors and found no error. Every number checked by any reviewer matches its macro.
+
+### Scores
+
+| | Holistic | Theory and LoCoBench reviewer | Natural-text reviewer | **Mine** (3rd review → now) |
+|---|---|---|---|---|
+| Soundness | 3 | 3.5 | 3.5 | 3 → **3** |
+| Excitement | 2.5 | – | – | 3 → **2.5** |
+| Overall | 2.5 (borderline Findings) | – | – | 3 → **2.5** (3 once A–F below are done) |
+| Confidence | 4 | – | – | **4** |
+| Reproducibility | 3 | – | – | **3** |
+
+**What improved.**
+- The decomposition is correct and clarifying (Prop. 1).
+- Presenting the sum beside LCS, with an explicit attribution, is more honest than "the sum does
+  slightly better".
+- All figures and tables carry both simplifications.
+
+**Why the rating fell.**
+- **The new summary text overclaims in four places (N27–N30), all of them mine.**
+- **The decomposition undercuts the MRF's empirical case (N28).** A v-weighted *linear* sum,
+  Σ_sup p·v − Σ_con p(1−v), reproduces LCS exactly wherever LCS beats the signed sum, and matches
+  Λ⊥ on mined graphs (I verified this). LCS's measured advantage is therefore first-order
+  asymmetry, which an O(|R|) score has. Neither the curvature of λ_r nor the interaction through
+  Z_R earns a significant gain anywhere.
+- **The value of the interaction now rests entirely on design principles, which the human study
+  has to test.**
+
+### New findings
+
+| # | Severity | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| N27 | **major (my error)** | **Attribution overclaims.** "The weights account for every LoCoBench difference from the signed sum" (Limitations) and "a difference the decomposition traces to the per-relation weights" (Intro) are false: 4 of the 7 GPT-6 pairs that Σ± wins come from the interaction. "The interaction helps on no LoCoBench pair" (§3.1, Conclusion) holds only for GPT-6. | LCS-only vs Λ⊥-only right, by arm: GPT-6 0:4; graph gpt-oss 8:5; pair gpt-oss 13:12; pair Llama 6:18 (exact p = 0.023) | me (eval.json) |
+| N28 | **major (my error)** | **"Σ± is the linear, interaction-free approximation" is wrong** (abstract, Intro, Conclusion, App. props "makes the comparison exact"). The first-order term is p·v for a support and −p(1−v) for a conflict, already 1:3 asymmetric for ent/con/cnc (v = ¼); Σ±/2 is this only with v = ½. **The v-weighted linear sum reproduces LCS** under verdict noise (q = 0.05/0.1/0.2: 93.2/86.5/74.1 for LCS, Λ⊥ and the linear sum, against 92.0/84.3/70.5 for Σ±) and Λ⊥ on GPT-6 graphs (97.8). Fig. decomp(a)'s ±p/2 lines reinforce the misreading. | holistic + theory reviewers; my run of the linear sum | me |
+| N29 | **major (my error)** | **f205 is misreported.** Σ± *falls* by 0.001 (6.476 → 6.475; "6.48 = 6.48" is rounding), so "Σ± ties" is wrong. Of LCS's +0.25-nat rise, about 90% comes from −ΔI_R (+0.225) and +0.023 from Λ⊥, yet the paper presents it as a case of "the weights at work": the attribution rule is a sign test at a 1e-10 relative tie and ignores magnitude. The sum's example is restricted to weight-decided cases, so no interaction-driven loss of LCS is shown, although those are the majority. | theory reviewer; values from arr_decomp.py | me |
+| N30 | major | **The wrong-verdict advantage depends on the type mix, and the abstract generalizes it.** At q = 0.2: conflict +11.4 to +13.8 points, chain −2.8 to −1.2, net +2.5 to +4.6 under a 1:1:1 mix. End to end (verifier, mined graphs), LCS − Σ± is [−3.3, +0.2], with LCS behind on chain [−8.9, −1.1] and sign [−5.6, −0.6]. "Worse at wrong verdicts" holds only for injected flips on gold graphs. | all three | macros |
+| N31 | major | **Sparse discordance: the bootstrap intervals are anti-conservative.** LCS − Λ⊥ on GPT-6, [−1.5, −0.2], rests on 0:4 discordant pairs (exact McNemar p = 0.125); LCS − Σ± [−2.2, −0.2] on 1:7 (p = 0.070). There is no multiplicity control over the many arm × type × q intervals. | theory reviewer | me |
+| N32 | major | **The Limitations sentence "Every natural-text test reads the asserted world" is false.** It ignores ExpertQA (expert verdicts), ContraDoc at the verdict world (H2a′ and the paired design), the ChatProtect sweep and ASAP's three worlds. It also hides that, wherever the verdict reading was tested on natural text, it failed or did not help (H2a′ 54/43, p = 0.31; ASAP strict +0.35 against asserted +0.50). | natural-text reviewer | me |
+| N33 | major | **The ExpertQA claim is specific to the verdict world and to the verdict convention.** At the asserted world LCS correlates with the relation count at 0.83 (Σ± 0.97). With unsure claims counted true, it is 0.23 (Σ± 0.73); with answers containing an unsure claim dropped (n = 73), 0.17 / 0.72. The gap itself is robust: ρ(Σ±) − ρ(LCS) = [0.47, 0.74]. At the verdict world LCS tracks minus the number of violations (ρ = −0.87), and the pool is selected for an incorrect claim. Nothing shows that "not counting relations" is desirable, so the Conclusion's general claim needs a qualifier. | natural-text reviewer + my sensitivity runs | me |
+| N34 | major | **The natural-text properties do not separate LCS from any relation-based score.** ASAP after length: LCS +0.50, Λ⊥ +0.45, Σ± +0.46, count +0.44, G-Eval +0.44; LCS − count +0.06 [−0.04, +0.15]. After the grader, the count still keeps +0.29. On contradictions Σ± and Λ⊥ behave alike. The abstract attributes these results to LCS. | natural-text reviewer | macros |
+| N35 | major | **"Not a proxy for discourse coherence" is a discriminant test only.** A constant would pass it. On summaries with a relation, ρ = −0.18 [−0.26, −0.10] (+0.31 without restatements). H1d is judged on its point estimate. The abstract omits that the score rewards repetition. | natural-text reviewer | rev |
+| N36 | major | **The order comparison with G-Eval is unfair.** G-Eval's coherence rubric rewards organization, so it *should* react to paragraph permutation. τ = 0.01 is below the judge's smallest step (1/12), so "kept" means identical ratings. The judge's ICC is higher on ContraDoc (0.96 vs 0.84). H1a and H1c failed and the main text does not say so. | natural-text reviewer | rev |
+| N37 | major | **Construct.** LCS measures material consistency with the verdicts: a planted non-sequitur raises LCS on 92% of pairs, a valid inference on 95%. **I_R does not depend on x\*.** It is the prior dependence of the relations' violation events (for two relations, its sign is that of P(V₁∩V₂) − v₁v₂), so the "contested premise" discount also applies when the contesting relation is a support at x\*. Example: a⇒b plus a⊥c with c false, I = +0.081; refuting a falsehood by citing a discounts every inference from a. Whether that is desirable is never argued. | theory reviewer; definitional | me |
+| N38 | minor | **Table 2's constructed-edit rows (100 vs 0) are definitional** but sit beside the empirical rows as "% passing". | theory + holistic | – |
+| N39 | minor (my error) | **"LCS alone has a unit, a bounded range with strict monotonicity"** is wrong: σ(Λ⊥) has both, and Table 2 gives Λ⊥ the unit nats. Only A2 separates them. | theory + holistic | me |
+| N40 | minor | **Smaller issues.** (1) ExpertQA claims are labelled by *one* expert per answer. (2) The appendix mentions "the human study's natural-text block", which conflicts with the Ethics statement "collects no new human data". (3) ExpertQA is missing from the data and licence table. (4) ASAP terms and de-identification are not stated. (5) The 97/97 "sign rule holds" sentence is true by construction but is presented as a validation. (6) "Detected conflicts lower the score" is near-tautological on the found subset. (7) The invariance tie rules differ between LCS and the judge; report Inv_τ (70% vs 91%) in the main text. (8) Notation is dense; consider a notation box. | natural-text + holistic | partly |
+| N41 | minor | **Novelty is moderate.** Λ is the MLN gain at x\* under virtual evidence, and monotonicity is near-definitional. Glass/Olsson-type coherence measures and epistemic probabilistic argumentation are compared only briefly. | holistic | – |
+
+### Fix plan
+
+- **A. Correct my errors (N27–N29, N39).** Text only, plus `arr_decomp.py`:
+  - Restate the attribution arm by arm, using the exact McNemar counts.
+  - Replace "linear, interaction-free approximation" with "Σ± is the linearization with every v_r
+    set to ½"; fix Fig. decomp(a).
+  - Attribute f205 by magnitude (ΔΛ = ΔΛ⊥ − ΔI_R) and report Σ±'s fall exactly.
+  - Make the example rule symmetric: one interaction-decided and one weight-decided case each way.
+  - Drop "LCS alone has a unit / bounded range".
+- **B. Add the v-weighted linear sum as the cheapest member of the hierarchy (N28).**
+  - Run it everywhere Λ⊥ is reported: ladders on all arms, noise, verifier, ExpertQA, ASAP,
+    Table 2 and Figure 2.
+  - Reframe §2.6 and §3.1: "every measured advantage of LCS over Σ± is first-order asymmetry; the
+    curvature and the interaction never earn a significant gain on our data; their value is design
+    (A2, repetition, contested premise)".
+  - This is the honest version of the decomposition story, and it keeps the decomposition as the
+    contribution.
+- **C. Statistics (N31).**
+  - Exact McNemar beside every paired bootstrap whose discordant pairs are few (say under 20).
+  - Holm over the decomposition family.
+  - Give q = 0.05 and 0.1 in the main text.
+- **D. Wrong verdicts (N30).** Per-type results in §3.1 (the conflict gain, the chain cost); the
+  end-to-end verifier null in the abstract.
+- **E. Natural text (N32–N36).**
+  - Correct the Limitations sentence and report where the verdict reading was tested and failed.
+  - ExpertQA: state the world, the convention sensitivity and the CI; qualify or drop the
+    Conclusion claim.
+  - Abstract: attribute the essay and contradiction results to mined relations generally.
+  - SummEval: report the negative ρ and the restatement effect in the abstract.
+  - Order: give the judge-construct caveat and the τ granularity; state the H1a/H1c failures.
+- **F. Construct (N37).**
+  - State that I_R depends only on the priors and the graph, and give the two-relation covariance
+    rule.
+  - Discuss the "refutation discounts the premise's inferences" case, either as a design choice
+    with an argument or as a limitation.
+- **G. Presentation (N38, N40).**
+  - Move the constructed edits into a "by construction" block.
+  - ExpertQA: "an expert", no human-study mention until it is reported, a row in the data table.
+  - ASAP terms; Inv_τ in the main text; a notation box.
+- **H. The human study** (critical, as before): Block A's repetition, presentation and premise-doubt
+  items now decide the value of the interaction term. Consider adding a "refutation discounts the
+  premise" item (F).
+
+## 16. Changelog (2026-11-28): fixes from the fourth review
+
+**A. My errors.**
+- **N27, attribution.** It is now stated arm by arm, with exact McNemar tests: "helps on no pair"
+  and "the weights account for every difference" are gone.
+- **N28, linearization.**
+  - Σ± is described as the linearization with every v set to ½.
+  - The new linear evidence Λ^lin = Σ_sup p·v − Σ_con p(1−v) is the first-order expansion of Λ
+    itself (proof in the appendix).
+  - Fig. decomp(a) shows the tangents.
+- **N29, f205.** The examples now follow a symmetric rule and are described by magnitude along the
+  chain (ΔΛ^lin, curvature, interaction); f205 reads "Σ± −0.001, Λ^lin −3×10⁻⁴, curvature +0.023,
+  interaction +0.225".
+- **N39, "LCS alone has a unit / bounded range".** Removed: what separates LCS is A2.
+
+**B. The chain Σ± → Λ^lin → Λ⊥ → LCS everywhere.**
+- **Where it is reported:** the ladders (all arms), noise, the verifier, Z-stress, the external
+  checks, ASAP, Table 2 (now four columns), the full-width signed-baseline table, Figure 2 and
+  Fig. decomp(c) (Λ^lin vs Σ±).
+- **Findings:**
+  - The asymmetry is first order: Λ^lin = Λ⊥ = LCS under verdict noise (74/74/74 vs 71 at
+    q = 0.2), with the curvature and interaction steps at [0, 0].
+  - Λ^lin passes the presentation tests (100%) and fails repetition and contested premise, which
+    are second-order interaction effects.
+  - On mined arms no step is significantly better after Holm. The only Holm-significant step is a
+    *loss*: the curvature on gpt-oss graphs, 5:24, p = 5.5×10⁻⁴, Holm 0.007.
+  - Λ^lin is the best of the four on both pairwise arms (435/540, 421/540) and end to end (91% vs
+    89–90%).
+
+**C. Statistics.** Exact McNemar tests and Holm over the 12 tests (3 steps × 4 arms), in a new full-width
+table (`tab:mcnemar`, `arr_phaseb.py paired`). The text says the bootstraps are anti-conservative when
+discordance is sparse.
+
+**D. Wrong verdicts.** Per type in §3.1 (conflict gain, chain cost) and the verifier null; the
+abstract now says "with injected verdict errors on gold graphs".
+
+**E. Natural text.**
+- **Limitations:** the "every natural-text test reads the asserted world" sentence is corrected,
+  with the verdict-world failures.
+- **ExpertQA:** "at the verdict world only", with the convention sensitivity, the asserted-world
+  value and the CI.
+- **Abstract, introduction and conclusion:** the natural-text results are attributed to mined
+  relations in general.
+- **SummEval:** described as a discriminant check only.
+- **Contradictions:** the fall is called guaranteed by Lemma 1, the missed pairs are reported, and
+  the Holm result is "absence of evidence".
+- **Order:** the G-Eval construct caveat, the 1/12 step and the H1a/H1c failures.
+- **The 97/97 sentence:** described as a check of the implementation, not evidence.
+
+**F. Construct.** §2.6 states that I_R depends only on the priors and the graph, gives the two-relation
+covariance rule (proof in the appendix) and the refutation-discount consequence, with f124-SIGN as
+an observed case (§3.1, Limitations).
+
+**G. Presentation.**
+- The constructed edits now sit in a "by construction" block.
+- ExpertQA: one expert per answer, no mention of a human study, a row in the data table.
+- The ASAP licence sentence; Inv_τ (70%) beside 52% in the main text.
+- A notation table (App. B); a −0.000 artefact fixed.
+
+**Not done.**
+- **H, the human study.** Adding a "refutation discounts the premise" item to Block A is still open.
+- **Length.** The main text now ends at the top of page 11 (it was the end of page 9); trimming is
+  the next step.
+
+Every existing macro value is unchanged (checked by diff for numbers_slot3, phaseb_noise,
+phaseb_paired, verifier, zstress, ext and asap).

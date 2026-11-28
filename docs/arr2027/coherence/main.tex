@@ -78,6 +78,8 @@
 \newcommand{\LCS}{\mathrm{LCS}}
 % The signed weight sum (Sec. 2.6); W is Good's weight of evidence (App. app:woe).
 \newcommand{\Ssum}{\Sigma_{\pm}}
+% The linear evidence, the first-order expansion of Lambda (Sec. 2.6).
+\newcommand{\Llin}{\Lambda^{\mathrm{lin}}}
 \newcommand{\coh}{\succeq}
 \newcommand{\scoh}{\succ}
 \newcommand{\cp}[1]{\textsc{#1}}
@@ -134,19 +136,24 @@
   \emph{Logical Coherence Score} (LCS), the weight of evidence that the relations lend to the truth
   values a factuality pipeline assigns.
   We prove that LCS is strictly monotone under every coherence-improving edit, for any priors and
-  relation graph, and that it splits into per-relation evidence and an interaction term, of which a
-  signed sum of relation weights is the linear, interaction-free approximation.
+  relation graph, and that it splits exactly into per-relation evidence and an interaction between
+  relations that share claims. To first order it is a linear score in which a violated relation
+  costs several times what a satisfied one earns; a signed sum of relation weights is that score
+  with the asymmetry removed.
   On LoCoBench, a benchmark that holds claims fixed while varying only
   their relational structure, LCS on GPT-6-mined graphs rises on \sThreeGraphGptLamIncPct\% of the
   declared increases (\subLlamaLcsInc\% with a weaker miner outside the benchmark's vendors). The
-  signed sum does slightly better there and worse at wrong verdicts, where LCS gains from its
-  per-relation weights: a violation costs several times what a satisfied relation earns. LLM judges rating one response
-  at a time rise and fall about equally often when the only edit is an added valid inference, while
-  a judge comparing two responses, given their verdicts, matches LCS on increases and keeps far
-  more of the invariances (\fjPairVInvTie\% against \sThreeGraphGptLamInvPct\%). On existing
-  human-labeled data, LCS is not a proxy for rated discourse coherence, falls when a detected
-  contradiction is added, and tracks the quality of student essays beyond their length and a
-  rubric-prompted grader.
+  signed sum does as well or slightly better on mined graphs. With injected verdict errors on gold
+  graphs it does worse, and the first-order asymmetry alone accounts for the difference; with a
+  real verifier's verdicts the scores are indistinguishable, and no ingredient beyond the asymmetry
+  is significantly better on any mined arm.
+  LLM judges rating one response at a time rise and fall about equally often when the only edit is
+  an added valid inference, while a judge comparing two responses, given their verdicts, trails
+  LCS on increases (LCS ahead by \pcLcsPairVInc{} points) and keeps far more of the invariances
+  (\fjPairVInvTie\% against \sThreeGraphGptLamInvPct\%). On existing human-labeled data, scores
+  of mined relations, LCS among them, do not track rated discourse coherence (LCS rewards the
+  restatements raters penalize), fall when a detected contradiction is added, and track the quality
+  of student essays beyond their length about as well as a bare count of relations.
 \end{abstract}
 
 

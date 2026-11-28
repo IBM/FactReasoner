@@ -94,6 +94,12 @@ def indep_sum(n, rels, x=None):
     return A.independent_evidence([0.5] * n, rels, x)
 
 
+def lin_sum(n, rels, x=None):
+    """The linear evidence: first-order expansion of Lambda (Sec. 2.6), flat priors."""
+    x = x if x is not None else [1] * n
+    return A.linear_evidence([0.5] * n, rels, x)
+
+
 def mean_abs_diff_ci(A_, B_, n=BOOT, seed=SEED):
     """PAIRED group bootstrap of mean|d|(A) - mean|d|(B): A_ and B_ map each family to its |d|
     values, and families are resampled jointly, since permutation and noise comparisons share
@@ -452,6 +458,7 @@ def check1(args):
             rows.append({"group": x["expected"]["family_id"], "lcs": lcs_at(x["num_atoms"], r)[0],
                          "wsum": signed_sum(x["num_atoms"], r),
                          "indep": indep_sum(x["num_atoms"], r),
+                         "lin": lin_sum(x["num_atoms"], r),
                          "lcs_norestate": lcs_at(x["num_atoms"],
                                                  [q for q in r if q[2] != "equivalence"])[0],
                          "empty": not r, "n_ent": kinds["entailment"], "n_eqv": kinds["equivalence"],
@@ -486,7 +493,8 @@ def check1(args):
             g = lambda S, c=col: spearman([r[c] for r in S], [r["coherence"] for r in S])  # noqa: E731
             out[f"count_{key}_rho_coherence"] = g(NE)
             out[f"count_{key}_rho_coherence_ci"] = boot(g, grouped(NE, "group"))
-        for key, col in (("wsum", "wsum"), ("indep", "indep"), ("norestate", "lcs_norestate")):
+        for key, col in (("wsum", "wsum"), ("indep", "indep"), ("lin", "lin"),
+                         ("norestate", "lcs_norestate")):
             g = lambda S, c=col: spearman([r[c] for r in S], [r["coherence"] for r in S])  # noqa: E731
             out[f"{key}_rho_coherence"] = g(rows)
             out[f"{key}_rho_coherence_ci"] = boot(g, groups)
@@ -589,6 +597,7 @@ def check2(args):
                    "verdict_b": lcs_at(b["num_atoms"], rb, xb)[0], "edge_on_evidence": bool(on_ev),
                    "wsum_a": signed_sum(a["num_atoms"], ra), "wsum_b": signed_sum(b["num_atoms"], rb),
                    "indep_a": indep_sum(a["num_atoms"], ra), "indep_b": indep_sum(b["num_atoms"], rb),
+                   "lin_a": lin_sum(a["num_atoms"], ra), "lin_b": lin_sum(b["num_atoms"], rb),
                    "paired_verdict_b": lcs_at(b["num_atoms"], rp, xb)[0],
                    "paired_asserted_b": lcs_at(b["num_atoms"], rp)[0],
                    "spot": (spot.get(a["id"]) or {}).get("majority"),
@@ -619,6 +628,7 @@ def check2(args):
                "verdict_edge": counts(edge, "verdict"), "asserted_edge": counts(edge, "asserted"),
                "wsum": counts(pairs, "wsum"), "wsum_edge": counts(edge, "wsum"),
                "indep": counts(pairs, "indep"), "indep_edge": counts(edge, "indep"),
+               "lin": counts(pairs, "lin"), "lin_edge": counts(edge, "lin"),
                "paired_verdict_edge": counts([dict(r, pv_a=r["verdict_a"], pv_b=r["paired_verdict_b"]) for r in edge], "pv"),
                "paired_asserted_edge": counts([dict(r, pa_a=r["asserted_a"], pa_b=r["paired_asserted_b"]) for r in edge], "pa"),
                "paired_verdict_all": counts([dict(r, pv_a=r["verdict_a"], pv_b=r["paired_verdict_b"]) for r in pairs], "pv"),
@@ -744,6 +754,7 @@ def check3(args):
                 row["d0"] = lcs_at(d0["num_atoms"], R0)[0]
                 row["w1"], row["w0"] = signed_sum(d1["num_atoms"], R), signed_sum(d0["num_atoms"], R0)
                 row["i1"], row["i0"] = indep_sum(d1["num_atoms"], R), indep_sum(d0["num_atoms"], R0)
+                row["l1"], row["l0"] = lin_sum(d1["num_atoms"], R), lin_sum(d0["num_atoms"], R0)
             rows.append(row)
             nf = d1["expected"].get("nonfactual")
             if nf in ("none", "1", "2", "both") and conflict:
@@ -789,6 +800,8 @@ def check3(args):
         out["wsum_found"] = split([r for r in S if r["conflict"]], "w0", "w1")
         out["indep"] = split(S, "i0", "i1")
         out["indep_found"] = split([r for r in S if r["conflict"]], "i0", "i1")
+        out["lin"] = split(S, "l0", "l1")
+        out["lin_found"] = split([r for r in S if r["conflict"]], "l0", "l1")
         fl = lambda R: [dict(r, lf=r["d1"] < r["d0"] - TIE, wf=r["w1"] < r["w0"] - TIE) for r in R]  # noqa: E731
         out["mcnemar_falls"] = mcnemar(fl(S), "lf", "wf")
         out["cluster_asserted"] = cluster_sign(S, lambda r: r["topic"], lambda r: r["d1"] - r["d0"])
@@ -803,6 +816,7 @@ def check3(args):
                                 "found_both_false": sum(1 for r in VW if r["conflict"] and r["nfv"] == "both")}
         out["wsum_control"] = split(C, "w0", "w1")
         out["indep_control"] = split(C, "i0", "i1")
+        out["lin_control"] = split(C, "l0", "l1")
         out["effect"] = {k: {"mean": st.mean(r["d1"] - r["d0"] for r in R),
                              "median": st.median(r["d1"] - r["d0"] for r in R), "n": len(R)}
                          for k, R in (("found", [r for r in S if r["conflict"]]),
@@ -1116,7 +1130,8 @@ def write_macros(ev, path):
             m(f"MtNoiseMean{tag}", f"{mt['noise_floor']['lcs']['mean_abs']:.3f}")
         d = c1.get(f"1d:{arm}")
         if d and "wsum_rho_coherence" in d:
-            for key, kt in (("wsum", "Wsum"), ("indep", "Indep"), ("norestate", "NoRestate")):
+            for key, kt in (("wsum", "Wsum"), ("indep", "Indep"), ("lin", "Lin"),
+                            ("norestate", "NoRestate")):
                 if f"{key}_rho_coherence" not in d:
                     continue
                 m(f"Se{kt}RhoCoh{tag}", f2(d[f"{key}_rho_coherence"]))
@@ -1126,7 +1141,8 @@ def write_macros(ev, path):
         x = c2.get(f"2:{arm}")
         if x and "wsum" in x:
             for k_, kt in (("wsum", "Wsum"), ("wsum_edge", "WsumEdge"), ("indep", "Indep"),
-                           ("indep_edge", "IndepEdge"), ("asserted_notfound", "AssertNotFound")):
+                           ("indep_edge", "IndepEdge"), ("lin", "Lin"), ("lin_edge", "LinEdge"),
+                           ("asserted_notfound", "AssertNotFound")):
                 if k_ not in x:
                     continue
                 m(f"Cd{kt}Dec{tag}", x[k_]["decrease"])
@@ -1163,7 +1179,8 @@ def write_macros(ev, path):
             for k_, kt in (("control_noncontradictory", "Ctl"), ("asserted_found", "Found"),
                            ("asserted_notfound", "NotFound"), ("wsum", "Wsum"), ("wsum_control", "WsumCtl"),
                            ("wsum_found", "WsumFound"), ("indep", "Indep"), ("indep_control", "IndepCtl"),
-                           ("indep_found", "IndepFound")):
+                           ("indep_found", "IndepFound"), ("lin", "Lin"), ("lin_control", "LinCtl"),
+                           ("lin_found", "LinFound")):
                 if k_ not in y:
                     continue
                 m(f"Cp{kt}Dec{tag}", y[k_]["decrease"])

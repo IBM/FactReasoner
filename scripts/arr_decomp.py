@@ -41,6 +41,7 @@ import arr_coherence_eval as A  # noqa: E402
 import arr_slot3_eval as E  # noqa: E402
 import asap_lcs as S  # noqa: E402
 
+SEED = 20261128
 P = 0.925  # the strong band's midpoint, the weight of most gold relations
 
 
@@ -71,7 +72,11 @@ def figure(scat, path):
                          (0.5, RAMP[2], r"EQV, EXC ($v_r=1/2$)")):
         ax.plot(p, -np.log(1 - p * v), color=col, lw=1.6, zorder=3, label=name)
         ax.plot(p, np.log(1 - p) - np.log(1 - p * v), color=col, lw=1.6, ls=(0, (3, 2)), zorder=3)
-    ax.plot(p, p / 2, color=MUTED, lw=1.0, ls=":", zorder=2, label=r"$\pm p_r/2$ (the terms of $\Sigma_{\pm}$)")
+        # the linear evidence: the tangents at p = 0
+        ax.plot(p, p * v, color=col, lw=0.8, ls="-.", zorder=2)
+        ax.plot(p, -p * (1 - v), color=col, lw=0.8, ls="-.", zorder=2)
+    ax.plot([], [], color=INK, lw=0.8, ls="-.", label=r"tangents: $p_rv_r$, $-p_r(1-v_r)$ ($\Lambda^{\mathrm{lin}}$)")
+    ax.plot(p, p / 2, color=MUTED, lw=1.0, ls=":", zorder=2, label=r"$\pm p_r/2$ ($\Sigma_{\pm}/2$: $v_r=\frac{1}{2}$ for all)")
     ax.plot(p, -p / 2, color=MUTED, lw=1.0, ls=":", zorder=2)
     ax.axhline(0, color=GRID, lw=0.8, zorder=1)
     ax.set_xlim(0, 1.0)
@@ -101,18 +106,16 @@ def figure(scat, path):
             color=MUTED, va="top")
     ax.text(lo, -0.97 * top, "$I_{\\mathcal{R}}<0$: relations reinforce", fontsize=6,
             color=MUTED, va="bottom")
-    # (c): what the weights change
+    # (c): what the first-order asymmetry changes
     ax = axes[2]
     for tag, col, lab in (("Gold", GOLD, "gold graphs"), ("Gpt", MINED, "graph-level miner, GPT-6")):
         pts = np.array(scat[tag])
-        ax.scatter(pts[:, 2], np.maximum(pts[:, 0], lo), s=5, color=col, alpha=0.5, lw=0, zorder=3,
-                   label=lab)
+        ax.scatter(pts[:, 2], pts[:, 3], s=5, color=col, alpha=0.5, lw=0, zorder=3, label=lab)
     ax.axhline(0, color=GRID, lw=0.8, zorder=1)
     ax.axvline(0, color=GRID, lw=0.8, zorder=1)
-    ax.set_ylim(lo - 0.3, 4.5)
     ax.set_xlabel(r"$\Sigma_{\pm}$ (sum of $\pm p_r$)")
-    ax.set_ylabel(r"$\Lambda^{\perp}$ (nats)")
-    ax.set_title(r"(c) the weights: $\Lambda^{\perp}$ against $\Sigma_{\pm}$", fontsize=7.5,
+    ax.set_ylabel(r"$\Lambda^{\mathrm{lin}}$ (nats)")
+    ax.set_title(r"(c) the asymmetry: $\Lambda^{\mathrm{lin}}$ against $\Sigma_{\pm}$", fontsize=7.5,
                  color=INK, loc="left")
     ax.legend(fontsize=5.8, frameon=False, loc="lower right", markerscale=2.2, handletextpad=0.3)
     fig.savefig(path)
@@ -133,7 +136,8 @@ def three(n, g, x):
     lam = A.confirmation(pu, g, x)
     ind = A.independent_evidence(pu, g, x)
     ws = float(sum(p * (1 if A.is_support((s, t, ty, p), x) else -1) for s, t, ty, p in g))
-    return {"lcs": A.lcs_flat(lam, n), "lam": lam, "indep": ind, "I": ind - lam, "wsum": ws}
+    return {"lcs": A.lcs_flat(lam, n), "lam": lam, "indep": ind, "I": ind - lam, "wsum": ws,
+            "lin": A.linear_evidence(pu, g, x)}
 
 
 def main() -> int:
@@ -163,12 +167,12 @@ def main() -> int:
                              ("gpt6", {i: tup(r) for i, r in mined.items()}, "Gpt")):
         T = [three(len(items[i]["atoms"]), g, world(items[i])) for i, g in graphs.items()
              if i in items]
-        SCAT[tag] = [(t["indep"], t["lam"], t["wsum"]) for t in T]
+        SCAT[tag] = [(t["indep"], t["lam"], t["wsum"], t["lin"]) for t in T]
         # The bands of the figure's panel (c): at the same signed sum, each further violated
-        # relation lowers Lambda_perp (residual of a linear fit of Lambda_perp on the sum).
+        # relation lowers the linear evidence (residual of a linear fit on the sum).
         keys = [i for i in graphs if i in items]
         nviol = np.array([sum(not A.is_support(r, world(items[i])) for r in graphs[i]) for i in keys])
-        xs_, ys_ = np.array([t["wsum"] for t in T]), np.array([t["indep"] for t in T])
+        xs_, ys_ = np.array([t["wsum"] for t in T]), np.array([t["lin"] for t in T])
         res_ = ys_ - np.polyval(np.polyfit(xs_, ys_, 1), xs_)
         for k, word in enumerate(("Zero", "One", "Two", "Three")):
             if (nviol == k).any():
@@ -176,6 +180,8 @@ def main() -> int:
         M[f"Band{tag}Corr"] = f"{np.corrcoef(res_, nviol)[0, 1]:.2f}"
         M[f"Rho{tag}IndepLam"] = f"{S.spearman([t['indep'] for t in T], [t['lam'] for t in T]):.2f}"
         M[f"Rho{tag}WsumIndep"] = f"{S.spearman([t['wsum'] for t in T], [t['indep'] for t in T]):.2f}"
+        M[f"Rho{tag}WsumLin"] = f"{S.spearman([t['wsum'] for t in T], [t['lin'] for t in T]):.2f}"
+        M[f"Rho{tag}LinIndep"] = f"{S.spearman([t['lin'] for t in T], [t['indep'] for t in T]):.2f}"
         I = [t["I"] for t in T]
         M[f"I{tag}AbsMedian"] = f"{st.median(np.abs(I)):.2f}"
         M[f"I{tag}AbsPninety"] = f"{np.percentile(np.abs(I), 90):.2f}"
@@ -187,103 +193,171 @@ def main() -> int:
         M[f"I{tag}Neg"] = f"{100 * np.mean(np.array(I) < -1e-9):.0f}"
         M[f"I{tag}Pos"] = f"{100 * np.mean(np.array(I) > 1e-9):.0f}"
         print(src, "I_R", M[f"I{tag}Median"], M[f"I{tag}Pninety"], M[f"I{tag}AbsSmall"])
-    # ---- attribution on the GPT-6 graphs (all increase rung pairs, the ladders' tie rule)
+    # ---- attribution on the GPT-6 graphs (all increase rung pairs, the ladders' tie rule). The
+    # chain sum -> lin -> indep -> LCS adds one ingredient per step: the asymmetry, the curvature,
+    # the interaction. A disagreement between the sum and LCS is attributed to the step after which
+    # every later score decides as LCS does.
+    CHAIN = ("wsum", "lin", "indep", "lcs")
+    STEP = {1: "Asym", 2: "Curv", 3: "Inter"}
     rows = []
     for lad in ladders:
         if lad["type"] not in E.INCREASE or any(i not in mined for i in lad["item_ids"]):
             continue
         V = [three(len(items[i]["atoms"]), tup(mined[i]), world(items[i])) for i in lad["item_ids"]]
         for i, j in itertools.combinations(range(3), 2):
-            ok = {k: E.pair_ok(lad["type"], V[i][k], V[j][k], E.REL_TIE, True)
-                  for k in ("lcs", "indep", "wsum")}
+            ok = {k: E.pair_ok(lad["type"], V[i][k], V[j][k], E.REL_TIE, True) for k in CHAIN}
             rows.append({"ladder": lad["ladder_id"], "pair": (i, j), "ok": ok, "V": (V[i], V[j]),
                          "ids": (lad["item_ids"][i], lad["item_ids"][j])})
     M["AttrPairs"] = len(rows)
-    for k in ("lcs", "indep", "wsum"):
+    for k in CHAIN:
         M[f"Attr{k.title()}"] = f"{100 * np.mean([r['ok'][k] for r in rows]):.1f}"
+
+    def decisive(r):
+        last = r["ok"]["lcs"]
+        k = 3
+        while k > 0 and r["ok"][CHAIN[k - 1]] == last:
+            k -= 1
+        return STEP.get(k)
+
     dis = [r for r in rows if r["ok"]["lcs"] != r["ok"]["wsum"]]
+    for r in dis:
+        r["step"] = decisive(r)
     sum_w = [r for r in dis if r["ok"]["wsum"]]
     lcs_w = [r for r in dis if r["ok"]["lcs"]]
     M["AttrDisagree"] = len(dis)
     M["AttrSumWins"] = len(sum_w)
     M["AttrLcsWins"] = len(lcs_w)
-    # a disagreement comes from the interaction term if sum_r lambda_r sides with the signed sum
-    # (the weights agree with it), from the weights if it sides with LCS
-    M["AttrSumWinsInteraction"] = sum(r["ok"]["indep"] == r["ok"]["wsum"] for r in sum_w)
-    M["AttrSumWinsWeights"] = sum(r["ok"]["indep"] == r["ok"]["lcs"] for r in sum_w)
-    M["AttrLcsWinsInteraction"] = sum(r["ok"]["indep"] == r["ok"]["wsum"] for r in lcs_w)
-    M["AttrLcsWinsWeights"] = sum(r["ok"]["indep"] == r["ok"]["lcs"] for r in lcs_w)
+    for who, R_ in (("Sum", sum_w), ("Lcs", lcs_w)):
+        for st_ in STEP.values():
+            M[f"Attr{who}Wins{st_}"] = sum(r["step"] == st_ for r in R_)
     print("attribution", {k: v for k, v in M.items() if k.startswith("Attr")})
 
-    # ---- examples. Rule: among the disagreements won by each score, the one whose two graphs
-    # differ in the fewest relations (ties broken by ladder id); for the signed sum, among those
-    # decided by the weights (the case the text explains).
+    # ---- examples. Rule (symmetric): for each winner and each decisive step that occurs, the
+    # disagreement whose two graphs differ in the fewest relations (ties by ladder id). Each is
+    # described by magnitude along the chain: the change in Lambda splits into the change in the
+    # linear evidence, the curvature (d indep - d lin) and the interaction (-d I).
     def ndiff(r):
         a, b = (set(tup(mined[i])) for i in r["ids"])
         return len(a ^ b)
 
-    def pick(cands):
-        return min(cands, key=lambda r: (ndiff(r), r["ladder"], r["pair"])) if cands else None
-
-    ex = {"Lcs": pick(lcs_w),
-          "Sum": pick([r for r in sum_w if r["ok"]["indep"] == r["ok"]["lcs"]])}
+    ex = {}
+    for who, R_ in (("Sum", sum_w), ("Lcs", lcs_w)):
+        for st_ in STEP.values():
+            c = [r for r in R_ if r["step"] == st_]
+            if c:
+                ex[f"{who}{st_}"] = min(c, key=lambda r: (ndiff(r), r["ladder"], r["pair"]))
+    M["ExList"] = ", ".join(sorted(ex))
     for tag, r in ex.items():
-        if r is None:
-            continue
         a, b = r["V"]
         M[f"Ex{tag}Ladder"] = r["ladder"].replace("-", "--")
-        M[f"Ex{tag}Type"] = r["ladder"].split("-")[1].lower()
         M[f"Ex{tag}RungA"], M[f"Ex{tag}RungB"] = r["pair"]
-        for k, f in (("lcs", "{:.3f}"), ("wsum", "{:.2f}"), ("indep", "{:.2f}"), ("I", "{:+.2f}")):
+        for k, f in (("lcs", "{:.3f}"), ("wsum", "{:.3f}"), ("lin", "{:.3f}"), ("indep", "{:.3f}"),
+                     ("I", "{:+.3f}"), ("lam", "{:.3f}")):
             M[f"Ex{tag}{k.title()}A"] = f.format(a[k])
             M[f"Ex{tag}{k.title()}B"] = f.format(b[k])
+        d = {k: b[k] - a[k] for k in ("wsum", "lin", "indep", "lam", "I")}
+
+        def sg(v):  # a signed change; below 5e-4 in scientific notation, so it never reads 0.000
+            if v != 0 and abs(v) < 5e-4:
+                m_, e_ = f"{v:.0e}".split("e")
+                return f"{m_}\\times10^{{{int(e_)}}}"
+            return f"{v:+.3f}"
+        M[f"Ex{tag}DWsum"] = sg(d["wsum"])
+        M[f"Ex{tag}DLin"] = sg(d["lin"])
+        M[f"Ex{tag}DCurv"] = sg(d["indep"] - d["lin"])
+        M[f"Ex{tag}DInter"] = sg(-d["I"])
+        M[f"Ex{tag}DLam"] = sg(d["lam"])
         ga, gb = (set(tup(mined[i])) for i in r["ids"])
         x = world(items[r["ids"][1]])
         n = len(x)
-        added = sorted(gb - ga)
-        removed = sorted(ga - gb)
-        print(tag, r["ladder"], r["pair"], {k: (a[k], b[k]) for k in ("lcs", "wsum", "indep", "I")})
-        print("   added", [(s, t, ty, p, A.is_support((s, t, ty, p), x)) for s, t, ty, p in added])
-        print("   removed", removed)
-        M[f"Ex{tag}Added"] = len(added)
+        added, removed = sorted(gb - ga), sorted(ga - gb)
+        M[f"Ex{tag}Added"], M[f"Ex{tag}Removed"] = len(added), len(removed)
         M[f"Ex{tag}NA"], M[f"Ex{tag}NB"] = len(ga), len(gb)
-        M[f"Ex{tag}By"] = "weights" if r["ok"]["indep"] == r["ok"]["lcs"] else "interaction"
-        M[f"Ex{tag}Removed"] = len(removed)
-        if tag == "Sum":
-            sup = [q for q in added if A.is_support(q, x)]
-            viol = [q for q in added if not A.is_support(q, x)]
-            if len(sup) == 1 and len(viol) == 1:
-                pu = np.full(n, 0.5)
-                M["ExSumSupP"] = f"{sup[0][3]:.3f}"
-                M["ExSumViolP"] = f"{viol[0][3]:.3f}"
-                M["ExSumViolType"] = viol[0][2]
-                M["ExSumSupGain"] = f"{A.relation_evidence(pu, sup[0], x):.2f}"
-                M["ExSumViolCost"] = f"{-A.relation_evidence(pu, viol[0], x):.2f}"
-    # ---- counts: ExpertQA pool, expert verdicts, GPT-6 graphs
+        print(tag, r["ladder"], r["pair"], {k: round(v, 3) for k, v in d.items()},
+              "added", [(q[0], q[1], q[2][:4], q[3], A.is_support(q, x)) for q in added],
+              "removed", [(q[0], q[1], q[2][:4], q[3]) for q in removed])
+        # the added relation the rest of the graph discounts most: its gain in context (leave
+        # one out) against its gain alone (lambda_r)
+        pu = np.full(n, 0.5)
+        gb_l = list(gb)
+        disc = []
+        for q in added:
+            rest = [r_ for r_ in gb_l if r_ != q]
+            ctx = A.confirmation(pu, gb_l, x) - A.confirmation(pu, rest, x)
+            disc.append((A.relation_evidence(pu, q, x) - ctx, q, ctx))
+        if disc:
+            dd_, q, ctx = max(disc)
+            M[f"Ex{tag}DiscType"] = q[2]
+            M[f"Ex{tag}DiscSupport"] = "support" if A.is_support(q, x) else "conflict"
+            M[f"Ex{tag}DiscCtx"] = f"{ctx:.2f}"
+            M[f"Ex{tag}DiscAlone"] = f"{A.relation_evidence(pu, q, x):.2f}"
+        sup = [q for q in added if A.is_support(q, x)]
+        viol = [q for q in added if not A.is_support(q, x)]
+        if len(sup) == 1 and len(viol) == 1 and not removed:
+            pu = np.full(n, 0.5)
+            M[f"Ex{tag}SupP"] = f"{sup[0][3]:.3f}"
+            M[f"Ex{tag}ViolP"] = f"{viol[0][3]:.3f}"
+            M[f"Ex{tag}ViolType"] = viol[0][2]
+            M[f"Ex{tag}SupGain"] = f"{A.relation_evidence(pu, sup[0], x):.2f}"
+            M[f"Ex{tag}ViolCost"] = f"{-A.relation_evidence(pu, viol[0], x):.2f}"
+            M[f"Ex{tag}SupLin"] = f"{A.linear_evidence(pu, [sup[0]], x):.2f}"
+            M[f"Ex{tag}ViolLin"] = f"{-A.linear_evidence(pu, [viol[0]], x):.2f}"
+    # ---- counts: ExpertQA pool, GPT-6 graphs. Default: expert verdicts with unsure/unlabelled
+    # claims false (the paper's polarity); sensitivity: unsure counted true, answers with an unsure
+    # claim dropped, and the asserted world (every claim true).
+    import random
     import ext_eval as X
+    from fact_reasoner.exteval import adapters as AD
     its = X.items("expertqa")
     recs, _ = X.records("expertqa", "graph_gpt6")
-    R = []
-    for iid, it in sorted(its.items()):
-        if iid not in recs:
-            continue
-        n = it["num_atoms"]
-        g = X.rels_of(recs[iid])
-        x = np.array([1 if a["factual"] else 0 for a in sorted(it["atoms"], key=lambda a: a["pos"])])
-        v = three(n, g, x)
-        v.update(nrel=len(g), words=it["expected"]["words"])
-        R.append(v)
+
+    def eqa_rows(mode):
+        out = []
+        for iid, it in sorted(its.items()):
+            if iid not in recs:
+                continue
+            labs = it["expected"]["labels"]
+            sure = all(l in AD.EQA_TRUE + AD.EQA_FALSE for l in labs)
+            if mode == "drop" and not sure:
+                continue
+            n = it["num_atoms"]
+            g = X.rels_of(recs[iid])
+            if mode == "asserted":
+                x = np.ones(n, dtype=int)
+            else:
+                x = np.array([0 if l in AD.EQA_FALSE else (1 if (l in AD.EQA_TRUE or mode == "unsure_true")
+                                                             else 0) for l in labs])
+            v = three(n, g, x)
+            v.update(nrel=len(g), words=it["expected"]["words"], viol=sum(not A.is_support(r, x) for r in g))
+            out.append(v)
+        return out
+
+    R = eqa_rows("paper")
     M["CountN"] = len(R)
-    for k in ("lcs", "indep", "wsum"):
+    for k in ("lcs", "indep", "lin", "wsum"):
         M[f"Count{k.title()}Nrel"] = f"{S.spearman([r[k] for r in R], [r['nrel'] for r in R]):.2f}"
         M[f"Count{k.title()}Words"] = f"{S.spearman([r[k] for r in R], [r['words'] for r in R]):.2f}"
+    M["CountLcsViol"] = f"{S.spearman([r['lcs'] for r in R], [r['viol'] for r in R]):.2f}"
+    rng = random.Random(SEED)
+    dd = []
+    for _ in range(2000):
+        smp = [rng.choice(R) for _ in R]
+        dd.append(S.spearman([r["wsum"] for r in smp], [r["nrel"] for r in smp])
+                  - S.spearman([r["lcs"] for r in smp], [r["nrel"] for r in smp]))
+    dd.sort()
+    M["CountDiffLo"], M["CountDiffHi"] = f"{dd[50]:.2f}", f"{dd[1949]:.2f}"
+    for mode, tag in (("unsure_true", "UnsureTrue"), ("drop", "Drop"), ("asserted", "Asserted")):
+        Rm = eqa_rows(mode)
+        M[f"Count{tag}N"] = len(Rm)
+        for k in ("lcs", "wsum"):
+            M[f"Count{tag}{k.title()}Nrel"] = f"{S.spearman([r[k] for r in Rm], [r['nrel'] for r in Rm]):.2f}"
     print("counts", {k: v for k, v in M.items() if k.startswith("Count")})
     if args.figure:
         figure(SCAT, args.figure)
     if args.macros:
         L = ["% Generated by scripts/arr_decomp.py -- do not edit by hand."]
         # signed values in math mode, so a minus is a minus in running text too
-        fmt = lambda v: f"\\ensuremath{{{v}}}" if isinstance(v, str) and re.match(r"^[+-]\d", v) else v  # noqa: E731
+        fmt = lambda v: f"\\ensuremath{{{v}}}" if isinstance(v, str) and (re.match(r"^[+-]\d", v) or "\\times" in v) else v  # noqa: E731
         L += [f"\\newcommand{{\\dc{k}}}{{{fmt(v)}}}" for k, v in M.items()]
         open(args.macros, "w").write("\n".join(L) + "\n")
         print(f"wrote {args.macros}")

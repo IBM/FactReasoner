@@ -169,6 +169,18 @@ def independent_evidence(pri, rels, x):
     return float(sum(relation_evidence(pri, r, x) for r in rels))
 
 
+def linear_evidence(pri, rels, x):
+    """The first-order (small-weight) expansion of the independent evidence: p v for a relation x
+    satisfies and -p (1 - v) for one it violates, v = pi(V_r). The signed weight sum is this with
+    every v set to 1/2 (up to a factor 2)."""
+    out = 0.0
+    for s, t, ty, p in rels:
+        ps, pt = float(pri[s]), float(pri[t])
+        v = sum((ps if a else 1 - ps) * (pt if b else 1 - pt) for a, b in VIOLATED[ty])
+        out += p * v if is_support((s, t, ty, p), x) else -p * (1 - v)
+    return float(out)
+
+
 def confirmation(pri, rels, x=None):
     """Lambda = log P_R(x*) - log pi(x*) under the sign-definite MRF (x* = 1 if None)."""
     n = len(pri)

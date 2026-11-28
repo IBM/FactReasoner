@@ -104,7 +104,7 @@ def cmd_eval(args):
             for lad in ladders:
                 if lad["type"] not in E.INCREASE or any(i not in graphs for i in lad["item_ids"]):
                     continue
-                vals = {"lcs": [], "wsum": [], "indep": []}
+                vals = {"lcs": [], "wsum": [], "indep": [], "lin": []}
                 for iid in lad["item_ids"]:
                     it = items[iid]
                     n_ = len(it["atoms"])
@@ -115,6 +115,7 @@ def cmd_eval(args):
                     vals["wsum"].append(sum(p * (1 if A.is_support((s, t, ty, p), x) else -1)
                                             for s, t, ty, p in tup))
                     vals["indep"].append(A.independent_evidence(np.full(n_, 0.5), tup, x))
+                    vals["lin"].append(A.linear_evidence(np.full(n_, 0.5), tup, x))
                 for i, j in itertools.combinations(range(3), 2):
                     okl = E.pair_ok(lad["type"], vals["lcs"][i], vals["lcs"][j], E.REL_TIE, True)
                     okw = E.pair_ok(lad["type"], vals["wsum"][i], vals["wsum"][j], E.REL_TIE, True)

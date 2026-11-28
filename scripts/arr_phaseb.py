@@ -60,12 +60,13 @@ def cmd_noise(args):
                 ws = [sum(p * (1 if A.is_support((s, t, ty, p), x) else -1) for s, t, ty, p in g)
                       for g in graphs]
                 ind = [A.independent_evidence(np.full(n, 0.5), g, x) for g in graphs]
+                lin = [A.linear_evidence(np.full(n, 0.5), g, x) for g in graphs]
                 for i, j in itertools.combinations(range(3), 2):
                     ok = {key: E.pair_ok(lad["type"], v[i], v[j], E.REL_TIE, True)
-                          for key, v in (("lcs", lcs), ("wsum", ws), ("indep", ind))}
+                          for key, v in (("lcs", lcs), ("wsum", ws), ("indep", ind), ("lin", lin))}
                     for t in (lad["type"], "inc"):
                         fam[t][lad["family_id"]].append((float(ok["lcs"]), float(ok["wsum"]),
-                                                         float(ok["indep"])))
+                                                         float(ok["indep"]), float(ok["lin"])))
                     for key in ok:
                         c[(key, lad["type"])][0] += ok[key]
                         c[(key, lad["type"])][1] += 1
@@ -74,7 +75,10 @@ def cmd_noise(args):
         res[q] = {f"{k[0]}:{k[1]}": v[0] / v[1] for k, v in c.items()}
         # paired family-cluster intervals: LCS - sum (as before), LCS - indep (the interaction
         # term), indep - sum (the weights)
-        for tag, (ia, ib) in (("diff", (0, 1)), ("diffli", (0, 2)), ("diffiw", (2, 1))):
+        # ... and the three steps of the chain sum -> linear -> independent -> LCS: the asymmetry
+        # (lin - sum), the curvature (indep - lin) and the interaction (LCS - indep)
+        for tag, (ia, ib) in (("diff", (0, 1)), ("diffli", (0, 2)), ("diffiw", (2, 1)),
+                              ("difflw", (3, 1)), ("diffil", (2, 3))):
             brng = random.Random(SEED)
             for t, F in fam.items():
                 F = list(F.values())
@@ -93,9 +97,11 @@ def cmd_noise(args):
             qt = {0.05: "Five", 0.10: "Ten", 0.20: "Twenty"}[q]
             for k, v in r.items():
                 key, t = k.split(":")
-                kt = {"lcs": "Lcs", "wsum": "Wsum", "indep": "Indep", "difflo": "DiffLo",
-                      "diffhi": "DiffHi", "difflilo": "DiffLILo", "difflihi": "DiffLIHi",
-                      "diffiwlo": "DiffIWLo", "diffiwhi": "DiffIWHi"}[key]
+                kt = {"lcs": "Lcs", "wsum": "Wsum", "indep": "Indep", "lin": "Lin",
+                      "difflo": "DiffLo", "diffhi": "DiffHi", "difflilo": "DiffLILo",
+                      "difflihi": "DiffLIHi", "diffiwlo": "DiffIWLo", "diffiwhi": "DiffIWHi",
+                      "difflwlo": "DiffLWLo", "difflwhi": "DiffLWHi", "diffillo": "DiffILLo",
+                      "diffilhi": "DiffILHi"}[key]
                 val = f"{100 * v:+.1f}" if key.startswith("diff") else f"{100 * v:.0f}"
                 L.append(f"\\newcommand{{\\vn{kt}{t.title()}{qt}}}{{{val}}}")
         open(args.macros, "w").write("\n".join(L) + "\n")
@@ -125,20 +131,49 @@ def paired_ci(A_, B_, group, key_a="ok", key_b="ok", n=BOOT, seed=SEED):
     return point, vals[int(0.025 * n)], vals[int(0.975 * n) - 1], len(keys)
 
 
+def mcnemar_exact(A_, B_, group):
+    """Discordant pairs (A right and B wrong, B right and A wrong) and the exact two-sided p."""
+    import math
+    keys = [k for k in A_ if k in B_ and (group is None or A_[k]["type"] in group)]
+    b = sum(bool(A_[k]["ok"]) and not B_[k]["ok"] for k in keys)
+    c = sum(bool(B_[k]["ok"]) and not A_[k]["ok"] for k in keys)
+    n = b + c
+    p = min(1.0, 2 * sum(math.comb(n, i) for i in range(min(b, c) + 1)) / 2 ** n) if n else 1.0
+    return b, c, p
+
+
+def pfmt(p):
+    """A p-value for running text and tables: three decimals, or m x 10^-k below 0.001."""
+    if p >= 1e-3:
+        return f"{p:.3f}"
+    m, e = f"{p:.1e}".split("e")
+    return f"\\ensuremath{{{m}\\times10^{{{int(e)}}}}}"
+
+
 def cmd_paired(args):
     d = json.load(open(os.path.join(ROOT, "eval.json")))
     fair = json.load(open(os.path.join(ROOT, "fair_judges", "eval.json")))
     inc, inv = set(E.INCREASE), set(E.INVARIANCE)
     out = {}
+    mc = {}
     for arm, tag in (("graph_gpt6", "Gpt"), ("graph_gptoss", "Oss"), ("pair_gptoss", "PairOss"),
                      ("pair_llama", "PairLlama")):
         L, W = _rows(d, arm, "lambda"), _rows(d, arm, "wsum")
         Dd = _rows(d, arm, "dsum")
         I = _rows(d, arm, "indep")
+        Ln = _rows(d, arm, "lin")
         out[f"LcsWsumInc{tag}"] = paired_ci(L, W, inc)
         if I:
             out[f"LcsIndepInc{tag}"] = paired_ci(L, I, inc)
             out[f"IndepWsumInc{tag}"] = paired_ci(I, W, inc)
+        if I and Ln:
+            out[f"LinWsumInc{tag}"] = paired_ci(Ln, W, inc)
+            out[f"IndepLinInc{tag}"] = paired_ci(I, Ln, inc)
+            # exact McNemar for the three steps of the chain (third review N31: the bootstrap
+            # is anti-conservative when the discordant pairs are few)
+            for name, (X_, Y_) in (("Asym", (Ln, W)), ("Curv", (I, Ln)), ("Inter", (L, I)),
+                                   ("Total", (L, W))):
+                mc[(name, tag)] = mcnemar_exact(X_, Y_, inc)
         if Dd:
             out[f"LcsDsumInc{tag}"] = paired_ci(L, Dd, inc)
     L = _rows(d, "graph_gpt6", "lambda")
@@ -147,6 +182,15 @@ def cmd_paired(args):
     out["LcsPairVInv"] = paired_ci(L, J, inv)
     for k, v in out.items():
         print(k, tuple(round(x, 4) if isinstance(x, float) else x for x in v))
+    # Holm over the family of the chain's three steps on the four mined arms (12 tests)
+    fam = sorted(((k, v) for k, v in mc.items() if k[0] != "Total"), key=lambda kv: kv[1][2])
+    m = len(fam)
+    holm, run = {}, 0.0
+    for i, (k, v) in enumerate(fam):
+        run = max(run, min(1.0, (m - i) * v[2]))
+        holm[k] = run
+    for k, v in mc.items():
+        print("mcnemar", k, v, "holm", holm.get(k))
     if args.macros:
         Lm = ["% Generated by scripts/arr_phaseb.py paired -- do not edit by hand."]
         f = lambda x: f"\\ensuremath{{{100 * x:+.1f}}}"  # noqa: E731
@@ -155,6 +199,13 @@ def cmd_paired(args):
             Lm.append(f"\\newcommand{{\\pc{k}Lo}}{{{f(lo)}}}")
             Lm.append(f"\\newcommand{{\\pc{k}Hi}}{{{f(hi)}}}")
             Lm.append(f"\\newcommand{{\\pc{k}N}}{{{n}}}")
+        for (name, tag), (b, c, pv) in mc.items():
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}B}}{{{b}}}")
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}C}}{{{c}}}")
+            Lm.append(f"\\newcommand{{\\mc{name}{tag}P}}{{{pfmt(pv)}}}")
+            if (name, tag) in holm:
+                Lm.append(f"\\newcommand{{\\mc{name}{tag}Holm}}{{{pfmt(holm[(name, tag)])}}}")
+        Lm.append(f"\\newcommand{{\\mcFamily}}{{{m}}}")
         open(args.macros, "w").write("\n".join(Lm) + "\n")
         print(f"wrote {args.macros}")
     return 0

@@ -10,16 +10,16 @@ world, meets it for any priors and any relation graph (Theorem~\ref{thm:mono}), 
 product MRFs read by a single-world log-ratio the requirement forces two-valued tables and the
 committed world as the readout (App.~\ref{app:why}).
 
-$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}), which
-places the signed weight sum as its linear, interaction-free approximation. The per-relation
-weights, under which a violation costs several times what a satisfied relation earns, make $\LCS$
-more robust to wrong verdicts and keep it from counting relations, at the price of sensitivity to a
-spurious violated relation. The interaction gives presentation invariance and discounts repeated
-inferences and contested premises; on LoCoBench it helps on no pair and costs a little on mined
-graphs, and whether people share its principles is an empirical question.
-A judge comparing two responses with their verdicts matches $\LCS$ on increases and is more stable
-on invariances. On natural text the score is not a proxy for rated discourse coherence, falls under
-detected contradictions, and tracks essay quality beyond length. What limits $\LCS$ is
+$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}). To first
+order it is a linear score in which a violation costs several times what a satisfied relation
+earns, and the signed weight sum is that score without the asymmetry. On our data the asymmetry is the only ingredient that helps. It makes the score more robust to injected verdict errors on gold graphs, and more sensitive to a spurious violated relation; neither the curvature of the per-relation evidence nor the interaction is significantly better on any mined arm, and the curvature costs on one. The interaction is
+what gives presentation invariance and discounts repeated inferences and contested premises. It is
+blind to the verdicts, so it also discounts an inference whose premise is used to refute a
+falsehood, and whether people share these principles is an empirical question.
+A judge comparing two responses with their verdicts trails $\LCS$ slightly on increases and is more stable
+on invariances. On natural text, scores of mined relations do not track rated discourse coherence,
+fall under detected contradictions, and track essay quality beyond length about as well as a bare
+relation count. What limits $\LCS$ is
 relation extraction and the verdicts it is read against. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
@@ -39,8 +39,11 @@ increases.
 \paragraph{External evaluation.} The natural-text datasets carry human labels (rated coherence,
 contradictions, discourse and argument relations, essay scores), but none rates the logical
 coherence of a response, so agreement with human judgments of logical coherence remains to be
-established, and no human study checks that people rank LoCoBench's rungs as declared. Every
-natural-text test reads the asserted world, so the verdict polarity is tested only on LoCoBench.
+established, and no human study checks that people rank LoCoBench's rungs as declared. Most
+natural-text tests read the asserted world. Where the verdict world was tested on natural text, it
+did not help: ContraDoc's preregistered verdict-world test failed (App.~\ref{app:external}), and on
+essays the strict world lowers the partial correlation (App.~\ref{app:asap}). The ExpertQA analysis
+uses expert labels, each from a single expert, with unsure claims counted false.
 $\LCS$ counts a restatement as support, so it rewards repetition that raters penalize. The score is
 order-free, but its extraction is only nearly so: on LoCoBench, permuting paragraphs moves the mined
 score slightly beyond the miner's re-mining noise. The essays come from one prompt, sampled uniformly over score
@@ -72,16 +75,17 @@ the pairwise miner's weights saturate the score. Only \sense{Refutation} compile
 incompatibility conveyed without being asserted produces no factor. Couplings are material
 constraints, so relevance of premise to conclusion is not modeled: a non-sequitur between two true
 claims, stated explicitly, is extracted in \nsExtracted\% of LoCoBench responses and raises $\LCS$ in
-\nsLcsRise\%, about as often as a valid inference does (\nvLcsRise\%). Saturation bounds redundant
+\nsLcsRise\%, about as often as a valid inference does (\nvLcsRise\%). The interaction term ignores the
+verdicts, so a relation that refutes a falsehood by citing a claim discounts the other inferences
+drawn from that claim, as one that contests the claim would (\S\ref{sec:decomp}); this happens on
+LoCoBench (App.~\ref{app:decomp}), and we have no argument that it is desirable. Saturation bounds redundant
 support but cannot stop a miner from hallucinating new support, so the score inherits the
 extractor's precision.
 
 \paragraph{Computation and reproducibility.} The score needs the partition function $Z_\R$, which
 is \#P-hard in general; it is exact here because the graphs are small, and approximate inference
 preserves the guarantees only up to the approximation (App.~\ref{app:further}). Where $Z_\R$ is out
-of reach, the independent evidence $\Lambda^{\perp}$ costs $O(|\R|)$ and keeps the per-relation
-weights, which account for every LoCoBench difference from the signed sum, but it loses the
-interaction and with it A2 (\S\ref{sec:decomp}). The strongest miner
+of reach, the linear evidence $\Llin$ costs $O(|\R|)$ and keeps the asymmetry, the only ingredient that helped on our data, but it loses the interaction and with it most of A2 (\S\ref{sec:decomp}). The strongest miner
 and judge, GPT-6, are proprietary models served through an API, so their outputs may not be
 reproducible over time.
 
@@ -96,7 +100,7 @@ licenses (App.~\ref{app:external}). The raw files of datasets whose licenses res
 state redistribution are not redistributed. GDTB is released under CC BY-NC-SA and is used for
 research only; QT30 states no license, so we use it for research only and redistribute nothing from
 it. The ASAP~2.0 essays were written by school students in grades 6--10 and are released under CC BY
-4.0. We use their text and scores only, no demographic metadata; the text was sent to commercial
+4.0, which permits this use; we use their text and scores only, no demographic metadata; the text was sent to commercial
 model APIs for claim extraction, relation mining and source checking. We do not redistribute the
 copyrighted source article, which was transcribed only for the source check. LLMs were used to generate the benchmark
 responses, to validate them, to extract claims and relations and as judges, as described. They

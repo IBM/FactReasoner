@@ -23,8 +23,8 @@ each increasing type give $180$ pairs (App.~\ref{sec-full-locobench} and supplem
 Invariance pair, up to a relative tie tolerance of $\sThreeRelTie$ (App.~\ref{app:setup-details}).
 An \emph{arm} fixes the graph source: the \cp{gold} relations or one of four mining
 configurations, each read at the verdict world (our default) and at the asserted world. On every
-arm we also score $\LCS$'s two simplifications over the same graphs (\S\ref{sec:decomp}): the
-signed weight sum $\Ssum$ and the independent evidence $\Lambda^{\perp}$. Text baselines are length, DiscoScore (RC, LC, entity graph)
+arm we also score $\LCS$'s three simplifications over the same graphs (\S\ref{sec:decomp}): the
+signed weight sum $\Ssum$, the linear evidence $\Llin$ and the independent evidence $\Lambda^{\perp}$. Text baselines are length, DiscoScore (RC, LC, entity graph)
 \citep{discoscore}, and judges using G-Eval \citep{geval} and a direct 1--5 rating of logical
 coherence, averaged over five runs with GPT-6 and gpt-oss-120b; the judges see the response only.
 Baselines that read only the claims tie on every pair (App.~\ref{app:results}). Error bars are 95\%
@@ -40,10 +40,10 @@ edits gets $0\%$ in both, a random one about $50\%$ in both. \emph{Right:} share
 pairs on which the score stays equal. \emph{Blue:}
 $\LCS$ at the verdict world, on gold and mined graphs; hollow blue markers give the share that rises
 by more than $\tau$. Judges average five runs, the verdict-aware
-absolute judge three. \emph{Gray:} $\LCS$'s two simplifications over the graph-level arms'
-graphs (all arms in Table~\ref{tab:signed}), the independent evidence $\Lambda^{\perp}$ (no
-interaction) and the signed weight sum $\Ssum$ (\S\ref{sec:decomp}); $\LCS$ at the asserted world;
-and the baselines. The entity graph reads the text but scores only nouns shared by nearby sentences, so it too
+absolute judge three. \emph{Gray:} $\LCS$'s three simplifications over the graph-level arms'
+graphs (all arms in Table~\ref{tab:signed}): the independent evidence $\Lambda^{\perp}$ (no
+interaction), the linear evidence $\Llin$ (first order) and the signed weight sum $\Ssum$
+(\S\ref{sec:decomp}); $\LCS$ at the asserted world; and the baselines. The entity graph reads the text but scores only nouns shared by nearby sentences, so it too
 almost never moves.}
 \label{fig:ladders}
 \end{figure*}
@@ -77,64 +77,94 @@ of its increases against \subGptLcsInc\%: results depend on the miner.
 
 \begin{table}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}Xccc@{}}
+\setlength{\tabcolsep}{2.4pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}Xcccc@{}}
 \toprule
-& $\Ssum$ & $\Lambda^{\perp}$ & $\LCS$ \\
+& $\Ssum$ & $\Llin$ & $\Lambda^{\perp}$ & $\LCS$ \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Properties} (\S\ref{sec:decomp})}\\
-Range & $\mathbb{R}$ & $\mathbb{R}$ & $(0,1)$ \\
-Unit & -- & nats & odds $B{:}1$ \\
-A2 (reads $\PR$) & -- & -- & \checkmark \\
-Violation outweighs support & -- & \checkmark & \checkmark \\
-Relations interact & -- & -- & \checkmark \\
-Cost & $O(|\R|)$ & $O(|\R|)$ & needs $Z_\R$ \\
+\multicolumn{5}{@{}l}{\emph{What each keeps} (\S\ref{sec:decomp})}\\
+Violation outweighs support & -- & \checkmark & \checkmark & \checkmark \\
+Curvature of $\lambda_r$ & -- & -- & \checkmark & \checkmark \\
+Relations interact (A2) & -- & -- & -- & \checkmark \\
+Range, unit & $\mathbb{R}$ & $\mathbb{R}$, nats & $\mathbb{R}$, nats & $(0,1)$, odds \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Constructed edits} (\% of gold graphs passing)}\\
-Two halves score as the whole & \zsEqvSum & \zsEqvIndep & \zsEqvLcs \\
-Repetition counts less & \zsRepSum & \zsRepIndep & \zsRepLcs \\
-Contested premise counts less & \zsDoubtSum & \zsDoubtIndep & \zsDoubtLcs \\
+\multicolumn{5}{@{}l}{\emph{By construction} (\% of gold graphs; App.~\ref{app:results})}\\
+Two halves score as the whole & \zsEqvSum & \zsEqvLin & \zsEqvIndep & \zsEqvLcs \\
+Repetition counts less & \zsRepSum & \zsRepLin & \zsRepIndep & \zsRepLcs \\
+Contested premise counts less & \zsDoubtSum & \zsDoubtLin & \zsDoubtIndep & \zsDoubtLcs \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{LoCoBench increases satisfied} (\%)}\\
-Gold graphs & \sThreeGoldWsumIncPct & \sThreeGoldIndepIncPct & \sThreeGoldLamIncPct \\
-Gold, 20\% of verdicts flipped & \vnWsumIncTwenty & \vnIndepIncTwenty & \vnLcsIncTwenty \\
-GPT-6 graphs & \dcAttrWsum & \dcAttrIndep & \dcAttrLcs \\
-GPT-6, verifier's verdicts & \vfGptMinedWsumInc & \vfGptMinedIndepInc & \vfGptMinedLcsInc \\
+\multicolumn{5}{@{}l}{\emph{LoCoBench increases satisfied} (\%)}\\
+Gold graphs & \sThreeGoldWsumIncPct & \sThreeGoldLinIncPct & \sThreeGoldIndepIncPct & \sThreeGoldLamIncPct \\
+Gold, 20\% of verdicts flipped & \vnWsumIncTwenty & \vnLinIncTwenty & \vnIndepIncTwenty & \vnLcsIncTwenty \\
+GPT-6 graphs & \dcAttrWsum & \dcAttrLin & \dcAttrIndep & \dcAttrLcs \\
+GPT-6, verifier's verdicts & \vfGptMinedWsumInc & \vfGptMinedLinInc & \vfGptMinedIndepInc & \vfGptMinedLcsInc \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{ExpertQA} (\dcCountN{} answers, expert verdicts)}\\
-$\rho$ with number of relations & $\dcCountWsumNrel$ & $\dcCountIndepNrel$ & $\dcCountLcsNrel$ \\
+\multicolumn{5}{@{}l}{\emph{ExpertQA} (\dcCountN{} answers, expert verdicts)}\\
+$\rho$ with number of relations & $\dcCountWsumNrel$ & $\dcCountLinNrel$ & $\dcCountIndepNrel$ & $\dcCountLcsNrel$ \\
 \bottomrule
 \end{tabularx}
-\caption{\textbf{$\LCS$ beside its two simplifications.} The signed weight sum $\Ssum$ drops the
-asymmetry and curvature of the per-relation evidence $\lambda_r$; the independent evidence
-$\Lambda^{\perp}=\sum_r\lambda_r$ keeps them and drops the interaction $I_\R$
-(Prop.~\ref{prop:decomp}). All three satisfy A1 and A3. Constructed edits: \zsEqvN{} gold graphs
-(\zsDoubtN{} for the contested premise), App.~\ref{app:results}.}
+\caption{\textbf{$\LCS$ beside its three simplifications} (Prop.~\ref{prop:decomp}). Left to
+right, each column adds one ingredient: the support/violation asymmetry ($\Llin$), the curvature of
+the per-relation evidence $\lambda_r$ ($\Lambda^{\perp}=\sum_r\lambda_r$), and the interaction
+$I_\R$ ($\LCS$). All four satisfy A1 and A3. The constructed edits hold or fail by definition; they
+show what each score encodes, not how accurate it is (\zsEqvN{} gold graphs, \zsDoubtN{} for the
+contested premise). Rows are read at the verdict world.}
 \label{tab:three}
 \end{table}
 
-\paragraph{Where the three scores differ.} With correct verdicts all three satisfy every gold
+\paragraph{Where the four scores differ.} With correct verdicts all four satisfy every gold
 increase (Table~\ref{tab:three}): each rung changes one relation's sign, which they read alike, and
 the interaction is small on these graphs (median $|I_\R|=\dcIGoldAbsMedian$ nats against
-$\dcLamGoldAbsMedian$ for $|\Lambda|$; Figure~\ref{fig:decomp}). \emph{The weights decide the wrong-verdict case.} With 20\%
-of the verdicts flipped, $\Lambda^{\perp}$ keeps exactly the increases that $\LCS$ keeps
-(difference\asapCI{\vnDiffLILoIncTwenty}{\vnDiffLIHiIncTwenty} points), so $\LCS$'s advantage over $\Ssum$
-(by\asapCI{\vnDiffLoIncTwenty}{\vnDiffHiIncTwenty} points, all on \cp{conflict}) comes from the asymmetric
-$\lambda_r$. \emph{On mined graphs both parts cut both ways.} $\LCS$ and $\Ssum$ disagree on
-\dcAttrDisagree{} of \dcAttrPairs{} GPT-6 increases; $\Ssum$ is right on \dcAttrSumWins{}
-(\dcAttrSumWinsInteraction{} through the interaction, \dcAttrSumWinsWeights{} through the weights)
-and $\LCS$ on \dcAttrLcsWins. The interaction costs $\LCS$ \pcLcsIndepIncGpt{} points
-\asapCI{\pcLcsIndepIncGptLo}{\pcLcsIndepIncGptHi} and helps on no LoCoBench pair, whose edits
-rarely repeat or split a relation; its effects are the constructed edits, which $\Ssum$ and
-$\Lambda^{\perp}$ fail by construction. Two cases show the weights at work (App.~\ref{app:decomp}).
-On \dcExSumLadder{} the miner finds the added support ($+\dcExSumSupGain$ nats) and a spurious
-violated contradiction ($-\dcExSumViolCost$), so $\Ssum$ rises and $\LCS$ falls (\dcExSumLcsA{} to
-\dcExSumLcsB). On \dcExLcsLadder{} it trades three weak supports for two strong ones of the same
-total weight, so $\Ssum$ ties and $\LCS$ rises (\dcExLcsLcsA{} to \dcExLcsLcsB): $\lambda_r$ is convex
-in $p_r$, and the new supports link a chain ($I_\R$ from \dcExLcsIA{} to \dcExLcsIB).
-\emph{On natural answers the asymmetry keeps $\LCS$ from counting relations:} over \dcCountN{}
-ExpertQA answers at expert verdicts \citep{expertqa}, $\Ssum$ correlates with the number of mined
-relations at $\dcCountWsumNrel$ and $\LCS$ at $\dcCountLcsNrel$.
+$\dcLamGoldAbsMedian$ for $|\Lambda|$; Figure~\ref{fig:decomp}). Each step of the chain
+$\Ssum\to\Llin\to\Lambda^{\perp}\to\LCS$ adds one ingredient, and the data separate them.
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
+\item \textbf{The asymmetry decides the wrong-verdict case, and it is first order.} With 20\% of
+  the verdicts flipped, $\Llin$, $\Lambda^{\perp}$ and $\LCS$ keep exactly the same increases (the
+  curvature and interaction steps change none, \asapCI{\vnDiffILLoIncTwenty}{\vnDiffILHiIncTwenty}
+  and \asapCI{\vnDiffLILoIncTwenty}{\vnDiffLIHiIncTwenty} points), and $\Llin$ beats $\Ssum$
+  by\asapCI{\vnDiffLWLoIncTwenty}{\vnDiffLWHiIncTwenty} points. The gain is
+  \asapCI{\vnDiffLWLoConflictTwenty}{\vnDiffLWHiConflictTwenty} on \cp{conflict} and a cost
+  of\asapCI{\vnDiffLWLoChainTwenty}{\vnDiffLWHiChainTwenty} on \cp{chain}, so its net size depends
+  on the mix of ladder types. With a closed-book GPT-6 verifier's verdicts on mined graphs, the four
+  are within two points of one another (Table~\ref{tab:three}; $\LCS-\Ssum$
+  in\asapCI{\vfGptMinedDiffloInc}{\vfGptMinedDiffhiInc}).
+\item \textbf{On mined graphs no step helps.} On GPT-6 graphs $\LCS$ and $\Ssum$ disagree on
+  \dcAttrDisagree{} of \dcAttrPairs{} increases. $\Ssum$ is right on \dcAttrSumWins{}, which turn
+  at the asymmetry (\dcAttrSumWinsAsym), the curvature (\dcAttrSumWinsCurv) and the interaction
+  (\dcAttrSumWinsInter) step; $\LCS$ is right on \dcAttrLcsWins. Exact McNemar tests of the three
+  steps on the four mined arms (\mcFamily{} tests, Holm-adjusted; App.~\ref{app:decomp}) find no step
+  at which the richer score is significantly better. The only step that survives the correction is a
+  loss: on gpt-oss graphs the curvature costs (\mcCurvOssB{} pairs against \mcCurvOssC,
+  $p=\mcCurvOssP$, Holm $\mcCurvOssHolm$), because a violated relation of high weight costs without
+  bound. Nominally, on pairwise Llama the asymmetry helps (\mcAsymPairLlamaB{} against
+  \mcAsymPairLlamaC, $p=\mcAsymPairLlamaP$) and the interaction costs (\mcInterPairLlamaB{} against
+  \mcInterPairLlamaC, $p=\mcInterPairLlamaP$); neither survives.
+\item \textbf{Three cases show the mechanisms} (App.~\ref{app:decomp}).
+  \begin{itemize}[leftmargin=1.2em,itemsep=0pt,topsep=1pt]
+  \item \emph{Asymmetry} (\dcExSumAsymLadder). The miner finds the added support (linear gain
+    $\dcExSumAsymSupLin$ nats) and a spurious violated contradiction of weight
+    \dcExSumAsymViolP{} ($-\dcExSumAsymViolLin$). $\Ssum$ rises and $\Llin$ falls, and so does $\LCS$
+    (\dcExSumAsymLcsA{} to \dcExSumAsymLcsB).
+  \item \emph{Interaction} (\dcExSumInterLadder). The rung's refutation of the falsehood cites a
+    claim from which the response also draws an inference. The two overlap, so the refutation
+    earns $\dcExSumInterDiscCtx$ nats in context against $\dcExSumInterDiscAlone$ alone; $\Lambda$
+    moves by $\dcExSumInterDLam$ while $\Llin$ rises by $\dcExSumInterDLin$.
+    This is the design consequence of \S\ref{sec:decomp}.
+  \item \emph{The one pair $\LCS$ wins} (\dcExLcsCurvLadder). The miner trades three weak supports
+    for two strong ones of the same total weight: $\Ssum$ moves by $\dcExLcsCurvDWsum$ and $\Llin$ by
+    $\dcExLcsCurvDLin$; the curvature adds $\dcExLcsCurvDCurv$ nats, which decides the pair, and the
+    interaction $\dcExLcsCurvDInter$, because the new supports link a chain.
+  \end{itemize}
+\item \textbf{On natural answers the weights keep $\LCS$ from counting relations, at the verdict
+  world only.} Over \dcCountN{} ExpertQA answers \citep{expertqa} read at expert verdicts,
+  the correlation with the number of mined relations falls along the chain: $\dcCountWsumNrel$,
+  $\dcCountLinNrel$, $\dcCountIndepNrel$, $\dcCountLcsNrel$ ($\Ssum-\LCS$ in
+  \asapCI{\dcCountDiffLo}{\dcCountDiffHi}). There $\LCS$ tracks the number of violated relations
+  ($\rho=\dcCountLcsViol$). The value depends on the reading: at the asserted world $\LCS$
+  correlates with the count at $\dcCountAssertedLcsNrel$, and with unsure claims counted true at
+  $\dcCountUnsureTrueLcsNrel$ ($\Ssum$ $\dcCountUnsureTrueWsumNrel$). It describes the scores;
+  whether counting relations is wrong is not something these data decide.
+\end{itemize}
 
 \paragraph{Text baselines and LLM judges.} Surface cues solve two of the three increasing types:
 length rises on \sThreeBCtlLengthChain{} \cp{chain} pairs and a discourse-marker count on
@@ -144,8 +174,9 @@ response at a time do not separate \cp{chain} rungs: G-Eval with GPT-6 rises on
 \sThreeGraphGptLamChain), even given the claims, verdicts and our definition (rise\,/\,fall\,/\,tie
 \fjAbsChainCounts). Asked which of two rungs is more coherent, in both orders and with the claims,
 verdicts and definition, GPT-6 prefers the declared rung on \fjPairVIncRise\% of the increases and
-calls \fjPairVInvTie\% of the invariance pairs equal: it matches $\LCS$ on increases
+calls \fjPairVInvTie\% of the invariance pairs equal: it comes close to $\LCS$ on increases
 (difference\asapCI{\pcLcsPairVIncLo}{\pcLcsPairVIncHi} points) and keeps far more invariances
-(\sThreeGraphGptLamInvPct\% for $\LCS$; \asapCI{\pcLcsPairVInvLo}{\pcLcsPairVInvHi}). $\LCS$ instead
+(\sThreeGraphGptLamInvPct\% for $\LCS$ exactly, \sThreeGraphGptLamInvTolPct\% within $\tau$;
+\asapCI{\pcLcsPairVInvLo}{\pcLcsPairVInvHi}). $\LCS$ instead
 scores each response on its own, with a guarantee and attribution, but rises on \nsLcsRise\% of
 planted non-sequiturs, as on valid inferences, which the judge partly separates (App.~\ref{app:results}).
