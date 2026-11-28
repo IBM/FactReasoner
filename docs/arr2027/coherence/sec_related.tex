@@ -3,32 +3,33 @@
 \label{sec:related}
 %% ============================================================================
 
-\paragraph{Factuality and consistency.} Claim-level metrics aggregate independent per-claim
-verdicts \citep{factscore,safe,veriscore}, over decompositions whose choice matters
-\citep{wanner2024}, and FactReasoner \citep{factreasoner} replaces counting with inference over
-claims and evidence; \citet{lorefact} show that such pipelines miss errors in the logic that
-connects the claims. Consistency metrics check a text against a source \citep{factcc,summac,alignscore,minicheck} or flag inconsistencies across samples, within a generation or dialogue, and across a model's beliefs \citep{selfcheckgpt,mundler2024,welleck2019,decode,ribeiro2019,li2019logic,elazar2021,becel}; reasoning-chain metrics score explicit derivations \citep{roscoe,receval,entailmentbank,lightman2024}. None of them says
-how supports and conflicts should combine into one score, and none fixes a committed world under
-which refuting a falsehood counts as support.
+\paragraph{Factuality and consistency.} Claim-level metrics aggregate independent per-claim verdicts
+\citep{factscore,safe,veriscore}, over decompositions whose choice matters \citep{wanner2024};
+FactReasoner \citep{factreasoner} reasons over claims and evidence, and \citet{lorefact} show that such
+pipelines miss errors in the logic connecting claims. Consistency metrics check a text against a source
+or across samples, generations, dialogues and beliefs
+\citep{factcc,summac,alignscore,minicheck,selfcheckgpt,mundler2024,welleck2019,decode,ribeiro2019,li2019logic,elazar2021,becel},
+and reasoning-chain metrics score explicit derivations \citep{roscoe,receval,entailmentbank,lightman2024}.
+None says how supports and conflicts combine into one score under a committed world in which refuting
+a falsehood counts as support.
 
 \paragraph{Discourse coherence} rests on cohesive ties, entity continuity or inferred relations
 \citep{hallidayhasan1976,grosz1995,hobbs1979,mann,pdtb} and is scored by entity grids, neural models,
 DiscoScore, entity graphs and LLM judges \citep{barzilay,li,discoscore,liustrube,geval,zheng2023judge}
 against human ratings \citep{gcdc}, without regard to the truth of the claims.
 
-\paragraph{Argumentation and logical constraints.} Argument mining recovers support and attack relations \citep{stab2017}, quality is rated for cogency and persuasiveness \citep{wachsmuth2017,habernal2016,persing2015}, and entailment graphs link propositions \citep{berant2011}. Gradual semantics for bipolar argumentation grade arguments under axioms such
-as neutrality and monotony \citep{cayrol2005,amgoud2016,amgoud2018,baroni2019}, the closest
-precedent to our axioms, but they grade acceptability from attacks and supports, not accordance
-with a committed truth assignment. Probabilistic argumentation and explanatory coherence constrain beliefs
-\citep{thimm2012,hunter2013,thagard1989,thagard1998}, and BeliefBank, ConCoRD and Maieutic prompting
-repair them with weighted MAX-SAT or factor graphs \citep{beliefbank,concord,maieutic}, as in Markov
-logic and PSL \citep{mln,psl}; we use such a model to \emph{measure} a response.
-
-\paragraph{Probabilistic coherence and confirmation.} Bayesian epistemology measures the coherence of
-a set of propositions under a joint distribution
-\citep{shogenji1999,olsson2002,fitelson2003,douven2007}, with impossibility results on
-truth-conduciveness \citep{bovens2003}. Confirmation is measured by the log-ratio
-\citep{milne1996} or the weight of evidence \citep{good1950}, which are not ordinally equivalent
-\citep{fitelson1999,crupi2007}; $\LCS$ is the logistic of the weight of evidence for the committed
-world, and unlike coherence measures it grades the relations against truth values
+\paragraph{Argumentation, constraints and confirmation.} Argument mining recovers support and attack
+relations \citep{stab2017}, quality is rated for cogency \citep{wachsmuth2017,habernal2016,persing2015},
+and gradual semantics for bipolar argumentation grade arguments under axioms such as neutrality and
+monotony \citep{cayrol2005,amgoud2016,amgoud2018,baroni2019}, our closest precedent, though they grade
+acceptability rather than accordance with a committed truth assignment. Coherence as constraint
+satisfaction \citep{thagard1989,thagard1998} scores a partition into accepted and rejected elements by
+the weight of the constraints it satisfies; read at the verdicts this is close to our signed sum, which
+we derive, with its asymmetry, as the first order of a probabilistic model. Probabilistic
+argumentation constrains beliefs \citep{thimm2012,hunter2013}, and BeliefBank, ConCoRD and Maieutic
+prompting repair them with weighted MAX-SAT or factor graphs \citep{beliefbank,concord,maieutic,berant2011},
+as in Markov logic and PSL \citep{mln,psl}; we use such a model to \emph{measure} a response. Bayesian
+coherence measures \citep{shogenji1999,olsson2002,fitelson2003,douven2007,bovens2003} grade a set of
+propositions rather than relations against truth values; $\LCS$ is the logistic of the weight of
+evidence \citep{good1950,milne1996,fitelson1999,crupi2007} for the committed world
 (App.~\ref{app:verify}).

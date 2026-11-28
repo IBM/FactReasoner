@@ -181,11 +181,11 @@ all summaries and at $\extSeNoRestateNonEmptyRhoCohGpt$
 {\scriptsize[\extSeNoRestateNonEmptyRhoCohGptLo,\,\extSeNoRestateNonEmptyRhoCohGptHi]} over those with
 a relation (gpt-oss-120b: $\extSeNoRestateRhoCohOss$ and $\extSeNoRestateNonEmptyRhoCohOss$). The
 inferences that remain therefore make a summary both more logically and more discursively
-coherent, and it is the restatements that pull the two apart. The signed weight sum is
-uncorrelated with rated coherence ($\extSeWsumRhoCohGpt$; $\extSeWsumNonEmptyRhoCohGpt$ on the
-summaries with a relation), and so are the independent evidence $\Lambda^{\perp}$ ($\extSeIndepRhoCohGpt$;
-$\extSeIndepNonEmptyRhoCohGpt$) and the linear evidence $\Llin$ ($\extSeLinRhoCohGpt$;
-$\extSeLinNonEmptyRhoCohGpt$). A score that counts a restatement as support rewards repetition, which
+coherent, and it is the restatements that pull the two apart. The signed weight sum is uncorrelated with rated coherence ($\extSeWsumRhoCohGpt$;
+$\extSeWsumNonEmptyRhoCohGpt$ on the summaries with a relation). The independent and linear evidence are
+near zero overall ($\extSeIndepRhoCohGpt$, $\extSeLinRhoCohGpt$) but negative on the summaries with a
+relation ($\extSeIndepNonEmptyRhoCohGpt$, $\extSeLinNonEmptyRhoCohGpt$), like $\LCS$, because they credit a
+restatement more than an inference and the signed sum does not. A score that counts a restatement as support rewards repetition, which
 raters penalize; capping repeated support is one remedy, which we leave to future work.
 
 %% ----------------------------------------------------------------------------
@@ -346,8 +346,8 @@ it is mined again, the ceiling the mined rows can reach.}
 \end{table}
 
 \paragraph{Order.} Gold-graph $\LCS$ is identical across every permutation, as it must be: the
-claims and relations do not change. With the GPT-6 arm, the mined score moves about as much as
-re-mining moves it (Table~\ref{tab:ext-order}):
+claims and relations do not change. With the GPT-6 arm, the mined score moves under permutation by an amount comparable to re-mining,
+and in the matched designs below slightly more (Table~\ref{tab:ext-order}):
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item on LoCoBench, a mean absolute change of \extLocoPermMeanGpt{} under permutation; beyond
   $\tau$ it falls on \extLocoPermDownTolGpt{} and rises on \extLocoPermUpTolGpt{} of
@@ -375,8 +375,8 @@ re-mining does by two one-sided tests at $\alpha=0.05$ with margin $\tau$ on the
 absolute change, using a 90\% bootstrap interval that resamples families jointly, since the
 permutation and re-mining comparisons share documents. On LoCoBench the difference is
 $\extLocoEqDiffGpt$ with interval [\extLocoEqLoGpt, \extLocoEqHiGpt], inside $(-\tau,\tau)$; on
-ContraDoc it is $\extCdEqDiffGpt$ with [\extCdEqLoGpt, \extCdEqHiGpt], so equivalence is established
-on LoCoBench in this design but not on ContraDoc. These two comparisons draw the noise floor from a
+ContraDoc it is $\extCdEqDiffGpt$ with [\extCdEqLoGpt, \extCdEqHiGpt], so equivalence holds on LoCoBench in this unmatched design but not on ContraDoc; the matched designs
+below, which are the ones the main text reports, do not establish it on either. These two comparisons draw the noise floor from a
 separate run; the matched designs below do not. The direction of the changes beyond
 $\tau$ matters as well. On LoCoBench, re-mining is balanced (\extLocoEqNoiseUpGpt{} rises,
 \extLocoEqNoiseDownGpt{} falls, $p=\extLocoEqNoisePGpt$), and permutation leans down
@@ -452,10 +452,11 @@ the world falls in the relation's violated cells. This checks the implementation
 graphs and confirms Lemma~\ref{lem:edit} at work. With gpt-oss-120b the sweep covers
 \extCpSweepNOss{} cases, every one with the predicted sign.
 
-On the subset whose false side the annotators recorded, the contradictions found are
-\extCpRealSupportGpt{} supports and \extCpRealConflictGpt{} conflicts at the real verdicts. A
-self-contradiction between two false sentences, or between a true and a false one, is a support
-at the verdict world. Counting contradictions would treat all of them as defects.
+On the pairs with a recorded factuality label (including pairs whose two sentences are both
+factual), the contradictions found are \extCpRealSupportGpt{} supports and \extCpRealConflictGpt{}
+conflicts at the real verdicts: a contradiction with a false sentence is a support at the verdict
+world, one between two factual sentences a conflict. Counting contradictions would treat the
+supports as defects too.
 
 
 \paragraph{ContraDoc at the verdict world, paired.} Mining the two versions of a document separately

@@ -1027,3 +1027,124 @@ half-way down page 9's first column:
 - §2.1, §2.3, §2.5 and the Lemma, Theorem and MRF prose are condensed;
 - the §3.1 setup, data and mined paragraphs, and related work, are tightened.
 The build is clean.
+
+## 20. Sixth review (2026-11-28, after option (a))
+
+Three fresh, independent reviewers on commit `a973d8e1` (rendered pages provided; no access to this
+file, HUMAN_STUDY.md, PREREG.md or `.claude/`); plus my checks. Length was excluded.
+- **Theory.** The theory is again fully verified by enumeration and recomputation, including the new
+  prose: supports saturate and conflicts compound, the two-relation sign rule, the refutation
+  discount, the split invariance of Λ^lin, and "only Λ satisfies A2".
+- **Numbers.** All three reviewers find every number they checked equal to its macro.
+
+### Scores
+
+| | Holistic | Theory and LoCoBench reviewer | Natural-text reviewer | **Mine** (5th review → now) |
+|---|---|---|---|---|
+| Soundness | 3 | 3.5 | 3.5 | 3 → **3** |
+| Excitement | 2.5 | – | – | 2.5 → **2.5** |
+| Overall | 2.5 (borderline Findings) | – | – | 2.5 → **2.5** |
+| Confidence | 4 | – | – | **4** |
+| Reproducibility | 3 | – | – | **3** |
+
+**What improved.** The framing is now honest: the paper says LCS is not better than its linearization.
+The theory is clean, and the caveats are stated in the main text.
+
+**Why the rating does not rise.**
+- **Λ^lin vs Σ± (N56).** Once LCS's advantage over Λ^lin is gone, the case for Λ^lin over the plain
+  signed sum Σ± is the remaining one, and it too is almost entirely an artefact of counting ties as
+  failures. The data do not separate the three linear-or-better scores.
+- **What is left.** The contribution reduces to: (i) reading relations at the verdict world, which
+  is not validated on natural text; (ii) a principled derivation of a weighted signed sum; (iii) a
+  benchmark. All three reviewers want human validation, and the holistic reviewer also wants a
+  clearer novelty statement against Thagard and Verbeurgt (1998).
+
+### New findings
+
+| # | Severity | Finding | Evidence | Verified |
+|---|---|---|---|---|
+| N56 | **major** | **The asymmetry's gain over Σ± is mostly tie-breaking.** "Satisfied" counts only rises, and Σ± ties when a flipped verdict turns a removed conflict into a removed support of the same weight (gold weights take three values). At q = 0.2, with ties counted as half credit, Λ^lin scores 74.5 against Σ± 73.7, and on rises minus falls 49.1 against 47.4; Σ± falls *less* (22.7% against 24.3%). On mined graphs with the verifier, Σ± is at least as good on rises minus falls. This overclaims in the abstract ("a signed sum without its asymmetry is worse with injected verdict errors"), the Conclusion ("its asymmetry is the only ingredient that helped") and §3.1 ("the asymmetry decides"). | theory reviewer; my rerun | me |
+| N57 | major | **What the recommendation of Λ^lin rests on.** "At least as accurate on every mined arm" is true against LCS but not against Σ± (530 vs 528; 87 vs 86). Over Σ±, the recommendation rests on theory: it is the first-order expansion of the model, and it scores a split constraint as the whole. The main reporting still leads with LCS (Fig. 2 "Our score", abstract numbers). "LCS is the model it approximates" overstates: at operating weights Λ^lin is a tangent (a violated ent costs 0.69 against 2.33). | holistic + theory reviewers | macros |
+| N58 | major | **"On natural text the two cannot be told apart" is false.** ChatProtect falls/rises are 261/100 for LCS against 217/102 for Λ^lin, and 11/71 against 3/72 on the control; ExpertQA gives 0.26 against −0.02. LCS depends on π(x\*), so on the claim set (App. A: an untouched claim moves LCS), while Λ and Λ^lin do not. This weakens "LCS is a reading on a common scale". | holistic + theory reviewers | macros |
+| N59 | major | **The recommended Λ^lin has no saturation.** It scores 0% on "repeated support counts less", so Limitations' "Saturation bounds redundant support" holds only for LCS. Padding with duplicated or paraphrased supports is untested. | holistic reviewer | me |
+| N60 | major | **Novelty.** Thagard and Verbeurgt's (1998) coherence at a fixed accept/reject partition is a sum of satisfied constraint weights, in which a negative constraint between an accepted and a rejected element counts as satisfied. That is close to Σ± and Λ^lin at the verdict world. BeliefBank counts violated constraints under beliefs. Related work cites both only as belief repair, and "none fixes a committed world under which refuting a falsehood counts as support" is too strong. | holistic reviewer | – |
+| N61 | major (partly my error) | **SummEval headline and a stale sentence.** "Do not track rated discourse coherence" hides two opposite effects: −0.18 with a relation, +0.15 inference-only, +0.31 without restatements. A stale appendix sentence (App. L, SummEval) calls Λ⊥ and Λ^lin "uncorrelated with rated coherence", contradicting the main-text mechanism (both −0.18 to −0.20 with a relation). The Λ^lin − Σ± difference has no interval, and a between-system confound is unexamined. | natural-text reviewer | me |
+| N62 | major | **An unreported verdict-world test.** The ChatProtect verdict-world test (listed post hoc) is not reported: found contradictions rise 14/14, all 64 pairs 20/12, p = 0.22. Limitations' "did not help" omits it, and §3.2 omits the gpt-oss natural-text nulls (ChatProtect 188/173, p = 0.46; ContraDoc recall 15%). | natural-text reviewer | rev |
+| N63 | critical (as before) | **No human validation; the construct is material consistency.** The non-sequitur control gives 92% against 95%. The verdict world, the distinctive idea, is validated only on ladders built to reward it. | all three | – |
+| N64 | minor | **Invariance measures mining noise** (LCS 52/5/1/1% exact). A noise-calibrated criterion, such as an AUC of increase against invariance change, would compare scores and judges fairly. | holistic reviewer | – |
+| N65 | minor (some mine) | **Wording.** (1) The Conclusion says "the full model is where presentation invariance … hold[s] exactly", but Λ^lin passes both split tests; restrict this to repetition and contested premises. (2) "Between the linear 3 and the exact 8.8" holds only for v = ¼ (1 and 3.2 for eqv and exc), and "several times" in the abstract is wrong for eqv and exc at first order. (3) "Each copy costs more than the last, without bound": the marginal cost converges to −log(1−p), and only the cumulative cost is unbounded. (4) The "two-valued" corollary is missing from App. B.1. (5) "By [+2.5, +4.6] points" has no point estimate. (6) "Always rises" against one numerical tie. (7) Limitations calls the verifier result "indistinguishable", although the CI is [−3.3, +0.2] and the fall rates are 10.7% against 7.4%. (8) Fig. 2 does not define the hollow markers. (9) The abstract's 92% (tolerance) and 69% (plain) read as comparable. (10) The family sign test is not Holm-adjusted. | all | me (several) |
+| N66 | minor | **Natural-text details.** (1) The ASAP standards are uneven: the grader "does better", yet the difference [−0.31, +0.01] crosses zero; add the CI after the grader against the count, +0.07 [−0.04, +0.19]. (2) The ASAP appendix overframes ("full pipeline", "density of supported reasoning"). (3) Stale order sentences in App. L (l. 349, 378). (4) The "kept" shares are not comparable across scores. (5) A wrong cross-reference for the cluster tests. (6) The description of the ChatProtect real-verdict subset is wrong (it includes "none"). (7) Ethics: the essays by minors were sent to APIs (state de-identification and retention), and the underlying texts have their own terms beyond the repository licences. | natural-text reviewer | rev |
+
+### Fix plan
+
+- **A. Text corrections** (N58, N59, N61's stale sentence, N65, N66): mechanical.
+- **B. Metrics** (N56, N64):
+  - Report falls and ties-as-half beside "rises" for the chain and the verifier (Table 1, App. H).
+  - Restate the asymmetry result: "with ties counted as half, Λ^lin and Σ± are within a point; the
+    asymmetry mostly breaks Σ±'s exact ties".
+  - Optionally add the noise-calibrated AUC.
+- **C. Framing (N57, N60), the authors' decision.** The data do not separate Σ±, Λ^lin and LCS.
+  Choose between:
+  - (a′) keep recommending Λ^lin, on theoretical grounds only: it is the first-order part of a
+    principled model, it scores a split constraint as the whole, and it is free of claim-set
+    dependence. Say plainly that empirically the three are indistinguishable.
+  - (b′) present the contribution as the verdict-world reading plus the decomposition, recommend
+    no single score, and position the work against Thagard and Verbeurgt (1998) and BeliefBank.
+  - (c′) make Λ, the log-ratio, the headline, since it has no claim-set dependence; LCS would
+    remain only as its odds reading.
+- **D. Natural text (N61, N62):** two-sided SummEval wording, report the ChatProtect verdict-world
+  test, summarize the gpt-oss nulls, and add the SummEval within-system check.
+- **E. New analyses (optional):** a padding stress test for Λ^lin (N59); the AUC (N64).
+- **F. The human study (N63)**, still the decisive missing piece.
+
+## 21. Changelog (2026-11-28): fixes from the sixth review (A, B, D; C option a′)
+
+**B. Metrics (N56).**
+- **Falls and ties.** Rise/fall/tie counts and a half-credit score (rise 1, tie ½, fall 0) are added
+  to the noise analysis (`arr_phaseb.py`, macros `vn*Fall*`, `vn*Tie*`, `vn*Half*`, and the paired
+  `vnDiffLWHalf*`), the verifier (`run_claim_verifier.py`, `vf*fall*`, `vf*half*`) and the GPT-6
+  chain (`arr_decomp.py`, `dcAttr*Fall`, `dcAttr*Half`).
+- **Table 1** shows half-credit values in parentheses.
+- **Result.** At q = 0.2, Λ^lin − Σ± is +2.5 to +4.6 counting rises only but +0.1 to +1.9 with
+  ties as half, and Σ± falls less (22% vs 24%). The verifier, mined, with ties as half: Σ± 91,
+  Λ^lin 91, LCS 89.
+- **Text.** §3.1 now says the asymmetry "mostly breaks ties". The abstract, Intro and Conclusion no
+  longer claim an empirical advantage for the asymmetry.
+
+**C, option a′.**
+- The data do not separate Σ±, Λ^lin and LCS once ties count as half.
+- Λ^lin is recommended on theoretical grounds (§2.6, abstract, Intro, Conclusion): it is the first
+  order of the model, it weighs relations by the prior mass they rule out, it scores split
+  constraints as the whole, and it does not depend on untouched claims (LCS does, through π(x*)).
+- Related work now positions the score against Thagard and Verbeurgt (1998), whose coherence at a
+  fixed partition is close to Σ±, and BeliefBank.
+
+**A. Text.**
+- **N58.** "Cannot be told apart on natural text" is replaced by LCS's claim-set dependence.
+- **N59.** The Limitations say Λ^lin does not saturate, so padding raises it.
+- **N61.** The stale App. L SummEval sentence is corrected.
+- **N65.**
+  - The presentation-invariance claim is restricted.
+  - The ratio range is given per coupling.
+  - "Several times" is removed from the abstract.
+  - The repeated-conflict marginal cost converges and the total is unbounded.
+  - The two-valued corollary is added to App. B.1.
+  - "All but one numerical tie".
+  - The verifier "indistinguishable" is replaced by its CI and fall rates.
+  - The family sign test carries a Bonferroni note.
+- **N66.**
+  - The ASAP "does better" now says the difference is not resolved.
+  - The ASAP appendix is no longer overframed.
+  - The stale order sentences in App. L are corrected.
+  - The ChatProtect real-verdict subset is described correctly.
+  - Ethics covers the minors' essays sent to APIs and the terms of the underlying texts.
+
+**D. Natural text (N61, N62).**
+- **SummEval.** Two-sided: −0.18 with a relation, +0.15 inference-only. A new within-system check
+  (`ext_eval.py`, `extSeWithin*`) gives LCS −0.17 and restatements −0.17, against Σ± −0.04, so the
+  effect is not between systems.
+- **ChatProtect.** The verdict-world test (14/14 found; 20/12 overall, p = 0.22) and the gpt-oss
+  nulls are reported in the Limitations.
+
+**Length.** The main text again ends about 60% down page 9's first column. Every existing macro
+value is unchanged (checked by diff for the noise, verifier and ext macro files).

@@ -55,7 +55,7 @@ counts as a support there (App.~\ref{app:asserted-sign}).
 (pairwise Llama) of the increases, by more than $\tau=\sThreeTol$ on \sThreeGraphGptLamIncTolPct\% to
 \sThreePairOssLamIncTolPct\%. Theorem~\ref{thm:mono} covers only pairs whose extracted graphs are
 ordered as declared (\sThreeGraphGptDomForward{} of \sThreeNIncPairs{} with GPT-6, \sThreePairOssDomForward{}
-with each pairwise miner), where $\LCS$ always rises (Figure~\ref{fig:dominance}). A graph-level miner outside the committee's vendors (Llama-3.3-70B, \subLadders{} ladders) reaches
+with each pairwise miner), where $\LCS$ rises on all but one numerical tie (Figure~\ref{fig:dominance}). A graph-level miner outside the committee's vendors (Llama-3.3-70B, \subLadders{} ladders) reaches
 F1 \subLlamaPairF{} against \subGptPairF{}, and $\LCS$ rises on \subLlamaLcsInc\% of its increases
 against \subGptLcsInc\% for GPT-6 there: results depend on the miner.
 
@@ -78,9 +78,9 @@ Contested premise counts less & \zsDoubtSum & \zsDoubtLin & \zsDoubtIndep & \zsD
 \midrule
 \multicolumn{5}{@{}l}{\emph{LoCoBench increases satisfied} (\%)}\\
 Gold graphs & \sThreeGoldWsumIncPct & \sThreeGoldLinIncPct & \sThreeGoldIndepIncPct & \sThreeGoldLamIncPct \\
-Gold, 20\% of verdicts flipped & \vnWsumIncTwenty & \vnLinIncTwenty & \vnIndepIncTwenty & \vnLcsIncTwenty \\
-GPT-6 graphs & \dcAttrWsum & \dcAttrLin & \dcAttrIndep & \dcAttrLcs \\
-GPT-6, verifier's verdicts & \vfGptMinedWsumInc & \vfGptMinedLinInc & \vfGptMinedIndepInc & \vfGptMinedLcsInc \\
+Gold, 20\% of verdicts flipped & \vnWsumIncTwenty{} (\vnWsumHalfIncTwenty) & \vnLinIncTwenty{} (\vnLinHalfIncTwenty) & \vnIndepIncTwenty{} (\vnIndepHalfIncTwenty) & \vnLcsIncTwenty{} (\vnLcsHalfIncTwenty) \\
+GPT-6 graphs & \dcAttrWsum{} (\dcAttrWsumHalf) & \dcAttrLin{} (\dcAttrLinHalf) & \dcAttrIndep{} (\dcAttrIndepHalf) & \dcAttrLcs{} (\dcAttrLcsHalf) \\
+GPT-6, verifier's verdicts & \vfGptMinedWsumInc{} (\vfGptMinedWsumhalfInc) & \vfGptMinedLinInc{} (\vfGptMinedLinhalfInc) & \vfGptMinedIndepInc{} (\vfGptMinedIndephalfInc) & \vfGptMinedLcsInc{} (\vfGptMinedLcshalfInc) \\
 \bottomrule
 \end{tabularx}
 \caption{\textbf{$\LCS$ beside its three simplifications} (Prop.~\ref{prop:decomp}). Left to
@@ -89,19 +89,21 @@ the per-relation evidence $\lambda_r$ ($\Lambda^{\perp}=\sum_r\lambda_r$), and t
 $I_\R$ ($\LCS$). All four satisfy A1 and A3. The constructed edits hold or fail by definition; they
 show what each score encodes, not how accurate it is (a repeated \emph{conflict} costs more each time
 under $\LCS$, \S\ref{sec:decomp}) (\zsEqvN{} gold graphs, \zsDoubtN{} for the
-contested premise). Rows are read at the verdict world; the GPT-6 row has one decimal to separate close values.}
+contested premise). Rows are read at the verdict world; increases count rises, and in parentheses a tie counts as
+half; the GPT-6 row has one decimal to separate close values.}
 \label{tab:three}
 \end{table}
 
 \paragraph{Where the four scores differ.} With correct verdicts all four satisfy every gold
-increase (Table~\ref{tab:three}). Rung pairs differ by one or two relations, so any cost/support ratio
-between the linear 3 and the exact $\dcRatioOne$ signs the edits alike: the ladders exercise the
+increase (Table~\ref{tab:three}). Rung pairs differ by one or two relations, so any cost/support ratio between the linear and the
+exact one (3 and $\dcRatioOne$ for \ent, \con, \cnc) signs the edits alike: the ladders exercise the
 asymmetry but hardly the curvature or the interaction, which is small on these graphs (median
-$|I_\R|=\dcIGoldAbsMedian$ nats against $\dcLamGoldAbsMedian$ for $|\Lambda|$). \emph{With injected
-verdict errors the asymmetry decides:} at 20\% flipped, $\Llin$, $\Lambda^{\perp}$ and $\LCS$ keep the
-same increases, and $\Llin$ beats $\Ssum$ by\asapCI{\vnDiffLWLoIncTwenty}{\vnDiffLWHiIncTwenty} points
-(a gain on \cp{conflict}, a cost on \cp{chain}). With a closed-book verifier's verdicts on mined graphs
-the four are within two points, with offsetting effects by type. \emph{On mined graphs no step is
+$|I_\R|=\dcIGoldAbsMedian$ nats against $\dcLamGoldAbsMedian$ for $|\Lambda|$). \emph{With injected verdict errors the asymmetry mostly breaks ties:} at 20\% flipped, $\Llin$,
+$\Lambda^{\perp}$ and $\LCS$ keep the same increases, and $\Llin$ keeps more than $\Ssum$ (by
+\vnDiffLWLoIncTwenty{} to \vnDiffLWHiIncTwenty{} points), largely because $\Ssum$ ties exactly where a flipped verdict swaps a removed conflict for a removed
+support of equal weight: with ties counted as half the difference is \vnDiffLWHalfLoIncTwenty{} to \vnDiffLWHalfHiIncTwenty{} points, and $\Ssum$ falls
+less often (\vnWsumFallIncTwenty\% against \vnLinFallIncTwenty\%). With a closed-book verifier's verdicts
+on mined graphs the four are within two points either way, with offsetting effects by type. \emph{On mined graphs no step is
 significantly better:} exact McNemar tests of the three steps on the four mined arms, Holm-adjusted,
 find none at which the richer score wins, and the only significant step is a loss. On gpt-oss graphs the
 curvature costs (\mcCurvOssB{} pairs against \mcCurvOssC, Holm $p=\mcCurvOssHolm$; by family
@@ -113,9 +115,9 @@ dominate; at the asserted world $\LCS$ correlates with the count at $\dcCountAss
 
 \paragraph{Text baselines and LLM judges.} Surface cues solve two of the three increasing types:
 length rises on \sThreeBCtlLengthChain{} \cp{chain} pairs and a discourse-marker count on
-\sThreeBCtlMarkersConflict{} \cp{conflict} pairs; only verdicts decide \cp{sign}. Judges rating one response at a time do not separate \cp{chain} rungs: G-Eval with GPT-6 rises on
-\sThreeBGevalGptChain{} pairs and falls on \sThreeBGevalGptChainFalls{} ($\LCS$:
-\sThreeGraphGptLamChain), even given the claims, verdicts and our definition. Asked which of two
+\sThreeBCtlMarkersConflict{} \cp{conflict} pairs; only verdicts decide \cp{sign}. Judges rating one response at a time do not separate \cp{chain} rungs (G-Eval with GPT-6 rises on
+\sThreeBGevalGptChain{} pairs and falls on \sThreeBGevalGptChainFalls), even given the claims, verdicts
+and our definition. Asked which of two
 rungs is more coherent, with the claims, verdicts and definition, GPT-6 prefers the declared rung on
 \fjPairVIncRise\% of the increases and calls \fjPairVInvTie\% of the invariance pairs equal ($\LCS$:
 \sThreeGraphGptLamInvPct\% exactly, \sThreeGraphGptLamInvTolPct\% within $\tau$). $\LCS$ instead scores

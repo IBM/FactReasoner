@@ -462,6 +462,7 @@ def check1(args):
                          "lcs_norestate": lcs_at(x["num_atoms"],
                                                  [q for q in r if q[2] != "equivalence"])[0],
                          "empty": not r, "n_ent": kinds["entailment"], "n_eqv": kinds["equivalence"],
+                         "system": x["expected"].get("model_id"),
                          "n_con": sum(kinds[k] for k in CONFLICTISH), "n_rel": len(r),
                          **x["expected"]["expert"],
                          "judge": base.get("judge_geval@gpt-6-sol", {}).get(iid)})
@@ -500,6 +501,24 @@ def check1(args):
             out[f"{key}_rho_coherence_ci"] = boot(g, groups)
             out[f"{key}_nonempty_rho_coherence"] = g(NE)
             out[f"{key}_nonempty_rho_coherence_ci"] = boot(g, grouped(NE, "group"))
+        # Sixth review N61: within-system correlations (16 summarizers; the restatement effect may be
+        # between systems). Ranks of score and rating are residualized on system dummies.
+        systems = sorted({r["system"] for r in NE})
+
+        def within(S, col):
+            import numpy as np
+            def rank(v):
+                return np.argsort(np.argsort(np.asarray(v, float))).astype(float)
+            D = np.array([[1.0 if r["system"] == sy else 0.0 for sy in systems] for r in S])
+            a, b = rank([r[col] for r in S]), rank([r["coherence"] for r in S])
+            ra = a - D @ np.linalg.lstsq(D, a, rcond=None)[0]
+            rb = b - D @ np.linalg.lstsq(D, b, rcond=None)[0]
+            den = math.sqrt(float(ra @ ra) * float(rb @ rb))
+            return float(ra @ rb) / den if den else float("nan")
+        for key, col in (("lcs", "lcs"), ("lin", "lin"), ("wsum", "wsum"), ("restatements", "n_eqv")):
+            g = lambda S, c=col: within(S, c)  # noqa: E731
+            out[f"within_{key}_nonempty"] = g(NE)
+            out[f"within_{key}_nonempty_ci"] = boot(g, grouped(NE, "group"))
         out["relations_by_kind"] = {"inference": sum(r["n_ent"] for r in NE),
                                     "restatement": sum(r["n_eqv"] for r in NE),
                                     "conflict": sum(r["n_con"] for r in NE),
@@ -1130,6 +1149,12 @@ def write_macros(ev, path):
             m(f"MtNoiseMean{tag}", f"{mt['noise_floor']['lcs']['mean_abs']:.3f}")
         d = c1.get(f"1d:{arm}")
         if d and "wsum_rho_coherence" in d:
+            for key, kt in (("lcs", "Lcs"), ("lin", "Lin"), ("wsum", "Wsum"),
+                            ("restatements", "Restate")):
+                if f"within_{key}_nonempty" in d:
+                    m(f"SeWithin{kt}{tag}", f2(d[f"within_{key}_nonempty"]))
+                    m(f"SeWithin{kt}{tag}Lo", f2(d[f"within_{key}_nonempty_ci"][0]))
+                    m(f"SeWithin{kt}{tag}Hi", f2(d[f"within_{key}_nonempty_ci"][1]))
             for key, kt in (("wsum", "Wsum"), ("indep", "Indep"), ("lin", "Lin"),
                             ("norestate", "NoRestate")):
                 if f"{key}_rho_coherence" not in d:

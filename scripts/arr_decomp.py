@@ -211,6 +211,16 @@ def main() -> int:
     M["AttrPairs"] = len(rows)
     for k in CHAIN:
         M[f"Attr{k.title()}"] = f"{100 * np.mean([r['ok'][k] for r in rows]):.1f}"
+        # fifth review N56: falls, and ties counted as half
+        fall = half = 0.0
+        for r in rows:
+            a_, b_ = r["V"][0][k], r["V"][1][k]
+            t_ = E.REL_TIE * max(abs(a_), abs(b_))
+            f_ = a_ - b_ > t_
+            fall += f_
+            half += 1.0 if r["ok"][k] else (0.0 if f_ else 0.5)
+        M[f"Attr{k.title()}Fall"] = f"{100 * fall / len(rows):.1f}"
+        M[f"Attr{k.title()}Half"] = f"{100 * half / len(rows):.1f}"
 
     def decisive(r):
         last = r["ok"]["lcs"]

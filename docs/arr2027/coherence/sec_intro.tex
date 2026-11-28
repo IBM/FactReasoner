@@ -7,9 +7,8 @@
 The dominant paradigm for evaluating the factuality of long-form generation is \emph{decompose-then-verify}: 
 a response is decomposed into atomic claims, each claim is verified against retrieved evidence, 
 and the resulting verdicts are aggregated into a final score
-\citep{factscore,safe,veriscore,factreasoner}. Although highly effective and now standard, this framework 
-implicitly assumes that claims can be evaluated in isolation. In doing so, it discards the relational 
-structure that transforms a collection of statements into a logically coherent argument. 
+\citep{factscore,safe,veriscore,factreasoner}. This framework evaluates claims in isolation, and so discards the relations that make a set of
+statements an argument. 
 
 For example, Figure~\ref{fig:voyager} shows two answers about Voyager~1 that state the
 same five claims with the same stance, so they receive the same verdicts. Response A derives its conclusion
@@ -26,11 +25,9 @@ incoherent.
 
 \input{figures/voyager-pair}
 
-To quantify this property, we represent an argument as a Markov random field (MRF) whose 
-variables correspond to claims and whose factors encode the relations expressed between 
-them. A factuality pipeline supplies the claims' truth values, defining a \emph{committed world} 
-against which the argument is evaluated. We then define the \emph{Logical Coherence Score} (LCS) 
-as the weight of evidence \citep{good1950} that the relation graph provides for that world. 
+We represent an argument as a Markov random field (MRF) over its claims whose factors encode its
+relations. A factuality pipeline's verdicts define a \emph{committed world}, and the \emph{Logical
+Coherence Score} (LCS) is the weight of evidence \citep{good1950} the relations give that world. 
 Relations the committed world supports raise it and relations it violates lower it: refuting a
 falsehood increases coherence, deriving a falsehood from a truth decreases it. LCS asks whether the
 argument's relations accord with the facts, not whether the claims are true, so it complements
@@ -45,12 +42,11 @@ hold whatever the verdicts, and the committed world as the readout (App.~\ref{ap
 into per-relation evidence and an interaction term, and its first-order expansion, the linear
 evidence, charges violations more than it credits supports (\S\ref{sec:decomp}).
 \item \textbf{A controlled evaluation on LoCoBench} (\S\ref{sec:experiments}). LCS rises on
-\sThreeGraphGptLamIncPct\% of the declared increases with GPT-6-mined graphs. The linear evidence is at
-least as accurate on every mined arm, and neither the curvature nor the interaction of the full model
-is significantly better anywhere, so we recommend the linear evidence in practice. Judges rating one
+\sThreeGraphGptLamIncPct\% of the declared increases with GPT-6-mined graphs. Once ties count as half, the data separate neither LCS, the linear evidence nor a plain signed sum;
+we recommend the linear evidence on theoretical grounds. Judges rating one
 response at a time do not see added valid inferences; a pairwise judge given the verdicts trails LCS
 slightly on increases and keeps far more invariances.
-\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). Read with every claim taken as
-asserted, scores of mined relations do not track rated discourse coherence, fall when a detected
-contradiction is added, and track essay quality beyond length about as well as a relation count.
+\item \textbf{An evaluation on natural text} (\S\ref{sec:exp-external}). Read with every claim taken as asserted, scores of mined relations fall when a detected contradiction
+is added, track essay quality beyond length about as well as a relation count, and relate to rated
+discourse coherence only through which relations are mined.
 \end{itemize}

@@ -60,12 +60,13 @@ check, which a constant would pass, shows only what the score is not. On SummEva
 coherence ratings at $\extSeRhoCohGpt$ \asapCI{\extSeRhoCohGptLo}{\extSeRhoCohGptHi}, against
 $\extSeJudgeRhoCoh$ for G-Eval; \extSeEmptyGpt\% of these three-sentence summaries have no relation,
 and on the rest the correlation is negative, $\extSeNonEmptyRhoCohGpt$
-\asapCI{\extSeNonEmptyRhoCohGptLo}{\extSeNonEmptyRhoCohGptHi}. Restatements drive it (exploratory): raters penalize the redundancy (their number correlates with
-rated coherence at $\extSeCountRestateRhoCohGpt$), while a restatement is an equivalence, which the
-first-order weights credit twice an inference ($v_r=\frac12$ against $\frac14$). $\Llin$ shows the same
-$\extSeLinNonEmptyRhoCohGpt$ and the signed sum, which credits both alike, $\extSeWsumNonEmptyRhoCohGpt$.
-Without restatements $\LCS$ correlates at $\extSeNoRestateNonEmptyRhoCohGpt$, no more than the number of
-inferences ($\extSeCountInfRhoCohGpt$). $\LCS$ thus rewards restating a claim.
+\asapCI{\extSeNonEmptyRhoCohGptLo}{\extSeNonEmptyRhoCohGptHi}. Two opposite effects meet there (exploratory). Summaries with more mined restatements are rated less
+coherent ($\extSeCountRestateRhoCohGpt$), and a restatement is an equivalence, which the first-order
+weights credit twice an inference ($v_r=\frac12$ against $\frac14$): $\Llin$ shows the same
+$\extSeLinNonEmptyRhoCohGpt$, the signed sum, which credits both alike, $\extSeWsumNonEmptyRhoCohGpt$. On
+summaries with inferences only, $\LCS$ correlates positively, $\extSeInfOnlyRhoCohGpt$
+\asapCI{\extSeInfOnlyRhoCohGptLo}{\extSeInfOnlyRhoCohGptHi}. It holds within each of the 16 summarizers ($\LCS$ $\extSeWithinLcsGpt$, restatements
+$\extSeWithinRestateGpt$): $\LCS$ rewards restating a claim.
 
 \paragraph{Detected conflicts lower the score.} With every claim true, adding a contradiction lowers $\Lambda$ (Lemma~\ref{lem:edit}); the two versions
 are mined separately, so the fall is predicted rather than guaranteed:
@@ -85,9 +86,9 @@ the added claim changes the prior of the committed world (App.~\ref{app:ext-cont
 permutation than under re-mining (90\% intervals of the difference in mean change: LoCoBench
 \extLmEqLoGpt{} to \extLmEqHiGpt, ContraDoc by section \extSecEqLoGpt{} to \extSecEqHiGpt), with
 test-retest ICC \extLmIccLcsAllGpt{} and \extSecIccLcsAllGpt{} (judge \extLmIccJudgeAll{} and
-\extSecIccJudgeAll; App.~\ref{app:ext-order}). The judge falls on \extLmJudgePermDec\% and
-\extSecJudgePermDec\% of permutations, against \extLmJudgeNoiseDec\% and \extSecJudgeNoiseDec\% when
-re-judged. Those falls need not be instability: G-Eval rates discourse coherence, which permuting paragraphs is meant to damage. The order tests fixed in advance failed for $\LCS$ too (Table~\ref{tab:ext-plan}; App.~\ref{app:ext-order}).
+\extSecIccJudgeAll; App.~\ref{app:ext-order}). G-Eval falls on \extLmJudgePermDec\% and \extSecJudgePermDec\% of permutations (\extLmJudgeNoiseDec\%
+and \extSecJudgeNoiseDec\% re-judged), as a rater of discourse coherence may; the order tests fixed
+in advance failed for $\LCS$ (App.~\ref{app:ext-order}).
 
 \paragraph{Essay quality beyond length.} We score \asapEssays{} ASAP~2.0 essays
 \citep{crossley2025asap}, rated 1--6 by trained raters, from atomized claims and mined relations at the asserted world;
@@ -97,6 +98,7 @@ Length correlates with the score at \asapRhoWords. $\LCS$ keeps a partial correl
 (\asapRobCubic{} to \asapRobBinsSix{} with nonlinear controls), the relation count
 \asapParRelations, the signed sum \asapParWsumAsserted{} and G-Eval \asapParJudgeGevalGptSixSol, with no
 difference resolved: the essay signal is carried by mined relations in general, not by how
-$\LCS$ combines them. A rubric-prompted 0--100 grader does better (\asapParJudgeRubricOneZeroZeroGptSixSol); $\LCS$ keeps
+$\LCS$ combines them. A rubric-prompted 0--100 grader correlates more (\asapParJudgeRubricOneZeroZeroGptSixSol), though its
+difference from $\LCS$ is not resolved; $\LCS$ keeps
 \asapPwrhLcsAsserted{} after length and the grader, not resolvably more than the relation count
 (App.~\ref{app:asap}).

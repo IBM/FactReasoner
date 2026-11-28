@@ -9,16 +9,14 @@ MRF lends to the committed world, meets this for any priors and relation graph (
 and within product MRFs read at one world it forces sign-definite tables and the committed world as
 the readout (App.~\ref{app:why}).
 
-$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}). Its
-first-order expansion, the linear evidence, is the score we recommend: its asymmetry is the only
-ingredient that helped on our data, while the curvature and the interaction were never significantly
-better. The full model is where presentation invariance and the treatment of redundant and contested
-evidence hold exactly; its interaction ignores the verdicts and compounds repeated conflicts, and
-needs human judgments to justify it.
+$\LCS$ splits into per-relation evidence and an interaction term (Prop.~\ref{prop:decomp}), and its
+first-order expansion, the linear evidence, is the score we recommend, on theoretical grounds: on our
+data, once ties count as half, it is not separable from $\LCS$ or from a plain signed sum. The full model treats repeated and contested evidence exactly, but its interaction ignores the
+verdicts and needs human judgments to justify it.
 A judge comparing two responses with their verdicts trails $\LCS$ slightly on increases and is more stable
-on invariances. On natural text, read with every claim asserted, scores of mined relations do not track rated discourse coherence,
-fall under detected contradictions, and track essay quality beyond length about as well as a bare
-relation count. What limits the score is relation extraction, the verdicts it is read against, and two design
+on invariances. On natural text, read with every claim asserted, scores of mined relations fall under detected
+contradictions, track essay quality beyond length about as well as a relation count, and relate to
+rated discourse coherence only through which relations are mined. What limits the score is relation extraction, the verdicts it is read against, and two design
 choices: restating a claim earns credit, and relevance is not modeled. Logical coherence is meant
 to be reported beside factuality and discourse coherence, not instead of them.
 
@@ -41,9 +39,12 @@ increases.
 contradictions, discourse and argument relations, essay scores), but none rates the logical
 coherence of a response, so agreement with human judgments of logical coherence remains to be
 established, and no human study checks that people rank LoCoBench's rungs as declared. Most
-natural-text tests read the asserted world. Where the verdict world was tested on natural text, it
-did not help: ContraDoc's preregistered verdict-world test failed (App.~\ref{app:external}), and on
-essays the strict world lowers the partial correlation (App.~\ref{app:asap}). The ExpertQA analysis uses one expert's labels per answer, counts unsure and unlabelled claims as
+natural-text tests read the asserted world. Where the verdict world was tested on natural text, it did not help: ContraDoc's preregistered
+verdict-world test failed (App.~\ref{app:external}); on ChatProtect the score rises on all
+\extCpVwFoundNGpt{} found contradictions, close to true by Lemma~\ref{lem:edit}, but on \extCpVwAllIncGpt{} against \extCpVwAllDecGpt{} of all
+\extCpVwAllNGpt{} pairs ($p=\extCpVwAllPGpt$); and on essays the strict world lowers the partial
+correlation (App.~\ref{app:asap}). With the gpt-oss-120b miner the ChatProtect test is null
+(\extCpAssertDecOss{} falls, \extCpAssertIncOss{} rises) and ContraDoc recall is \extCdRecallInsertOss\%. The ExpertQA analysis uses one expert's labels per answer, counts unsure and unlabelled claims as
 false, and uses answers selected to contain an incorrect claim, which all raise the number of
 violations.
 At first order a restatement, an equivalence, earns twice the credit of an inference, so the score
@@ -67,7 +68,8 @@ for \flipOverTenth\% of the \flipTouched{} such flips), and the change grows wit
 degree. Flipping each verdict with probability $0.2$, $\LCS$ still satisfies \vnLcsIncTwenty\% of
 LoCoBench's increases on gold graphs, against \vnWsumIncTwenty\% for the signed sum, and with a
 closed-book GPT-6 verifier (\vfGptAcc\% accurate) it satisfies \vfGptGoldLcsInc\% against
-\vfGptGoldWsumInc\%; on mined graphs the two are indistinguishable. Verdicts are binary, so a claim the
+\vfGptGoldWsumInc\%; on mined graphs the difference is \asapCI{\vfGptMinedDiffloInc}{\vfGptMinedDiffhiInc} points, and $\LCS$
+falls more often (\vfGptMinedLcsfallInc\% against \vfGptMinedWsumfallInc\%). Verdicts are binary, so a claim the
 evidence neither supports nor refutes is treated as false. On LoCoBench the verdicts are the
 generator's factuality labels, an error-free pipeline; App.~\ref{app:results} measures injected and
 verifier errors.
@@ -81,14 +83,15 @@ claims, stated explicitly, is extracted in \nsExtracted\% of LoCoBench responses
 \nsLcsRise\%, about as often as a valid inference does (\nvLcsRise\%). The interaction term ignores the
 verdicts, so a relation that refutes a falsehood by citing a claim discounts the other inferences
 drawn from that claim, as one that contests the claim would (\S\ref{sec:decomp}); this happens on
-LoCoBench (App.~\ref{app:decomp}), and we have no argument that it is desirable. Saturation bounds redundant
-support but cannot stop a miner from hallucinating new support, so the score inherits the
-extractor's precision.
+LoCoBench (App.~\ref{app:decomp}), and we have no argument that it is desirable. $\LCS$ saturates redundant support but the recommended $\Llin$ does not: it counts a repeated
+support in full, so a response padded with restated supports scores higher; neither can stop a miner
+from hallucinating new support, so the score inherits the extractor's precision.
 
 \paragraph{Computation and reproducibility.} The score needs the partition function $Z_\R$, which
 is \#P-hard in general; it is exact here because the graphs are small, and approximate inference
 preserves the guarantees only up to the approximation (App.~\ref{app:further}). The recommended linear evidence $\Llin$ needs no $Z_\R$ and costs $O(|\R|)$; it keeps the asymmetry,
-the only ingredient that helped on our data, and loses the interaction and with it part of A2
+whose measured benefit on our data is mostly tie-breaking, and loses the interaction and with it part
+of A2
 (\S\ref{sec:decomp}). The strongest miner
 and judge, GPT-6, are proprietary models served through an API, so their outputs may not be
 reproducible over time.
@@ -99,13 +102,15 @@ The score is intended for evaluating and diagnosing generated text. A high coher
 evidence of truth, and it should not be used on its own to certify content. LoCoBench is synthetic
 and contains no personal data. By design it contains plausible false claims written as expert prose,
 and every item carries per-claim factuality labels, which released copies should keep attached.
-This paper collects no new human data. The external evaluation uses public datasets under their
-licenses (App.~\ref{app:external}). The raw files of datasets whose licenses restrict or do not
+This paper collects no new human data. The external evaluation uses public datasets under their licenses (App.~\ref{app:external}); the
+licenses cover the datasets as released, and the underlying texts (news, Wikipedia, model outputs)
+keep their own terms. The raw files of datasets whose licenses restrict or do not
 state redistribution are not redistributed. GDTB is released under CC BY-NC-SA and is used for
 research only; QT30 states no license, so we use it for research only and redistribute nothing from
 it. The ASAP~2.0 essays were written by school students in grades 6--10 and are released under CC BY
-4.0, which permits this use; we use their text and scores only, no demographic metadata; the text was sent to commercial
-model APIs for claim extraction, relation mining and source checking. We do not redistribute the
+4.0, which permits this use; we use their text and scores only, no demographic metadata. These essays, written by minors, were
+sent to commercial model APIs under the providers' standard API terms for claim extraction, relation
+mining and source checking. We do not redistribute the
 copyrighted source article, which was transcribed only for the source check and, like the texts of
 every external dataset, sent to the same model APIs. LLMs were used to generate the benchmark
 responses, to validate them, to extract claims and relations and as judges, as described. They

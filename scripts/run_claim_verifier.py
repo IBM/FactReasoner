@@ -100,6 +100,7 @@ def cmd_eval(args):
         for src, graphs in (("gold", {iid: E.gold_relations(it) for iid, it in items.items()}),
                             ("gpt6", mined)):
             c = defaultdict(lambda: [0, 0])
+            cf = defaultdict(lambda: [0, 0.0])
             fam = defaultdict(lambda: defaultdict(list))
             for lad in ladders:
                 if lad["type"] not in E.INCREASE or any(i not in graphs for i in lad["item_ids"]):
@@ -123,10 +124,19 @@ def cmd_eval(args):
                         fam[t][lad["family_id"]].append((float(okl), float(okw)))
                     for key, v in vals.items():
                         ok = E.pair_ok(lad["type"], v[i], v[j], E.REL_TIE, True)
+                        t_ = E.REL_TIE * max(abs(v[i]), abs(v[j]))
+                        fall = v[i] - v[j] > t_
+                        tie = not ok and not fall
                         for t in ("inc", lad["type"]):
                             c[(key, t)][0] += ok
                             c[(key, t)][1] += 1
+                            cf[(key, t)][0] += fall
+                            cf[(key, t)][1] += ok + 0.5 * tie
             r[src] = {f"{k[0]}:{k[1]}": v[0] / v[1] for k, v in c.items()}
+            # fifth review N56: falls, and ties counted as half
+            for k, (fall, half) in cf.items():
+                r[src][f"{k[0]}fall:{k[1]}"] = fall / c[k][1]
+                r[src][f"{k[0]}half:{k[1]}"] = half / c[k][1]
             import random
             rng = random.Random(20261128)
             for t, Fm in fam.items():

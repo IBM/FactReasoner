@@ -247,11 +247,13 @@ none; the \emph{linear evidence} $\Llin$ adds the asymmetry (a violated \ent{} c
 satisfied one earns); and the \emph{independent evidence} $\Lambda^{\perp}=\sum_r\lambda_r$ adds the
 curvature (the ratio is $\dcRatioOne$ at $p_r=\dcP$, the strong band), treating relations as separate
 evidence as naive Bayes does. $\Llin$ scores a constraint split into halves of equal weight as the
-whole; the curvature breaks this and the interaction restores it, and only $\Lambda$ satisfies A2. On
-LoCoBench $\Llin$ is at least as accurate as $\LCS$ on every arm and on natural text the two cannot be
-told apart (\S\ref{sec:experiments}), so we recommend $\Llin$ in practice; $\LCS$ is the model it
-approximates, in which A2 holds and redundant and contested evidence are treated exactly
-(Table~\ref{tab:three}; Figure~\ref{fig:decomp}, App.~\ref{app:decomp}).
+whole; the curvature breaks this and the interaction restores it, and only $\Lambda$ satisfies A2. On our benchmarks the data do not separate $\Ssum$, $\Llin$ and $\LCS$ once ties are counted as half
+(\S\ref{sec:experiments}). We recommend $\Llin$ on theoretical grounds: it is the first-order part of
+the model, it weighs each relation by the prior mass it rules out and so scores a split constraint as
+the whole, and, unlike $\LCS$, it does not move when claims that no relation touches are added, since
+$\LCS$ depends on $\pi(\xs)$. $\Lambda$ is the full model, in which A2 holds and repeated and contested
+evidence are treated exactly; $\Llin$ linearizes it, coarsely at the operating weights (Table~\ref{tab:three};
+Figure~\ref{fig:decomp}, App.~\ref{app:decomp}).
 
 % App.~\ref{app:props} shows that the result rests on two choices that cannot be changed,
 % sign-definite tables and the committed world as the readout, and collects further properties of

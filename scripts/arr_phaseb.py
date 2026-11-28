@@ -47,6 +47,8 @@ def cmd_noise(args):
         c = defaultdict(lambda: [0, 0])
         # type -> family -> [(lcs ok, wsum ok, indep ok)]; indep is Lambda without I_R
         fam = defaultdict(lambda: defaultdict(list))
+        famh = defaultdict(lambda: defaultdict(list))
+        c3 = defaultdict(lambda: defaultdict(int))
         for lad in inc:
             its = [items[i] for i in lad["item_ids"]]
             atoms = [sorted(it["atoms"], key=lambda a: a["pos"]) for it in its]
@@ -62,17 +64,46 @@ def cmd_noise(args):
                 ind = [A.independent_evidence(np.full(n, 0.5), g, x) for g in graphs]
                 lin = [A.linear_evidence(np.full(n, 0.5), g, x) for g in graphs]
                 for i, j in itertools.combinations(range(3), 2):
+                    scores_ = (("lcs", lcs), ("wsum", ws), ("indep", ind), ("lin", lin))
                     ok = {key: E.pair_ok(lad["type"], v[i], v[j], E.REL_TIE, True)
-                          for key, v in (("lcs", lcs), ("wsum", ws), ("indep", ind), ("lin", lin))}
+                          for key, v in scores_}
+                    # fifth review N56: a tie counts as a failed increase in "ok"; also record falls
+                    # and ties, and score a pair 1 / 0.5 / 0 for a rise / tie / fall ("ties as half")
+                    half = {}
+                    for key, v in scores_:
+                        t_ = E.REL_TIE * max(abs(v[i]), abs(v[j]))
+                        cls = "rise" if v[j] - v[i] > t_ else ("fall" if v[i] - v[j] > t_ else "tie")
+                        half[key] = {"rise": 1.0, "tie": 0.5, "fall": 0.0}[cls]
+                        for t in (lad["type"], "inc"):
+                            c3[(key, t)][cls] += 1
+                            c3[(key, t)]["n"] += 1
                     for t in (lad["type"], "inc"):
                         fam[t][lad["family_id"]].append((float(ok["lcs"]), float(ok["wsum"]),
                                                          float(ok["indep"]), float(ok["lin"])))
+                        famh[t][lad["family_id"]].append((half["lcs"], half["wsum"], half["indep"],
+                                                          half["lin"]))
                     for key in ok:
                         c[(key, lad["type"])][0] += ok[key]
                         c[(key, lad["type"])][1] += 1
                         c[(key, "inc")][0] += ok[key]
                         c[(key, "inc")][1] += 1
         res[q] = {f"{k[0]}:{k[1]}": v[0] / v[1] for k, v in c.items()}
+        for (key, t), d in c3.items():
+            res[q][f"{key}fall:{t}"] = d["fall"] / d["n"]
+            res[q][f"{key}tie:{t}"] = d["tie"] / d["n"]
+            res[q][f"{key}half:{t}"] = (d["rise"] + 0.5 * d["tie"]) / d["n"]
+        # paired interval of lin - wsum with ties as half
+        brng = random.Random(SEED)
+        for t, Fh in famh.items():
+            Fh = list(Fh.values())
+            vals = []
+            for _ in range(BOOT):
+                smp = [brng.choice(Fh) for _ in Fh]
+                tot = sum(len(f) for f in smp)
+                vals.append(sum(r[3] - r[1] for f in smp for r in f) / tot)
+            vals.sort()
+            res[q][f"difflwhlo:{t}"] = vals[int(0.025 * BOOT)]
+            res[q][f"difflwhhi:{t}"] = vals[int(0.975 * BOOT) - 1]
         # paired family-cluster intervals: LCS - sum (as before), LCS - indep (the interaction
         # term), indep - sum (the weights)
         # ... and the three steps of the chain sum -> linear -> independent -> LCS: the asymmetry
@@ -101,7 +132,12 @@ def cmd_noise(args):
                       "difflo": "DiffLo", "diffhi": "DiffHi", "difflilo": "DiffLILo",
                       "difflihi": "DiffLIHi", "diffiwlo": "DiffIWLo", "diffiwhi": "DiffIWHi",
                       "difflwlo": "DiffLWLo", "difflwhi": "DiffLWHi", "diffillo": "DiffILLo",
-                      "diffilhi": "DiffILHi"}[key]
+                      "diffilhi": "DiffILHi", "difflwhlo": "DiffLWHalfLo",
+                      "difflwhhi": "DiffLWHalfHi"}.get(key) or {
+                      "lcsfall": "LcsFall", "wsumfall": "WsumFall", "indepfall": "IndepFall",
+                      "linfall": "LinFall", "lcstie": "LcsTie", "wsumtie": "WsumTie",
+                      "indeptie": "IndepTie", "lintie": "LinTie", "lcshalf": "LcsHalf",
+                      "wsumhalf": "WsumHalf", "indephalf": "IndepHalf", "linhalf": "LinHalf"}[key]
                 val = f"{100 * v:+.1f}" if key.startswith("diff") else f"{100 * v:.0f}"
                 L.append(f"\\newcommand{{\\vn{kt}{t.title()}{qt}}}{{{val}}}")
         open(args.macros, "w").write("\n".join(L) + "\n")
