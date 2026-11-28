@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import os
+import re
 import statistics as st
 import sys
 
@@ -41,6 +42,81 @@ import arr_slot3_eval as E  # noqa: E402
 import asap_lcs as S  # noqa: E402
 
 P = 0.925  # the strong band's midpoint, the weight of most gold relations
+
+
+# Palette and style of fig_lcs_lambda.pdf (scripts/arr_lcs_lambda.py): validated ordinal ramp and
+# categorical pair.
+RAMP = ("#86b6ef", "#2a78d6", "#104281")
+GOLD, MINED = "#2a78d6", "#eb6834"
+INK, MUTED, GRID = "#52514E", "#898781", "#E4E2DD"
+
+
+def figure(scat, path):
+    """(a) lambda_r against the weight, with the signed sum's linear terms; (b) Lambda against the
+    independent evidence (the interaction is the distance from the diagonal); (c) the independent
+    evidence against the signed sum (what the weights change). (b) and (c): every LoCoBench test
+    response at the verdict world, gold and GPT-6 graphs."""
+    import matplotlib.pyplot as plt
+
+    plt.rcParams.update({"font.family": "serif", "font.size": 7.5, "axes.edgecolor": MUTED,
+                         "axes.labelcolor": INK, "xtick.color": INK, "ytick.color": INK,
+                         "axes.spines.top": False, "axes.spines.right": False,
+                         "axes.linewidth": 0.6})
+    fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.35), constrained_layout=True,
+                             gridspec_kw={"width_ratios": [1.0, 1.0, 1.0]})
+    # (a)
+    ax = axes[0]
+    p = np.linspace(0.0, 0.985, 400)
+    for v, col, name in ((0.25, RAMP[1], r"ENT, CON, CNC ($v_r=1/4$)"),
+                         (0.5, RAMP[2], r"EQV, EXC ($v_r=1/2$)")):
+        ax.plot(p, -np.log(1 - p * v), color=col, lw=1.6, zorder=3, label=name)
+        ax.plot(p, np.log(1 - p) - np.log(1 - p * v), color=col, lw=1.6, ls=(0, (3, 2)), zorder=3)
+    ax.plot(p, p / 2, color=MUTED, lw=1.0, ls=":", zorder=2, label=r"$\pm p_r/2$ (the terms of $\Sigma_{\pm}$)")
+    ax.plot(p, -p / 2, color=MUTED, lw=1.0, ls=":", zorder=2)
+    ax.axhline(0, color=GRID, lw=0.8, zorder=1)
+    ax.set_xlim(0, 1.0)
+    ax.set_ylim(-4.2, 1.3)
+    ax.set_xlabel(r"weight $p_r$")
+    ax.set_ylabel(r"$\lambda_r$ (nats)")
+    ax.set_title(r"(a) one relation's evidence $\lambda_r$", fontsize=7.5, color=INK, loc="left")
+    ax.text(0.03, 0.35, "satisfied (solid)", fontsize=6, color=INK, va="bottom")
+    ax.text(0.03, -0.55, "violated (dashed)", fontsize=6, color=INK, va="top")
+    ax.legend(fontsize=5.8, frameon=False, loc="lower left", handlelength=1.8)
+    # (b): the interaction term itself, against the independent evidence
+    lo = -9.5  # below every response's Lambda_perp (min -9.1), so nothing is clipped
+    ax = axes[1]
+    for tag, col, lab in (("Gold", GOLD, "gold graphs"), ("Gpt", MINED, "graph-level miner, GPT-6")):
+        pts = np.array(scat[tag])
+        ax.scatter(np.maximum(pts[:, 0], lo), pts[:, 0] - pts[:, 1], s=5, color=col, alpha=0.5,
+                   lw=0, zorder=3, label=lab)
+    ax.axhline(0, color=INK, lw=0.7, zorder=2)
+    ax.axvline(0, color=GRID, lw=0.8, zorder=1)
+    ax.set_xlim(lo - 0.3, 4.5)
+    top = 1.15 * max(abs(r[0] - r[1]) for t in scat for r in scat[t])
+    ax.set_ylim(-top, top)
+    ax.set_xlabel(r"$\Lambda^{\perp}=\sum_r\lambda_r$ (nats)")
+    ax.set_ylabel(r"$I_{\mathcal{R}}=\Lambda^{\perp}-\Lambda$ (nats)")
+    ax.set_title(r"(b) the interaction $I_{\mathcal{R}}$", fontsize=7.5, color=INK, loc="left")
+    ax.text(lo, 0.97 * top, "$I_{\\mathcal{R}}>0$: relations overlap (discount)", fontsize=6,
+            color=MUTED, va="top")
+    ax.text(lo, -0.97 * top, "$I_{\\mathcal{R}}<0$: relations reinforce", fontsize=6,
+            color=MUTED, va="bottom")
+    # (c): what the weights change
+    ax = axes[2]
+    for tag, col, lab in (("Gold", GOLD, "gold graphs"), ("Gpt", MINED, "graph-level miner, GPT-6")):
+        pts = np.array(scat[tag])
+        ax.scatter(pts[:, 2], np.maximum(pts[:, 0], lo), s=5, color=col, alpha=0.5, lw=0, zorder=3,
+                   label=lab)
+    ax.axhline(0, color=GRID, lw=0.8, zorder=1)
+    ax.axvline(0, color=GRID, lw=0.8, zorder=1)
+    ax.set_ylim(lo - 0.3, 4.5)
+    ax.set_xlabel(r"$\Sigma_{\pm}$ (sum of $\pm p_r$)")
+    ax.set_ylabel(r"$\Lambda^{\perp}$ (nats)")
+    ax.set_title(r"(c) the weights: $\Lambda^{\perp}$ against $\Sigma_{\pm}$", fontsize=7.5,
+                 color=INK, loc="left")
+    ax.legend(fontsize=5.8, frameon=False, loc="lower right", markerscale=2.2, handletextpad=0.3)
+    fig.savefig(path)
+    print(f"wrote {path}")
 
 
 def tup(rels):
@@ -63,8 +139,10 @@ def three(n, g, x):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--macros", default=None)
+    ap.add_argument("--figure", default=None, help="Write the decomposition figure (PDF).")
     args = ap.parse_args()
     M = {}
+    SCAT = {}
     # ---- weights: one-cell couplings (ent, con, cnc) forbid 1/4 of the flat prior, two-cell
     # couplings (eqv, exc) 1/2
     x2 = {"entailment": (1, 1), "equivalence": (1, 1)}
@@ -85,6 +163,19 @@ def main() -> int:
                              ("gpt6", {i: tup(r) for i, r in mined.items()}, "Gpt")):
         T = [three(len(items[i]["atoms"]), g, world(items[i])) for i, g in graphs.items()
              if i in items]
+        SCAT[tag] = [(t["indep"], t["lam"], t["wsum"]) for t in T]
+        # The bands of the figure's panel (c): at the same signed sum, each further violated
+        # relation lowers Lambda_perp (residual of a linear fit of Lambda_perp on the sum).
+        keys = [i for i in graphs if i in items]
+        nviol = np.array([sum(not A.is_support(r, world(items[i])) for r in graphs[i]) for i in keys])
+        xs_, ys_ = np.array([t["wsum"] for t in T]), np.array([t["indep"] for t in T])
+        res_ = ys_ - np.polyval(np.polyfit(xs_, ys_, 1), xs_)
+        for k, word in enumerate(("Zero", "One", "Two", "Three")):
+            if (nviol == k).any():
+                M[f"Band{tag}{word}"] = f"{res_[nviol == k].mean():+.2f}"
+        M[f"Band{tag}Corr"] = f"{np.corrcoef(res_, nviol)[0, 1]:.2f}"
+        M[f"Rho{tag}IndepLam"] = f"{S.spearman([t['indep'] for t in T], [t['lam'] for t in T]):.2f}"
+        M[f"Rho{tag}WsumIndep"] = f"{S.spearman([t['wsum'] for t in T], [t['indep'] for t in T]):.2f}"
         I = [t["I"] for t in T]
         M[f"I{tag}AbsMedian"] = f"{st.median(np.abs(I)):.2f}"
         M[f"I{tag}AbsPninety"] = f"{np.percentile(np.abs(I), 90):.2f}"
@@ -187,9 +278,13 @@ def main() -> int:
         M[f"Count{k.title()}Nrel"] = f"{S.spearman([r[k] for r in R], [r['nrel'] for r in R]):.2f}"
         M[f"Count{k.title()}Words"] = f"{S.spearman([r[k] for r in R], [r['words'] for r in R]):.2f}"
     print("counts", {k: v for k, v in M.items() if k.startswith("Count")})
+    if args.figure:
+        figure(SCAT, args.figure)
     if args.macros:
         L = ["% Generated by scripts/arr_decomp.py -- do not edit by hand."]
-        L += [f"\\newcommand{{\\dc{k}}}{{{v}}}" for k, v in M.items()]
+        # signed values in math mode, so a minus is a minus in running text too
+        fmt = lambda v: f"\\ensuremath{{{v}}}" if isinstance(v, str) and re.match(r"^[+-]\d", v) else v  # noqa: E731
+        L += [f"\\newcommand{{\\dc{k}}}{{{fmt(v)}}}" for k, v in M.items()]
         open(args.macros, "w").write("\n".join(L) + "\n")
         print(f"wrote {args.macros}")
     return 0

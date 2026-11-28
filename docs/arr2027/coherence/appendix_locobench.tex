@@ -263,43 +263,47 @@ are in Table~\ref{tab:dominance}.}
 \label{fig:dominance}
 \end{figure}
 
-\paragraph{Signed baselines over the same graphs.} Table~\ref{tab:signed} compares $\LCS$ with the
-signed weight sum and the signed count on every arm. All three satisfy every gold pair: they are
-monotone under elementary improvements, and the gate admits only ordered gold graphs. At the
-asserted world all three fail the same \sThreeGoldWsumASign{} \cp{sign} pairs of the gold graphs,
-so the need for the verdicts holds for any signed score. On mined graphs the weight sum matches or
-exceeds $\LCS$ on increases, including the incomparable pairs, where only the scoring function
-decides. The count is coarser on increases, but as an integer it ignores the drift of the weights
+\paragraph{Simplifications and signed baselines over the same graphs.} Table~\ref{tab:signed}
+compares $\LCS$ with its two simplifications, $\Lambda^{\perp}$ and $\Ssum$, and with the signed
+count, on every arm. All four satisfy every gold pair: they are monotone under elementary
+improvements, and the gate admits only ordered gold graphs. At the asserted world the signed scores
+fail the same \sThreeGoldWsumASign{} \cp{sign} pairs of the gold graphs, so the need for the verdicts
+holds for any signed score. On mined graphs the weight sum matches or exceeds $\LCS$ on increases
+on every arm, including the incomparable pairs, where only the scoring function decides.
+$\Lambda^{\perp}$ is between them on GPT-6 graphs (\sThreeGraphGptIndepInc{} increases against
+\sThreeGraphGptLamInc{} and \sThreeGraphGptWsumInc), slightly below both on the gpt-oss arms
+(\sThreeGraphOssIndepInc{} and \sThreePairOssIndepInc), and ahead of both on pairwise Llama
+(\sThreePairLlamaIndepInc{} against \sThreePairLlamaLamInc{} and \sThreePairLlamaWsumInc). The count is coarser on increases, but as an integer it ignores the drift of the weights
 and keeps more invariances. The ladders change one or two relations between rungs and rarely
 repeat a relation, so the interactions through $Z_\R$ that separate $\LCS$ from the sum
 (saturation of redundant support, cancellation, context-dependent magnitudes) are not exercised by
 the edits themselves. On mined graphs, the interaction term costs $\LCS$ a little, and the
 per-relation weights help on some arms and cost on others; App.~\ref{app:decomp} separates the two.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{0.7pt}
-\begin{tabular}{@{}lcccccccc@{}}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lccccccccc@{}}
 \toprule
-& \multicolumn{4}{c}{Increase} & \multicolumn{3}{c}{Invariance} & Incomp. \\
-\cmidrule(lr){2-5}\cmidrule(lr){6-8}\cmidrule(l){9-9}
-Arm & $\LCS$ & $\Lambda^{\perp}$ & sum & count & $\LCS$ & sum & count & $\LCS$\,/\,sum \\
+& \multicolumn{4}{c}{Increase} & \multicolumn{4}{c}{Invariance} & Incomparable \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(l){10-10}
+Arm & $\LCS$ & $\Lambda^{\perp}$ & $\Ssum$ & count & $\LCS$ & $\Lambda^{\perp}$ & $\Ssum$ & count & $\LCS$\,/\,$\Ssum$ \\
 \midrule
-gold & \sThreeGoldLamIncPct & \sThreeGoldIndepIncPct & \sThreeGoldWsumIncPct & \sThreeGoldCountIncPct & \sThreeGoldLamInvPct & \sThreeGoldWsumInvPct & \sThreeGoldCountInvPct & -- \\
-graph, GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptIndepIncPct & \sThreeGraphGptWsumIncPct & \sThreeGraphGptCountIncPct & \sThreeGraphGptLamInvPct & \sThreeGraphGptWsumInvPct & \sThreeGraphGptCountInvPct & \sThreeGraphGptDomIncomparableOk\,/\,\sThreeGraphGptDomWIncomparableOk \\
-graph, gpt-oss & \sThreeGraphOssLamIncPct & \sThreeGraphOssIndepIncPct & \sThreeGraphOssWsumIncPct & \sThreeGraphOssCountIncPct & \sThreeGraphOssLamInvPct & \sThreeGraphOssWsumInvPct & \sThreeGraphOssCountInvPct & \sThreeGraphOssDomIncomparableOk\,/\,\sThreeGraphOssDomWIncomparableOk \\
-pair, gpt-oss & \sThreePairOssLamIncPct & \sThreePairOssIndepIncPct & \sThreePairOssWsumIncPct & \sThreePairOssCountIncPct & \sThreePairOssLamInvPct & \sThreePairOssWsumInvPct & \sThreePairOssCountInvPct & \sThreePairOssDomIncomparableOk\,/\,\sThreePairOssDomWIncomparableOk \\
-pair, Llama & \sThreePairLlamaLamIncPct & \sThreePairLlamaIndepIncPct & \sThreePairLlamaWsumIncPct & \sThreePairLlamaCountIncPct & \sThreePairLlamaLamInvPct & \sThreePairLlamaWsumInvPct & \sThreePairLlamaCountInvPct & \sThreePairLlamaDomIncomparableOk\,/\,\sThreePairLlamaDomWIncomparableOk \\
+gold & \sThreeGoldLamIncPct & \sThreeGoldIndepIncPct & \sThreeGoldWsumIncPct & \sThreeGoldCountIncPct & \sThreeGoldLamInvPct & \sThreeGoldIndepInvPct & \sThreeGoldWsumInvPct & \sThreeGoldCountInvPct & -- \\
+graph, GPT-6 & \sThreeGraphGptLamIncPct & \sThreeGraphGptIndepIncPct & \sThreeGraphGptWsumIncPct & \sThreeGraphGptCountIncPct & \sThreeGraphGptLamInvPct & \sThreeGraphGptIndepInvPct & \sThreeGraphGptWsumInvPct & \sThreeGraphGptCountInvPct & \sThreeGraphGptDomIncomparableOk\,/\,\sThreeGraphGptDomWIncomparableOk \\
+graph, gpt-oss & \sThreeGraphOssLamIncPct & \sThreeGraphOssIndepIncPct & \sThreeGraphOssWsumIncPct & \sThreeGraphOssCountIncPct & \sThreeGraphOssLamInvPct & \sThreeGraphOssIndepInvPct & \sThreeGraphOssWsumInvPct & \sThreeGraphOssCountInvPct & \sThreeGraphOssDomIncomparableOk\,/\,\sThreeGraphOssDomWIncomparableOk \\
+pair, gpt-oss & \sThreePairOssLamIncPct & \sThreePairOssIndepIncPct & \sThreePairOssWsumIncPct & \sThreePairOssCountIncPct & \sThreePairOssLamInvPct & \sThreePairOssIndepInvPct & \sThreePairOssWsumInvPct & \sThreePairOssCountInvPct & \sThreePairOssDomIncomparableOk\,/\,\sThreePairOssDomWIncomparableOk \\
+pair, Llama & \sThreePairLlamaLamIncPct & \sThreePairLlamaIndepIncPct & \sThreePairLlamaWsumIncPct & \sThreePairLlamaCountIncPct & \sThreePairLlamaLamInvPct & \sThreePairLlamaIndepInvPct & \sThreePairLlamaWsumInvPct & \sThreePairLlamaCountInvPct & \sThreePairLlamaDomIncomparableOk\,/\,\sThreePairLlamaDomWIncomparableOk \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{$\LCS$ against signed baselines over the same graphs} (\%; verdict world). $\Lambda^{\perp}$:
-the independent evidence $\sum_r\lambda_r$ (\S\ref{sec:decomp}); ``sum'': $W$,
-$\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$; ``count'': supports minus conflicts. Incomparable rises: the
-incomparable Increase pairs (\sThreeGraphGptDomIncomparable, \sThreeGraphOssDomIncomparable,
-\sThreePairOssDomIncomparable{} and \sThreePairLlamaDomIncomparable{} per arm) on which each score
-rises.}
+\caption{\textbf{$\LCS$ beside its two simplifications and the signed count, over the same graphs}
+(\%; verdict world). $\Lambda^{\perp}$: the independent evidence $\sum_r\lambda_r$, which drops the
+interaction; $\Ssum$: the signed weight sum $\sum_{\Rsup}p_r-\sum_{\Rcon}p_r$ (\S\ref{sec:decomp});
+count: supports minus conflicts. Incomparable: of the incomparable Increase pairs
+(\sThreeGraphGptDomIncomparable, \sThreeGraphOssDomIncomparable, \sThreePairOssDomIncomparable{}
+and \sThreePairLlamaDomIncomparable{} per arm), the number on which $\LCS$ and $\Ssum$ rise.}
 \label{tab:signed}
-\end{table}
+\end{table*}
 
 \paragraph{Where $Z_\R$ matters.} The two scores agree in direction on every pair the coherence
 order ranks, so they can differ only on unranked edits. Three such edits, built on each of the
@@ -330,41 +334,61 @@ the model. The independent evidence $\Lambda^{\perp}$ (\S\ref{sec:decomp}), whic
 per-relation weights but no interaction, fails all three as the sum does (\zsEqvIndep\%,
 \zsExcIndep\%, \zsRepIndep\% and \zsDoubtIndep\%): all three are effects of $I_\R$. On the ladders such edits do not occur, and there the sum does slightly better.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_decomp.pdf}
+\caption{\textbf{$\LCS$'s two simplifications, illustrated} (Prop.~\ref{prop:decomp}).
+(a)~One relation's evidence $\lambda_r$ at flat priors, for the one-cell couplings ($v_r=\frac14$)
+and the two-cell ones ($v_r=\frac12$). A satisfied relation (solid) adds little and grows faster
+than linearly in $p_r$; a violated one (dashed) costs several times as much, without bound as
+$p_r\to1$. Dotted: the terms $\pm p_r/2$ of $\Ssum/2$, linear and symmetric.
+(b)~The interaction $I_\R=\Lambda^{\perp}-\Lambda$ for every LoCoBench test response at the verdict
+world. It is small next to $\Lambda$ (median $|I_\R|$ \dcIGoldAbsMedian{} nats on gold graphs and
+\dcIGptAbsMedian{} on GPT-6's) and of either sign, and $\Lambda^{\perp}$ ranks the responses as
+$\Lambda$ does (Spearman \dcRhoGoldIndepLam{} and \dcRhoGptIndepLam).
+(c)~$\Lambda^{\perp}$ against $\Ssum$ for the same responses (Spearman \dcRhoGoldWsumIndep{} and
+\dcRhoGptWsumIndep). The parallel bands are the number of violated relations: at the same $\Ssum$,
+each further violation lowers $\Lambda^{\perp}$ (mean residual of a linear fit \dcBandGoldZero,
+\dcBandGoldOne, \dcBandGoldTwo{} and \dcBandGoldThree{} nats for zero to three violations on gold
+graphs; \dcBandGptZero{} to \dcBandGptThree{} on GPT-6's).}
+\label{fig:decomp}
+\end{figure*}
+
 \paragraph{The decomposition on LoCoBench.}
 \label{app:decomp}
 Proposition~\ref{prop:decomp} splits $\Lambda$ into per-relation evidence and an interaction term
-$I_\R$ (proof in App.~\ref{app:proof-score}).
+$I_\R$ (proof in App.~\ref{app:proof-score}); Figure~\ref{fig:decomp} illustrates both parts.
 \begin{itemize}[leftmargin=1.2em,itemsep=1pt,topsep=2pt]
 \item \textbf{The size of $I_\R$.} At the verdict world, $|I_\R|$ has a median of
   \dcIGoldAbsMedian{} nats over the \dcIGoldN{} gold graphs (90th percentile \dcIGoldAbsPninety),
   against a median $|\Lambda|$ of \dcLamGoldAbsMedian. $I_\R$ is positive on \dcIGoldPos\% of the
   graphs and negative on \dcIGoldNeg\%. On the GPT-6 graphs the median is \dcIGptAbsMedian{}
   (90th percentile \dcIGptAbsPninety; median $|\Lambda|$ \dcLamGptAbsMedian).
-\item \textbf{Attribution.} On the GPT-6 graphs, $\LCS$, $\Lambda^{\perp}$ and $W$ satisfy
-  \dcAttrLcs\%, \dcAttrIndep\% and \dcAttrWsum\% of the \dcAttrPairs{} increases. $\LCS$ and $W$
+\item \textbf{Attribution.} On the GPT-6 graphs, $\LCS$, $\Lambda^{\perp}$ and $\Ssum$ satisfy
+  \dcAttrLcs\%, \dcAttrIndep\% and \dcAttrWsum\% of the \dcAttrPairs{} increases. $\LCS$ and $\Ssum$
   disagree on \dcAttrDisagree{} pairs. A disagreement is attributed to the interaction if
-  $\Lambda^{\perp}$ sides with $W$ (removing $I_\R$ alone reverses $\LCS$'s decision), and to the
+  $\Lambda^{\perp}$ sides with $\Ssum$ (removing $I_\R$ alone reverses $\LCS$'s decision), and to the
   weights if it sides with $\LCS$:
   \begin{itemize}[leftmargin=1.2em,itemsep=0pt,topsep=1pt]
-  \item of the \dcAttrSumWins{} pairs $W$ gets right, \dcAttrSumWinsInteraction{} come from the
+  \item of the \dcAttrSumWins{} pairs $\Ssum$ gets right, \dcAttrSumWinsInteraction{} come from the
     interaction and \dcAttrSumWinsWeights{} from the weights;
   \item the \dcAttrLcsWins{} pair $\LCS$ gets right comes from the weights.
   \end{itemize}
   Paired intervals: $\LCS-\Lambda^{\perp}$ \pcLcsIndepIncGpt{} points
-  \asapCI{\pcLcsIndepIncGptLo}{\pcLcsIndepIncGptHi}, $\Lambda^{\perp}-W$ \pcIndepWsumIncGpt{}
+  \asapCI{\pcLcsIndepIncGptLo}{\pcLcsIndepIncGptHi}, $\Lambda^{\perp}-\Ssum$ \pcIndepWsumIncGpt{}
   \asapCI{\pcIndepWsumIncGptLo}{\pcIndepWsumIncGptHi}.
 \item \textbf{Examples.} The two examples of \S\ref{sec:experiments} are chosen by a fixed rule:
-  among the disagreements won by each score (for $W$, those decided by the weights), the one whose
+  among the disagreements won by each score (for $\Ssum$, those decided by the weights), the one whose
   two graphs differ in the fewest relations.
   \begin{itemize}[leftmargin=1.2em,itemsep=0pt,topsep=1pt]
   \item On \dcExSumLadder, rung \dcExSumRungB's graph adds \dcExSumAdded{} relations to rung
     \dcExSumRungA's \dcExSumNA{}: a support (weight \dcExSumSupP) and a
-    \dcExSumViolType{} that the verdicts violate (weight \dcExSumViolP). $W$ goes from
+    \dcExSumViolType{} that the verdicts violate (weight \dcExSumViolP). $\Ssum$ goes from
     \dcExSumWsumA{} to \dcExSumWsumB, $\Lambda^{\perp}$ from \dcExSumIndepA{} to \dcExSumIndepB, and
     $\LCS$ from \dcExSumLcsA{} to \dcExSumLcsB.
   \item On \dcExLcsLadder, rung \dcExLcsRungB's graph has \dcExLcsNB{} relations against rung
     \dcExLcsRungA's \dcExLcsNA: it drops \dcExLcsRemoved{} weak supports and adds \dcExLcsAdded{}
-    strong ones. $W$ goes from \dcExLcsWsumA{} to \dcExLcsWsumB, $\Lambda^{\perp}$ from
+    strong ones. $\Ssum$ goes from \dcExLcsWsumA{} to \dcExLcsWsumB, $\Lambda^{\perp}$ from
     \dcExLcsIndepA{} to \dcExLcsIndepB, $I_\R$ from \dcExLcsIA{} to \dcExLcsIB, and $\LCS$ from
     \dcExLcsLcsA{} to \dcExLcsLcsB.
   \end{itemize}
@@ -377,7 +401,7 @@ $I_\R$ (proof in App.~\ref{app:proof-score}).
     count as false, as verdict polarity prescribes. 9 of 165 answers are dropped because a claim
     cannot be located in the answer once citation markers are removed.
   \item \emph{Graphs and results.} The graphs are GPT-6's (graph-level, $K=5$). Spearman
-    correlations with the number of mined relations are $\dcCountWsumNrel$ ($W$),
+    correlations with the number of mined relations are $\dcCountWsumNrel$ ($\Ssum$),
     $\dcCountIndepNrel$ ($\Lambda^{\perp}$) and $\dcCountLcsNrel$ ($\LCS$), and with length
     $\dcCountWsumWords$, $\dcCountIndepWords$ and $\dcCountLcsWords$.
   \end{itemize}
@@ -398,19 +422,21 @@ relation nor split one. Against the pairwise judge with verdicts, $\LCS$ on GPT-
 
 \paragraph{Wrong verdicts.} Each gold verdict is flipped with probability $q$, independently per
 claim and identically on the three rungs of a ladder, which share their claims (20 draws per
-ladder); $\LCS$ and the signed sum are read on the gold graphs at the noisy world, and the declared
-order is the original one. Share of increases satisfied (\%), with the paired family-cluster
-interval of the difference:
+ladder); $\LCS$, $\Lambda^{\perp}$ and $\Ssum$ are read on the gold graphs at the noisy world, and the declared
+order is the original one. Share of increases satisfied (\%) by $\LCS$\,/\,$\Lambda^{\perp}$\,/\,$\Ssum$, with
+paired family-cluster intervals of the differences:
 \begin{center}\footnotesize
 \begin{tabular}{@{}lccc@{}}
 \toprule
 & $q=0.05$ & $q=0.10$ & $q=0.20$ \\
 \midrule
-all, $\LCS$\,/\,sum & \vnLcsIncFive\,/\,\vnWsumIncFive & \vnLcsIncTen\,/\,\vnWsumIncTen & \vnLcsIncTwenty\,/\,\vnWsumIncTwenty \\
-\quad difference & [\vnDiffLoIncFive, \vnDiffHiIncFive] & [\vnDiffLoIncTen, \vnDiffHiIncTen] & [\vnDiffLoIncTwenty, \vnDiffHiIncTwenty] \\
-\cp{conflict} & \vnLcsConflictFive\,/\,\vnWsumConflictFive & \vnLcsConflictTen\,/\,\vnWsumConflictTen & \vnLcsConflictTwenty\,/\,\vnWsumConflictTwenty \\
-\cp{chain} & \vnLcsChainFive\,/\,\vnWsumChainFive & \vnLcsChainTen\,/\,\vnWsumChainTen & \vnLcsChainTwenty\,/\,\vnWsumChainTwenty \\
-\cp{sign} & \vnLcsSignFive\,/\,\vnWsumSignFive & \vnLcsSignTen\,/\,\vnWsumSignTen & \vnLcsSignTwenty\,/\,\vnWsumSignTwenty \\
+all & \vnLcsIncFive\,/\,\vnIndepIncFive\,/\,\vnWsumIncFive & \vnLcsIncTen\,/\,\vnIndepIncTen\,/\,\vnWsumIncTen & \vnLcsIncTwenty\,/\,\vnIndepIncTwenty\,/\,\vnWsumIncTwenty \\
+\quad $\LCS-\Ssum$ & [\vnDiffLoIncFive, \vnDiffHiIncFive] & [\vnDiffLoIncTen, \vnDiffHiIncTen] & [\vnDiffLoIncTwenty, \vnDiffHiIncTwenty] \\
+\quad $\LCS-\Lambda^{\perp}$ & [\vnDiffLILoIncFive, \vnDiffLIHiIncFive] & [\vnDiffLILoIncTen, \vnDiffLIHiIncTen] & [\vnDiffLILoIncTwenty, \vnDiffLIHiIncTwenty] \\
+\quad $\Lambda^{\perp}-\Ssum$ & [\vnDiffIWLoIncFive, \vnDiffIWHiIncFive] & [\vnDiffIWLoIncTen, \vnDiffIWHiIncTen] & [\vnDiffIWLoIncTwenty, \vnDiffIWHiIncTwenty] \\
+\cp{conflict} & \vnLcsConflictFive\,/\,\vnIndepConflictFive\,/\,\vnWsumConflictFive & \vnLcsConflictTen\,/\,\vnIndepConflictTen\,/\,\vnWsumConflictTen & \vnLcsConflictTwenty\,/\,\vnIndepConflictTwenty\,/\,\vnWsumConflictTwenty \\
+\cp{chain} & \vnLcsChainFive\,/\,\vnIndepChainFive\,/\,\vnWsumChainFive & \vnLcsChainTen\,/\,\vnIndepChainTen\,/\,\vnWsumChainTen & \vnLcsChainTwenty\,/\,\vnIndepChainTwenty\,/\,\vnWsumChainTwenty \\
+\cp{sign} & \vnLcsSignFive\,/\,\vnIndepSignFive\,/\,\vnWsumSignFive & \vnLcsSignTen\,/\,\vnIndepSignTen\,/\,\vnWsumSignTen & \vnLcsSignTwenty\,/\,\vnIndepSignTwenty\,/\,\vnWsumSignTwenty \\
 \bottomrule
 \end{tabular}
 \end{center}

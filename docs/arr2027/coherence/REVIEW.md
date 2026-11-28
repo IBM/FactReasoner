@@ -684,3 +684,17 @@ model and set beside LCS, and the paper says exactly where the two differ.
   - Every existing macro value is unchanged (checked by diff).
 - **Abstract, introduction, conclusion and Limitations** updated. Page limit relaxed by the
   authors: the main text may run about half a column onto page 9.
+- **Notation.** The signed weight sum is written Σ± (macro `\Ssum`), since W is Good's weight of
+  evidence in the framework appendix (`app:woe`).
+- **Figures and tables with both simplifications (2026-11-28).**
+  - **Figure 2:** Λ⊥ and Σ± rows for the two graph-level miners (`arr_slot3_figures.py`).
+  - **Signed-baseline table:** now full width, with LCS / Λ⊥ / Σ± / count for increases and
+    invariances.
+  - **Wrong-verdict table:** LCS / Λ⊥ / Σ± per cell, with the LCS − Σ±, LCS − Λ⊥ and Λ⊥ − Σ±
+    intervals.
+  - **Natural-text table (§3.2):** a Λ⊥ column. `ext_eval.py` and `asap_lcs.py` compute Λ⊥ (at
+    the asserted world); no existing macro changed.
+  - **New Figure (`fig:decomp`, App. H, `arr_decomp.py --figure`):** (a) λ_r against p_r, with the
+    ±p_r/2 terms of Σ±; (b) I_R for every LoCoBench response; (c) Λ⊥ against Σ±, whose bands are
+    the number of violated relations.
+  - **Macros:** signed `\dc` macros are now `\ensuremath`, so minus signs print correctly in text.

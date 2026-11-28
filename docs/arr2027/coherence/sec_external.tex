@@ -9,33 +9,35 @@
 
 \begin{table}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{2.2pt}
-\begin{tabular}{@{}lrrr@{}}
+\setlength{\tabcolsep}{1.8pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-Data ($n$) & $\LCS$ & signed sum & G-Eval \\
+Data ($n$) & $\LCS$ & $\Lambda^{\perp}$ & $\Ssum$ & G-Eval \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Discourse coherence}: $\rho$ with expert ratings} \\
-SummEval (\extSeN) & $\extSeRhoCohGpt$ & $\extSeWsumRhoCohGpt$ & $\extSeJudgeRhoCoh$ \\
-\quad with a relation (\extSeNonEmptyNGpt) & $\extSeNonEmptyRhoCohGpt$ & $\extSeWsumNonEmptyRhoCohGpt$ & $\extSeNonEmptyJudgeRhoCohGpt$ \\
-\quad\quad without restatements & $\extSeNoRestateNonEmptyRhoCohGpt$ & & \\
+\multicolumn{5}{@{}l}{\textit{Discourse coherence}: $\rho$ with expert ratings} \\
+SummEval (\extSeN) & $\extSeRhoCohGpt$ & $\extSeIndepRhoCohGpt$ & $\extSeWsumRhoCohGpt$ & $\extSeJudgeRhoCoh$ \\
+\quad with a relation (\extSeNonEmptyNGpt) & $\extSeNonEmptyRhoCohGpt$ & $\extSeIndepNonEmptyRhoCohGpt$ & $\extSeWsumNonEmptyRhoCohGpt$ & $\extSeNonEmptyJudgeRhoCohGpt$ \\
+\quad\quad without restatements & $\extSeNoRestateNonEmptyRhoCohGpt$ & & & \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Adding a sentence}: falls\,/\,rises (every claim true)} \\
-ContraDoc, contra.\ (\extCdPairs) & \extCdAssertDecGpt\,/\,\extCdAssertIncGpt & \extCdWsumDecGpt\,/\,\extCdWsumIncGpt & \extCdJudgeDec\,/\,\extCdJudgeInc \\
-\quad found (\extCdAssertEdgeNGpt) & \extCdAssertEdgeDecGpt\,/\,\extCdAssertEdgeIncGpt & \extCdWsumEdgeDecGpt\,/\,\extCdWsumEdgeIncGpt & \\
-ChatProtect, contra.\ (\extCpAssertNGpt) & \extCpAssertDecGpt\,/\,\extCpAssertIncGpt & \extCpWsumDecGpt\,/\,\extCpWsumIncGpt & -- \\
-\quad found (\extCpFoundNGpt) & \extCpFoundDecGpt\,/\,\extCpFoundIncGpt & \extCpWsumFoundDecGpt\,/\,\extCpWsumFoundIncGpt & \\
-ChatProtect, consistent (\extCpCtlNGpt) & \extCpCtlDecGpt\,/\,\extCpCtlIncGpt & \extCpWsumCtlDecGpt\,/\,\extCpWsumCtlIncGpt & -- \\
+\multicolumn{5}{@{}l}{\textit{Adding a sentence}: falls\,/\,rises (every claim true)} \\
+ContraDoc, contra.\ (\extCdPairs) & \extCdAssertDecGpt\,/\,\extCdAssertIncGpt & \extCdIndepDecGpt\,/\,\extCdIndepIncGpt & \extCdWsumDecGpt\,/\,\extCdWsumIncGpt & \extCdJudgeDec\,/\,\extCdJudgeInc \\
+\quad found (\extCdAssertEdgeNGpt) & \extCdAssertEdgeDecGpt\,/\,\extCdAssertEdgeIncGpt & \extCdIndepEdgeDecGpt\,/\,\extCdIndepEdgeIncGpt & \extCdWsumEdgeDecGpt\,/\,\extCdWsumEdgeIncGpt & \\
+ChatProtect, contra.\ (\extCpAssertNGpt) & \extCpAssertDecGpt\,/\,\extCpAssertIncGpt & \extCpIndepDecGpt\,/\,\extCpIndepIncGpt & \extCpWsumDecGpt\,/\,\extCpWsumIncGpt & -- \\
+\quad found (\extCpFoundNGpt) & \extCpFoundDecGpt\,/\,\extCpFoundIncGpt & \extCpIndepFoundDecGpt\,/\,\extCpIndepFoundIncGpt & \extCpWsumFoundDecGpt\,/\,\extCpWsumFoundIncGpt & \\
+ChatProtect, consistent (\extCpCtlNGpt) & \extCpCtlDecGpt\,/\,\extCpCtlIncGpt & \extCpIndepCtlDecGpt\,/\,\extCpIndepCtlIncGpt & \extCpWsumCtlDecGpt\,/\,\extCpWsumCtlIncGpt & -- \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Paragraph order}: \% kept within $\tau$ (unchanged text again)} \\
-LoCoBench (\extLmEqNPermGpt) & \extLmPermInvGpt{} (\extLmNoiseInvGpt) & & \extLmJudgePermInv{} (\extLmJudgeNoiseInv) \\
-ContraDoc (\extSecEqNPermGpt) & \extSecPermInvGpt{} (\extSecNoiseInvGpt) & & \extSecJudgePermInv{} (\extSecJudgeNoiseInv) \\
+\multicolumn{5}{@{}l}{\textit{Paragraph order}: \% kept within $\tau$ (unchanged text again)} \\
+LoCoBench (\extLmEqNPermGpt) & \extLmPermInvGpt{} (\extLmNoiseInvGpt) & & & \extLmJudgePermInv{} (\extLmJudgeNoiseInv) \\
+ContraDoc (\extSecEqNPermGpt) & \extSecPermInvGpt{} (\extSecNoiseInvGpt) & & & \extSecJudgePermInv{} (\extSecJudgeNoiseInv) \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Essay quality}: partial $\rho$ with the score, length removed} \\
-ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParWsumAsserted & \asapParJudgeGevalGptSixSol \\
+\multicolumn{5}{@{}l}{\textit{Essay quality}: partial $\rho$ with the score, length removed} \\
+ASAP~2.0 (\asapEssays) & \asapParLcsAsserted & \asapParIndepAsserted & \asapParWsumAsserted & \asapParJudgeGevalGptSixSol \\
 \bottomrule
-\end{tabular}
-\caption{\textbf{$\LCS$ on natural text}, GPT-6 miner, every claim true, beside the signed weight
-sum over the same graphs and the G-Eval judge. ``Contra.'': the added sentence contradicts; ``found'': the
+\end{tabular}}
+\caption{\textbf{$\LCS$ on natural text}, GPT-6 miner, every claim true, beside its two simplifications over the same
+graphs (\S\ref{sec:decomp}: $\Lambda^{\perp}$, no interaction; $\Ssum$, the signed weight sum) and the
+G-Eval judge. ``Contra.'': the added sentence contradicts; ``found'': the
 graph links it by a contradiction. ``Kept'': the share of paragraph permutations that move a score by at most $\tau$;
 in parentheses, the same share when the unchanged text is mined, or judged, again in the same run. The entity graph and
 DiscoScore keep 99--100\% of LoCoBench permutations because they barely react to any edit
